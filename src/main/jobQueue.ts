@@ -17,6 +17,17 @@ interface PendingTask<T> extends WorkerQueueTask<T> {
   reject: (error: unknown) => void;
 }
 
+export class WorkerQueueCanceledError extends Error {
+  constructor(jobId: string) {
+    super(`Job ${jobId} was canceled before it started.`);
+    this.name = "WorkerQueueCanceledError";
+  }
+}
+
+export function isWorkerQueueCanceledError(error: unknown): error is WorkerQueueCanceledError {
+  return error instanceof WorkerQueueCanceledError;
+}
+
 export class LocalWorkerQueue {
   private readonly concurrency: number;
   private readonly pending: Array<PendingTask<unknown>> = [];
@@ -38,6 +49,16 @@ export class LocalWorkerQueue {
       });
       this.drain();
     });
+  }
+
+  cancel(jobId: string): boolean {
+    const index = this.pending.findIndex((candidate) => candidate.id === jobId);
+    if (index === -1) {
+      return false;
+    }
+    const [task] = this.pending.splice(index, 1);
+    task?.reject(new WorkerQueueCanceledError(jobId));
+    return true;
   }
 
   stats(): WorkerQueueStats {

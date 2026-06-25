@@ -17,7 +17,7 @@ import {
   loadStorageConfig,
   type DirectUploadSession
 } from "./storage";
-import { LocalWorkerQueue } from "./jobQueue";
+import { isWorkerQueueCanceledError, LocalWorkerQueue } from "./jobQueue";
 import { startGideonControlServer } from "./controlServer";
 import type {
   AddWorkspaceMemberInput,
@@ -310,7 +310,13 @@ function registerIpcHandlers(): void {
     return enqueueRenderFromControl(projectId);
   });
 
-  ipcMain.handle("job:cancel", async (_event, projectId: string, jobId: string) => store.requestJobCancel(projectId, jobId));
+  ipcMain.handle("job:cancel", async (_event, projectId: string, jobId: string) => {
+    const project = await store.requestJobCancel(projectId, jobId);
+    if (project.jobs.find((candidate) => candidate.id === jobId)?.status === "canceled") {
+      workerQueue.cancel(jobId);
+    }
+    return project;
+  });
 
   ipcMain.handle("job:retry", async (_event, projectId: string, jobId: string) => {
     const job = await store.retryJob(projectId, jobId);
@@ -506,6 +512,9 @@ function enqueueAnalysisJob(projectId: string, jobId: string): void {
       run: () => runAnalysisJob(projectId, jobId)
     })
     .catch((error) => {
+      if (isWorkerQueueCanceledError(error)) {
+        return;
+      }
       console.error(`Analysis job ${jobId} failed outside normal job handling.`, error);
     });
 }
@@ -519,6 +528,9 @@ function enqueueRenderJob(projectId: string, jobId: string): void {
       run: () => runRenderJob(projectId, jobId)
     })
     .catch((error) => {
+      if (isWorkerQueueCanceledError(error)) {
+        return;
+      }
       console.error(`Render job ${jobId} failed outside normal job handling.`, error);
     });
 }
