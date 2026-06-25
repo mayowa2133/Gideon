@@ -21,6 +21,7 @@ import type {
   ContentConcept,
   CreateProjectInput,
   DetectedMoment,
+  JobEvent,
   JobRecord,
   FrameEvidence,
   ProviderRun,
@@ -43,6 +44,7 @@ import {
   summarizeUsage
 } from "../shared/usage";
 import {
+  createJobEvent,
   finishJobCancel as finishJobCancelState,
   requestJobCancel as requestJobCancelState,
   retryJob as retryJobState
@@ -51,6 +53,7 @@ import { assertWorkspacePermission, type WorkspaceAction } from "../shared/rbac"
 
 const STORE_FILE = "gideon-store.json";
 const MAX_AUDIT_EVENTS = 500;
+const MAX_PROJECT_JOB_EVENTS = 300;
 
 interface AuditInput {
   action: AuditAction;
@@ -66,6 +69,8 @@ interface UpdateProjectOptions {
   action?: WorkspaceAction;
   audit?: AuditInput;
 }
+
+type JobEventInput = Omit<JobEvent, "id" | "createdAt" | "projectId"> & { createdAt?: string };
 
 export class GideonStore {
   private state: AppState | null = null;
@@ -145,6 +150,7 @@ export class GideonStore {
       artifacts: [],
       providerRuns: [],
       jobs: [],
+      jobEvents: [],
       createdAt: now,
       updatedAt: now
     };
@@ -200,6 +206,7 @@ export class GideonStore {
         project.artifacts = project.artifacts ?? [];
         project.providerRuns = project.providerRuns ?? [];
         project.jobs = project.jobs ?? [];
+        project.jobEvents = project.jobEvents ?? [];
         project.updatedAt = new Date().toISOString();
       },
       {
@@ -497,6 +504,19 @@ export class GideonStore {
       projectId,
       (project) => {
         project.jobs = [...(project.jobs ?? []), job];
+        project.jobEvents = [
+          ...(project.jobEvents ?? []),
+          createJobEvent({
+            id: randomUUID(),
+            projectId,
+            jobId: job.id,
+            kind: "queued",
+            stage: "queued",
+            message: job.userMessage,
+            progress: job.progress,
+            now: job.createdAt
+          })
+        ].slice(-MAX_PROJECT_JOB_EVENTS);
         project.updatedAt = new Date().toISOString();
       },
       {
@@ -510,6 +530,34 @@ export class GideonStore {
           metadata: { jobKind: job.kind, status: job.status }
         }
       }
+    );
+  }
+
+  async appendJobEvent(projectId: string, input: JobEventInput): Promise<Project> {
+    return this.updateProject(
+      projectId,
+      (project) => {
+        if (!project.jobs.some((job) => job.id === input.jobId)) {
+          throw new Error("Job not found.");
+        }
+        const now = input.createdAt ?? new Date().toISOString();
+        project.jobEvents = [
+          ...(project.jobEvents ?? []),
+          createJobEvent({
+            id: randomUUID(),
+            projectId,
+            jobId: input.jobId,
+            kind: input.kind,
+            stage: input.stage,
+            message: input.message,
+            progress: input.progress,
+            metadata: input.metadata,
+            now
+          })
+        ].slice(-MAX_PROJECT_JOB_EVENTS);
+        project.updatedAt = now;
+      },
+      { action: "job:write" }
     );
   }
 
@@ -538,36 +586,102 @@ export class GideonStore {
 
   async requestJobCancel(projectId: string, jobId: string): Promise<Project> {
     const job = await this.getJob(projectId, jobId);
-    return this.updateJob(projectId, requestJobCancelState(job, new Date().toISOString()), {
-      action: "job:write",
-      audit: {
-        action: "job.cancel",
-        targetType: "job",
-        targetId: jobId,
-        summary: `Requested cancel for ${job.kind} job.`,
-        metadata: { jobKind: job.kind, status: job.status }
+    const now = new Date().toISOString();
+    const nextJob = requestJobCancelState(job, now);
+    return this.updateProject(
+      projectId,
+      (project) => {
+        project.jobs = project.jobs.map((candidate) => (candidate.id === jobId ? nextJob : candidate));
+        project.jobEvents = [
+          ...(project.jobEvents ?? []),
+          createJobEvent({
+            id: randomUUID(),
+            projectId,
+            jobId,
+            kind: job.status === "queued" ? "canceled" : "cancel_requested",
+            stage: "cancel",
+            message: nextJob.userMessage,
+            progress: nextJob.progress,
+            now
+          })
+        ].slice(-MAX_PROJECT_JOB_EVENTS);
+        project.updatedAt = now;
+      },
+      {
+        action: "job:write",
+        audit: {
+          action: "job.cancel",
+          targetType: "job",
+          targetId: jobId,
+          summary: `Requested cancel for ${job.kind} job.`,
+          metadata: { jobKind: job.kind, status: job.status }
+        }
       }
-    });
+    );
   }
 
   async finishJobCancel(projectId: string, jobId: string): Promise<Project> {
     const job = await this.getJob(projectId, jobId);
-    return this.updateJob(projectId, finishJobCancelState(job, new Date().toISOString()));
+    const now = new Date().toISOString();
+    const nextJob = finishJobCancelState(job, now);
+    return this.updateProject(
+      projectId,
+      (project) => {
+        project.jobs = project.jobs.map((candidate) => (candidate.id === jobId ? nextJob : candidate));
+        project.jobEvents = [
+          ...(project.jobEvents ?? []),
+          createJobEvent({
+            id: randomUUID(),
+            projectId,
+            jobId,
+            kind: "canceled",
+            stage: "cancel",
+            message: nextJob.userMessage,
+            progress: nextJob.progress,
+            now
+          })
+        ].slice(-MAX_PROJECT_JOB_EVENTS);
+        project.updatedAt = now;
+      },
+      { action: "job:write" }
+    );
   }
 
   async retryJob(projectId: string, jobId: string): Promise<JobRecord> {
     const job = await this.getJob(projectId, jobId);
-    const retried = retryJobState(job, new Date().toISOString());
-    await this.updateJob(projectId, retried, {
-      action: "job:write",
-      audit: {
-        action: "job.retry",
-        targetType: "job",
-        targetId: jobId,
-        summary: `Retried ${job.kind} job.`,
-        metadata: { jobKind: job.kind, nextAttempt: retried.attempt }
+    const now = new Date().toISOString();
+    const retried = retryJobState(job, now);
+    await this.updateProject(
+      projectId,
+      (project) => {
+        project.jobs = project.jobs.map((candidate) => (candidate.id === jobId ? retried : candidate));
+        project.jobEvents = [
+          ...(project.jobEvents ?? []),
+          createJobEvent({
+            id: randomUUID(),
+            projectId,
+            jobId,
+            kind: "retried",
+            stage: "queued",
+            message: retried.userMessage,
+            progress: retried.progress,
+            metadata: { nextAttempt: retried.attempt },
+            now
+          })
+        ].slice(-MAX_PROJECT_JOB_EVENTS);
+        project.updatedAt = now;
+      },
+      {
+        action: "job:write",
+        audit: {
+          action: "job.retry",
+          targetType: "job",
+          targetId: jobId,
+          summary: `Retried ${job.kind} job.`,
+          metadata: { jobKind: job.kind, nextAttempt: retried.attempt }
+        }
       }
-    });
+    );
     return retried;
   }
 
@@ -722,7 +836,8 @@ function normalizeAppState(state: AppState): AppState {
       renders: project.renders ?? [],
       artifacts: project.artifacts ?? [],
       providerRuns: project.providerRuns ?? [],
-      jobs: project.jobs ?? []
+      jobs: project.jobs ?? [],
+      jobEvents: project.jobEvents ?? []
     }))
   };
 }

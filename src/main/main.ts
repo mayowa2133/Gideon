@@ -12,11 +12,11 @@ import { GideonStore } from "./store";
 import { createPrivateObjectStorage, isCloudStorageConfigured, loadStorageConfig } from "./storage";
 import { LocalWorkerQueue } from "./jobQueue";
 import { startGideonControlServer } from "./controlServer";
-import type { AppState, ContentConcept, DetectedMoment, Project, ProviderRun, RenderedVideo, ScriptDraft } from "../shared/types";
+import type { AppState, ContentConcept, DetectedMoment, JobRecord, JobStage, Project, ProviderRun, RenderedVideo, ScriptDraft } from "../shared/types";
 import { runAnalysisPipeline, safeProviderError } from "./analysisPipeline";
 import { loadProviderConfig } from "./providers/config";
 import { OpenAiProvider } from "./providers/openai";
-import { createJob, failJob, startJob, succeedJob } from "../shared/jobState";
+import { createJob, failJob, startJob, succeedJob, updateJobStage } from "../shared/jobState";
 
 const store = new GideonStore();
 const workerQueue = new LocalWorkerQueue({ concurrency: 1 });
@@ -380,20 +380,48 @@ async function runAnalysisJob(projectId: string, jobId: string): Promise<Project
   }
   job = startJob(job, new Date().toISOString(), "Analyzing recording evidence.");
   await store.updateJob(projectId, job);
+  await store.appendJobEvent(projectId, {
+    jobId,
+    kind: "started",
+    stage: "queued",
+    message: "Analysis job started.",
+    progress: job.progress
+  });
   try {
+    job = await advanceJobStage(projectId, jobId, "quota", 1, 5, "Checking workspace AI and media quotas.");
     await assertAnalysisQuota(project);
     if (await finishIfCancelRequested(projectId, jobId)) {
       return store.getProject(projectId);
     }
+    job = await advanceJobStage(projectId, jobId, "frame_extraction", 2, 5, "Extracting representative frames.");
+    job = await advanceJobStage(projectId, jobId, "transcription", 3, 5, "Transcribing source audio when configured.");
+    job = await advanceJobStage(projectId, jobId, "ocr", 4, 5, "Reading UI text from extracted frames when configured.");
+    job = await advanceJobStage(projectId, jobId, "semantic_analysis", 5, 5, "Analyzing product flow and moments.");
     const analyzed = await store.runAnalysis(projectId, (analysisProject, moments) =>
       runAnalysisPipeline(analysisProject, moments, store.projectDir(projectId))
     );
+    await store.appendJobEvent(projectId, {
+      jobId,
+      kind: "stage",
+      stage: "usage",
+      message: "Recording provider usage for analysis.",
+      progress: job.progress,
+      metadata: { providerRuns: analyzed.providerRuns.length }
+    });
     await recordAnalysisUsage(projectId, analyzed, analyzed.providerRuns.slice(providerRunStartCount));
     if (await finishIfCancelRequested(projectId, jobId)) {
       return store.getProject(projectId);
     }
     job = await store.getJob(projectId, jobId);
     job = succeedJob(job, new Date().toISOString(), "Analysis completed.");
+    await store.appendJobEvent(projectId, {
+      jobId,
+      kind: "succeeded",
+      stage: "finalize",
+      message: "Analysis completed.",
+      progress: job.progress,
+      metadata: { moments: analyzed.moments.length, frameEvidence: analyzed.frameEvidence.length }
+    });
     return store.updateJob(projectId, job);
   } catch (error) {
     return failOrCancelJob(projectId, jobId, error);
@@ -418,10 +446,19 @@ async function runRenderJob(projectId: string, jobId: string): Promise<Project> 
   }
   job = startJob(job, new Date().toISOString(), "Rendering selected drafts.");
   await store.updateJob(projectId, job);
+  await store.appendJobEvent(projectId, {
+    jobId,
+    kind: "started",
+    stage: "queued",
+    message: "Render job started.",
+    progress: job.progress
+  });
   const renders: RenderedVideo[] = [];
   try {
+    job = await advanceJobStage(projectId, jobId, "quota", 1, scripts.length + 3, "Checking render quota.");
     await store.assertUsageAvailable(projectId, "render_minutes", scripts.length);
-    for (const script of scripts.slice(0, 3)) {
+    const scriptsToRender = scripts.slice(0, 3);
+    for (const [index, script] of scriptsToRender.entries()) {
       if (await finishIfCancelRequested(projectId, jobId)) {
         return store.getProject(projectId);
       }
@@ -430,11 +467,27 @@ async function runRenderJob(projectId: string, jobId: string): Promise<Project> 
         .map((momentId) => project.moments.find((candidate) => candidate.id === momentId))
         .find(Boolean);
       const createdAt = new Date().toISOString();
+      job = await advanceJobStage(
+        projectId,
+        jobId,
+        "tts",
+        index + 2,
+        scriptsToRender.length + 3,
+        `Generating voiceover for draft ${index + 1}/${scriptsToRender.length}.`
+      );
       const voiceoverPath = await createProviderVoiceover(projectId, script);
       if (await finishIfCancelRequested(projectId, jobId)) {
         return store.getProject(projectId);
       }
       try {
+        job = await advanceJobStage(
+          projectId,
+          jobId,
+          "render",
+          index + 3,
+          scriptsToRender.length + 3,
+          `Rendering draft ${index + 1}/${scriptsToRender.length}.`
+        );
         const rendered = await renderDraft({
           projectId,
           projectDir: store.projectDir(projectId),
@@ -469,16 +522,54 @@ async function runRenderJob(projectId: string, jobId: string): Promise<Project> 
     if (await finishIfCancelRequested(projectId, jobId)) {
       return store.getProject(projectId);
     }
+    job = await advanceJobStage(projectId, jobId, "finalize", scriptsToRender.length + 2, scriptsToRender.length + 3, "Saving render outputs.");
     await store.replaceRenders(projectId, renders);
+    await store.appendJobEvent(projectId, {
+      jobId,
+      kind: "stage",
+      stage: "usage",
+      message: "Recording render usage.",
+      progress: job.progress,
+      metadata: { renders: renders.length }
+    });
     await recordRenderUsage(projectId, renders);
     job = await store.getJob(projectId, jobId);
     job = renders.some((render) => render.status === "failed")
       ? failJob(job, new Date().toISOString(), "One or more render drafts failed.")
       : succeedJob(job, new Date().toISOString(), "Rendering completed.");
+    await store.appendJobEvent(projectId, {
+      jobId,
+      kind: job.status === "failed" ? "failed" : "succeeded",
+      stage: "finalize",
+      message: job.userMessage,
+      progress: job.progress,
+      metadata: { completed: renders.filter((render) => render.status === "completed").length, failed: renders.filter((render) => render.status === "failed").length }
+    });
     return store.updateJob(projectId, job);
   } catch (error) {
     return failOrCancelJob(projectId, jobId, error);
   }
+}
+
+async function advanceJobStage(
+  projectId: string,
+  jobId: string,
+  stage: JobStage,
+  current: number,
+  total: number,
+  message: string
+): Promise<JobRecord> {
+  let job = await store.getJob(projectId, jobId);
+  job = updateJobStage(job, stage, { current, total, unit: "stage" }, new Date().toISOString(), message);
+  await store.updateJob(projectId, job);
+  await store.appendJobEvent(projectId, {
+    jobId,
+    kind: "stage",
+    stage,
+    message,
+    progress: job.progress
+  });
+  return job;
 }
 
 async function finishIfCancelRequested(projectId: string, jobId: string): Promise<boolean> {
@@ -495,7 +586,16 @@ async function failOrCancelJob(projectId: string, jobId: string, error: unknown)
   if (latest.status === "canceling") {
     return store.finishJobCancel(projectId, jobId);
   }
-  return store.updateJob(projectId, failJob(latest, new Date().toISOString(), safeProviderError(error)));
+  const failed = failJob(latest, new Date().toISOString(), safeProviderError(error));
+  await store.appendJobEvent(projectId, {
+    jobId,
+    kind: "failed",
+    stage: "finalize",
+    message: failed.safeError ?? "Job failed.",
+    progress: failed.progress,
+    metadata: { retryable: failed.retryable }
+  });
+  return store.updateJob(projectId, failed);
 }
 
 async function createProviderVoiceover(projectId: string, script: ScriptDraft): Promise<string | null> {

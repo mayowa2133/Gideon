@@ -1,4 +1,4 @@
-import type { JobKind, JobRecord } from "./types";
+import type { JobEvent, JobEventKind, JobKind, JobRecord, JobStage } from "./types";
 
 export interface CreateJobInput {
   id: string;
@@ -8,6 +8,18 @@ export interface CreateJobInput {
   maxAttempts?: number;
   userMessage?: string;
   cancelable?: boolean;
+}
+
+export interface CreateJobEventInput {
+  id: string;
+  projectId: string;
+  jobId: string;
+  kind: JobEventKind;
+  stage: JobStage;
+  message: string;
+  now: string;
+  progress?: JobEvent["progress"];
+  metadata?: JobEvent["metadata"];
 }
 
 export function createJob(input: CreateJobInput): JobRecord {
@@ -29,6 +41,30 @@ export function createJob(input: CreateJobInput): JobRecord {
     createdAt: input.now,
     updatedAt: input.now
   };
+}
+
+export function createJobEvent(input: CreateJobEventInput): JobEvent {
+  return {
+    id: input.id,
+    projectId: input.projectId,
+    jobId: input.jobId,
+    kind: input.kind,
+    stage: input.stage,
+    message: input.message,
+    progress: input.progress,
+    metadata: input.metadata,
+    createdAt: input.now
+  };
+}
+
+export function updateJobStage(
+  job: JobRecord,
+  stage: JobStage,
+  progress: JobRecord["progress"],
+  now: string,
+  userMessage: string
+): JobRecord {
+  return updateJobProgress(job, progress, now, `${stage.replace(/_/g, " ")}: ${userMessage}`);
 }
 
 export function startJob(job: JobRecord, now: string, userMessage = "Running."): JobRecord {
@@ -151,4 +187,3 @@ function assertStatus(job: JobRecord, allowed: JobRecord["status"][], action: st
     throw new Error(`Cannot ${action} ${job.status} job.`);
   }
 }
-

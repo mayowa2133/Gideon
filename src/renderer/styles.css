@@ -446,6 +446,18 @@ video {
   color: #9ba8c2;
 }
 
+.job-event-list {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.5rem;
+  border-left: 2px solid rgba(245, 209, 95, 0.35);
+  padding-left: 0.55rem;
+}
+
+.job-event-list small {
+  font-size: 0.72rem;
+}
+
 .job-actions {
   display: flex;
   gap: 0.45rem;

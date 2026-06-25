@@ -19,6 +19,30 @@ export type JobKind = "analysis" | "transcription" | "semantic_analysis" | "ocr"
 
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceling" | "canceled";
 
+export type JobEventKind =
+  | "queued"
+  | "started"
+  | "stage"
+  | "progress"
+  | "succeeded"
+  | "failed"
+  | "cancel_requested"
+  | "canceled"
+  | "retried";
+
+export type JobStage =
+  | "queued"
+  | "quota"
+  | "frame_extraction"
+  | "transcription"
+  | "ocr"
+  | "semantic_analysis"
+  | "tts"
+  | "render"
+  | "usage"
+  | "finalize"
+  | "cancel";
+
 export type WorkspaceRole = "owner" | "admin" | "editor" | "viewer";
 
 export type WorkspacePlan = "local_mvp" | "starter" | "team" | "enterprise";
@@ -167,6 +191,22 @@ export interface JobRecord {
   updatedAt: string;
   startedAt?: string;
   finishedAt?: string;
+}
+
+export interface JobEvent {
+  id: string;
+  projectId: string;
+  jobId: string;
+  kind: JobEventKind;
+  stage: JobStage;
+  message: string;
+  progress?: {
+    current: number;
+    total: number;
+    unit: string;
+  };
+  metadata?: Record<string, AuditMetadataValue>;
+  createdAt: string;
 }
 
 export type TonePreset =
@@ -337,6 +377,7 @@ export interface Project {
   artifacts: ArtifactRecord[];
   providerRuns: ProviderRun[];
   jobs: JobRecord[];
+  jobEvents: JobEvent[];
   createdAt: string;
   updatedAt: string;
 }

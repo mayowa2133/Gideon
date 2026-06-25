@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createJobEvent,
   createJob,
   failJob,
   finishJobCancel,
@@ -7,6 +8,7 @@ import {
   retryJob,
   startJob,
   succeedJob,
+  updateJobStage,
   updateJobProgress
 } from "./jobState";
 
@@ -26,6 +28,37 @@ describe("job state machine", () => {
     expect(progressed.progress.current).toBe(2);
     expect(succeeded.status).toBe("succeeded");
     expect(succeeded.cancelable).toBe(false);
+  });
+
+  it("creates durable job events and stage progress updates", () => {
+    const queued = createJob({ id: "job-1", projectId: "project-1", kind: "analysis", now: t0 });
+    const running = startJob(queued, t1, "Analyzing recording.");
+    const staged = updateJobStage(
+      running,
+      "transcription",
+      { current: 2, total: 5, unit: "stage" },
+      t1,
+      "Transcribing source audio."
+    );
+    const event = createJobEvent({
+      id: "event-1",
+      projectId: "project-1",
+      jobId: "job-1",
+      kind: "stage",
+      stage: "transcription",
+      message: "Transcribing source audio.",
+      progress: staged.progress,
+      now: t1
+    });
+
+    expect(staged.userMessage).toBe("transcription: Transcribing source audio.");
+    expect(event).toMatchObject({
+      projectId: "project-1",
+      jobId: "job-1",
+      kind: "stage",
+      stage: "transcription",
+      progress: { current: 2, total: 5, unit: "stage" }
+    });
   });
 
   it("marks failed jobs retryable until max attempts is reached", () => {
@@ -57,4 +90,3 @@ describe("job state machine", () => {
     expect(() => succeedJob(queued, t1)).toThrow("Cannot succeed queued job.");
   });
 });
-

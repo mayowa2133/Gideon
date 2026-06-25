@@ -40,6 +40,7 @@ interface GideonProject {
   scripts?: GideonScript[];
   renders?: Array<Record<string, unknown>>;
   jobs?: Array<Record<string, unknown>>;
+  jobEvents?: Array<Record<string, unknown>>;
   providerRuns?: Array<Record<string, unknown>>;
   frameEvidence?: Array<Record<string, unknown>>;
   [key: string]: unknown;
@@ -520,6 +521,7 @@ function projectPayload(state: GideonState, project: GideonProject): Record<stri
     scripts: (project.scripts ?? []).map((script) => sanitizeRecord(script)),
     renders: (project.renders ?? []).map((render) => sanitizeRecord(render)),
     jobs: (project.jobs ?? []).map((job) => sanitizeRecord(job)),
+    jobEvents: (project.jobEvents ?? []).slice(-20).map((event) => sanitizeRecord(event)),
     providerRuns: (project.providerRuns ?? []).map((run) => sanitizeRecord(run)),
     auditEvents: (state.auditEvents ?? [])
       .filter((event) => event.projectId === project.id)

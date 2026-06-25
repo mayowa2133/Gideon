@@ -570,6 +570,16 @@ function JobHistory({
             <small>
               attempt {job.attempt}/{job.maxAttempts} · {job.userMessage}
             </small>
+            <div className="job-event-list">
+              {project.jobEvents
+                .filter((event) => event.jobId === job.id)
+                .slice(-3)
+                .map((event) => (
+                  <small key={event.id}>
+                    {event.stage.replace(/_/g, " ")} · {event.message}
+                  </small>
+                ))}
+            </div>
             <div className="job-actions">
               {job.cancelable && (job.status === "queued" || job.status === "running") ? (
                 <button className="ghost compact" disabled={busy} onClick={() => onCancel(job.id)} type="button">
