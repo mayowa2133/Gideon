@@ -47,6 +47,17 @@ function App(): JSX.Element {
     void loadInitialState();
   }, []);
 
+  useEffect(() => {
+    if (!activeProject || !hasActiveJobs(activeProject)) {
+      return;
+    }
+    const activeProjectId = activeProject.id;
+    const timer = window.setInterval(() => {
+      void refreshState(activeProjectId);
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [activeProject?.id, activeProject?.jobs.map((job) => `${job.id}:${job.status}:${job.updatedAt}`).join("|")]);
+
   const refreshProject = (project: Project): void => {
     setActiveProject(project);
     setState((current) => ({
@@ -73,6 +84,21 @@ function App(): JSX.Element {
       setError(messageFromError(loadError));
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function refreshState(preferredProjectId?: string): Promise<void> {
+    try {
+      const projects = await window.gideon.listProjects();
+      setState(projects);
+      const active =
+        projects.projects.find((project) => project.id === preferredProjectId) ??
+        projects.projects.find((project) => project.id === projects.activeProjectId) ??
+        projects.projects[0] ??
+        null;
+      setActiveProject(active);
+    } catch {
+      // Background polling should not interrupt the user's current edit.
     }
   }
 
@@ -153,6 +179,10 @@ function createEmptyAppState(): AppState {
     projects: [],
     activeProjectId: null
   };
+}
+
+function hasActiveJobs(project: Project): boolean {
+  return project.jobs.some((job) => job.status === "queued" || job.status === "running" || job.status === "canceling");
 }
 
 function ProjectList({
@@ -390,7 +420,7 @@ function ProjectWorkspace({
           >
             {busy === "analysis" ? "Analyzing…" : "Analyze recording"}
           </button>
-          <p className="muted">Gideon samples representative frames and creates editable moments from the timeline.</p>
+          <p className="muted">Gideon queues analysis work, samples representative frames, and creates editable moments from the timeline.</p>
         </div>
         <MomentGrid
           moments={project.moments}
@@ -452,7 +482,7 @@ function ProjectWorkspace({
           >
             {busy === "rendering" ? "Rendering MP4 drafts…" : "Render selected drafts"}
           </button>
-          <p className="muted">Outputs are 1080×1920 H.264/AAC MP4 files with burned-in captions.</p>
+          <p className="muted">Render jobs run through the local worker queue and output 1080×1920 H.264/AAC MP4 files.</p>
         </div>
         <RenderGallery
           project={project}

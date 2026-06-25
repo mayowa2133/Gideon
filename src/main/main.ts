@@ -10,6 +10,7 @@ import {
 } from "./media";
 import { GideonStore } from "./store";
 import { LocalPrivateObjectStorage } from "./storage";
+import { LocalWorkerQueue } from "./jobQueue";
 import type { AppState, ContentConcept, DetectedMoment, Project, ProviderRun, RenderedVideo, ScriptDraft } from "../shared/types";
 import { runAnalysisPipeline, safeProviderError } from "./analysisPipeline";
 import { loadProviderConfig } from "./providers/config";
@@ -17,6 +18,7 @@ import { OpenAiProvider } from "./providers/openai";
 import { createJob, failJob, startJob, succeedJob } from "../shared/jobState";
 
 const store = new GideonStore();
+const workerQueue = new LocalWorkerQueue({ concurrency: 1 });
 let mainWindow: BrowserWindow | null = null;
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -152,7 +154,8 @@ function registerIpcHandlers(): void {
       userMessage: "Waiting to analyze recording."
     });
     await store.appendJob(projectId, job);
-    return runAnalysisJob(projectId, job.id);
+    enqueueAnalysisJob(projectId, job.id);
+    return store.getProject(projectId);
   });
 
   ipcMain.handle("analysis:update-moments", async (_event, projectId: string, moments: DetectedMoment[]) =>
@@ -189,7 +192,8 @@ function registerIpcHandlers(): void {
       userMessage: "Waiting to render selected drafts."
     });
     await store.appendJob(projectId, job);
-    return runRenderJob(projectId, job.id);
+    enqueueRenderJob(projectId, job.id);
+    return store.getProject(projectId);
   });
 
   ipcMain.handle("job:cancel", async (_event, projectId: string, jobId: string) => store.requestJobCancel(projectId, jobId));
@@ -197,10 +201,12 @@ function registerIpcHandlers(): void {
   ipcMain.handle("job:retry", async (_event, projectId: string, jobId: string) => {
     const job = await store.retryJob(projectId, jobId);
     if (job.kind === "analysis") {
-      return runAnalysisJob(projectId, job.id);
+      enqueueAnalysisJob(projectId, job.id);
+      return store.getProject(projectId);
     }
     if (job.kind === "render") {
-      return runRenderJob(projectId, job.id);
+      enqueueRenderJob(projectId, job.id);
+      return store.getProject(projectId);
     }
     throw new Error(`Retry is not wired for ${job.kind} jobs yet.`);
   });
@@ -245,6 +251,32 @@ async function activeWorkspaceState(): Promise<AppState> {
     projects: await store.listProjects(),
     activeProjectId: activeProject?.id ?? null
   };
+}
+
+function enqueueAnalysisJob(projectId: string, jobId: string): void {
+  void workerQueue
+    .enqueue({
+      id: jobId,
+      projectId,
+      kind: "analysis",
+      run: () => runAnalysisJob(projectId, jobId)
+    })
+    .catch((error) => {
+      console.error(`Analysis job ${jobId} failed outside normal job handling.`, error);
+    });
+}
+
+function enqueueRenderJob(projectId: string, jobId: string): void {
+  void workerQueue
+    .enqueue({
+      id: jobId,
+      projectId,
+      kind: "render",
+      run: () => runRenderJob(projectId, jobId)
+    })
+    .catch((error) => {
+      console.error(`Render job ${jobId} failed outside normal job handling.`, error);
+    });
 }
 
 async function runAnalysisJob(projectId: string, jobId: string): Promise<Project> {

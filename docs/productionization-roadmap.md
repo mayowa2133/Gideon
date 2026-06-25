@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-25
 
-This roadmap turns the current downloadable macOS MVP into the fuller Gideon product described by the PRD. The current app already packages and downloads on macOS, accepts local walkthrough videos, generates deterministic moments/concepts/scripts, and renders captioned vertical MP4 drafts. The remaining work is to replace deterministic/local-only pieces with real provider-backed analysis, transcription, storage, jobs, auth, workspaces, and operational controls.
+This roadmap turns the current downloadable macOS MVP into the fuller Gideon product described by the PRD. The current app already packages and downloads on macOS, accepts local walkthrough videos, generates deterministic moments/concepts/scripts, and renders captioned vertical MP4 drafts. The remaining work is to replace deterministic/local-only pieces with real provider-backed analysis, transcription, storage, jobs, auth, workspaces, operational controls, and an MCP control plane that lets tools like Codex or Claude Code inspect and edit Gideon projects without requiring Gideon to hold LLM API keys.
 
 ## North-star target
 
@@ -18,6 +18,7 @@ Gideon should support this production loop:
 8. Render jobs produce validated 1080×1920 MP4 drafts.
 9. User exports privately or publishes through explicitly configured channels.
 10. Usage, cost, quotas, job state, and audit events are tracked.
+11. Codex, Claude Code, and other MCP-capable agents can connect to Gideon, inspect project evidence/timelines/scripts, propose edits, update approved editable artifacts, and enqueue renders through explicit tools.
 
 ## Delivery strategy
 
@@ -27,8 +28,27 @@ Implement in vertical slices that keep the app usable after each commit:
 - Add cloud-ready abstractions before forcing a hosted deployment.
 - Keep deterministic fallback paths so tests run without paid provider credentials.
 - Add provider-backed behavior only behind explicit configuration.
+- Treat MCP agent control as a first-class no-provider-key path: external agents may bring their own model credentials, while Gideon exposes local/project tools and keeps user approval gates.
 - Add tests and push to `main` after each working slice.
 - Do not add social publishing, avatars, or voice cloning until the core evidence-to-render loop is production-grade.
+
+## Milestone 0: MCP agent control plane
+
+### Scope
+
+- Add a local MCP server that Codex, Claude Code, or other MCP clients can launch over stdio.
+- Expose tools for project discovery, evidence inspection, script/moment edits, render/analysis job enqueueing, and status checks.
+- Keep this path independent from OpenAI/provider API keys; the MCP client supplies its own model reasoning.
+- Model the interaction pattern after agent-controlled creative tools such as Palmier: the agent discusses intent with the user, inspects Gideon project state through MCP, proposes edits, applies explicit structured edits, and asks Gideon to render.
+- Add authorization and safety boundaries before exposing destructive actions.
+
+### Acceptance criteria
+
+- MCP clients can connect and list Gideon capabilities without any provider API key.
+- MCP clients can inspect local projects and editable artifacts.
+- MCP clients can make bounded edits to scripts/moments with persisted audit-safe state changes.
+- Render/analysis job tools reuse Gideon’s durable job system instead of bypassing it.
+- Tool schemas make destructive or publishing actions unavailable until later explicit implementation.
 
 ## Milestone 1: provider-backed AI, ASR, and TTS foundation
 
@@ -177,4 +197,3 @@ The next implementation slice is Milestone 1:
 3. Persist transcript/provider metadata.
 4. Use provider TTS when available.
 5. Add tests and push to `main`.
-
