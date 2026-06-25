@@ -1,6 +1,9 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadProviderConfig } from "./config";
-import { OpenAiProvider, parseWalkthroughAnalysis } from "./openai";
+import { OpenAiProvider, parseFrameOcr, parseWalkthroughAnalysis } from "./openai";
 import type { ProductProfile, RecordingMetadata } from "../../shared/types";
 
 const profile: ProductProfile = {
@@ -101,6 +104,21 @@ describe("OpenAI structured analysis parsing", () => {
   });
 });
 
+describe("OpenAI frame OCR parsing", () => {
+  it("parses OCR text and clamps confidence", () => {
+    const parsed = parseFrameOcr({
+      output_text: JSON.stringify({
+        text: "Create campaign\nGenerate scripts",
+        confidence: 1.4
+      })
+    });
+    expect(parsed).toEqual({
+      text: "Create campaign\nGenerate scripts",
+      confidence: 1
+    });
+  });
+});
+
 describe("OpenAI provider requests", () => {
   it("posts structured analysis requests to the Responses API", async () => {
     const requests: Array<{ url: string; init: RequestInit }> = [];
@@ -138,6 +156,17 @@ describe("OpenAI provider requests", () => {
     const result = await provider.analyzeWalkthrough({
       profile,
       recording,
+      frameEvidence: [
+        {
+          id: "frame-moment-1",
+          momentId: "moment-1",
+          timestampMs: 1000,
+          ocrProvider: "openai",
+          ocrText: "Qualified leads generated",
+          confidence: 0.9,
+          createdAt: "2026-06-25T00:00:00.000Z"
+        }
+      ],
       moments: [
         {
           id: "moment-1",
@@ -153,9 +182,55 @@ describe("OpenAI provider requests", () => {
 
     expect(result.moments[0]?.label).toBe("Proof moment");
     expect(requests[0]?.url).toBe("https://api.example.test/v1/responses");
-    const body = JSON.parse(String(requests[0]?.init.body)) as { model: string; text: { format: { type: string } } };
+    const body = JSON.parse(String(requests[0]?.init.body)) as {
+      model: string;
+      input: Array<{ content: string }>;
+      text: { format: { type: string } };
+    };
     expect(body.model).toBe("gpt-test");
     expect(body.text.format.type).toBe("json_schema");
+    expect(body.input[1]?.content).toContain("Qualified leads generated");
+  });
+
+  it("posts image data URLs for frame OCR requests", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const provider = new OpenAiProvider({
+      config: {
+        apiKey: "sk-test",
+        baseUrl: "https://api.example.test/v1",
+        llmModel: "gpt-test",
+        transcriptionModel: "gpt-4o-transcribe",
+        ttsModel: "gpt-4o-mini-tts",
+        ttsVoice: "coral"
+      },
+      fetchImpl: async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(
+          JSON.stringify({
+            output_text: JSON.stringify({
+              text: "Generate scripts",
+              confidence: 0.74
+            })
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+    });
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-ocr-"));
+    const imagePath = path.join(tempDir, "frame.jpg");
+    await fs.writeFile(imagePath, Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+
+    const result = await provider.extractFrameText({ imagePath, timestampMs: 1200, momentLabel: "Setup" });
+
+    expect(result.text).toBe("Generate scripts");
+    expect(requests[0]?.url).toBe("https://api.example.test/v1/responses");
+    const body = JSON.parse(String(requests[0]?.init.body)) as {
+      input: Array<{ content: Array<{ type: string; image_url?: string; detail?: string }> }>;
+      text: { format: { type: string; name: string } };
+    };
+    const imagePart = body.input[1]?.content.find((part) => part.type === "input_image");
+    expect(imagePart?.image_url).toMatch(/^data:image\/jpeg;base64,/);
+    expect(imagePart?.detail).toBe("low");
+    expect(body.text.format).toMatchObject({ type: "json_schema", name: "gideon_frame_ocr" });
   });
 });
-

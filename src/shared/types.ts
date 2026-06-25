@@ -15,7 +15,7 @@ export type ProjectStatus =
   | "ready"
   | "failed";
 
-export type JobKind = "analysis" | "transcription" | "semantic_analysis" | "tts" | "render" | "export";
+export type JobKind = "analysis" | "transcription" | "semantic_analysis" | "ocr" | "tts" | "render" | "export";
 
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceling" | "canceled";
 
@@ -93,9 +93,21 @@ export interface TranscriptArtifact {
   error?: string;
 }
 
+export interface FrameEvidence {
+  id: string;
+  momentId: string;
+  timestampMs: number;
+  imagePath?: string;
+  imageUrl?: string;
+  ocrText?: string;
+  ocrProvider?: "openai" | "local" | "none";
+  confidence?: number;
+  createdAt: string;
+}
+
 export interface ProviderRun {
   id: string;
-  kind: "analysis" | "transcription" | "tts";
+  kind: "analysis" | "transcription" | "ocr" | "tts";
   provider: "openai" | "local" | "none";
   model?: string;
   status: "completed" | "skipped" | "failed";
@@ -184,6 +196,7 @@ export interface Project {
   recording?: RecordingMetadata;
   transcript?: TranscriptArtifact;
   analysisSummary?: string;
+  frameEvidence: FrameEvidence[];
   moments: DetectedMoment[];
   concepts: ContentConcept[];
   scripts: ScriptDraft[];

@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
-import type { DetectedMoment, Project, ProviderRun, TranscriptArtifact } from "../shared/types";
+import type { DetectedMoment, FrameEvidence, Project, ProviderRun, TranscriptArtifact } from "../shared/types";
 import { extractAudioForTranscription, enrichMomentThumbnails } from "./media";
 import { loadProviderConfig } from "./providers/config";
 import { OpenAiProvider } from "./providers/openai";
+
+const MAX_OCR_FRAMES = 4;
 
 export interface AnalysisPipelineResult {
   moments: DetectedMoment[];
   transcript?: TranscriptArtifact;
   analysisSummary?: string;
+  frameEvidence: FrameEvidence[];
   providerRuns: ProviderRun[];
 }
 
@@ -26,6 +29,10 @@ export async function runAnalysisPipeline(
   let transcript: TranscriptArtifact | undefined;
   let analysisSummary: string | undefined;
   let moments = baseMoments;
+  let frameEvidence: FrameEvidence[] = [];
+
+  const seededMoments = await enrichMomentThumbnails(project.recording, baseMoments, projectDir);
+  moments = seededMoments;
 
   if (openai.isConfigured() && project.recording.hasAudio) {
     const startedAt = new Date().toISOString();
@@ -75,6 +82,63 @@ export async function runAnalysisPipeline(
     };
   }
 
+  const ocrStartedAt = new Date().toISOString();
+  frameEvidence = createFrameEvidence(seededMoments, ocrStartedAt);
+  if (openai.isConfigured()) {
+    const imageBackedEvidence = frameEvidence.filter((frame) => frame.imagePath).slice(0, MAX_OCR_FRAMES);
+    if (imageBackedEvidence.length > 0) {
+      const errors: string[] = [];
+      let completedFrames = 0;
+      for (const frame of imageBackedEvidence) {
+        const moment = seededMoments.find((candidate) => candidate.id === frame.momentId);
+        try {
+          const result = await openai.extractFrameText({
+            imagePath: frame.imagePath!,
+            timestampMs: frame.timestampMs,
+            momentLabel: moment?.label
+          });
+          frame.ocrText = result.text;
+          frame.ocrProvider = "openai";
+          frame.confidence = result.confidence;
+          completedFrames += 1;
+        } catch (error) {
+          frame.ocrProvider = "none";
+          errors.push(safeProviderError(error));
+        }
+      }
+      providerRuns.push({
+        id: randomUUID(),
+        kind: "ocr",
+        provider: "openai",
+        model: config.openai.llmModel,
+        status: completedFrames > 0 ? "completed" : "failed",
+        startedAt: ocrStartedAt,
+        finishedAt: new Date().toISOString(),
+        error: errors[0]
+      });
+    } else {
+      providerRuns.push({
+        id: randomUUID(),
+        kind: "ocr",
+        provider: "none",
+        status: "skipped",
+        startedAt: ocrStartedAt,
+        finishedAt: new Date().toISOString(),
+        error: "No extracted frame images were available for OCR."
+      });
+    }
+  } else {
+    providerRuns.push({
+      id: randomUUID(),
+      kind: "ocr",
+      provider: "none",
+      status: "skipped",
+      startedAt: ocrStartedAt,
+      finishedAt: new Date().toISOString(),
+      error: "OpenAI OCR is not configured."
+    });
+  }
+
   if (openai.isConfigured()) {
     const startedAt = new Date().toISOString();
     try {
@@ -82,11 +146,12 @@ export async function runAnalysisPipeline(
         profile: project.profile,
         recording: project.recording,
         transcript,
-        moments: baseMoments
+        moments: seededMoments,
+        frameEvidence
       });
       analysisSummary = analysis.summary;
-      moments = analysis.moments.map((moment) => ({
-        id: randomUUID(),
+      moments = analysis.moments.map((moment, index) => ({
+        id: seededMoments[index]?.id ?? randomUUID(),
         label: moment.label,
         startMs: moment.startMs,
         endMs: moment.endMs,
@@ -129,11 +194,12 @@ export async function runAnalysisPipeline(
     });
   }
 
-  const enrichedMoments = await enrichMomentThumbnails(project.recording, moments, projectDir);
+  const enrichedMoments = moments === seededMoments ? seededMoments : await enrichMomentThumbnails(project.recording, moments, projectDir);
   return {
     moments: enrichedMoments,
     transcript,
     analysisSummary,
+    frameEvidence,
     providerRuns
   };
 }
@@ -145,3 +211,14 @@ export function safeProviderError(error: unknown): string {
   return "Provider request failed.";
 }
 
+function createFrameEvidence(moments: DetectedMoment[], createdAt: string): FrameEvidence[] {
+  return moments.map((moment) => ({
+    id: `frame-${moment.id}`,
+    momentId: moment.id,
+    timestampMs: moment.startMs,
+    imagePath: moment.thumbnailPath,
+    imageUrl: moment.thumbnailUrl,
+    ocrProvider: "none",
+    createdAt
+  }));
+}

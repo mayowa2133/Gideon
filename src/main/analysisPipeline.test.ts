@@ -46,6 +46,7 @@ describe("analysis pipeline", () => {
       status: "recording_ready",
       profile,
       recording,
+      frameEvidence: [],
       moments: [],
       concepts: [],
       scripts: [],
@@ -62,7 +63,10 @@ describe("analysis pipeline", () => {
     expect(result.moments).toHaveLength(baseMoments.length);
     expect(result.analysisSummary).toContain("Local deterministic analysis");
     expect(result.transcript?.status).toBe("skipped");
+    expect(result.frameEvidence).toHaveLength(baseMoments.length);
+    expect(result.frameEvidence.every((frame) => frame.ocrProvider === "none")).toBe(true);
     expect(result.providerRuns.some((run) => run.kind === "analysis" && run.status === "skipped")).toBe(true);
+    expect(result.providerRuns.some((run) => run.kind === "ocr" && run.status === "skipped")).toBe(true);
 
     if (oldKey) {
       process.env.OPENAI_API_KEY = oldKey;

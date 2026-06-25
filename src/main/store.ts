@@ -16,6 +16,7 @@ import type {
   CreateProjectInput,
   DetectedMoment,
   JobRecord,
+  FrameEvidence,
   ProviderRun,
   ProductProfile,
   Project,
@@ -81,6 +82,7 @@ export class GideonStore {
       status: "draft",
       profile,
       moments: [],
+      frameEvidence: [],
       concepts: [],
       scripts: [],
       renders: [],
@@ -110,6 +112,7 @@ export class GideonStore {
       project.status = "recording_ready";
       project.transcript = undefined;
       project.analysisSummary = undefined;
+      project.frameEvidence = [];
       project.moments = [];
       project.concepts = [];
       project.scripts = [];
@@ -126,6 +129,7 @@ export class GideonStore {
       moments: DetectedMoment[];
       transcript?: TranscriptArtifact;
       analysisSummary?: string;
+      frameEvidence?: FrameEvidence[];
       providerRuns?: ProviderRun[];
     }>
   ): Promise<Project> {
@@ -139,6 +143,7 @@ export class GideonStore {
       draft.moments = analysis.moments;
       draft.transcript = analysis.transcript;
       draft.analysisSummary = analysis.analysisSummary;
+      draft.frameEvidence = analysis.frameEvidence ?? [];
       draft.concepts = [];
       draft.scripts = [];
       draft.renders = [];
@@ -298,6 +303,7 @@ function normalizeAppState(state: AppState): AppState {
     projects: (state.projects ?? []).map((project) => ({
       ...project,
       moments: project.moments ?? [],
+      frameEvidence: project.frameEvidence ?? [],
       concepts: project.concepts ?? [],
       scripts: project.scripts ?? [],
       renders: project.renders ?? [],

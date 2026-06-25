@@ -576,6 +576,42 @@ video {
   padding-left: 0.8rem;
 }
 
+.frame-evidence-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+}
+
+.frame-evidence-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.055);
+  padding: 0.75rem;
+}
+
+.frame-evidence-card img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 0.55rem;
+}
+
+.frame-evidence-card span,
+.frame-evidence-card small {
+  display: block;
+}
+
+.frame-evidence-card span {
+  color: #f5d15f;
+  font-weight: 900;
+}
+
+.frame-evidence-card small,
+.frame-evidence-card p {
+  color: #9ba8c2;
+}
+
 .provider-run-list {
   display: flex;
   flex-wrap: wrap;

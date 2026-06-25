@@ -434,9 +434,10 @@ function JobHistory({ project }: { project: Project }): JSX.Element | null {
 }
 
 function AnalysisEvidence({ project }: { project: Project }): JSX.Element | null {
-  if (!project.analysisSummary && !project.transcript && project.providerRuns.length === 0) {
+  if (!project.analysisSummary && !project.transcript && project.frameEvidence.length === 0 && project.providerRuns.length === 0) {
     return null;
   }
+  const ocrFrames = project.frameEvidence.filter((frame) => frame.ocrText?.trim());
   return (
     <div className="analysis-evidence">
       {project.analysisSummary ? (
@@ -454,6 +455,27 @@ function AnalysisEvidence({ project }: { project: Project }): JSX.Element | null
           </p>
           {project.transcript.text ? <blockquote>{project.transcript.text.slice(0, 600)}</blockquote> : null}
           {project.transcript.error ? <small>{project.transcript.error}</small> : null}
+        </div>
+      ) : null}
+      {project.frameEvidence.length > 0 ? (
+        <div>
+          <strong>Visual evidence</strong>
+          <p>
+            {project.frameEvidence.length} sampled frames · {ocrFrames.length} with readable UI text
+          </p>
+          <div className="frame-evidence-list">
+            {project.frameEvidence.slice(0, 6).map((frame) => (
+              <article key={frame.id} className="frame-evidence-card">
+                {frame.imageUrl ? <img src={frame.imageUrl} alt="" /> : null}
+                <span>{formatMs(frame.timestampMs)}</span>
+                <small>
+                  {frame.ocrProvider ?? "none"}
+                  {typeof frame.confidence === "number" ? ` · ${Math.round(frame.confidence * 100)}%` : ""}
+                </small>
+                {frame.ocrText ? <blockquote>{frame.ocrText.slice(0, 240)}</blockquote> : <p>No readable UI text captured.</p>}
+              </article>
+            ))}
+          </div>
         </div>
       ) : null}
       {project.providerRuns.length > 0 ? (
