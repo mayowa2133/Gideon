@@ -1,0 +1,377 @@
+import type {
+  CaptionSegment,
+  ContentConcept,
+  DetectedMoment,
+  Platform,
+  ProductProfile,
+  RecordingMetadata,
+  ScriptDraft,
+  VisualBeat
+} from "./types";
+
+const forbiddenPhrases = [
+  "revolutionary platform",
+  "seamlessly streamline",
+  "unlock your potential",
+  "game-changing solution",
+  "powerful tool designed to"
+];
+
+const formatTemplates = [
+  {
+    family: "problem-solution",
+    title: "Stop losing time to the old workflow",
+    pain: "manual work that slows down the target customer",
+    hook: "Show the painful before-state, then the faster path",
+    duration: 28
+  },
+  {
+    family: "before-after",
+    title: "Before and after using the product",
+    pain: "the contrast between scattered work and a clean outcome",
+    hook: "Open with the messy baseline, then show the improved result",
+    duration: 32
+  },
+  {
+    family: "founder-demo",
+    title: "I built this because the existing way was too slow",
+    pain: "a founder-facing frustration that triggered the build",
+    hook: "Use a plain founder voice and show the core workflow quickly",
+    duration: 36
+  },
+  {
+    family: "feature-highlight",
+    title: "The one feature worth seeing first",
+    pain: "unclear value from a key feature until the proof appears",
+    hook: "Start at the payoff, then rewind into how it works",
+    duration: 24
+  },
+  {
+    family: "how-it-works",
+    title: "How the workflow works in under a minute",
+    pain: "uncertainty about what the product actually does",
+    hook: "Walk through three visible steps with concrete labels",
+    duration: 42
+  },
+  {
+    family: "launch-announcement",
+    title: "Launch week demo for people who need the outcome",
+    pain: "the audience has the problem but has not tried the product",
+    hook: "Announce the product through a specific use case, not hype",
+    duration: 30
+  },
+  {
+    family: "tutorial",
+    title: "Do this workflow once, then repeat it",
+    pain: "users need a practical first action",
+    hook: "Teach one narrow workflow and show the resulting state",
+    duration: 45
+  },
+  {
+    family: "customer-pain",
+    title: "If this task is still manual, this is the fix",
+    pain: "the recurring task that the target customer wants removed",
+    hook: "Name the pain in the first sentence and prove the fix on screen",
+    duration: 26
+  },
+  {
+    family: "three-reasons",
+    title: "Three reasons this workflow matters",
+    pain: "the audience needs quick reasons to care",
+    hook: "Stack three concrete benefits tied to visible moments",
+    duration: 38
+  },
+  {
+    family: "linkedin-professional",
+    title: "A practical workflow breakdown for LinkedIn",
+    pain: "buyers need a credible explanation before trying a new tool",
+    hook: "Use a calm proof-first walkthrough with a work outcome",
+    duration: 44
+  }
+];
+
+export function createDefaultProfile(): ProductProfile {
+  return {
+    productName: "",
+    targetCustomer: "",
+    productDescription: "",
+    preferredTone: "direct",
+    toneGuidance: "",
+    platforms: ["tiktok", "instagram_reels", "youtube_shorts"],
+    walkthroughNotes: ""
+  };
+}
+
+export function validateProfile(profile: ProductProfile): string[] {
+  const errors: string[] = [];
+  if (profile.productName.trim().length < 1 || profile.productName.trim().length > 80) {
+    errors.push("Product name must be 1–80 characters.");
+  }
+  if (profile.targetCustomer.trim().length < 3 || profile.targetCustomer.trim().length > 300) {
+    errors.push("Target customer must be 3–300 characters.");
+  }
+  if (
+    profile.productDescription.trim().length < 10 ||
+    profile.productDescription.trim().length > 600
+  ) {
+    errors.push("Product description must be 10–600 characters.");
+  }
+  if (profile.toneGuidance.length > 300) {
+    errors.push("Tone guidance must be 300 characters or fewer.");
+  }
+  if (profile.platforms.length < 1) {
+    errors.push("Choose at least one platform.");
+  }
+  return errors;
+}
+
+export function createMoments(
+  profile: ProductProfile,
+  recording: RecordingMetadata,
+  ids: () => string
+): DetectedMoment[] {
+  const duration = Math.max(recording.durationMs, 15_000);
+  const usableEnd = Math.max(duration - 1_000, 8_000);
+  const segmentCount = duration >= 60_000 ? 5 : 4;
+  const segmentSize = usableEnd / segmentCount;
+  const product = cleanPhrase(profile.productName || "the product");
+  const outcome = shortSentence(profile.productDescription || "the product workflow");
+  const labels = [
+    `${product} setup or starting point`,
+    "Core action in the walkthrough",
+    "Product response or generated result",
+    "Success state and next step",
+    "Best proof moment for the audience"
+  ];
+
+  return Array.from({ length: segmentCount }, (_, index) => {
+    const startMs = Math.round(index * segmentSize);
+    const endMs = Math.min(Math.round(startMs + segmentSize * 0.82), duration);
+    const label = labels[index] ?? `Moment ${index + 1}`;
+    return {
+      id: ids(),
+      label,
+      startMs,
+      endMs,
+      evidence: evidenceForMoment(index, product, outcome, recording),
+      confidence: Number((0.68 + Math.min(index, 3) * 0.05).toFixed(2)),
+      enabled: true
+    };
+  });
+}
+
+export function generateConcepts(
+  profile: ProductProfile,
+  moments: DetectedMoment[],
+  ids: () => string
+): ContentConcept[] {
+  const enabledMoments = moments.filter((moment) => moment.enabled);
+  const proofMoments = enabledMoments.length > 0 ? enabledMoments : moments;
+  const product = cleanPhrase(profile.productName || "your product");
+  const customer = cleanPhrase(profile.targetCustomer || "your target customer");
+  const outcome = shortSentence(profile.productDescription || "the workflow shown in the recording");
+  const platforms: Platform[] = profile.platforms.length > 0 ? profile.platforms : ["tiktok"];
+
+  return formatTemplates.map((template, index) => {
+    const primary = proofMoments[index % Math.max(proofMoments.length, 1)];
+    const secondary = proofMoments[(index + 1) % Math.max(proofMoments.length, 1)];
+    const proofMomentIds = [primary, secondary]
+      .filter((moment): moment is DetectedMoment => Boolean(moment))
+      .map((moment) => moment.id);
+    const platformFit = choosePlatforms(platforms, template.family);
+
+    return {
+      id: ids(),
+      title: personalizeTitle(template.title, product, index),
+      formatFamily: template.family,
+      targetPain: `${customer} dealing with ${template.pain}`,
+      hookDirection: `${template.hook}. Keep it grounded in ${primary?.label ?? "the recording"}.`,
+      proofMomentIds,
+      platformFit,
+      estimatedDurationSec: template.duration,
+      rationale: `${product} can be explained through "${primary?.label ?? "the uploaded walkthrough"}" because it visibly supports ${outcome}.`,
+      selected: index < 3,
+      brief: `Use ${primary?.label ?? "the strongest visible moment"} to show ${customer} how ${product} helps with ${outcome}.`
+    };
+  });
+}
+
+export function enforceSelectionLimit(concepts: ContentConcept[], changedId: string): ContentConcept[] {
+  const selected = concepts.filter((concept) => concept.selected);
+  if (selected.length <= 3) {
+    return concepts;
+  }
+  const selectedToKeep = new Set<string>();
+  selected
+    .filter((concept) => concept.id === changedId)
+    .slice(0, 1)
+    .forEach((concept) => selectedToKeep.add(concept.id));
+  selected
+    .filter((concept) => concept.id !== changedId)
+    .slice(0, 2)
+    .forEach((concept) => selectedToKeep.add(concept.id));
+  return concepts.map((concept) => ({
+    ...concept,
+    selected: concept.selected ? selectedToKeep.has(concept.id) : false
+  }));
+}
+
+export function generateScripts(
+  profile: ProductProfile,
+  concepts: ContentConcept[],
+  moments: DetectedMoment[],
+  ids: () => string,
+  now: () => string
+): ScriptDraft[] {
+  const selected = concepts.filter((concept) => concept.selected).slice(0, 3);
+  return selected.map((concept) => generateScript(profile, concept, moments, ids, now));
+}
+
+export function sanitizeMarketingCopy(text: string): string {
+  let sanitized = text.replace(/\s+/g, " ").trim();
+  for (const phrase of forbiddenPhrases) {
+    const pattern = new RegExp(escapeRegExp(phrase), "gi");
+    sanitized = sanitized.replace(pattern, "specific workflow");
+  }
+  return sanitized;
+}
+
+export function splitCaptionSegments(text: string, durationMs: number): CaptionSegment[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) {
+    return [];
+  }
+  const chunkSize = 7;
+  const chunks: string[] = [];
+  for (let index = 0; index < words.length; index += chunkSize) {
+    chunks.push(words.slice(index, index + chunkSize).join(" "));
+  }
+  const segmentDuration = Math.max(1_500, Math.floor(durationMs / chunks.length));
+  return chunks.map((chunk, index) => ({
+    startMs: index * segmentDuration,
+    endMs: index === chunks.length - 1 ? durationMs : Math.min((index + 1) * segmentDuration, durationMs),
+    text: chunk
+  }));
+}
+
+export function estimateScriptDurationMs(script: Pick<ScriptDraft, "voiceoverText">): number {
+  const wordCount = script.voiceoverText.split(/\s+/).filter(Boolean).length;
+  const spokenMs = Math.round((wordCount / 2.45) * 1_000);
+  return clamp(spokenMs + 2_500, 15_000, 60_000);
+}
+
+function generateScript(
+  profile: ProductProfile,
+  concept: ContentConcept,
+  moments: DetectedMoment[],
+  ids: () => string,
+  now: () => string
+): ScriptDraft {
+  const product = cleanPhrase(profile.productName || "this product");
+  const customer = cleanPhrase(profile.targetCustomer || "the team");
+  const outcome = shortSentence(profile.productDescription || "the workflow in the demo");
+  const selectedMoments = concept.proofMomentIds
+    .map((id) => moments.find((moment) => moment.id === id))
+    .filter((moment): moment is DetectedMoment => Boolean(moment));
+  const primaryMoment = selectedMoments[0] ?? moments[0];
+  const secondaryMoment = selectedMoments[1] ?? moments[1] ?? primaryMoment;
+  const hook = sanitizeMarketingCopy(`${product} turns this ${primaryMoment?.label.toLowerCase() ?? "workflow"} into a clear outcome.`);
+  const body = sanitizeMarketingCopy(
+    [
+      `If you are ${customer}, this is the part of the workflow that matters.`,
+      `First, the walkthrough shows ${primaryMoment?.label.toLowerCase() ?? "the starting point"}.`,
+      `Then it moves into ${secondaryMoment?.label.toLowerCase() ?? "the product result"}, so the viewer can see the actual proof.`,
+      `The point is simple: ${outcome}.`,
+      `Use this when you need the audience to understand the product without a long demo.`
+    ].join(" ")
+  );
+  const voiceoverText = `${hook} ${body}`;
+  const durationMs = estimateScriptDurationMs({ voiceoverText });
+  const visualBeats = buildVisualBeats(selectedMoments, durationMs);
+
+  return {
+    id: ids(),
+    conceptId: concept.id,
+    hook,
+    voiceoverText,
+    captions: splitCaptionSegments(voiceoverText, durationMs),
+    cta: `Try ${product} with one workflow from your own team.`,
+    visualBeats,
+    approved: true,
+    updatedAt: now()
+  };
+}
+
+function buildVisualBeats(moments: DetectedMoment[], durationMs: number): VisualBeat[] {
+  const usableMoments = moments.length > 0 ? moments : [];
+  if (usableMoments.length === 0) {
+    return [];
+  }
+  const beatDuration = Math.floor(durationMs / usableMoments.length);
+  return usableMoments.map((moment, index) => ({
+    startMs: index * beatDuration,
+    endMs: index === usableMoments.length - 1 ? durationMs : (index + 1) * beatDuration,
+    momentId: moment.id,
+    instruction: `Show ${moment.label.toLowerCase()} with readable framing.`
+  }));
+}
+
+function choosePlatforms(platforms: Platform[], family: string): Platform[] {
+  if (family === "linkedin-professional") {
+    return platforms.includes("linkedin") ? ["linkedin"] : ["linkedin", ...platforms.slice(0, 1)];
+  }
+  if (family === "tutorial" || family === "how-it-works") {
+    return platforms.filter((platform) => platform !== "other").slice(0, 3);
+  }
+  return platforms.slice(0, 3);
+}
+
+function personalizeTitle(title: string, product: string, index: number): string {
+  if (index === 0) {
+    return `${product}: ${title}`;
+  }
+  return title.replace("the product", product).replace("this workflow", `${product} workflow`);
+}
+
+function evidenceForMoment(
+  index: number,
+  product: string,
+  outcome: string,
+  recording: RecordingMetadata
+): string {
+  const duration = `${Math.round(recording.durationMs / 1000)}s`;
+  const base = [
+    `Detected from the uploaded ${duration} recording metadata and representative timeline position.`,
+    `${product} context: ${outcome}.`
+  ];
+  if (index === 0) {
+    base.push("This opening section usually establishes the starting state.");
+  } else if (index === 1) {
+    base.push("This section is positioned where the main action typically appears.");
+  } else if (index === 2) {
+    base.push("This section is useful for showing product response or output.");
+  } else {
+    base.push("This later section is useful for a result, CTA, or success state.");
+  }
+  return base.join(" ");
+}
+
+function cleanPhrase(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function shortSentence(text: string): string {
+  const clean = cleanPhrase(text);
+  if (clean.length <= 150) {
+    return clean;
+  }
+  return `${clean.slice(0, 147).trim()}...`;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

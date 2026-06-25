@@ -1,0 +1,68 @@
+{
+  "name": "gideon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gideon turns one product walkthrough into short-form video drafts.",
+  "main": "dist/main/main/main.js",
+  "type": "commonjs",
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "dev": "pnpm build:main && vite --host 127.0.0.1",
+    "start": "pnpm build && electron .",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "build": "pnpm build:main && pnpm build:renderer",
+    "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package:mac": "pnpm build && electron-builder --mac dmg zip --config.mac.identity=null",
+    "dist:mac": "pnpm package:mac"
+  },
+  "build": {
+    "appId": "com.gideon.desktop",
+    "productName": "Gideon",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.video",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "electron": "^42.5.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.9"
+  }
+}

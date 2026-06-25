@@ -1,0 +1,729 @@
+import { createRoot } from "react-dom/client";
+import { useEffect, useMemo, useState } from "react";
+import type {
+  AppState,
+  ContentConcept,
+  DetectedMoment,
+  Platform,
+  PlatformInfo,
+  ProductProfile,
+  Project,
+  ScriptDraft
+} from "../shared/types";
+import { platformLabels, toneLabels } from "../shared/types";
+import { createDefaultProfile, splitCaptionSegments } from "../shared/contentEngine";
+import "./styles.css";
+
+type BusyAction =
+  | "loading"
+  | "saving"
+  | "recording"
+  | "analysis"
+  | "concepts"
+  | "scripts"
+  | "rendering"
+  | "exporting"
+  | null;
+
+const platforms: Platform[] = ["tiktok", "instagram_reels", "youtube_shorts", "linkedin", "other"];
+
+function App(): JSX.Element {
+  const [state, setState] = useState<AppState>({ projects: [], activeProjectId: null });
+  const [activeProject, setActiveProject] = useState<Project | null>(null);
+  const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
+  const [busy, setBusy] = useState<BusyAction>("loading");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadInitialState();
+  }, []);
+
+  const refreshProject = (project: Project): void => {
+    setActiveProject(project);
+    setState((current) => ({
+      activeProjectId: project.id,
+      projects: [project, ...current.projects.filter((candidate) => candidate.id !== project.id)]
+    }));
+  };
+
+  async function loadInitialState(): Promise<void> {
+    setBusy("loading");
+    setError(null);
+    try {
+      const [projects, info] = await Promise.all([window.gideon.listProjects(), window.gideon.platformInfo()]);
+      setState(projects);
+      setPlatformInfo(info);
+      const active = projects.projects.find((project) => project.id === projects.activeProjectId) ?? projects.projects[0] ?? null;
+      setActiveProject(active);
+    } catch (loadError) {
+      setError(messageFromError(loadError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function createProject(profile: ProductProfile): Promise<void> {
+    setBusy("saving");
+    setError(null);
+    try {
+      const project = await window.gideon.createProject({
+        name: profile.productName ? `${profile.productName} campaign` : "Untitled campaign",
+        profile
+      });
+      refreshProject(project);
+    } catch (createError) {
+      setError(messageFromError(createError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function chooseProject(projectId: string): Promise<void> {
+    setBusy("loading");
+    setError(null);
+    try {
+      const project = await window.gideon.setActiveProject(projectId);
+      setActiveProject(project);
+      setState((current) => ({ ...current, activeProjectId: projectId }));
+    } catch (chooseError) {
+      setError(messageFromError(chooseError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <main className="app-shell">
+      <aside className="sidebar" aria-label="Projects">
+        <div className="brand-lockup">
+          <div className="brand-mark">G</div>
+          <div>
+            <p className="eyebrow">Gideon Desktop</p>
+            <h1>Walkthrough to short-form videos</h1>
+          </div>
+        </div>
+        <button className="primary full-width" onClick={() => setActiveProject(null)} type="button">
+          New project
+        </button>
+        <ProjectList
+          projects={state.projects}
+          activeProjectId={activeProject?.id ?? null}
+          onSelect={(projectId) => void chooseProject(projectId)}
+        />
+        <RuntimePanel info={platformInfo} />
+      </aside>
+
+      <section className="workspace">
+        {error ? (
+          <div className="error-banner" role="alert">
+            {error}
+          </div>
+        ) : null}
+        {busy === "loading" ? (
+          <div className="empty-state">Loading Gideon workspace…</div>
+        ) : activeProject ? (
+          <ProjectWorkspace project={activeProject} busy={busy} setBusy={setBusy} setError={setError} onProject={refreshProject} />
+        ) : (
+          <NewProjectPanel onCreate={(profile) => void createProject(profile)} busy={busy === "saving"} />
+        )}
+      </section>
+    </main>
+  );
+}
+
+function ProjectList({
+  projects,
+  activeProjectId,
+  onSelect
+}: {
+  projects: Project[];
+  activeProjectId: string | null;
+  onSelect: (projectId: string) => void;
+}): JSX.Element {
+  if (projects.length === 0) {
+    return <div className="muted-card">No projects yet. Create one, choose a recording, then render drafts.</div>;
+  }
+  return (
+    <div className="project-list">
+      {projects.map((project) => (
+        <button
+          key={project.id}
+          className={`project-card ${project.id === activeProjectId ? "active" : ""}`}
+          onClick={() => onSelect(project.id)}
+          type="button"
+        >
+          <strong>{project.name}</strong>
+          <span>{project.status.replace(/_/g, " ")}</span>
+          <small>{new Date(project.updatedAt).toLocaleString()}</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function RuntimePanel({ info }: { info: PlatformInfo | null }): JSX.Element {
+  if (!info) {
+    return <div className="runtime-panel">Checking local media tools…</div>;
+  }
+  return (
+    <div className="runtime-panel">
+      <p className="eyebrow">Local runtime</p>
+      <StatusDot ok={info.ffmpegAvailable} label="FFmpeg" />
+      <StatusDot ok={info.ffprobeAvailable} label="ffprobe" />
+      <StatusDot ok={info.sayAvailable} label="macOS voiceover" />
+      <small>Data folder: {info.userDataPath}</small>
+    </div>
+  );
+}
+
+function StatusDot({ ok, label }: { ok: boolean; label: string }): JSX.Element {
+  return (
+    <span className="status-dot">
+      <span className={ok ? "dot ok" : "dot warn"} />
+      {label}
+    </span>
+  );
+}
+
+function NewProjectPanel({ onCreate, busy }: { onCreate: (profile: ProductProfile) => void; busy: boolean }): JSX.Element {
+  const [profile, setProfile] = useState<ProductProfile>(() => ({
+    ...createDefaultProfile(),
+    productName: "LeadPilot",
+    targetCustomer: "B2B SaaS founders and growth teams",
+    productDescription: "Finds qualified leads, researches context, and drafts personalized outreach from one workflow.",
+    preferredTone: "direct",
+    toneGuidance: "Plain founder voice. No hype.",
+    walkthroughNotes: "Focus on the setup, lead research, generated draft, and final success state."
+  }));
+  return (
+    <section className="hero-panel">
+      <p className="eyebrow">Create campaign</p>
+      <h2>Turn one product recording into three editable vertical video drafts.</h2>
+      <p>
+        Gideon runs locally on your Mac. It stores project state in your application data folder and renders private MP4
+        files with local FFmpeg.
+      </p>
+      <ProfileForm profile={profile} onChange={setProfile} />
+      <button className="primary" onClick={() => onCreate(profile)} disabled={busy} type="button">
+        {busy ? "Creating…" : "Create project"}
+      </button>
+    </section>
+  );
+}
+
+function ProjectWorkspace({
+  project,
+  busy,
+  setBusy,
+  setError,
+  onProject
+}: {
+  project: Project;
+  busy: BusyAction;
+  setBusy: (busy: BusyAction) => void;
+  setError: (error: string | null) => void;
+  onProject: (project: Project) => void;
+}): JSX.Element {
+  const [profile, setProfile] = useState<ProductProfile>(project.profile);
+  const [scripts, setScripts] = useState<ScriptDraft[]>(project.scripts);
+
+  useEffect(() => {
+    setProfile(project.profile);
+    setScripts(project.scripts);
+  }, [project]);
+
+  async function runAction(action: BusyAction, callback: () => Promise<Project | null>): Promise<void> {
+    setBusy(action);
+    setError(null);
+    try {
+      const updated = await callback();
+      if (updated) {
+        onProject(updated);
+      }
+    } catch (actionError) {
+      setError(messageFromError(actionError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const selectedConceptCount = project.concepts.filter((concept) => concept.selected).length;
+
+  return (
+    <div className="project-workspace">
+      <header className="project-header">
+        <div>
+          <p className="eyebrow">Project</p>
+          <h2>{project.name}</h2>
+          <p>{project.profile.productDescription}</p>
+        </div>
+        <div className="header-metrics">
+          <Metric label="Moments" value={project.moments.length} />
+          <Metric label="Concepts" value={project.concepts.length} />
+          <Metric label="Scripts" value={project.scripts.length} />
+          <Metric label="Renders" value={project.renders.filter((render) => render.status === "completed").length} />
+        </div>
+      </header>
+
+      <Stepper project={project} />
+
+      <section className="grid two">
+        <Panel title="1. Product context" eyebrow="Grounding">
+          <ProfileForm profile={profile} onChange={setProfile} />
+          <button
+            className="secondary"
+            disabled={busy === "saving"}
+            onClick={() => void runAction("saving", () => window.gideon.updateProfile(project.id, profile))}
+            type="button"
+          >
+            Save context
+          </button>
+        </Panel>
+
+        <Panel title="2. Recording" eyebrow="Input media">
+          {project.recording ? (
+            <div className="recording-card">
+              <video src={project.recording.fileUrl} controls />
+              <div>
+                <strong>{project.recording.fileName}</strong>
+                <p>
+                  {project.recording.width}×{project.recording.height} · {Math.round(project.recording.durationMs / 1000)}s ·{" "}
+                  {project.recording.videoCodec}
+                  {project.recording.audioCodec ? ` + ${project.recording.audioCodec}` : " · no audio"}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="muted">Choose an MP4, MOV, or WebM product walkthrough.</p>
+          )}
+          <button
+            className="secondary"
+            disabled={busy === "recording"}
+            onClick={() => void runAction("recording", () => window.gideon.chooseRecording(project.id))}
+            type="button"
+          >
+            {project.recording ? "Replace recording" : "Choose recording"}
+          </button>
+        </Panel>
+      </section>
+
+      <Panel title="3. Analysis and moments" eyebrow="Evidence">
+        <div className="action-row">
+          <button
+            className="primary"
+            disabled={!project.recording || busy === "analysis"}
+            onClick={() => void runAction("analysis", () => window.gideon.runAnalysis(project.id))}
+            type="button"
+          >
+            {busy === "analysis" ? "Analyzing…" : "Analyze recording"}
+          </button>
+          <p className="muted">Gideon samples representative frames and creates editable moments from the timeline.</p>
+        </div>
+        <MomentGrid
+          moments={project.moments}
+          onChange={(moments) => void runAction("saving", () => window.gideon.updateMoments(project.id, moments))}
+        />
+      </Panel>
+
+      <Panel title="4. Concepts" eyebrow="10 angles">
+        <div className="action-row">
+          <button
+            className="primary"
+            disabled={project.moments.length === 0 || busy === "concepts"}
+            onClick={() => void runAction("concepts", () => window.gideon.generateConcepts(project.id))}
+            type="button"
+          >
+            {busy === "concepts" ? "Generating…" : "Generate 10 concepts"}
+          </button>
+          <p className="muted">Select up to three. Current selection: {selectedConceptCount}/3.</p>
+        </div>
+        <ConceptGrid
+          concepts={project.concepts}
+          moments={project.moments}
+          onChange={(concepts, changedId) =>
+            void runAction("saving", () => window.gideon.updateConcepts(project.id, concepts, changedId))
+          }
+        />
+      </Panel>
+
+      <Panel title="5. Scripts and captions" eyebrow="Review gate">
+        <div className="action-row">
+          <button
+            className="primary"
+            disabled={selectedConceptCount === 0 || busy === "scripts"}
+            onClick={() => void runAction("scripts", () => window.gideon.generateScripts(project.id))}
+            type="button"
+          >
+            {busy === "scripts" ? "Writing…" : "Generate scripts"}
+          </button>
+          <button
+            className="secondary"
+            disabled={scripts.length === 0 || busy === "saving"}
+            onClick={() => void runAction("saving", () => window.gideon.updateScripts(project.id, scripts))}
+            type="button"
+          >
+            Save script edits
+          </button>
+        </div>
+        <ScriptEditor scripts={scripts} setScripts={setScripts} />
+      </Panel>
+
+      <Panel title="6. Render and export" eyebrow="Downloadable MP4">
+        <div className="action-row">
+          <button
+            className="primary"
+            disabled={project.scripts.length === 0 || busy === "rendering"}
+            onClick={() => void runAction("rendering", () => window.gideon.renderSelected(project.id))}
+            type="button"
+          >
+            {busy === "rendering" ? "Rendering MP4 drafts…" : "Render selected drafts"}
+          </button>
+          <p className="muted">Outputs are 1080×1920 H.264/AAC MP4 files with burned-in captions.</p>
+        </div>
+        <RenderGallery
+          project={project}
+          exporting={busy === "exporting"}
+          onExport={(renderId) =>
+            void runAction("exporting", async () => {
+              const exported = await window.gideon.exportVideo(project.id, renderId);
+              if (exported) {
+                await window.gideon.revealPath(exported);
+              }
+              return project;
+            })
+          }
+        />
+      </Panel>
+    </div>
+  );
+}
+
+function ProfileForm({
+  profile,
+  onChange
+}: {
+  profile: ProductProfile;
+  onChange: (profile: ProductProfile) => void;
+}): JSX.Element {
+  function update<K extends keyof ProductProfile>(key: K, value: ProductProfile[K]): void {
+    onChange({ ...profile, [key]: value });
+  }
+
+  function togglePlatform(platform: Platform): void {
+    const next = profile.platforms.includes(platform)
+      ? profile.platforms.filter((candidate) => candidate !== platform)
+      : [...profile.platforms, platform];
+    update("platforms", next);
+  }
+
+  return (
+    <form className="profile-form">
+      <label>
+        Product name
+        <input value={profile.productName} onChange={(event) => update("productName", event.target.value)} />
+      </label>
+      <label>
+        Target customer
+        <textarea value={profile.targetCustomer} onChange={(event) => update("targetCustomer", event.target.value)} rows={2} />
+      </label>
+      <label>
+        Product outcome
+        <textarea
+          value={profile.productDescription}
+          onChange={(event) => update("productDescription", event.target.value)}
+          rows={3}
+        />
+      </label>
+      <label>
+        Tone
+        <select value={profile.preferredTone} onChange={(event) => update("preferredTone", event.target.value as ProductProfile["preferredTone"])}>
+          {Object.entries(toneLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Tone guidance
+        <input value={profile.toneGuidance} onChange={(event) => update("toneGuidance", event.target.value)} />
+      </label>
+      <label>
+        Walkthrough notes
+        <textarea
+          value={profile.walkthroughNotes}
+          onChange={(event) => update("walkthroughNotes", event.target.value)}
+          rows={3}
+        />
+      </label>
+      <div className="platform-picker" aria-label="Platforms">
+        {platforms.map((platform) => (
+          <button
+            key={platform}
+            className={profile.platforms.includes(platform) ? "chip selected" : "chip"}
+            onClick={(event) => {
+              event.preventDefault();
+              togglePlatform(platform);
+            }}
+            type="button"
+          >
+            {platformLabels[platform]}
+          </button>
+        ))}
+      </div>
+    </form>
+  );
+}
+
+function Stepper({ project }: { project: Project }): JSX.Element {
+  const steps = [
+    ["Context", Boolean(project.profile.productName)],
+    ["Recording", Boolean(project.recording)],
+    ["Moments", project.moments.length > 0],
+    ["Concepts", project.concepts.length === 10],
+    ["Scripts", project.scripts.length > 0],
+    ["Renders", project.renders.some((render) => render.status === "completed")]
+  ] as const;
+  return (
+    <ol className="stepper">
+      {steps.map(([label, complete]) => (
+        <li key={label} className={complete ? "complete" : ""}>
+          <span>{complete ? "✓" : "•"}</span>
+          {label}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function MomentGrid({
+  moments,
+  onChange
+}: {
+  moments: DetectedMoment[];
+  onChange: (moments: DetectedMoment[]) => void;
+}): JSX.Element {
+  if (moments.length === 0) {
+    return <div className="empty-inline">No moments yet. Analyze a validated recording first.</div>;
+  }
+  return (
+    <div className="moment-grid">
+      {moments.map((moment) => (
+        <article className={`moment-card ${moment.enabled ? "" : "disabled"}`} key={moment.id}>
+          {moment.thumbnailUrl ? <img src={moment.thumbnailUrl} alt="" /> : <div className="thumbnail-placeholder" />}
+          <input
+            value={moment.label}
+            onChange={(event) =>
+              onChange(moments.map((candidate) => (candidate.id === moment.id ? { ...candidate, label: event.target.value } : candidate)))
+            }
+          />
+          <p>{formatMs(moment.startMs)}–{formatMs(moment.endMs)}</p>
+          <small>{moment.evidence}</small>
+          <button
+            className="chip"
+            onClick={() =>
+              onChange(moments.map((candidate) => (candidate.id === moment.id ? { ...candidate, enabled: !candidate.enabled } : candidate)))
+            }
+            type="button"
+          >
+            {moment.enabled ? "Use moment" : "Hidden"}
+          </button>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function ConceptGrid({
+  concepts,
+  moments,
+  onChange
+}: {
+  concepts: ContentConcept[];
+  moments: DetectedMoment[];
+  onChange: (concepts: ContentConcept[], changedId: string) => void;
+}): JSX.Element {
+  if (concepts.length === 0) {
+    return <div className="empty-inline">Generate concepts after reviewing moments.</div>;
+  }
+  return (
+    <div className="concept-grid">
+      {concepts.map((concept) => (
+        <article className={`concept-card ${concept.selected ? "selected" : ""}`} key={concept.id}>
+          <div className="card-topline">
+            <span>{concept.formatFamily}</span>
+            <label className="select-toggle">
+              <input
+                type="checkbox"
+                checked={concept.selected}
+                onChange={(event) =>
+                  onChange(
+                    concepts.map((candidate) =>
+                      candidate.id === concept.id ? { ...candidate, selected: event.target.checked } : candidate
+                    ),
+                    concept.id
+                  )
+                }
+              />
+              Select
+            </label>
+          </div>
+          <h3>{concept.title}</h3>
+          <p>{concept.brief}</p>
+          <small>{concept.hookDirection}</small>
+          <div className="proof-list">
+            {concept.proofMomentIds.map((momentId) => (
+              <span key={momentId}>{moments.find((moment) => moment.id === momentId)?.label ?? "Moment"}</span>
+            ))}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function ScriptEditor({
+  scripts,
+  setScripts
+}: {
+  scripts: ScriptDraft[];
+  setScripts: (scripts: ScriptDraft[]) => void;
+}): JSX.Element {
+  if (scripts.length === 0) {
+    return <div className="empty-inline">Generate scripts from selected concepts, then edit voiceover and CTA before render.</div>;
+  }
+
+  function updateScript(scriptId: string, patch: Partial<ScriptDraft>): void {
+    setScripts(
+      scripts.map((script) => {
+        if (script.id !== scriptId) {
+          return script;
+        }
+        const next = { ...script, ...patch };
+        if (patch.voiceoverText) {
+          next.captions = splitCaptionSegments(patch.voiceoverText, Math.max(...script.captions.map((caption) => caption.endMs), 30_000));
+        }
+        return next;
+      })
+    );
+  }
+
+  return (
+    <div className="script-stack">
+      {scripts.map((script, index) => (
+        <article className="script-card" key={script.id}>
+          <p className="eyebrow">Draft {index + 1}</p>
+          <label>
+            Hook
+            <input value={script.hook} onChange={(event) => updateScript(script.id, { hook: event.target.value })} />
+          </label>
+          <label>
+            Voiceover
+            <textarea
+              value={script.voiceoverText}
+              onChange={(event) => updateScript(script.id, { voiceoverText: event.target.value })}
+              rows={6}
+            />
+          </label>
+          <label>
+            CTA
+            <input value={script.cta} onChange={(event) => updateScript(script.id, { cta: event.target.value })} />
+          </label>
+          <div className="caption-preview">
+            {script.captions.slice(0, 4).map((caption) => (
+              <span key={`${script.id}-${caption.startMs}`}>{caption.text}</span>
+            ))}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function RenderGallery({
+  project,
+  exporting,
+  onExport
+}: {
+  project: Project;
+  exporting: boolean;
+  onExport: (renderId: string) => void;
+}): JSX.Element {
+  if (project.renders.length === 0) {
+    return <div className="empty-inline">No renders yet. Render selected drafts to create local MP4 files.</div>;
+  }
+  return (
+    <div className="render-grid">
+      {project.renders.map((render) => (
+        <article className="render-card" key={render.id}>
+          <h3>{render.title}</h3>
+          {render.status === "completed" && render.outputUrl ? (
+            <video src={render.outputUrl} controls />
+          ) : (
+            <div className="render-error">{render.error ?? "Render failed."}</div>
+          )}
+          {render.validation ? (
+            <p>
+              {render.validation.width}×{render.validation.height} · {Math.round(render.validation.durationMs / 1000)}s ·{" "}
+              {render.validation.videoCodec}/{render.validation.audioCodec}
+            </p>
+          ) : null}
+          <div className="action-row">
+            <button className="secondary" disabled={render.status !== "completed" || exporting} onClick={() => onExport(render.id)} type="button">
+              Export MP4
+            </button>
+            {render.outputPath ? (
+              <button className="ghost" onClick={() => void window.gideon.revealPath(render.outputPath!)} type="button">
+                Show file
+              </button>
+            ) : null}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function Panel({
+  title,
+  eyebrow,
+  children
+}: {
+  title: string;
+  eyebrow: string;
+  children: React.ReactNode;
+}): JSX.Element {
+  return (
+    <section className="panel">
+      <p className="eyebrow">{eyebrow}</p>
+      <h2>{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }): JSX.Element {
+  return (
+    <div className="metric">
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function formatMs(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function messageFromError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Something went wrong.";
+}
+
+createRoot(document.getElementById("root")!).render(<App />);
+
