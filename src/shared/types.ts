@@ -19,6 +19,70 @@ export type JobKind = "analysis" | "transcription" | "semantic_analysis" | "ocr"
 
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceling" | "canceled";
 
+export type WorkspaceRole = "owner" | "admin" | "editor" | "viewer";
+
+export type WorkspacePlan = "local_mvp" | "starter" | "team" | "enterprise";
+
+export type BillingStatus = "not_configured" | "trialing" | "active" | "past_due" | "canceled";
+
+export type UsageMetric =
+  | "source_minutes"
+  | "transcription_minutes"
+  | "llm_runs"
+  | "tts_characters"
+  | "render_minutes"
+  | "storage_bytes"
+  | "exports";
+
+export interface UserAccount {
+  id: string;
+  email: string;
+  displayName: string;
+  createdAt: string;
+}
+
+export interface WorkspaceEntitlements {
+  sourceMinutesMonthly: number;
+  transcriptionMinutesMonthly: number;
+  llmRunsMonthly: number;
+  ttsCharactersMonthly: number;
+  renderMinutesMonthly: number;
+  storageBytes: number;
+  exportsMonthly: number;
+  maxProjects: number;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+  plan: WorkspacePlan;
+  billingStatus: BillingStatus;
+  entitlements: WorkspaceEntitlements;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkspaceMember {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  role: WorkspaceRole;
+  createdAt: string;
+}
+
+export interface UsageEvent {
+  id: string;
+  workspaceId: string;
+  projectId?: string;
+  metric: UsageMetric;
+  quantity: number;
+  unit: "minute" | "count" | "character" | "byte";
+  source: "recording" | "transcription" | "analysis" | "ocr" | "tts" | "render" | "export";
+  idempotencyKey: string;
+  createdAt: string;
+}
+
 export interface JobRecord {
   id: string;
   projectId: string;
@@ -190,6 +254,7 @@ export interface RenderedVideo {
 
 export interface Project {
   id: string;
+  workspaceId: string;
   name: string;
   status: ProjectStatus;
   profile: ProductProfile;
@@ -208,6 +273,12 @@ export interface Project {
 }
 
 export interface AppState {
+  users: UserAccount[];
+  workspaces: Workspace[];
+  workspaceMembers: WorkspaceMember[];
+  usageEvents: UsageEvent[];
+  activeUserId: string | null;
+  activeWorkspaceId: string | null;
   projects: Project[];
   activeProjectId: string | null;
 }

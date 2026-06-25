@@ -8,10 +8,18 @@ import type {
   PlatformInfo,
   ProductProfile,
   Project,
-  ScriptDraft
+  ScriptDraft,
+  UsageMetric
 } from "../shared/types";
 import { platformLabels, toneLabels } from "../shared/types";
 import { createDefaultProfile, splitCaptionSegments } from "../shared/contentEngine";
+import {
+  createLocalUserWorkspace,
+  entitlementLimit,
+  formatQuantity,
+  summarizeUsage,
+  usageMetricLabels
+} from "../shared/usage";
 import "./styles.css";
 
 type BusyAction =
@@ -28,7 +36,7 @@ type BusyAction =
 const platforms: Platform[] = ["tiktok", "instagram_reels", "youtube_shorts", "linkedin", "other"];
 
 function App(): JSX.Element {
-  const [state, setState] = useState<AppState>({ projects: [], activeProjectId: null });
+  const [state, setState] = useState<AppState>(() => createEmptyAppState());
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [platformInfo, setPlatformInfo] = useState<PlatformInfo | null>(null);
   const [busy, setBusy] = useState<BusyAction>("loading");
@@ -41,9 +49,14 @@ function App(): JSX.Element {
   const refreshProject = (project: Project): void => {
     setActiveProject(project);
     setState((current) => ({
+      ...current,
       activeProjectId: project.id,
       projects: [project, ...current.projects.filter((candidate) => candidate.id !== project.id)]
     }));
+    void window.gideon
+      .listProjects()
+      .then((nextState) => setState(nextState))
+      .catch(() => undefined);
   };
 
   async function loadInitialState(): Promise<void> {
@@ -110,6 +123,7 @@ function App(): JSX.Element {
           activeProjectId={activeProject?.id ?? null}
           onSelect={(projectId) => void chooseProject(projectId)}
         />
+        <WorkspacePanel state={state} />
         <RuntimePanel info={platformInfo} />
       </aside>
 
@@ -129,6 +143,15 @@ function App(): JSX.Element {
       </section>
     </main>
   );
+}
+
+function createEmptyAppState(): AppState {
+  return {
+    ...createLocalUserWorkspace(),
+    usageEvents: [],
+    projects: [],
+    activeProjectId: null
+  };
 }
 
 function ProjectList({
@@ -180,6 +203,32 @@ function RuntimePanel({ info }: { info: PlatformInfo | null }): JSX.Element {
         <small>Set OPENAI_API_KEY or GIDEON_OPENAI_API_KEY before launching to enable real AI, ASR, and provider TTS.</small>
       )}
       <small>Data folder: {info.userDataPath}</small>
+    </div>
+  );
+}
+
+function WorkspacePanel({ state }: { state: AppState }): JSX.Element | null {
+  const workspace = state.workspaces.find((candidate) => candidate.id === state.activeWorkspaceId) ?? state.workspaces[0];
+  if (!workspace) {
+    return null;
+  }
+  const summary = summarizeUsage(state.usageEvents, workspace.id);
+  const metrics: UsageMetric[] = ["source_minutes", "llm_runs", "tts_characters", "render_minutes", "exports"];
+  return (
+    <div className="workspace-panel">
+      <p className="eyebrow">Workspace</p>
+      <strong>{workspace.name}</strong>
+      <small>
+        {workspace.plan.replace(/_/g, " ")} · billing {workspace.billingStatus.replace(/_/g, " ")}
+      </small>
+      <div className="usage-list">
+        {metrics.map((metric) => (
+          <span key={metric}>
+            {usageMetricLabels[metric]}: {formatQuantity(summary[metric], metric)} /{" "}
+            {formatQuantity(entitlementLimit(workspace.entitlements, metric), metric)}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

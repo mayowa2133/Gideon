@@ -23,8 +23,19 @@ import type {
   RecordingMetadata,
   RenderedVideo,
   ScriptDraft,
-  TranscriptArtifact
+  TranscriptArtifact,
+  UsageEvent,
+  UsageMetric
 } from "../shared/types";
+import {
+  assertWithinEntitlement,
+  createLocalUserWorkspace,
+  DEFAULT_LOCAL_USER_ID,
+  DEFAULT_LOCAL_WORKSPACE_ID,
+  defaultLocalEntitlements,
+  mergeUsageEvent,
+  summarizeUsage
+} from "../shared/usage";
 
 const STORE_FILE = "gideon-store.json";
 
@@ -44,7 +55,7 @@ export class GideonStore {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         throw error;
       }
-      this.state = { projects: [], activeProjectId: null };
+      this.state = createInitialAppState();
       await this.save();
     }
     return this.state;
@@ -52,12 +63,13 @@ export class GideonStore {
 
   async listProjects(): Promise<Project[]> {
     const state = await this.load();
-    return state.projects;
+    return state.projects.filter((project) => project.workspaceId === state.activeWorkspaceId);
   }
 
   async getActiveProject(): Promise<Project | null> {
     const state = await this.load();
-    return state.projects.find((project) => project.id === state.activeProjectId) ?? state.projects[0] ?? null;
+    const workspaceProjects = state.projects.filter((project) => project.workspaceId === state.activeWorkspaceId);
+    return workspaceProjects.find((project) => project.id === state.activeProjectId) ?? workspaceProjects[0] ?? null;
   }
 
   async getProject(projectId: string): Promise<Project> {
@@ -75,9 +87,17 @@ export class GideonStore {
     if (errors.length > 0) {
       throw new Error(errors.join(" "));
     }
+    const state = await this.load();
+    const workspaceId = state.activeWorkspaceId ?? DEFAULT_LOCAL_WORKSPACE_ID;
+    const workspace = requireWorkspace(state, workspaceId);
+    const workspaceProjectCount = state.projects.filter((project) => project.workspaceId === workspaceId).length;
+    if (workspaceProjectCount >= workspace.entitlements.maxProjects) {
+      throw new Error(`Project limit exceeded. This workspace allows ${workspace.entitlements.maxProjects} projects.`);
+    }
     const now = new Date().toISOString();
     const project: Project = {
       id: randomUUID(),
+      workspaceId,
       name: input.name.trim() || profile.productName,
       status: "draft",
       profile,
@@ -91,7 +111,6 @@ export class GideonStore {
       createdAt: now,
       updatedAt: now
     };
-    const state = await this.load();
     state.projects.unshift(project);
     state.activeProjectId = project.id;
     await this.save();
@@ -227,6 +246,47 @@ export class GideonStore {
     });
   }
 
+  async assertUsageAvailable(projectId: string, metric: UsageMetric, additionalQuantity: number): Promise<void> {
+    const state = await this.load();
+    const project = state.projects.find((candidate) => candidate.id === projectId);
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const workspace = requireWorkspace(state, project.workspaceId);
+    assertWithinEntitlement({
+      entitlements: workspace.entitlements,
+      summary: summarizeUsage(state.usageEvents, workspace.id),
+      metric,
+      additionalQuantity
+    });
+  }
+
+  async recordUsage(
+    projectId: string,
+    input: Omit<UsageEvent, "id" | "workspaceId" | "projectId" | "createdAt"> & { createdAt?: string }
+  ): Promise<Project> {
+    const state = await this.load();
+    const project = state.projects.find((candidate) => candidate.id === projectId);
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const now = input.createdAt ?? new Date().toISOString();
+    state.usageEvents = mergeUsageEvent(state.usageEvents, {
+      id: randomUUID(),
+      workspaceId: project.workspaceId,
+      projectId,
+      metric: input.metric,
+      quantity: input.quantity,
+      unit: input.unit,
+      source: input.source,
+      idempotencyKey: input.idempotencyKey,
+      createdAt: now
+    });
+    project.updatedAt = now;
+    await this.save();
+    return project;
+  }
+
   async appendJob(projectId: string, job: JobRecord): Promise<Project> {
     return this.updateProject(projectId, (project) => {
       project.jobs = [...(project.jobs ?? []), job];
@@ -259,7 +319,8 @@ export class GideonStore {
     const state = await this.load();
     state.projects = state.projects.filter((project) => project.id !== projectId);
     if (state.activeProjectId === projectId) {
-      state.activeProjectId = state.projects[0]?.id ?? null;
+      state.activeProjectId =
+        state.projects.find((project) => project.workspaceId === state.activeWorkspaceId)?.id ?? null;
     }
     await this.save();
     return state;
@@ -298,10 +359,32 @@ export class GideonStore {
 }
 
 function normalizeAppState(state: AppState): AppState {
+  const raw = state as Partial<AppState>;
+  const local = createLocalUserWorkspace();
+  const users = raw.users?.length ? raw.users : local.users;
+  const workspaces = raw.workspaces?.length
+    ? raw.workspaces.map((workspace) => ({
+        ...workspace,
+        entitlements: {
+          ...defaultLocalEntitlements,
+          ...workspace.entitlements
+        }
+      }))
+    : local.workspaces;
+  const workspaceMembers = raw.workspaceMembers?.length ? raw.workspaceMembers : local.workspaceMembers;
+  const activeUserId = raw.activeUserId ?? users[0]?.id ?? DEFAULT_LOCAL_USER_ID;
+  const activeWorkspaceId = raw.activeWorkspaceId ?? workspaces[0]?.id ?? DEFAULT_LOCAL_WORKSPACE_ID;
   return {
-    activeProjectId: state.activeProjectId ?? null,
-    projects: (state.projects ?? []).map((project) => ({
+    users,
+    workspaces,
+    workspaceMembers,
+    usageEvents: raw.usageEvents ?? [],
+    activeUserId,
+    activeWorkspaceId,
+    activeProjectId: raw.activeProjectId ?? null,
+    projects: (raw.projects ?? []).map((project) => ({
       ...project,
+      workspaceId: project.workspaceId ?? activeWorkspaceId,
       moments: project.moments ?? [],
       frameEvidence: project.frameEvidence ?? [],
       concepts: project.concepts ?? [],
@@ -311,6 +394,23 @@ function normalizeAppState(state: AppState): AppState {
       jobs: project.jobs ?? []
     }))
   };
+}
+
+function createInitialAppState(): AppState {
+  return {
+    ...createLocalUserWorkspace(),
+    usageEvents: [],
+    projects: [],
+    activeProjectId: null
+  };
+}
+
+function requireWorkspace(state: AppState, workspaceId: string) {
+  const workspace = state.workspaces.find((candidate) => candidate.id === workspaceId);
+  if (!workspace) {
+    throw new Error("Workspace not found.");
+  }
+  return workspace;
 }
 
 export function newProjectTemplate(): CreateProjectInput {

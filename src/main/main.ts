@@ -9,7 +9,7 @@ import {
   renderDraft
 } from "./media";
 import { GideonStore } from "./store";
-import type { ContentConcept, DetectedMoment, ScriptDraft } from "../shared/types";
+import type { AppState, ContentConcept, DetectedMoment, Project, ProviderRun, RenderedVideo, ScriptDraft } from "../shared/types";
 import { runAnalysisPipeline, safeProviderError } from "./analysisPipeline";
 import { loadProviderConfig } from "./providers/config";
 import { OpenAiProvider } from "./providers/openai";
@@ -70,17 +70,17 @@ function registerIpcHandlers(): void {
     ...(await getToolAvailability())
   }));
 
-  ipcMain.handle("project:list", async () => ({
-    projects: await store.listProjects(),
-    activeProjectId: (await store.getActiveProject())?.id ?? null
-  }));
+  ipcMain.handle("project:list", async () => activeWorkspaceState());
 
   ipcMain.handle("project:set-active", async (_event, projectId: string) => store.setActiveProject(projectId));
   ipcMain.handle("project:create", async (_event, input) => store.createProject(input));
   ipcMain.handle("project:update-profile", async (_event, projectId: string, profile) =>
     store.updateProfile(projectId, profile)
   );
-  ipcMain.handle("project:delete", async (_event, projectId: string) => store.deleteProject(projectId));
+  ipcMain.handle("project:delete", async (_event, projectId: string) => {
+    await store.deleteProject(projectId);
+    return activeWorkspaceState();
+  });
 
   ipcMain.handle("recording:choose", async (_event, projectId: string) => {
     const options = {
@@ -98,7 +98,24 @@ function registerIpcHandlers(): void {
       return null;
     }
     const recording = await probeRecording(result.filePaths[0]);
-    return store.attachRecording(projectId, recording);
+    const sourceMinutes = minutesForDuration(recording.durationMs);
+    await store.assertUsageAvailable(projectId, "source_minutes", sourceMinutes);
+    await store.assertUsageAvailable(projectId, "storage_bytes", recording.sizeBytes);
+    await store.attachRecording(projectId, recording);
+    await store.recordUsage(projectId, {
+      metric: "source_minutes",
+      quantity: sourceMinutes,
+      unit: "minute",
+      source: "recording",
+      idempotencyKey: `recording:${projectId}:${recording.validatedAt}:source_minutes`
+    });
+    return store.recordUsage(projectId, {
+      metric: "storage_bytes",
+      quantity: recording.sizeBytes,
+      unit: "byte",
+      source: "recording",
+      idempotencyKey: `recording:${projectId}:${recording.validatedAt}:storage_bytes`
+    });
   });
 
   ipcMain.handle("analysis:run", async (_event, projectId: string) => {
@@ -106,6 +123,8 @@ function registerIpcHandlers(): void {
     if (!project.recording) {
       throw new Error("Choose a recording before analysis.");
     }
+    await assertAnalysisQuota(project);
+    const providerRunStartCount = project.providerRuns.length;
     let job = createJob({
       id: randomUUID(),
       projectId,
@@ -117,9 +136,10 @@ function registerIpcHandlers(): void {
     job = startJob(job, new Date().toISOString(), "Analyzing recording evidence.");
     await store.updateJob(projectId, job);
     try {
-      await store.runAnalysis(projectId, (analysisProject, moments) =>
+      const analyzed = await store.runAnalysis(projectId, (analysisProject, moments) =>
         runAnalysisPipeline(analysisProject, moments, store.projectDir(projectId))
       );
+      await recordAnalysisUsage(projectId, analyzed, analyzed.providerRuns.slice(providerRunStartCount));
       job = succeedJob(job, new Date().toISOString(), "Analysis completed.");
       return store.updateJob(projectId, job);
     } catch (error) {
@@ -155,6 +175,7 @@ function registerIpcHandlers(): void {
     if (scripts.length === 0) {
       throw new Error("Generate scripts before rendering.");
     }
+    await store.assertUsageAvailable(projectId, "render_minutes", scripts.length);
     let job = createJob({
       id: randomUUID(),
       projectId,
@@ -207,6 +228,7 @@ function registerIpcHandlers(): void {
         }
       }
       await store.replaceRenders(projectId, renders);
+      await recordRenderUsage(projectId, renders);
       job = renders.some((render) => render.status === "failed")
         ? failJob(job, new Date().toISOString(), "One or more render drafts failed.")
         : succeedJob(job, new Date().toISOString(), "Rendering completed.");
@@ -233,13 +255,31 @@ function registerIpcHandlers(): void {
     if (result.canceled || !result.filePath) {
       return null;
     }
+    await store.assertUsageAvailable(projectId, "exports", 1);
     await copyExport(render.outputPath, result.filePath);
+    await store.recordUsage(projectId, {
+      metric: "exports",
+      quantity: 1,
+      unit: "count",
+      source: "export",
+      idempotencyKey: `export:${projectId}:${renderId}:${result.filePath}`
+    });
     return result.filePath;
   });
 
   ipcMain.handle("shell:reveal", async (_event, filePath: string) => {
     shell.showItemInFolder(filePath);
   });
+}
+
+async function activeWorkspaceState(): Promise<AppState> {
+  const state = await store.load();
+  const activeProject = await store.getActiveProject();
+  return {
+    ...state,
+    projects: await store.listProjects(),
+    activeProjectId: activeProject?.id ?? null
+  };
 }
 
 async function createProviderVoiceover(projectId: string, script: ScriptDraft): Promise<string | null> {
@@ -251,6 +291,7 @@ async function createProviderVoiceover(projectId: string, script: ScriptDraft): 
   const startedAt = new Date().toISOString();
   const outputPath = path.join(store.projectDir(projectId), "voiceovers", `${script.id}.wav`);
   try {
+    await store.assertUsageAvailable(projectId, "tts_characters", script.voiceoverText.length);
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     const result = await provider.synthesizeSpeech({
       text: script.voiceoverText,
@@ -268,6 +309,13 @@ async function createProviderVoiceover(projectId: string, script: ScriptDraft): 
         finishedAt: new Date().toISOString()
       }
     ]);
+    await store.recordUsage(projectId, {
+      metric: "tts_characters",
+      quantity: script.voiceoverText.length,
+      unit: "character",
+      source: "tts",
+      idempotencyKey: `tts:${projectId}:${script.id}:${startedAt}`
+    });
     return result.outputPath;
   } catch (error) {
     await store.appendProviderRuns(projectId, [
@@ -284,4 +332,75 @@ async function createProviderVoiceover(projectId: string, script: ScriptDraft): 
     ]);
     return null;
   }
+}
+
+async function assertAnalysisQuota(project: Project): Promise<void> {
+  const config = loadProviderConfig();
+  if (!config.openai.apiKey || !project.recording) {
+    return;
+  }
+  const estimatedLlmRuns = 1 + 4;
+  await store.assertUsageAvailable(project.id, "llm_runs", estimatedLlmRuns);
+  if (project.recording.hasAudio) {
+    await store.assertUsageAvailable(project.id, "transcription_minutes", minutesForDuration(project.recording.durationMs));
+  }
+}
+
+async function recordAnalysisUsage(projectId: string, project: Project, providerRuns: ProviderRun[]): Promise<void> {
+  const completedTranscription = providerRuns.some(
+    (run) => run.kind === "transcription" && run.provider === "openai" && run.status === "completed"
+  );
+  if (completedTranscription && project.recording) {
+    const quantity = minutesForDuration(project.recording.durationMs);
+    await store.recordUsage(projectId, {
+      metric: "transcription_minutes",
+      quantity,
+      unit: "minute",
+      source: "transcription",
+      idempotencyKey: `transcription:${projectId}:${project.transcript?.id ?? providerRuns[0]?.id}`
+    });
+  }
+
+  const completedAnalysisRuns = providerRuns.filter(
+    (run) => run.kind === "analysis" && run.provider === "openai" && run.status === "completed"
+  ).length;
+  if (completedAnalysisRuns > 0) {
+    await store.recordUsage(projectId, {
+      metric: "llm_runs",
+      quantity: completedAnalysisRuns,
+      unit: "count",
+      source: "analysis",
+      idempotencyKey: `analysis:${projectId}:${providerRuns.find((run) => run.kind === "analysis")?.id ?? randomUUID()}`
+    });
+  }
+
+  const completedOcrFrames = project.frameEvidence.filter((frame) => frame.ocrProvider === "openai").length;
+  if (completedOcrFrames > 0) {
+    await store.recordUsage(projectId, {
+      metric: "llm_runs",
+      quantity: completedOcrFrames,
+      unit: "count",
+      source: "ocr",
+      idempotencyKey: `ocr:${projectId}:${providerRuns.find((run) => run.kind === "ocr")?.id ?? randomUUID()}`
+    });
+  }
+}
+
+async function recordRenderUsage(projectId: string, renders: RenderedVideo[]): Promise<void> {
+  for (const render of renders) {
+    if (render.status !== "completed" || !render.validation) {
+      continue;
+    }
+    await store.recordUsage(projectId, {
+      metric: "render_minutes",
+      quantity: minutesForDuration(render.validation.durationMs),
+      unit: "minute",
+      source: "render",
+      idempotencyKey: `render:${projectId}:${render.id}`
+    });
+  }
+}
+
+function minutesForDuration(durationMs: number): number {
+  return Math.max(1, Math.ceil(durationMs / 60_000));
 }

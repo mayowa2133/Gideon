@@ -169,7 +169,8 @@ video {
 
 .project-card,
 .muted-card,
-.runtime-panel {
+.runtime-panel,
+.workspace-panel {
   width: 100%;
   text-align: left;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -202,6 +203,23 @@ video {
   display: grid;
   gap: 0.5rem;
   margin-top: 1rem;
+}
+
+.workspace-panel {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.workspace-panel small,
+.usage-list {
+  color: #9ba8c2;
+}
+
+.usage-list {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.78rem;
 }
 
 .status-dot {
