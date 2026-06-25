@@ -1,8 +1,10 @@
 import { pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
+import { createWriteStream, existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import PImage from "pureimage";
 import type {
   DetectedMoment,
   ProductProfile,
@@ -145,7 +147,7 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   const renderDir = path.join(input.projectDir, "renders", input.script.id);
   await fs.mkdir(renderDir, { recursive: true });
   const outputPath = path.join(renderDir, safeFileName(`${input.title}.mp4`));
-  const subtitlePath = path.join(renderDir, "captions.ass");
+  const overlayPath = path.join(renderDir, "overlay.png");
   const voicePath = path.join(renderDir, "voiceover.aiff");
   const audioPath = path.join(renderDir, "audio.m4a");
   const durationMs = Math.min(
@@ -156,7 +158,7 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   const sourceStartMs = clamp(input.moment?.startMs ?? 0, 0, Math.max(input.recording.durationMs - 2_000, 0));
   const sourceDurationSec = Math.max(8, durationMs / 1000);
 
-  await fs.writeFile(subtitlePath, buildAssSubtitles(input.script, input.profile, durationMs), "utf8");
+  await createCaptionOverlay(input.profile, input.script, overlayPath);
   const voiceCreated = await createVoiceover(input.script.voiceoverText, voicePath);
   if (!voiceCreated) {
     await createSilentAudio(audioPath, sourceDurationSec);
@@ -164,8 +166,9 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
 
   const audioInput = voiceCreated ? voicePath : audioPath;
   const filter = [
-    `[0:v]${videoFilter(subtitlePath)}[v]`,
-    `[1:a]apad,atrim=0:${sourceDurationSec.toFixed(3)},asetpts=N/SR/TB[a]`
+    `[0:v]${videoFilter()}[base]`,
+    "[base][1:v]overlay=0:0:shortest=1[v]",
+    `[2:a]apad,atrim=0:${sourceDurationSec.toFixed(3)},asetpts=N/SR/TB[a]`
   ].join(";");
 
   await runCommand(resolveFfmpeg(), [
@@ -179,6 +182,10 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     sourceDurationSec.toFixed(3),
     "-i",
     input.recording.filePath,
+    "-loop",
+    "1",
+    "-i",
+    overlayPath,
     "-i",
     audioInput,
     "-filter_complex",
@@ -187,6 +194,8 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     "[v]",
     "-map",
     "[a]",
+    "-t",
+    sourceDurationSec.toFixed(3),
     "-r",
     "30",
     "-c:v",
@@ -262,6 +271,9 @@ async function ffprobe(filePath: string): Promise<ProbeResult> {
 }
 
 async function createVoiceover(text: string, outputPath: string): Promise<boolean> {
+  if (process.env.GIDEON_DISABLE_SAY === "1") {
+    return false;
+  }
   if (!(await commandExists("/usr/bin/say"))) {
     return false;
   }
@@ -296,46 +308,87 @@ async function createSilentAudio(outputPath: string, durationSec: number): Promi
   ]);
 }
 
-function buildAssSubtitles(script: ScriptDraft, profile: ProductProfile, durationMs: number): string {
-  const hookEnd = Math.min(4_000, durationMs);
-  const ctaStart = Math.max(durationMs - 4_000, hookEnd);
-  const events = [
-    assDialogue(0, hookEnd, "Hook", script.hook),
-    ...script.captions.map((caption) =>
-      assDialogue(caption.startMs, Math.min(caption.endMs, durationMs), "Caption", caption.text)
-    ),
-    assDialogue(ctaStart, durationMs, "Cta", script.cta)
-  ];
-  return [
-    "[Script Info]",
-    "ScriptType: v4.00+",
-    "PlayResX: 1080",
-    "PlayResY: 1920",
-    `Title: Gideon ${escapeAss(profile.productName || "render")}`,
-    "",
-    "[V4+ Styles]",
-    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    "Style: Hook,Arial,74,&H00FFFFFF,&H00FFFFFF,&H7A000000,&HAA000000,1,0,0,0,100,100,0,0,1,5,2,8,80,80,230,1",
-    "Style: Caption,Arial,58,&H00FFFFFF,&H00FFFFFF,&H7A000000,&HAA000000,1,0,0,0,100,100,0,0,1,4,2,2,90,90,250,1",
-    "Style: Cta,Arial,54,&H00F5D15F,&H00FFFFFF,&H7A000000,&HAA000000,1,0,0,0,100,100,0,0,1,4,2,2,100,100,135,1",
-    "",
-    "[Events]",
-    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-    ...events
-  ].join("\n");
+async function createCaptionOverlay(profile: ProductProfile, script: ScriptDraft, outputPath: string): Promise<void> {
+  loadOverlayFont();
+  const image = PImage.make(1080, 1920);
+  const context = image.getContext("2d");
+
+  context.clearRect(0, 0, 1080, 1920);
+  drawPanel(context, 70, 105, 940, 285, "rgba(5, 7, 13, 0.72)");
+  drawPanel(context, 80, 1270, 920, 360, "rgba(5, 7, 13, 0.78)");
+  drawPanel(context, 150, 1680, 780, 130, "rgba(245, 209, 95, 0.92)");
+
+  context.fillStyle = "#f5d15f";
+  context.font = "34pt Arial";
+  context.fillText(profile.productName || "Gideon draft", 110, 165);
+
+  context.fillStyle = "#ffffff";
+  context.font = "56pt Arial";
+  drawWrappedText(context, script.hook, 110, 245, 860, 68, 3);
+
+  context.fillStyle = "#ffffff";
+  context.font = "46pt Arial";
+  const captionText = script.captions
+    .slice(0, 4)
+    .map((caption) => caption.text)
+    .join(" ");
+  drawWrappedText(context, captionText, 130, 1360, 820, 60, 4);
+
+  context.fillStyle = "#10131d";
+  context.font = "38pt Arial";
+  drawWrappedText(context, script.cta, 190, 1758, 700, 48, 2);
+
+  await PImage.encodePNGToStream(image, createWriteStream(outputPath));
 }
 
-function assDialogue(startMs: number, endMs: number, style: string, text: string): string {
-  return `Dialogue: 0,${assTime(startMs)},${assTime(Math.max(endMs, startMs + 750))},${style},,0,0,0,,${escapeAss(wrapCaption(text))}`;
+type OverlayContext = ReturnType<ReturnType<typeof PImage.make>["getContext"]>;
+
+function drawPanel(
+  context: OverlayContext,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  fillStyle: string
+): void {
+  const radius = 36;
+  context.fillStyle = fillStyle;
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.lineTo(x + width - radius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + radius);
+  context.lineTo(x + width, y + height - radius);
+  context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  context.lineTo(x + radius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - radius);
+  context.lineTo(x, y + radius);
+  context.quadraticCurveTo(x, y, x + radius, y);
+  context.closePath();
+  context.fill();
 }
 
-function wrapCaption(text: string): string {
+function drawWrappedText(
+  context: OverlayContext,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number
+): void {
+  const lines = wrapText(context, text, maxWidth).slice(0, maxLines);
+  lines.forEach((line, index) => {
+    context.fillText(line, x, y + index * lineHeight);
+  });
+}
+
+function wrapText(context: OverlayContext, text: string, maxWidth: number): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let line: string[] = [];
   for (const word of words) {
     const candidate = [...line, word].join(" ");
-    if (candidate.length > 30 && line.length > 0) {
+    if (context.measureText(candidate).width > maxWidth && line.length > 0) {
       lines.push(line.join(" "));
       line = [word];
     } else {
@@ -345,35 +398,30 @@ function wrapCaption(text: string): string {
   if (line.length > 0) {
     lines.push(line.join(" "));
   }
-  return lines.slice(0, 3).join("\\N");
+  return lines;
 }
 
-function assTime(ms: number): string {
-  const centiseconds = Math.floor(ms / 10) % 100;
-  const totalSeconds = Math.floor(ms / 1000);
-  const seconds = totalSeconds % 60;
-  const minutes = Math.floor(totalSeconds / 60) % 60;
-  const hours = Math.floor(totalSeconds / 3600);
-  return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(
-    centiseconds
-  ).padStart(2, "0")}`;
+function loadOverlayFont(): void {
+  const candidates = [
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/System/Library/Fonts/Helvetica.ttc"
+  ];
+  for (const candidate of candidates) {
+    try {
+      PImage.registerFont(candidate, "Arial").loadSync();
+      return;
+    } catch {
+      // Try the next system font.
+    }
+  }
 }
 
-function escapeAss(text: string): string {
-  return text.replace(/[{}]/g, "").replace(/\r?\n/g, "\\N");
-}
-
-function videoFilter(subtitlePath: string): string {
+function videoFilter(): string {
   return [
     "scale=1080:1920:force_original_aspect_ratio=decrease",
-    "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=0x0B1020",
-    `ass=${escapeFilterPath(subtitlePath)}`
+    "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=0x0B1020"
   ].join(",");
-}
-
-function escapeFilterPath(filePath: string): string {
-  const escaped = filePath.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/:/g, "\\:");
-  return `'${escaped}'`;
 }
 
 function parseFrameRate(rate: string | undefined): number {
@@ -410,7 +458,7 @@ function findKnownBinary(name: "ffmpeg" | "ffprobe"): string {
     `/usr/local/bin/${name}`,
     path.join(os.homedir(), ".local", "bin", name)
   ];
-  return candidates[0] ?? name;
+  return candidates.find((candidate) => existsSync(candidate)) ?? name;
 }
 
 function runCommand(
@@ -468,4 +516,3 @@ function safeFileName(name: string): string {
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
-
