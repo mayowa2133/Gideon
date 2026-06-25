@@ -31,6 +31,7 @@ type BusyAction =
   | "scripts"
   | "rendering"
   | "exporting"
+  | "job"
   | null;
 
 const platforms: Platform[] = ["tiktok", "instagram_reels", "youtube_shorts", "linkedin", "other"];
@@ -323,7 +324,12 @@ function ProjectWorkspace({
       </header>
 
       <Stepper project={project} />
-      <JobHistory project={project} />
+      <JobHistory
+        project={project}
+        busy={busy !== null}
+        onCancel={(jobId) => void runAction("job", () => window.gideon.cancelJob(project.id, jobId))}
+        onRetry={(jobId) => void runAction("job", () => window.gideon.retryJob(project.id, jobId))}
+      />
 
       <section className="grid two">
         <Panel title="1. Product context" eyebrow="Grounding">
@@ -457,7 +463,17 @@ function ProjectWorkspace({
   );
 }
 
-function JobHistory({ project }: { project: Project }): JSX.Element | null {
+function JobHistory({
+  project,
+  busy,
+  onCancel,
+  onRetry
+}: {
+  project: Project;
+  busy: boolean;
+  onCancel: (jobId: string) => void;
+  onRetry: (jobId: string) => void;
+}): JSX.Element | null {
   if (project.jobs.length === 0) {
     return null;
   }
@@ -475,6 +491,18 @@ function JobHistory({ project }: { project: Project }): JSX.Element | null {
             <small>
               attempt {job.attempt}/{job.maxAttempts} · {job.userMessage}
             </small>
+            <div className="job-actions">
+              {job.cancelable && (job.status === "queued" || job.status === "running") ? (
+                <button className="ghost compact" disabled={busy} onClick={() => onCancel(job.id)} type="button">
+                  Cancel
+                </button>
+              ) : null}
+              {job.retryable && (job.status === "failed" || job.status === "canceled") ? (
+                <button className="secondary compact" disabled={busy} onClick={() => onRetry(job.id)} type="button">
+                  Retry
+                </button>
+              ) : null}
+            </div>
           </article>
         ))}
       </div>

@@ -123,9 +123,7 @@ function registerIpcHandlers(): void {
     if (!project.recording) {
       throw new Error("Choose a recording before analysis.");
     }
-    await assertAnalysisQuota(project);
-    const providerRunStartCount = project.providerRuns.length;
-    let job = createJob({
+    const job = createJob({
       id: randomUUID(),
       projectId,
       kind: "analysis",
@@ -133,20 +131,7 @@ function registerIpcHandlers(): void {
       userMessage: "Waiting to analyze recording."
     });
     await store.appendJob(projectId, job);
-    job = startJob(job, new Date().toISOString(), "Analyzing recording evidence.");
-    await store.updateJob(projectId, job);
-    try {
-      const analyzed = await store.runAnalysis(projectId, (analysisProject, moments) =>
-        runAnalysisPipeline(analysisProject, moments, store.projectDir(projectId))
-      );
-      await recordAnalysisUsage(projectId, analyzed, analyzed.providerRuns.slice(providerRunStartCount));
-      job = succeedJob(job, new Date().toISOString(), "Analysis completed.");
-      return store.updateJob(projectId, job);
-    } catch (error) {
-      job = failJob(job, new Date().toISOString(), safeProviderError(error));
-      await store.updateJob(projectId, job);
-      throw error;
-    }
+    return runAnalysisJob(projectId, job.id);
   });
 
   ipcMain.handle("analysis:update-moments", async (_event, projectId: string, moments: DetectedMoment[]) =>
@@ -175,8 +160,7 @@ function registerIpcHandlers(): void {
     if (scripts.length === 0) {
       throw new Error("Generate scripts before rendering.");
     }
-    await store.assertUsageAvailable(projectId, "render_minutes", scripts.length);
-    let job = createJob({
+    const job = createJob({
       id: randomUUID(),
       projectId,
       kind: "render",
@@ -184,60 +168,20 @@ function registerIpcHandlers(): void {
       userMessage: "Waiting to render selected drafts."
     });
     await store.appendJob(projectId, job);
-    job = startJob(job, new Date().toISOString(), "Rendering selected drafts.");
-    await store.updateJob(projectId, job);
-    const renders = [];
-    try {
-      for (const script of scripts.slice(0, 3)) {
-        const concept = project.concepts.find((candidate) => candidate.id === script.conceptId);
-        const moment = concept?.proofMomentIds
-          .map((momentId) => project.moments.find((candidate) => candidate.id === momentId))
-          .find(Boolean);
-        const createdAt = new Date().toISOString();
-        const voiceoverPath = await createProviderVoiceover(projectId, script);
-        try {
-          const rendered = await renderDraft({
-            projectId,
-            projectDir: store.projectDir(projectId),
-            profile: project.profile,
-            recording: project.recording,
-            script,
-            moment,
-            title: concept?.title ?? script.hook,
-            voiceoverPath: voiceoverPath ?? undefined
-          });
-          renders.push({
-            id: randomUUID(),
-            scriptId: script.id,
-            title: concept?.title ?? script.hook,
-            status: "completed" as const,
-            outputPath: rendered.outputPath,
-            outputUrl: rendered.outputUrl,
-            validation: rendered.validation,
-            createdAt
-          });
-        } catch (error) {
-          renders.push({
-            id: randomUUID(),
-            scriptId: script.id,
-            title: concept?.title ?? script.hook,
-            status: "failed" as const,
-            error: error instanceof Error ? error.message : "Render failed.",
-            createdAt
-          });
-        }
-      }
-      await store.replaceRenders(projectId, renders);
-      await recordRenderUsage(projectId, renders);
-      job = renders.some((render) => render.status === "failed")
-        ? failJob(job, new Date().toISOString(), "One or more render drafts failed.")
-        : succeedJob(job, new Date().toISOString(), "Rendering completed.");
-      return store.updateJob(projectId, job);
-    } catch (error) {
-      job = failJob(job, new Date().toISOString(), safeProviderError(error));
-      await store.updateJob(projectId, job);
-      throw error;
+    return runRenderJob(projectId, job.id);
+  });
+
+  ipcMain.handle("job:cancel", async (_event, projectId: string, jobId: string) => store.requestJobCancel(projectId, jobId));
+
+  ipcMain.handle("job:retry", async (_event, projectId: string, jobId: string) => {
+    const job = await store.retryJob(projectId, jobId);
+    if (job.kind === "analysis") {
+      return runAnalysisJob(projectId, job.id);
     }
+    if (job.kind === "render") {
+      return runRenderJob(projectId, job.id);
+    }
+    throw new Error(`Retry is not wired for ${job.kind} jobs yet.`);
   });
 
   ipcMain.handle("export:video", async (_event, projectId: string, renderId: string) => {
@@ -280,6 +224,136 @@ async function activeWorkspaceState(): Promise<AppState> {
     projects: await store.listProjects(),
     activeProjectId: activeProject?.id ?? null
   };
+}
+
+async function runAnalysisJob(projectId: string, jobId: string): Promise<Project> {
+  const project = await store.getProject(projectId);
+  if (!project.recording) {
+    throw new Error("Choose a recording before analysis.");
+  }
+  const providerRunStartCount = project.providerRuns.length;
+  let job = await store.getJob(projectId, jobId);
+  if (job.status === "canceled") {
+    return project;
+  }
+  job = startJob(job, new Date().toISOString(), "Analyzing recording evidence.");
+  await store.updateJob(projectId, job);
+  try {
+    await assertAnalysisQuota(project);
+    if (await finishIfCancelRequested(projectId, jobId)) {
+      return store.getProject(projectId);
+    }
+    const analyzed = await store.runAnalysis(projectId, (analysisProject, moments) =>
+      runAnalysisPipeline(analysisProject, moments, store.projectDir(projectId))
+    );
+    await recordAnalysisUsage(projectId, analyzed, analyzed.providerRuns.slice(providerRunStartCount));
+    if (await finishIfCancelRequested(projectId, jobId)) {
+      return store.getProject(projectId);
+    }
+    job = await store.getJob(projectId, jobId);
+    job = succeedJob(job, new Date().toISOString(), "Analysis completed.");
+    return store.updateJob(projectId, job);
+  } catch (error) {
+    return failOrCancelJob(projectId, jobId, error);
+  }
+}
+
+async function runRenderJob(projectId: string, jobId: string): Promise<Project> {
+  const project = await store.getProject(projectId);
+  if (!project.recording) {
+    throw new Error("Choose a recording before rendering.");
+  }
+  const selectedConcepts = project.concepts.filter((concept) => concept.selected);
+  const scripts = project.scripts.filter((script) =>
+    selectedConcepts.some((concept) => concept.id === script.conceptId)
+  );
+  if (scripts.length === 0) {
+    throw new Error("Generate scripts before rendering.");
+  }
+  let job = await store.getJob(projectId, jobId);
+  if (job.status === "canceled") {
+    return project;
+  }
+  job = startJob(job, new Date().toISOString(), "Rendering selected drafts.");
+  await store.updateJob(projectId, job);
+  const renders: RenderedVideo[] = [];
+  try {
+    await store.assertUsageAvailable(projectId, "render_minutes", scripts.length);
+    for (const script of scripts.slice(0, 3)) {
+      if (await finishIfCancelRequested(projectId, jobId)) {
+        return store.getProject(projectId);
+      }
+      const concept = project.concepts.find((candidate) => candidate.id === script.conceptId);
+      const moment = concept?.proofMomentIds
+        .map((momentId) => project.moments.find((candidate) => candidate.id === momentId))
+        .find(Boolean);
+      const createdAt = new Date().toISOString();
+      const voiceoverPath = await createProviderVoiceover(projectId, script);
+      if (await finishIfCancelRequested(projectId, jobId)) {
+        return store.getProject(projectId);
+      }
+      try {
+        const rendered = await renderDraft({
+          projectId,
+          projectDir: store.projectDir(projectId),
+          profile: project.profile,
+          recording: project.recording,
+          script,
+          moment,
+          title: concept?.title ?? script.hook,
+          voiceoverPath: voiceoverPath ?? undefined
+        });
+        renders.push({
+          id: randomUUID(),
+          scriptId: script.id,
+          title: concept?.title ?? script.hook,
+          status: "completed",
+          outputPath: rendered.outputPath,
+          outputUrl: rendered.outputUrl,
+          validation: rendered.validation,
+          createdAt
+        });
+      } catch (error) {
+        renders.push({
+          id: randomUUID(),
+          scriptId: script.id,
+          title: concept?.title ?? script.hook,
+          status: "failed",
+          error: error instanceof Error ? error.message : "Render failed.",
+          createdAt
+        });
+      }
+    }
+    if (await finishIfCancelRequested(projectId, jobId)) {
+      return store.getProject(projectId);
+    }
+    await store.replaceRenders(projectId, renders);
+    await recordRenderUsage(projectId, renders);
+    job = await store.getJob(projectId, jobId);
+    job = renders.some((render) => render.status === "failed")
+      ? failJob(job, new Date().toISOString(), "One or more render drafts failed.")
+      : succeedJob(job, new Date().toISOString(), "Rendering completed.");
+    return store.updateJob(projectId, job);
+  } catch (error) {
+    return failOrCancelJob(projectId, jobId, error);
+  }
+}
+
+async function finishIfCancelRequested(projectId: string, jobId: string): Promise<boolean> {
+  const job = await store.getJob(projectId, jobId);
+  if (job.status !== "canceling") {
+    return false;
+  }
+  await store.finishJobCancel(projectId, jobId);
+  return true;
+}
+
+async function failOrCancelJob(projectId: string, jobId: string, error: unknown): Promise<Project> {
+  const latest = await store.getJob(projectId, jobId);
+  if (latest.status === "canceling") {
+    return store.finishJobCancel(projectId, jobId);
+  }
+  return store.updateJob(projectId, failJob(latest, new Date().toISOString(), safeProviderError(error)));
 }
 
 async function createProviderVoiceover(projectId: string, script: ScriptDraft): Promise<string | null> {

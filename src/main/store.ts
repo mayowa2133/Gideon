@@ -36,6 +36,11 @@ import {
   mergeUsageEvent,
   summarizeUsage
 } from "../shared/usage";
+import {
+  finishJobCancel as finishJobCancelState,
+  requestJobCancel as requestJobCancelState,
+  retryJob as retryJobState
+} from "../shared/jobState";
 
 const STORE_FILE = "gideon-store.json";
 
@@ -302,6 +307,32 @@ export class GideonStore {
         : [...jobs, job];
       project.updatedAt = new Date().toISOString();
     });
+  }
+
+  async getJob(projectId: string, jobId: string): Promise<JobRecord> {
+    const project = await this.getProject(projectId);
+    const job = project.jobs.find((candidate) => candidate.id === jobId);
+    if (!job) {
+      throw new Error("Job not found.");
+    }
+    return job;
+  }
+
+  async requestJobCancel(projectId: string, jobId: string): Promise<Project> {
+    const job = await this.getJob(projectId, jobId);
+    return this.updateJob(projectId, requestJobCancelState(job, new Date().toISOString()));
+  }
+
+  async finishJobCancel(projectId: string, jobId: string): Promise<Project> {
+    const job = await this.getJob(projectId, jobId);
+    return this.updateJob(projectId, finishJobCancelState(job, new Date().toISOString()));
+  }
+
+  async retryJob(projectId: string, jobId: string): Promise<JobRecord> {
+    const job = await this.getJob(projectId, jobId);
+    const retried = retryJobState(job, new Date().toISOString());
+    await this.updateJob(projectId, retried);
+    return retried;
   }
 
   async setActiveProject(projectId: string): Promise<Project> {

@@ -29,6 +29,8 @@ const api = {
   updateScripts: (projectId: string, scripts: ScriptDraft[]): Promise<Project> =>
     ipcRenderer.invoke("scripts:update", projectId, scripts),
   renderSelected: (projectId: string): Promise<Project> => ipcRenderer.invoke("render:selected", projectId),
+  cancelJob: (projectId: string, jobId: string): Promise<Project> => ipcRenderer.invoke("job:cancel", projectId, jobId),
+  retryJob: (projectId: string, jobId: string): Promise<Project> => ipcRenderer.invoke("job:retry", projectId, jobId),
   exportVideo: (projectId: string, renderId: string): Promise<string | null> =>
     ipcRenderer.invoke("export:video", projectId, renderId),
   revealPath: (filePath: string): Promise<void> => ipcRenderer.invoke("shell:reveal", filePath)
@@ -37,4 +39,3 @@ const api = {
 contextBridge.exposeInMainWorld("gideon", api);
 
 export type GideonApi = typeof api;
-

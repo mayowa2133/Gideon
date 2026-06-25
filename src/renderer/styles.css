@@ -139,6 +139,11 @@ video {
   font-weight: 800;
 }
 
+.compact {
+  padding: 0.45rem 0.7rem;
+  font-size: 0.76rem;
+}
+
 .primary {
   color: #111521;
   background: linear-gradient(135deg, #f5d15f, #ffb55c);
@@ -419,6 +424,12 @@ video {
 
 .job-pill small {
   color: #9ba8c2;
+}
+
+.job-actions {
+  display: flex;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
 }
 
 .job-pill.succeeded {
