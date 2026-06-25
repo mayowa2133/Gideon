@@ -41,7 +41,7 @@ import type {
 import { runAnalysisPipeline, safeProviderError } from "./analysisPipeline";
 import { loadProviderConfig } from "./providers/config";
 import { OpenAiProvider } from "./providers/openai";
-import { createJob, failJob, startJob, succeedJob, updateJobStage } from "../shared/jobState";
+import { createJob, failJob, findActiveJob, startJob, succeedJob, updateJobStage } from "../shared/jobState";
 
 const store = new GideonStore();
 const workerQueue = new LocalWorkerQueue({ concurrency: 1 });
@@ -319,6 +319,12 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle("job:retry", async (_event, projectId: string, jobId: string) => {
+    const currentJob = await store.getJob(projectId, jobId);
+    const project = await store.getProject(projectId);
+    const activeJob = findActiveJob(project.jobs, currentJob.kind);
+    if (activeJob && activeJob.id !== jobId) {
+      throw new Error(`A ${currentJob.kind} job is already ${activeJob.status}. Wait for it to finish or cancel it before retrying.`);
+    }
     const job = await store.retryJob(projectId, jobId);
     if (job.kind === "analysis") {
       enqueueAnalysisJob(projectId, job.id);
@@ -456,6 +462,10 @@ async function enqueueAnalysisFromControl(projectId: string, actorType: "local_u
   if (!project.recording) {
     throw new Error("Choose a recording before analysis.");
   }
+  const activeJob = findActiveJob(project.jobs, "analysis");
+  if (activeJob) {
+    return project;
+  }
   const job = createJob({
     id: randomUUID(),
     projectId,
@@ -475,6 +485,10 @@ async function enqueueRenderFromControl(projectId: string, actorType: "local_use
   }
   if (project.scripts.length === 0) {
     throw new Error("Generate scripts before rendering.");
+  }
+  const activeJob = findActiveJob(project.jobs, "render");
+  if (activeJob) {
+    return project;
   }
   const job = createJob({
     id: randomUUID(),

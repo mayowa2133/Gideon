@@ -32,6 +32,8 @@ export interface RecoverInterruptedJobResult {
   };
 }
 
+const activeJobStatuses = new Set<JobRecord["status"]>(["queued", "running", "canceling"]);
+
 export function createJob(input: CreateJobInput): JobRecord {
   return {
     id: input.id,
@@ -234,6 +236,14 @@ export function recoverInterruptedJob(job: JobRecord, now: string): RecoverInter
     };
   }
   return null;
+}
+
+export function isActiveJob(job: JobRecord): boolean {
+  return activeJobStatuses.has(job.status);
+}
+
+export function findActiveJob(jobs: JobRecord[], kind: JobKind): JobRecord | null {
+  return jobs.find((job) => job.kind === kind && isActiveJob(job)) ?? null;
 }
 
 function assertStatus(job: JobRecord, allowed: JobRecord["status"][], action: string): void {

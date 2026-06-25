@@ -3,7 +3,9 @@ import {
   createJobEvent,
   createJob,
   failJob,
+  findActiveJob,
   finishJobCancel,
+  isActiveJob,
   recoverInterruptedJob,
   requestJobCancel,
   retryJob,
@@ -107,6 +109,18 @@ describe("job state machine", () => {
     expect(recoveredCanceling?.event).toMatchObject({ kind: "canceled", metadata: { recoveredFromStatus: "canceling" } });
 
     expect(recoverInterruptedJob(recoveredCanceling!.job, t2)).toBeNull();
+  });
+
+  it("detects active jobs by kind", () => {
+    const queued = createJob({ id: "job-1", projectId: "project-1", kind: "analysis", now: t0 });
+    const running = startJob(createJob({ id: "job-2", projectId: "project-1", kind: "render", now: t0 }), t1);
+    const failed = failJob(startJob(createJob({ id: "job-3", projectId: "project-1", kind: "analysis", now: t0 }), t1), t2, "Nope.");
+
+    expect(isActiveJob(queued)).toBe(true);
+    expect(isActiveJob(running)).toBe(true);
+    expect(isActiveJob(failed)).toBe(false);
+    expect(findActiveJob([failed, queued, running], "analysis")?.id).toBe("job-1");
+    expect(findActiveJob([failed], "analysis")).toBeNull();
   });
 
   it("rejects invalid transitions", () => {
