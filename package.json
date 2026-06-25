@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "package:mac": "pnpm build && electron-builder --mac dmg zip --config.mac.identity=null",
+    "package:mac": "pnpm build && electron-builder --mac dmg zip --config.mac.identity=null --publish=never",
     "dist:mac": "pnpm package:mac"
   },
   "build": {
