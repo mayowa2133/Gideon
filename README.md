@@ -70,7 +70,7 @@ GIDEON_STORAGE_SECRET_ACCESS_KEY=... \
 pnpm start
 ```
 
-Use `GIDEON_STORAGE_PROVIDER=s3` for AWS/S3-compatible storage, or omit it for local private storage. Gideon signs uploads with AWS Signature V4 and stores objects under workspace/project-prefixed keys. The storage layer can also create short-lived presigned PUT sessions for future direct browser-to-cloud uploads.
+Use `GIDEON_STORAGE_PROVIDER=s3` for AWS/S3-compatible storage, or omit it for local private storage. Gideon signs uploads with AWS Signature V4 and stores objects under workspace/project-prefixed keys. When cloud storage is configured, the recording panel can create short-lived presigned PUT sessions for browser-to-cloud upload flows. Upload completion and media validation still need to run through the trusted app/backend before a session becomes the active recording.
 
 ## Codex/Claude MCP control without Gideon API keys
 

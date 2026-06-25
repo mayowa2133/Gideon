@@ -8,6 +8,7 @@ import type {
   PlatformInfo,
   ProductProfile,
   Project,
+  RecordingUploadSession,
   ScriptDraft,
   UsageMetric,
   WorkspaceRole
@@ -174,7 +175,14 @@ function App(): JSX.Element {
         {busy === "loading" ? (
           <div className="empty-state">Loading Gideon workspace…</div>
         ) : activeProject ? (
-          <ProjectWorkspace project={activeProject} busy={busy} setBusy={setBusy} setError={setError} onProject={refreshProject} />
+          <ProjectWorkspace
+            project={activeProject}
+            platformInfo={platformInfo}
+            busy={busy}
+            setBusy={setBusy}
+            setError={setError}
+            onProject={refreshProject}
+          />
         ) : (
           <NewProjectPanel onCreate={(profile) => void createProject(profile)} busy={busy === "saving"} />
         )}
@@ -443,6 +451,69 @@ function TeamPanel({
 
 const workspaceRoles: WorkspaceRole[] = ["owner", "admin", "editor", "viewer"];
 
+function DirectUploadSessionCard({
+  platformInfo,
+  busy,
+  uploadFile,
+  uploadSession,
+  onFile,
+  onCreate
+}: {
+  platformInfo: PlatformInfo | null;
+  busy: boolean;
+  uploadFile: File | null;
+  uploadSession: RecordingUploadSession | null;
+  onFile: (file: File | null) => void;
+  onCreate: () => void;
+}): JSX.Element {
+  if (!platformInfo?.cloudStorageConfigured) {
+    return (
+      <div className="direct-upload-card muted-card">
+        <p className="eyebrow">Direct cloud upload</p>
+        <small>
+          Configure S3/R2 storage env vars to create browser-to-cloud upload sessions. Local “Choose recording” remains the
+          complete import path.
+        </small>
+      </div>
+    );
+  }
+
+  return (
+    <div className="direct-upload-card">
+      <p className="eyebrow">Direct cloud upload</p>
+      <small>
+        Creates a short-lived PUT URL for {platformInfo.storageProvider}. Completion and media validation are tracked as the
+        next workflow step.
+      </small>
+      <input
+        type="file"
+        accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+        disabled={busy}
+        onChange={(event) => onFile(event.target.files?.[0] ?? null)}
+      />
+      {uploadFile ? (
+        <small>
+          Selected {uploadFile.name} · {formatBytes(uploadFile.size)}
+        </small>
+      ) : null}
+      <button className="secondary compact" disabled={busy || !uploadFile} onClick={onCreate} type="button">
+        Create upload session
+      </button>
+      {uploadSession ? (
+        <div className="upload-session-details">
+          <strong>Session ready</strong>
+          <small>
+            {uploadSession.method} {uploadSession.provider.toUpperCase()} · expires{" "}
+            {new Date(uploadSession.expiresAt).toLocaleTimeString()}
+          </small>
+          <small>Header: Content-Type {uploadSession.headers["Content-Type"]}</small>
+          <code>{uploadSession.uploadUrl.slice(0, 96)}…</code>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AuditPanel({ state }: { state: AppState }): JSX.Element | null {
   const workspaceId = state.activeWorkspaceId ?? state.workspaces[0]?.id;
   if (!workspaceId) {
@@ -511,12 +582,14 @@ function NewProjectPanel({ onCreate, busy }: { onCreate: (profile: ProductProfil
 
 function ProjectWorkspace({
   project,
+  platformInfo,
   busy,
   setBusy,
   setError,
   onProject
 }: {
   project: Project;
+  platformInfo: PlatformInfo | null;
   busy: BusyAction;
   setBusy: (busy: BusyAction) => void;
   setError: (error: string | null) => void;
@@ -524,11 +597,18 @@ function ProjectWorkspace({
 }): JSX.Element {
   const [profile, setProfile] = useState<ProductProfile>(project.profile);
   const [scripts, setScripts] = useState<ScriptDraft[]>(project.scripts);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadSession, setUploadSession] = useState<RecordingUploadSession | null>(null);
 
   useEffect(() => {
     setProfile(project.profile);
     setScripts(project.scripts);
   }, [project]);
+
+  useEffect(() => {
+    setUploadFile(null);
+    setUploadSession(null);
+  }, [project.id]);
 
   async function runAction(action: BusyAction, callback: () => Promise<Project | null>): Promise<void> {
     setBusy(action);
@@ -540,6 +620,28 @@ function ProjectWorkspace({
       }
     } catch (actionError) {
       setError(messageFromError(actionError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function createDirectUploadSession(): Promise<void> {
+    if (!uploadFile) {
+      return;
+    }
+    setBusy("recording");
+    setError(null);
+    try {
+      const session = await window.gideon.createRecordingUploadSession({
+        projectId: project.id,
+        fileName: uploadFile.name,
+        byteSize: uploadFile.size,
+        contentType: uploadFile.type || undefined
+      });
+      setUploadSession(session);
+      onProject(await window.gideon.setActiveProject(project.id));
+    } catch (sessionError) {
+      setError(messageFromError(sessionError));
     } finally {
       setBusy(null);
     }
@@ -617,6 +719,14 @@ function ProjectWorkspace({
           >
             {project.recording ? "Replace recording" : "Choose recording"}
           </button>
+          <DirectUploadSessionCard
+            platformInfo={platformInfo}
+            busy={busy === "recording"}
+            uploadFile={uploadFile}
+            uploadSession={uploadSession}
+            onFile={setUploadFile}
+            onCreate={() => void createDirectUploadSession()}
+          />
         </Panel>
       </section>
 
@@ -1145,6 +1255,20 @@ function formatMs(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[unitIndex]}`;
 }
 
 function messageFromError(error: unknown): string {

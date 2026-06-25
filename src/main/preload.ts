@@ -4,11 +4,13 @@ import type {
   AppState,
   ContentConcept,
   CreateProjectInput,
+  CreateRecordingUploadSessionInput,
   CreateWorkspaceInput,
   DetectedMoment,
   PlatformInfo,
   ProductProfile,
   Project,
+  RecordingUploadSession,
   RemoveWorkspaceMemberInput,
   ScriptDraft,
   UpdateWorkspaceMemberRoleInput
@@ -31,6 +33,8 @@ const api = {
     ipcRenderer.invoke("project:update-profile", projectId, profile),
   deleteProject: (projectId: string): Promise<AppState> => ipcRenderer.invoke("project:delete", projectId),
   chooseRecording: (projectId: string): Promise<Project | null> => ipcRenderer.invoke("recording:choose", projectId),
+  createRecordingUploadSession: (input: CreateRecordingUploadSessionInput): Promise<RecordingUploadSession> =>
+    ipcRenderer.invoke("recording:create-upload-session", input),
   runAnalysis: (projectId: string): Promise<Project> => ipcRenderer.invoke("analysis:run", projectId),
   updateMoments: (projectId: string, moments: DetectedMoment[]): Promise<Project> =>
     ipcRenderer.invoke("analysis:update-moments", projectId, moments),

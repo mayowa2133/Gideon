@@ -61,6 +61,7 @@ export type AuditAction =
   | "project.update_profile"
   | "project.delete"
   | "recording.attach"
+  | "recording.upload_session.create"
   | "analysis.complete"
   | "moments.update"
   | "concepts.generate"
@@ -187,6 +188,25 @@ export interface ArtifactRecord {
   localPath?: string;
   localUrl?: string;
   createdAt: string;
+}
+
+export type RecordingUploadSessionStatus = "pending" | "completed" | "expired" | "aborted";
+
+export interface RecordingUploadSessionRecord {
+  id: string;
+  workspaceId: string;
+  projectId: string;
+  artifactId: string;
+  provider: Extract<ArtifactProvider, "s3" | "r2">;
+  storageKey: string;
+  status: RecordingUploadSessionStatus;
+  method: "PUT";
+  contentType: string;
+  byteSize: number;
+  originalFileName: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface JobRecord {
@@ -393,6 +413,7 @@ export interface Project {
   scripts: ScriptDraft[];
   renders: RenderedVideo[];
   artifacts: ArtifactRecord[];
+  uploadSessions: RecordingUploadSessionRecord[];
   providerRuns: ProviderRun[];
   jobs: JobRecord[];
   jobEvents: JobEvent[];
@@ -452,6 +473,26 @@ export interface UpdateWorkspaceMemberRoleInput {
 export interface RemoveWorkspaceMemberInput {
   workspaceId: string;
   userId: string;
+}
+
+export interface CreateRecordingUploadSessionInput {
+  projectId: string;
+  fileName: string;
+  byteSize: number;
+  contentType?: string;
+}
+
+export interface RecordingUploadSession {
+  id: string;
+  recordingId: string;
+  provider: Extract<ArtifactProvider, "s3" | "r2">;
+  uploadUrl: string;
+  method: "PUT";
+  headers: Record<string, string>;
+  expiresAt: string;
+  maxBytes: number;
+  contentType: string;
+  originalFileName: string;
 }
 
 export const platformLabels: Record<Platform, string> = {

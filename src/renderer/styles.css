@@ -551,6 +551,43 @@ video {
   overflow-wrap: anywhere;
 }
 
+.direct-upload-card {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(130, 166, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(130, 166, 255, 0.07);
+}
+
+.direct-upload-card input[type="file"] {
+  width: 100%;
+  color: #cdd7ef;
+}
+
+.direct-upload-card small {
+  color: #9ba8c2;
+}
+
+.muted-card {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.upload-session-details {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border-radius: 14px;
+  background: rgba(4, 7, 13, 0.45);
+}
+
+.upload-session-details code {
+  overflow-wrap: anywhere;
+  color: #b7c7ff;
+}
+
 .moment-grid,
 .concept-grid,
 .render-grid {

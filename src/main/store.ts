@@ -30,6 +30,7 @@ import type {
   ProductProfile,
   Project,
   RecordingMetadata,
+  RecordingUploadSessionRecord,
   RemoveWorkspaceMemberInput,
   RenderedVideo,
   ScriptDraft,
@@ -307,6 +308,7 @@ export class GideonStore {
       scripts: [],
       renders: [],
       artifacts: [],
+      uploadSessions: [],
       providerRuns: [],
       jobs: [],
       jobEvents: [],
@@ -375,6 +377,41 @@ export class GideonStore {
           targetId: recording.artifactId,
           summary: `Attached recording ${recording.fileName}.`,
           metadata: { fileName: recording.fileName, durationMs: recording.durationMs, sizeBytes: recording.sizeBytes }
+        }
+      }
+    );
+  }
+
+  async createRecordingUploadSessionRecord(
+    projectId: string,
+    session: Omit<RecordingUploadSessionRecord, "createdAt" | "updatedAt">
+  ): Promise<Project> {
+    const now = new Date().toISOString();
+    return this.updateProject(
+      projectId,
+      (project) => {
+        project.uploadSessions = [
+          ...(project.uploadSessions ?? []).filter((candidate) => candidate.id !== session.id),
+          {
+            ...session,
+            createdAt: now,
+            updatedAt: now
+          }
+        ];
+        project.updatedAt = now;
+      },
+      {
+        audit: {
+          action: "recording.upload_session.create",
+          targetType: "recording",
+          targetId: session.artifactId,
+          summary: `Created direct upload session for ${session.originalFileName}.`,
+          metadata: {
+            provider: session.provider,
+            contentType: session.contentType,
+            byteSize: session.byteSize,
+            expiresAt: session.expiresAt
+          }
         }
       }
     );
@@ -994,6 +1031,7 @@ function normalizeAppState(state: AppState): AppState {
       scripts: project.scripts ?? [],
       renders: project.renders ?? [],
       artifacts: project.artifacts ?? [],
+      uploadSessions: project.uploadSessions ?? [],
       providerRuns: project.providerRuns ?? [],
       jobs: project.jobs ?? [],
       jobEvents: project.jobEvents ?? []

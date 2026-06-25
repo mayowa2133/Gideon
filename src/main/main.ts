@@ -9,19 +9,27 @@ import {
   renderDraft
 } from "./media";
 import { GideonStore } from "./store";
-import { createPrivateObjectStorage, isCloudStorageConfigured, loadStorageConfig } from "./storage";
+import {
+  createDirectUploadSession,
+  createPrivateObjectStorage,
+  isCloudStorageConfigured,
+  loadStorageConfig,
+  type DirectUploadSession
+} from "./storage";
 import { LocalWorkerQueue } from "./jobQueue";
 import { startGideonControlServer } from "./controlServer";
 import type {
   AddWorkspaceMemberInput,
   AppState,
   ContentConcept,
+  CreateRecordingUploadSessionInput,
   CreateWorkspaceInput,
   DetectedMoment,
   JobRecord,
   JobStage,
   Project,
   ProviderRun,
+  RecordingUploadSession,
   RemoveWorkspaceMemberInput,
   RenderedVideo,
   ScriptDraft,
@@ -181,6 +189,42 @@ function registerIpcHandlers(): void {
       source: "recording",
       idempotencyKey: `recording:${projectId}:${stored.artifact.id}:storage_bytes`
     });
+  });
+
+  ipcMain.handle("recording:create-upload-session", async (_event, input: CreateRecordingUploadSessionInput) => {
+    await store.assertProjectPermission(input.projectId, "project:update");
+    const fileName = normalizeUploadFileName(input.fileName);
+    const byteSize = normalizeUploadByteSize(input.byteSize);
+    await store.assertUsageAvailable(input.projectId, "storage_bytes", byteSize);
+    const project = await store.getProject(input.projectId);
+    const session = createDirectUploadSession(
+      {
+        localRootDir: store.storageRoot()
+      },
+      {
+        workspaceId: project.workspaceId,
+        projectId: project.id,
+        kind: "source_recording",
+        originalFileName: fileName,
+        byteSize,
+        contentType: input.contentType
+      }
+    );
+    await store.createRecordingUploadSessionRecord(input.projectId, {
+      id: session.id,
+      workspaceId: project.workspaceId,
+      projectId: project.id,
+      artifactId: session.id,
+      provider: session.provider,
+      storageKey: session.storageKey,
+      status: "pending",
+      method: session.method,
+      contentType: session.contentType,
+      byteSize,
+      originalFileName: fileName,
+      expiresAt: session.expiresAt
+    });
+    return toRecordingUploadSession(session);
   });
 
   ipcMain.handle("analysis:run", async (_event, projectId: string) => {
@@ -750,6 +794,39 @@ async function recordRenderUsage(projectId: string, renders: RenderedVideo[]): P
       idempotencyKey: `render:${projectId}:${render.id}`
     });
   }
+}
+
+function normalizeUploadFileName(fileName: string): string {
+  const normalized = fileName.trim().replace(/[\u0000-\u001f\u007f]/g, "");
+  if (normalized.length < 1 || normalized.length > 255) {
+    throw new Error("Upload filename must be 1–255 characters.");
+  }
+  if (!/\.(mp4|mov|webm)$/i.test(normalized)) {
+    throw new Error("Recording uploads must be MP4, MOV, or WebM files.");
+  }
+  return normalized;
+}
+
+function normalizeUploadByteSize(byteSize: number): number {
+  if (!Number.isSafeInteger(byteSize) || byteSize <= 0) {
+    throw new Error("Upload byte size must be a positive integer.");
+  }
+  return byteSize;
+}
+
+function toRecordingUploadSession(session: DirectUploadSession): RecordingUploadSession {
+  return {
+    id: session.id,
+    recordingId: session.id,
+    provider: session.provider,
+    uploadUrl: session.uploadUrl,
+    method: session.method,
+    headers: session.headers,
+    expiresAt: session.expiresAt,
+    maxBytes: session.maxBytes,
+    contentType: session.contentType,
+    originalFileName: session.originalFileName
+  };
 }
 
 function minutesForDuration(durationMs: number): number {

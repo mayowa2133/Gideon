@@ -53,6 +53,7 @@ describe("analysis pipeline", () => {
       scripts: [],
       renders: [],
       artifacts: [],
+      uploadSessions: [],
       providerRuns: [],
       jobs: [],
       jobEvents: [],
