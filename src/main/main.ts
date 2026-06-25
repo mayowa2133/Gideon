@@ -10,6 +10,7 @@ import {
 } from "./media";
 import { GideonStore } from "./store";
 import {
+  completeDirectUploadSession,
   createDirectUploadSession,
   createPrivateObjectStorage,
   isCloudStorageConfigured,
@@ -21,6 +22,7 @@ import { startGideonControlServer } from "./controlServer";
 import type {
   AddWorkspaceMemberInput,
   AppState,
+  CompleteRecordingUploadSessionInput,
   ContentConcept,
   CreateRecordingUploadSessionInput,
   CreateWorkspaceInput,
@@ -226,6 +228,59 @@ function registerIpcHandlers(): void {
       expiresAt: session.expiresAt
     });
     return toRecordingUploadSession(session);
+  });
+
+  ipcMain.handle("recording:complete-upload-session", async (_event, input: CompleteRecordingUploadSessionInput) => {
+    await store.assertProjectPermission(input.projectId, "project:update");
+    const session = await store.getRecordingUploadSession(input.projectId, input.sessionId);
+    if (session.status !== "pending") {
+      throw new Error(`Recording upload session is already ${session.status}.`);
+    }
+    const stored = await completeDirectUploadSession(
+      {
+        localRootDir: store.storageRoot()
+      },
+      {
+        workspaceId: session.workspaceId,
+        projectId: session.projectId,
+        kind: "source_recording",
+        artifactId: session.artifactId,
+        provider: session.provider,
+        storageKey: session.storageKey,
+        originalFileName: session.originalFileName,
+        contentType: session.contentType,
+        expectedByteSize: session.byteSize
+      }
+    );
+    const recording = await probeRecording(stored.filePath);
+    const sourceMinutes = minutesForDuration(recording.durationMs);
+    await store.assertUsageAvailable(input.projectId, "source_minutes", sourceMinutes);
+    await store.assertUsageAvailable(input.projectId, "storage_bytes", stored.artifact.byteSize);
+    await store.completeRecordingUploadSessionRecord(input.projectId, session.id, stored.artifact);
+    await store.attachRecording(input.projectId, {
+      ...recording,
+      fileName: stored.artifact.originalFileName,
+      filePath: stored.filePath,
+      fileUrl: stored.fileUrl,
+      artifactId: stored.artifact.id,
+      storageKey: stored.artifact.storageKey,
+      sha256: stored.artifact.sha256,
+      sizeBytes: stored.artifact.byteSize
+    });
+    await store.recordUsage(input.projectId, {
+      metric: "source_minutes",
+      quantity: sourceMinutes,
+      unit: "minute",
+      source: "recording",
+      idempotencyKey: `recording:${input.projectId}:${stored.artifact.id}:source_minutes`
+    });
+    return store.recordUsage(input.projectId, {
+      metric: "storage_bytes",
+      quantity: stored.artifact.byteSize,
+      unit: "byte",
+      source: "recording",
+      idempotencyKey: `recording:${input.projectId}:${stored.artifact.id}:storage_bytes`
+    });
   });
 
   ipcMain.handle("analysis:run", async (_event, projectId: string) => {

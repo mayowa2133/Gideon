@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  completeDirectUploadSession,
   createDirectUploadSession,
   createPrivateObjectStorage,
   isCloudStorageConfigured,
@@ -173,6 +174,53 @@ describe("local private object storage", () => {
       await received.close();
     }
   });
+
+  it("caches a completed direct upload from S3-compatible private storage", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-direct-complete-"));
+    const received = await captureGetRequest("uploaded recording bytes");
+    try {
+      const stored = await completeDirectUploadSession(
+        {
+          localRootDir: path.join(tempDir, "objects"),
+          env: {
+            GIDEON_STORAGE_PROVIDER: "r2",
+            GIDEON_STORAGE_ENDPOINT: received.endpoint,
+            GIDEON_STORAGE_BUCKET: "gideon-private",
+            GIDEON_STORAGE_REGION: "auto",
+            GIDEON_STORAGE_ACCESS_KEY_ID: "test-key",
+            GIDEON_STORAGE_SECRET_ACCESS_KEY: "test-secret"
+          }
+        },
+        {
+          workspaceId: "workspace-1",
+          projectId: "project-1",
+          kind: "source_recording",
+          artifactId: "artifact-1",
+          provider: "r2",
+          storageKey: "workspaces/workspace-1/projects/project-1/source_recording/artifact-1-demo.mp4",
+          originalFileName: "demo.mp4",
+          contentType: "video/mp4",
+          expectedByteSize: "uploaded recording bytes".length,
+          now: "2026-06-25T12:00:00.000Z"
+        }
+      );
+
+      expect(stored.artifact).toMatchObject({
+        id: "artifact-1",
+        provider: "r2",
+        storageKey: "workspaces/workspace-1/projects/project-1/source_recording/artifact-1-demo.mp4",
+        byteSize: "uploaded recording bytes".length,
+        contentType: "video/mp4"
+      });
+      expect(stored.artifact.sha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(await fs.readFile(stored.filePath, "utf8")).toBe("uploaded recording bytes");
+      expect(received.request?.method).toBe("GET");
+      expect(received.request?.url).toContain("/gideon-private/workspaces/workspace-1/projects/project-1/source_recording/artifact-1-demo.mp4");
+      expect(received.request?.url).toContain("X-Amz-Signature=");
+    } finally {
+      await received.close();
+    }
+  });
 });
 
 async function capturePutRequest(): Promise<{
@@ -219,6 +267,42 @@ async function capturePutRequest(): Promise<{
     },
     get body() {
       return captured.body;
+    },
+    close: () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+  };
+}
+
+async function captureGetRequest(body: string): Promise<{
+  endpoint: string;
+  request?: http.IncomingMessage;
+  close: () => Promise<void>;
+}> {
+  const captured: {
+    request?: http.IncomingMessage;
+  } = {};
+  const server = http.createServer((request, response) => {
+    captured.request = request;
+    response.writeHead(200, {
+      "Content-Type": "video/mp4",
+      "Content-Length": String(Buffer.byteLength(body))
+    });
+    response.end(body);
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Could not start local storage test server.");
+  }
+  return {
+    endpoint: `http://127.0.0.1:${address.port}`,
+    get request() {
+      return captured.request;
     },
     close: () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
   };

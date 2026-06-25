@@ -62,6 +62,7 @@ export type AuditAction =
   | "project.delete"
   | "recording.attach"
   | "recording.upload_session.create"
+  | "recording.upload_session.complete"
   | "analysis.complete"
   | "moments.update"
   | "concepts.generate"
@@ -480,6 +481,11 @@ export interface CreateRecordingUploadSessionInput {
   fileName: string;
   byteSize: number;
   contentType?: string;
+}
+
+export interface CompleteRecordingUploadSessionInput {
+  projectId: string;
+  sessionId: string;
 }
 
 export interface RecordingUploadSession {

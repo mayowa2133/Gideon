@@ -418,6 +418,54 @@ export class GideonStore {
     );
   }
 
+  async getRecordingUploadSession(projectId: string, sessionId: string): Promise<RecordingUploadSessionRecord> {
+    const project = await this.getProject(projectId);
+    const session = (project.uploadSessions ?? []).find((candidate) => candidate.id === sessionId);
+    if (!session) {
+      throw new Error("Recording upload session not found.");
+    }
+    return session;
+  }
+
+  async completeRecordingUploadSessionRecord(
+    projectId: string,
+    sessionId: string,
+    artifact: ArtifactRecord
+  ): Promise<Project> {
+    const now = new Date().toISOString();
+    return this.updateProject(
+      projectId,
+      (project) => {
+        const session = (project.uploadSessions ?? []).find((candidate) => candidate.id === sessionId);
+        if (!session) {
+          throw new Error("Recording upload session not found.");
+        }
+        if (session.status !== "pending") {
+          throw new Error(`Recording upload session is already ${session.status}.`);
+        }
+        project.uploadSessions = project.uploadSessions.map((candidate) =>
+          candidate.id === sessionId ? { ...candidate, status: "completed", updatedAt: now } : candidate
+        );
+        project.artifacts = [...(project.artifacts ?? []).filter((candidate) => candidate.id !== artifact.id), artifact];
+        project.updatedAt = now;
+      },
+      {
+        audit: {
+          action: "recording.upload_session.complete",
+          targetType: "recording",
+          targetId: artifact.id,
+          summary: `Completed direct upload for ${artifact.originalFileName}.`,
+          metadata: {
+            provider: artifact.provider,
+            contentType: artifact.contentType,
+            byteSize: artifact.byteSize,
+            sha256: artifact.sha256
+          }
+        }
+      }
+    );
+  }
+
   async runAnalysis(
     projectId: string,
     enrich: (project: Project, moments: DetectedMoment[]) => Promise<{

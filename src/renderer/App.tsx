@@ -456,15 +456,19 @@ function DirectUploadSessionCard({
   busy,
   uploadFile,
   uploadSession,
+  uploadStatus,
   onFile,
-  onCreate
+  onCreate,
+  onUpload
 }: {
   platformInfo: PlatformInfo | null;
   busy: boolean;
   uploadFile: File | null;
   uploadSession: RecordingUploadSession | null;
+  uploadStatus: string | null;
   onFile: (file: File | null) => void;
   onCreate: () => void;
+  onUpload: () => void;
 }): JSX.Element {
   if (!platformInfo?.cloudStorageConfigured) {
     return (
@@ -482,8 +486,8 @@ function DirectUploadSessionCard({
     <div className="direct-upload-card">
       <p className="eyebrow">Direct cloud upload</p>
       <small>
-        Creates a short-lived PUT URL for {platformInfo.storageProvider}. Completion and media validation are tracked as the
-        next workflow step.
+        Uploads directly to {platformInfo.storageProvider}, then Gideon downloads the private object into its processing
+        cache, probes it, attaches it, and meters usage.
       </small>
       <input
         type="file"
@@ -497,7 +501,7 @@ function DirectUploadSessionCard({
         </small>
       ) : null}
       <button className="secondary compact" disabled={busy || !uploadFile} onClick={onCreate} type="button">
-        Create upload session
+        {uploadSession ? "Create new session" : "Create upload session"}
       </button>
       {uploadSession ? (
         <div className="upload-session-details">
@@ -508,8 +512,12 @@ function DirectUploadSessionCard({
           </small>
           <small>Header: Content-Type {uploadSession.headers["Content-Type"]}</small>
           <code>{uploadSession.uploadUrl.slice(0, 96)}…</code>
+          <button className="primary compact" disabled={busy || !uploadFile} onClick={onUpload} type="button">
+            Upload file and finish import
+          </button>
         </div>
       ) : null}
+      {uploadStatus ? <small>{uploadStatus}</small> : null}
     </div>
   );
 }
@@ -599,6 +607,7 @@ function ProjectWorkspace({
   const [scripts, setScripts] = useState<ScriptDraft[]>(project.scripts);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadSession, setUploadSession] = useState<RecordingUploadSession | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   useEffect(() => {
     setProfile(project.profile);
@@ -608,6 +617,7 @@ function ProjectWorkspace({
   useEffect(() => {
     setUploadFile(null);
     setUploadSession(null);
+    setUploadStatus(null);
   }, [project.id]);
 
   async function runAction(action: BusyAction, callback: () => Promise<Project | null>): Promise<void> {
@@ -639,9 +649,43 @@ function ProjectWorkspace({
         contentType: uploadFile.type || undefined
       });
       setUploadSession(session);
+      setUploadStatus("Session created. Upload the file to finish importing it.");
       onProject(await window.gideon.setActiveProject(project.id));
     } catch (sessionError) {
       setError(messageFromError(sessionError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function uploadDirectRecording(): Promise<void> {
+    if (!uploadFile || !uploadSession) {
+      return;
+    }
+    setBusy("recording");
+    setError(null);
+    setUploadStatus("Uploading directly to private object storage…");
+    try {
+      const response = await fetch(uploadSession.uploadUrl, {
+        method: uploadSession.method,
+        headers: uploadSession.headers,
+        body: uploadFile
+      });
+      if (!response.ok) {
+        throw new Error(`Cloud upload failed with HTTP ${response.status}. Check bucket CORS and storage credentials.`);
+      }
+      setUploadStatus("Upload complete. Validating and attaching recording…");
+      const projectWithRecording = await window.gideon.completeRecordingUploadSession({
+        projectId: project.id,
+        sessionId: uploadSession.id
+      });
+      setUploadFile(null);
+      setUploadSession(null);
+      setUploadStatus(null);
+      onProject(projectWithRecording);
+    } catch (uploadError) {
+      setError(messageFromError(uploadError));
+      setUploadStatus("Upload did not finish.");
     } finally {
       setBusy(null);
     }
@@ -724,8 +768,14 @@ function ProjectWorkspace({
             busy={busy === "recording"}
             uploadFile={uploadFile}
             uploadSession={uploadSession}
-            onFile={setUploadFile}
+            uploadStatus={uploadStatus}
+            onFile={(file) => {
+              setUploadFile(file);
+              setUploadSession(null);
+              setUploadStatus(null);
+            }}
             onCreate={() => void createDirectUploadSession()}
+            onUpload={() => void uploadDirectRecording()}
           />
         </Panel>
       </section>

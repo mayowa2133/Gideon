@@ -29,6 +29,19 @@ export interface CreateDirectUploadSessionInput {
   expiresInSeconds?: number;
 }
 
+export interface CompleteDirectUploadSessionInput {
+  workspaceId: string;
+  projectId: string;
+  kind: ArtifactKind;
+  artifactId: string;
+  provider: Extract<ArtifactProvider, "s3" | "r2">;
+  storageKey: string;
+  originalFileName: string;
+  contentType: string;
+  expectedByteSize: number;
+  now?: string;
+}
+
 export interface StoredArtifact {
   artifact: ArtifactRecord;
   filePath: string;
@@ -152,6 +165,29 @@ export function createDirectUploadSession(
   }).createDirectUploadSession(sessionInput);
 }
 
+export async function completeDirectUploadSession(
+  factoryInput: PrivateObjectStorageFactoryInput,
+  sessionInput: CompleteDirectUploadSessionInput
+): Promise<StoredArtifact> {
+  const config = loadStorageConfig(factoryInput.env);
+  if (!isCloudStorageConfigured(config)) {
+    throw new Error("Completing direct upload sessions requires configured S3-compatible cloud storage.");
+  }
+  if (config.provider !== sessionInput.provider) {
+    throw new Error(`Direct upload session provider ${sessionInput.provider} does not match configured ${config.provider} storage.`);
+  }
+  return new S3CompatibleObjectStorage({
+    provider: config.provider as Extract<ArtifactProvider, "s3" | "r2">,
+    endpoint: config.endpoint!,
+    bucket: config.bucket!,
+    region: config.region,
+    accessKeyId: config.accessKeyId!,
+    secretAccessKey: config.secretAccessKey!,
+    publicBaseUrl: config.publicBaseUrl,
+    cacheRootDir: factoryInput.cloudCacheRootDir ?? path.join(factoryInput.localRootDir, "_cloud-cache")
+  }).cacheUploadedObject(sessionInput);
+}
+
 export class LocalPrivateObjectStorage implements PrivateObjectStorage {
   constructor(private readonly rootDir: string) {}
 
@@ -257,6 +293,44 @@ export class S3CompatibleObjectStorage implements PrivateObjectStorage {
     };
   }
 
+  async cacheUploadedObject(input: CompleteDirectUploadSessionInput): Promise<StoredArtifact> {
+    const cachePath = path.join(this.config.cacheRootDir, input.storageKey);
+    await fs.mkdir(path.dirname(cachePath), { recursive: true });
+    const downloadUrl = presignedGetUrl({
+      url: s3ObjectUrl(this.config.endpoint, this.config.bucket, input.storageKey),
+      region: this.config.region,
+      accessKeyId: this.config.accessKeyId,
+      secretAccessKey: this.config.secretAccessKey,
+      expiresInSeconds: 300,
+      now: new Date()
+    });
+    const { byteSize, sha256 } = await downloadWithSha256(new URL(downloadUrl), cachePath);
+    if (byteSize !== input.expectedByteSize) {
+      await fs.unlink(cachePath).catch(() => undefined);
+      throw new Error(`Uploaded object size mismatch. Expected ${input.expectedByteSize} bytes, received ${byteSize}.`);
+    }
+    const fileUrl = pathToFileURL(cachePath).toString();
+    return {
+      filePath: cachePath,
+      fileUrl,
+      artifact: {
+        id: input.artifactId,
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        kind: input.kind,
+        provider: input.provider,
+        storageKey: input.storageKey,
+        contentType: input.contentType,
+        byteSize,
+        sha256,
+        originalFileName: input.originalFileName,
+        localPath: cachePath,
+        localUrl: fileUrl,
+        createdAt: input.now ?? new Date().toISOString()
+      }
+    };
+  }
+
   private async uploadObject(input: UploadObjectInput): Promise<void> {
     const target = s3ObjectUrl(this.config.endpoint, this.config.bucket, input.storageKey);
     const headers = signedPutHeaders({
@@ -335,6 +409,47 @@ function presignedPutUrl(input: {
   const canonicalHeaders = `content-type:${input.contentType}\nhost:${input.url.host}\n`;
   const canonicalRequest = [
     "PUT",
+    canonicalUri(input.url.pathname),
+    canonicalQueryString,
+    canonicalHeaders,
+    signedHeaders,
+    "UNSIGNED-PAYLOAD"
+  ].join("\n");
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    createHash("sha256").update(canonicalRequest).digest("hex")
+  ].join("\n");
+  const signature = hmac(signingKey(input.secretAccessKey, dateStamp, input.region), stringToSign, "hex");
+  query.set("X-Amz-Signature", signature);
+  input.url.search = canonicalQuery(query);
+  return input.url.toString();
+}
+
+function presignedGetUrl(input: {
+  url: URL;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  expiresInSeconds: number;
+  now: Date;
+}): string {
+  const amzDate = toAmzDate(input.now);
+  const dateStamp = amzDate.slice(0, 8);
+  const credentialScope = `${dateStamp}/${input.region}/s3/aws4_request`;
+  const signedHeaders = "host";
+  const query = new URLSearchParams({
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": `${input.accessKeyId}/${credentialScope}`,
+    "X-Amz-Date": amzDate,
+    "X-Amz-Expires": String(input.expiresInSeconds),
+    "X-Amz-SignedHeaders": signedHeaders
+  });
+  const canonicalQueryString = canonicalQuery(query);
+  const canonicalHeaders = `host:${input.url.host}\n`;
+  const canonicalRequest = [
+    "GET",
     canonicalUri(input.url.pathname),
     canonicalQueryString,
     canonicalHeaders,
@@ -449,6 +564,40 @@ async function putStream(url: URL, headers: Record<string, string>, sourcePath: 
     request.on("error", reject);
     void pipeline(createReadStream(sourcePath), request).catch(reject);
   });
+}
+
+async function downloadWithSha256(url: URL, destinationPath: string): Promise<{ byteSize: number; sha256: string }> {
+  const client = url.protocol === "https:" ? https : http;
+  const hash = createHash("sha256");
+  let byteSize = 0;
+  await new Promise<void>((resolve, reject) => {
+    const request = client.request(url, { method: "GET" }, (response) => {
+      const chunks: Buffer[] = [];
+      if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () =>
+          reject(
+            new Error(
+              `Cloud storage download failed with HTTP ${response.statusCode ?? "unknown"}: ${Buffer.concat(chunks).toString("utf8").slice(0, 180)}`
+            )
+          )
+        );
+        return;
+      }
+      const output = createWriteStream(destinationPath, { mode: 0o600 });
+      response.on("data", (chunk: Buffer) => {
+        byteSize += chunk.length;
+        hash.update(chunk);
+      });
+      response.on("error", reject);
+      output.on("error", reject);
+      output.on("finish", resolve);
+      response.pipe(output);
+    });
+    request.on("error", reject);
+    request.end();
+  });
+  return { byteSize, sha256: hash.digest("hex") };
 }
 
 function toAmzDate(value: Date): string {

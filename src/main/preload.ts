@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   AddWorkspaceMemberInput,
   AppState,
+  CompleteRecordingUploadSessionInput,
   ContentConcept,
   CreateProjectInput,
   CreateRecordingUploadSessionInput,
@@ -35,6 +36,8 @@ const api = {
   chooseRecording: (projectId: string): Promise<Project | null> => ipcRenderer.invoke("recording:choose", projectId),
   createRecordingUploadSession: (input: CreateRecordingUploadSessionInput): Promise<RecordingUploadSession> =>
     ipcRenderer.invoke("recording:create-upload-session", input),
+  completeRecordingUploadSession: (input: CompleteRecordingUploadSessionInput): Promise<Project> =>
+    ipcRenderer.invoke("recording:complete-upload-session", input),
   runAnalysis: (projectId: string): Promise<Project> => ipcRenderer.invoke("analysis:run", projectId),
   updateMoments: (projectId: string, moments: DetectedMoment[]): Promise<Project> =>
     ipcRenderer.invoke("analysis:update-moments", projectId, moments),
