@@ -35,6 +35,7 @@ import type {
   RemoveWorkspaceMemberInput,
   RenderedVideo,
   ScriptDraft,
+  UpdateWorkspaceBillingPlanInput,
   UpdateWorkspaceMemberRoleInput
 } from "../shared/types";
 import { runAnalysisPipeline, safeProviderError } from "./analysisPipeline";
@@ -124,6 +125,10 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle("workspace:remove-member", async (_event, input: RemoveWorkspaceMemberInput) => {
     await store.removeWorkspaceMember(input);
+    return activeWorkspaceState();
+  });
+  ipcMain.handle("workspace:update-billing-plan", async (_event, input: UpdateWorkspaceBillingPlanInput) => {
+    await store.updateWorkspaceBillingPlan(input);
     return activeWorkspaceState();
   });
 

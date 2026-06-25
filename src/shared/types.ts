@@ -74,7 +74,8 @@ export type AuditAction =
   | "job.create"
   | "job.cancel"
   | "job.retry"
-  | "usage.record";
+  | "usage.record"
+  | "billing.plan.update";
 
 export type AuditTargetType =
   | "workspace"
@@ -88,7 +89,8 @@ export type AuditTargetType =
   | "concept"
   | "script"
   | "render"
-  | "usage";
+  | "usage"
+  | "billing";
 
 export type AuditMetadataValue = string | number | boolean | null;
 
@@ -474,6 +476,12 @@ export interface UpdateWorkspaceMemberRoleInput {
 export interface RemoveWorkspaceMemberInput {
   workspaceId: string;
   userId: string;
+}
+
+export interface UpdateWorkspaceBillingPlanInput {
+  workspaceId: string;
+  plan: WorkspacePlan;
+  billingStatus?: BillingStatus;
 }
 
 export interface CreateRecordingUploadSessionInput {

@@ -4,8 +4,10 @@ import {
   assertWithinEntitlement,
   defaultLocalEntitlements,
   DEFAULT_LOCAL_WORKSPACE_ID,
+  entitlementsForPlan,
   mergeUsageEvent,
-  summarizeUsage
+  summarizeUsage,
+  workspacePlanDefinition
 } from "./usage";
 
 const event: UsageEvent = {
@@ -69,5 +71,14 @@ describe("usage metering", () => {
   it("deduplicates usage events by idempotency key", () => {
     expect(mergeUsageEvent([event], { ...event, id: "usage-duplicate" })).toHaveLength(1);
     expect(mergeUsageEvent([event], { ...event, id: "usage-2", idempotencyKey: "analysis:project-1:run-2" })).toHaveLength(2);
+  });
+
+  it("defines billing plan entitlements for quota decisions", () => {
+    const starter = workspacePlanDefinition("starter");
+    const team = workspacePlanDefinition("team");
+    expect(starter.monthlyPriceCents).toBe(2900);
+    expect(team.entitlements.llmRunsMonthly).toBeGreaterThan(starter.entitlements.llmRunsMonthly);
+    expect(entitlementsForPlan("local_mvp")).toEqual(defaultLocalEntitlements);
+    expect(entitlementsForPlan("team")).not.toBe(team.entitlements);
   });
 });

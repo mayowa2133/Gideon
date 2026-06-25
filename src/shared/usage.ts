@@ -1,4 +1,4 @@
-import type { UsageEvent, UsageMetric, WorkspaceEntitlements } from "./types";
+import type { BillingStatus, UsageEvent, UsageMetric, WorkspaceEntitlements, WorkspacePlan } from "./types";
 
 export const DEFAULT_LOCAL_USER_ID = "local-user";
 export const DEFAULT_LOCAL_WORKSPACE_ID = "local-workspace";
@@ -15,6 +15,89 @@ export const defaultLocalEntitlements: WorkspaceEntitlements = {
   exportsMonthly: 500,
   maxProjects: 250
 };
+
+export interface WorkspacePlanDefinition {
+  id: WorkspacePlan;
+  label: string;
+  description: string;
+  billingStatus: BillingStatus;
+  monthlyPriceCents: number | null;
+  entitlements: WorkspaceEntitlements;
+}
+
+export const workspacePlanDefinitions: WorkspacePlanDefinition[] = [
+  {
+    id: "local_mvp",
+    label: "Local MVP",
+    description: "Single-machine development plan with generous local limits and no billing provider.",
+    billingStatus: "not_configured",
+    monthlyPriceCents: null,
+    entitlements: defaultLocalEntitlements
+  },
+  {
+    id: "starter",
+    label: "Starter",
+    description: "Hosted single-workspace plan for early product teams validating the upload-to-export loop.",
+    billingStatus: "active",
+    monthlyPriceCents: 2900,
+    entitlements: {
+      sourceMinutesMonthly: 180,
+      transcriptionMinutesMonthly: 180,
+      llmRunsMonthly: 300,
+      ttsCharactersMonthly: 250_000,
+      renderMinutesMonthly: 180,
+      storageBytes: 25 * 1024 * 1024 * 1024,
+      exportsMonthly: 100,
+      maxProjects: 50
+    }
+  },
+  {
+    id: "team",
+    label: "Team",
+    description: "Shared workspace plan with higher AI, render, storage, and export allowances.",
+    billingStatus: "active",
+    monthlyPriceCents: 9900,
+    entitlements: {
+      sourceMinutesMonthly: 1_200,
+      transcriptionMinutesMonthly: 1_200,
+      llmRunsMonthly: 2_500,
+      ttsCharactersMonthly: 2_500_000,
+      renderMinutesMonthly: 1_200,
+      storageBytes: 250 * 1024 * 1024 * 1024,
+      exportsMonthly: 1_000,
+      maxProjects: 1_000
+    }
+  },
+  {
+    id: "enterprise",
+    label: "Enterprise",
+    description: "Contract-backed workspace plan for large teams, custom limits, and future SSO/provider controls.",
+    billingStatus: "active",
+    monthlyPriceCents: null,
+    entitlements: {
+      sourceMinutesMonthly: 10_000,
+      transcriptionMinutesMonthly: 10_000,
+      llmRunsMonthly: 25_000,
+      ttsCharactersMonthly: 25_000_000,
+      renderMinutesMonthly: 10_000,
+      storageBytes: 2 * 1024 * 1024 * 1024 * 1024,
+      exportsMonthly: 10_000,
+      maxProjects: 10_000
+    }
+  }
+];
+
+export function workspacePlanDefinition(plan: WorkspacePlan): WorkspacePlanDefinition {
+  const definition = workspacePlanDefinitions.find((candidate) => candidate.id === plan);
+  if (!definition) {
+    throw new Error(`Unknown workspace plan ${plan}.`);
+  }
+  return definition;
+}
+
+export function entitlementsForPlan(plan: WorkspacePlan): WorkspaceEntitlements {
+  return { ...workspacePlanDefinition(plan).entitlements };
+}
 
 export const usageMetricLabels: Record<UsageMetric, string> = {
   source_minutes: "Source minutes",
@@ -57,7 +140,7 @@ export function createLocalUserWorkspace(now = DEFAULT_LOCAL_CREATED_AT) {
         slug: "local",
         plan: "local_mvp" as const,
         billingStatus: "not_configured" as const,
-        entitlements: defaultLocalEntitlements,
+        entitlements: entitlementsForPlan("local_mvp"),
         createdAt: now,
         updatedAt: now
       }

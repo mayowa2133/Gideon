@@ -35,6 +35,7 @@ import type {
   RenderedVideo,
   ScriptDraft,
   TranscriptArtifact,
+  UpdateWorkspaceBillingPlanInput,
   UpdateWorkspaceMemberRoleInput,
   UserAccount,
   UsageEvent,
@@ -48,8 +49,10 @@ import {
   DEFAULT_LOCAL_USER_ID,
   DEFAULT_LOCAL_WORKSPACE_ID,
   defaultLocalEntitlements,
+  entitlementsForPlan,
   mergeUsageEvent,
-  summarizeUsage
+  summarizeUsage,
+  workspacePlanDefinition
 } from "../shared/usage";
 import {
   createJobEvent,
@@ -148,7 +151,7 @@ export class GideonStore {
       slug,
       plan: "local_mvp",
       billingStatus: "not_configured",
-      entitlements: { ...defaultLocalEntitlements },
+      entitlements: entitlementsForPlan("local_mvp"),
       createdAt: now,
       updatedAt: now
     };
@@ -277,6 +280,33 @@ export class GideonStore {
       targetId: existing.id,
       summary: `Removed ${user?.email ?? input.userId} from the workspace.`,
       metadata: { userId: input.userId, previousRole: existing.role }
+    });
+    await this.save();
+    return state;
+  }
+
+  async updateWorkspaceBillingPlan(input: UpdateWorkspaceBillingPlanInput): Promise<AppState> {
+    const state = await this.load();
+    const workspace = requireWorkspace(state, input.workspaceId);
+    this.assertWorkspaceAccessInState(state, input.workspaceId, "billing:manage");
+    const definition = workspacePlanDefinition(input.plan);
+    const now = new Date().toISOString();
+    workspace.plan = definition.id;
+    workspace.billingStatus = input.billingStatus ?? definition.billingStatus;
+    workspace.entitlements = entitlementsForPlan(definition.id);
+    workspace.updatedAt = now;
+    this.appendAuditToState(state, {
+      workspaceId: workspace.id,
+      action: "billing.plan.update",
+      targetType: "billing",
+      targetId: workspace.id,
+      summary: `Updated billing plan to ${definition.label}.`,
+      metadata: {
+        plan: definition.id,
+        billingStatus: workspace.billingStatus,
+        monthlyPriceCents: definition.monthlyPriceCents
+      },
+      createdAt: now
     });
     await this.save();
     return state;

@@ -14,6 +14,7 @@ import type {
   RecordingUploadSession,
   RemoveWorkspaceMemberInput,
   ScriptDraft,
+  UpdateWorkspaceBillingPlanInput,
   UpdateWorkspaceMemberRoleInput
 } from "../shared/types";
 
@@ -28,6 +29,8 @@ const api = {
     ipcRenderer.invoke("workspace:update-member-role", input),
   removeWorkspaceMember: (input: RemoveWorkspaceMemberInput): Promise<AppState> =>
     ipcRenderer.invoke("workspace:remove-member", input),
+  updateWorkspaceBillingPlan: (input: UpdateWorkspaceBillingPlanInput): Promise<AppState> =>
+    ipcRenderer.invoke("workspace:update-billing-plan", input),
   setActiveProject: (projectId: string): Promise<Project> => ipcRenderer.invoke("project:set-active", projectId),
   createProject: (input: CreateProjectInput): Promise<Project> => ipcRenderer.invoke("project:create", input),
   updateProfile: (projectId: string, profile: ProductProfile): Promise<Project> =>

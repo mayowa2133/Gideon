@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { useEffect, useMemo, useState } from "react";
 import type {
   AppState,
+  BillingStatus,
   ContentConcept,
   DetectedMoment,
   Platform,
@@ -11,6 +12,7 @@ import type {
   RecordingUploadSession,
   ScriptDraft,
   UsageMetric,
+  WorkspacePlan,
   WorkspaceRole
 } from "../shared/types";
 import { platformLabels, toneLabels } from "../shared/types";
@@ -20,7 +22,8 @@ import {
   entitlementLimit,
   formatQuantity,
   summarizeUsage,
-  usageMetricLabels
+  usageMetricLabels,
+  workspacePlanDefinitions
 } from "../shared/usage";
 import "./styles.css";
 
@@ -155,6 +158,13 @@ function App(): JSX.Element {
           onSelect={(projectId) => void chooseProject(projectId)}
         />
         <WorkspacePanel state={state} />
+        <BillingPanel
+          state={state}
+          busy={busy === "saving"}
+          onState={applyAppState}
+          setBusy={setBusy}
+          setError={setError}
+        />
         <TeamPanel
           state={state}
           busy={busy === "saving"}
@@ -287,6 +297,117 @@ function WorkspacePanel({ state }: { state: AppState }): JSX.Element | null {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+function BillingPanel({
+  state,
+  busy,
+  onState,
+  setBusy,
+  setError
+}: {
+  state: AppState;
+  busy: boolean;
+  onState: (state: AppState, preferredProjectId?: string) => void;
+  setBusy: (busy: BusyAction) => void;
+  setError: (error: string | null) => void;
+}): JSX.Element | null {
+  const workspace = state.workspaces.find((candidate) => candidate.id === state.activeWorkspaceId) ?? state.workspaces[0];
+  const [plan, setPlan] = useState<WorkspacePlan>(workspace?.plan ?? "local_mvp");
+  const [billingStatus, setBillingStatus] = useState<BillingStatus>(workspace?.billingStatus ?? "not_configured");
+
+  useEffect(() => {
+    if (!workspace) {
+      return;
+    }
+    setPlan(workspace.plan);
+    setBillingStatus(workspace.billingStatus);
+  }, [workspace?.id, workspace?.plan, workspace?.billingStatus]);
+
+  if (!workspace) {
+    return null;
+  }
+
+  const activeWorkspace = workspace;
+  const selectedDefinition =
+    workspacePlanDefinitions.find((candidate) => candidate.id === plan) ?? workspacePlanDefinitions[0]!;
+  const currentMembership = state.workspaceMembers.find(
+    (member) => member.workspaceId === activeWorkspace.id && member.userId === state.activeUserId
+  );
+  const canManageBilling = currentMembership?.role === "owner" || currentMembership?.role === "admin";
+
+  async function savePlan(): Promise<void> {
+    setBusy("saving");
+    setError(null);
+    try {
+      const next = await window.gideon.updateWorkspaceBillingPlan({
+        workspaceId: activeWorkspace.id,
+        plan,
+        billingStatus
+      });
+      onState(next);
+    } catch (billingError) {
+      setError(messageFromError(billingError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="billing-panel">
+      <p className="eyebrow">Billing and quotas</p>
+      <label>
+        <span>Plan</span>
+        <select
+          value={plan}
+          disabled={busy || !canManageBilling}
+          onChange={(event) => {
+            const nextPlan = event.target.value as WorkspacePlan;
+            setPlan(nextPlan);
+            const definition = workspacePlanDefinitions.find((candidate) => candidate.id === nextPlan);
+            if (definition) {
+              setBillingStatus(definition.billingStatus);
+            }
+          }}
+        >
+          {workspacePlanDefinitions.map((definition) => (
+            <option key={definition.id} value={definition.id}>
+              {definition.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span>Status</span>
+        <select
+          value={billingStatus}
+          disabled={busy || !canManageBilling}
+          onChange={(event) => setBillingStatus(event.target.value as BillingStatus)}
+        >
+          {billingStatuses.map((status) => (
+            <option key={status} value={status}>
+              {status.replace(/_/g, " ")}
+            </option>
+          ))}
+        </select>
+      </label>
+      <small>{selectedDefinition.description}</small>
+      <small>
+        {selectedDefinition.monthlyPriceCents === null
+          ? "Provider billing not configured"
+          : `$${(selectedDefinition.monthlyPriceCents / 100).toFixed(0)}/month placeholder`}
+      </small>
+      <button
+        className="secondary compact"
+        disabled={busy || !canManageBilling || (plan === activeWorkspace.plan && billingStatus === activeWorkspace.billingStatus)}
+        onClick={() => void savePlan()}
+        type="button"
+      >
+        Save plan
+      </button>
+      {!canManageBilling ? <small>Only workspace owners and admins can change billing settings.</small> : null}
     </div>
   );
 }
@@ -450,6 +571,7 @@ function TeamPanel({
 }
 
 const workspaceRoles: WorkspaceRole[] = ["owner", "admin", "editor", "viewer"];
+const billingStatuses: BillingStatus[] = ["not_configured", "trialing", "active", "past_due", "canceled"];
 
 function DirectUploadSessionCard({
   platformInfo,

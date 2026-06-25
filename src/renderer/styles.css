@@ -176,6 +176,7 @@ video {
 .muted-card,
 .runtime-panel,
 .workspace-panel,
+.billing-panel,
 .team-panel,
 .audit-panel {
   width: 100%;
@@ -213,6 +214,7 @@ video {
 }
 
 .workspace-panel,
+.billing-panel,
 .team-panel,
 .audit-panel {
   display: grid;
@@ -222,6 +224,7 @@ video {
 
 .workspace-panel small,
 .usage-list,
+.billing-panel small,
 .team-panel small,
 .audit-panel small,
 .audit-event span {
@@ -250,6 +253,7 @@ video {
   font-size: 0.78rem;
 }
 
+.billing-panel label,
 .team-panel label,
 .team-add-form,
 .team-inline-form,
@@ -259,6 +263,7 @@ video {
   gap: 0.4rem;
 }
 
+.billing-panel label span,
 .team-panel label span {
   color: #9ba8c2;
   font-size: 0.78rem;
@@ -288,6 +293,7 @@ video {
   text-overflow: ellipsis;
 }
 
+.billing-panel select,
 .team-panel input,
 .team-panel select {
   min-height: 2.2rem;
