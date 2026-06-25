@@ -22,6 +22,16 @@ export interface CreateJobEventInput {
   metadata?: JobEvent["metadata"];
 }
 
+export interface RecoverInterruptedJobResult {
+  job: JobRecord;
+  event: {
+    kind: JobEventKind;
+    stage: JobStage;
+    message: string;
+    metadata: NonNullable<JobEvent["metadata"]>;
+  };
+}
+
 export function createJob(input: CreateJobInput): JobRecord {
   return {
     id: input.id,
@@ -180,6 +190,50 @@ export function retryJob(job: JobRecord, now: string): JobRecord {
     finishedAt: undefined,
     updatedAt: now
   };
+}
+
+export function recoverInterruptedJob(job: JobRecord, now: string): RecoverInterruptedJobResult | null {
+  if (job.status === "queued") {
+    const recovered = {
+      ...job,
+      userMessage: "Recovered queued job after app restart.",
+      updatedAt: now
+    };
+    return {
+      job: recovered,
+      event: {
+        kind: "queued",
+        stage: "queued",
+        message: recovered.userMessage,
+        metadata: { recoveredFromStatus: job.status }
+      }
+    };
+  }
+  if (job.status === "running") {
+    const recovered = failJob(job, now, "Gideon stopped before this job finished.");
+    return {
+      job: recovered,
+      event: {
+        kind: "failed",
+        stage: "finalize",
+        message: recovered.safeError ?? recovered.userMessage,
+        metadata: { recoveredFromStatus: job.status, retryable: recovered.retryable }
+      }
+    };
+  }
+  if (job.status === "canceling") {
+    const recovered = finishJobCancel(job, now);
+    return {
+      job: recovered,
+      event: {
+        kind: "canceled",
+        stage: "cancel",
+        message: recovered.userMessage,
+        metadata: { recoveredFromStatus: job.status }
+      }
+    };
+  }
+  return null;
 }
 
 function assertStatus(job: JobRecord, allowed: JobRecord["status"][], action: string): void {

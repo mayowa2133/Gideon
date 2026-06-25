@@ -54,6 +54,7 @@ import {
 import {
   createJobEvent,
   finishJobCancel as finishJobCancelState,
+  recoverInterruptedJob,
   requestJobCancel as requestJobCancelState,
   retryJob as retryJobState
 } from "../shared/jobState";
@@ -879,6 +880,52 @@ export class GideonStore {
       }
     );
     return retried;
+  }
+
+  async recoverInterruptedJobs(): Promise<JobRecord[]> {
+    const state = await this.load();
+    const now = new Date().toISOString();
+    const queuedForRuntime: JobRecord[] = [];
+    let changed = false;
+    for (const project of state.projects) {
+      let projectChanged = false;
+      const nextJobs: JobRecord[] = [];
+      for (const job of project.jobs ?? []) {
+        const recovered = recoverInterruptedJob(job, now);
+        if (!recovered) {
+          nextJobs.push(job);
+          continue;
+        }
+        changed = true;
+        projectChanged = true;
+        nextJobs.push(recovered.job);
+        project.jobEvents = [
+          ...(project.jobEvents ?? []),
+          createJobEvent({
+            id: randomUUID(),
+            projectId: project.id,
+            jobId: job.id,
+            kind: recovered.event.kind,
+            stage: recovered.event.stage,
+            message: recovered.event.message,
+            progress: recovered.job.progress,
+            metadata: recovered.event.metadata,
+            now
+          })
+        ].slice(-MAX_PROJECT_JOB_EVENTS);
+        if (recovered.job.status === "queued") {
+          queuedForRuntime.push(recovered.job);
+        }
+      }
+      if (projectChanged) {
+        project.jobs = nextJobs;
+        project.updatedAt = now;
+      }
+    }
+    if (changed) {
+      await this.save();
+    }
+    return queuedForRuntime;
   }
 
   async setActiveProject(projectId: string): Promise<Project> {

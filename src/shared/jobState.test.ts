@@ -4,6 +4,7 @@ import {
   createJob,
   failJob,
   finishJobCancel,
+  recoverInterruptedJob,
   requestJobCancel,
   retryJob,
   startJob,
@@ -83,6 +84,29 @@ describe("job state machine", () => {
     expect(canceling.status).toBe("canceling");
     const canceled = finishJobCancel(canceling, t2);
     expect(canceled.status).toBe("canceled");
+  });
+
+  it("recovers interrupted local jobs on app restart", () => {
+    const queued = createJob({ id: "job-1", projectId: "project-1", kind: "analysis", now: t0 });
+    const recoveredQueued = recoverInterruptedJob(queued, t1);
+    expect(recoveredQueued?.job.status).toBe("queued");
+    expect(recoveredQueued?.event).toMatchObject({ kind: "queued", metadata: { recoveredFromStatus: "queued" } });
+
+    const running = startJob(createJob({ id: "job-2", projectId: "project-1", kind: "render", now: t0 }), t1);
+    const recoveredRunning = recoverInterruptedJob(running, t2);
+    expect(recoveredRunning?.job.status).toBe("failed");
+    expect(recoveredRunning?.job.retryable).toBe(true);
+    expect(recoveredRunning?.event).toMatchObject({
+      kind: "failed",
+      metadata: { recoveredFromStatus: "running", retryable: true }
+    });
+
+    const canceling = requestJobCancel(running, t2);
+    const recoveredCanceling = recoverInterruptedJob(canceling, t2);
+    expect(recoveredCanceling?.job.status).toBe("canceled");
+    expect(recoveredCanceling?.event).toMatchObject({ kind: "canceled", metadata: { recoveredFromStatus: "canceling" } });
+
+    expect(recoverInterruptedJob(recoveredCanceling!.job, t2)).toBeNull();
   });
 
   it("rejects invalid transitions", () => {

@@ -71,6 +71,7 @@ async function createWindow(): Promise<void> {
 
 app.whenReady().then(async () => {
   registerIpcHandlers();
+  await recoverInterruptedJobsAtStartup();
   await startControlBridge();
   await createWindow();
   app.on("activate", () => {
@@ -419,6 +420,21 @@ async function enqueueRenderFromControl(projectId: string, actorType: "local_use
   await store.appendJob(projectId, job, actorType);
   enqueueRenderJob(projectId, job.id);
   return store.getProject(projectId);
+}
+
+async function recoverInterruptedJobsAtStartup(): Promise<void> {
+  const jobs = await store.recoverInterruptedJobs();
+  for (const job of jobs) {
+    if (job.kind === "analysis") {
+      enqueueAnalysisJob(job.projectId, job.id);
+      continue;
+    }
+    if (job.kind === "render") {
+      enqueueRenderJob(job.projectId, job.id);
+      continue;
+    }
+    console.warn(`Recovered queued ${job.kind} job ${job.id}, but no local runner is wired for that job kind.`);
+  }
 }
 
 function enqueueAnalysisJob(projectId: string, jobId: string): void {
