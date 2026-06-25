@@ -11,6 +11,7 @@ import {
 import { GideonStore } from "./store";
 import { LocalPrivateObjectStorage } from "./storage";
 import { LocalWorkerQueue } from "./jobQueue";
+import { startGideonControlServer } from "./controlServer";
 import type { AppState, ContentConcept, DetectedMoment, Project, ProviderRun, RenderedVideo, ScriptDraft } from "../shared/types";
 import { runAnalysisPipeline, safeProviderError } from "./analysisPipeline";
 import { loadProviderConfig } from "./providers/config";
@@ -48,6 +49,7 @@ async function createWindow(): Promise<void> {
 
 app.whenReady().then(async () => {
   registerIpcHandlers();
+  await startControlBridge();
   await createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -142,20 +144,7 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle("analysis:run", async (_event, projectId: string) => {
-    const project = await store.getProject(projectId);
-    if (!project.recording) {
-      throw new Error("Choose a recording before analysis.");
-    }
-    const job = createJob({
-      id: randomUUID(),
-      projectId,
-      kind: "analysis",
-      now: new Date().toISOString(),
-      userMessage: "Waiting to analyze recording."
-    });
-    await store.appendJob(projectId, job);
-    enqueueAnalysisJob(projectId, job.id);
-    return store.getProject(projectId);
+    return enqueueAnalysisFromControl(projectId);
   });
 
   ipcMain.handle("analysis:update-moments", async (_event, projectId: string, moments: DetectedMoment[]) =>
@@ -173,27 +162,7 @@ function registerIpcHandlers(): void {
   );
 
   ipcMain.handle("render:selected", async (_event, projectId: string) => {
-    const project = await store.getProject(projectId);
-    if (!project.recording) {
-      throw new Error("Choose a recording before rendering.");
-    }
-    const selectedConcepts = project.concepts.filter((concept) => concept.selected);
-    const scripts = project.scripts.filter((script) =>
-      selectedConcepts.some((concept) => concept.id === script.conceptId)
-    );
-    if (scripts.length === 0) {
-      throw new Error("Generate scripts before rendering.");
-    }
-    const job = createJob({
-      id: randomUUID(),
-      projectId,
-      kind: "render",
-      now: new Date().toISOString(),
-      userMessage: "Waiting to render selected drafts."
-    });
-    await store.appendJob(projectId, job);
-    enqueueRenderJob(projectId, job.id);
-    return store.getProject(projectId);
+    return enqueueRenderFromControl(projectId);
   });
 
   ipcMain.handle("job:cancel", async (_event, projectId: string, jobId: string) => store.requestJobCancel(projectId, jobId));
@@ -243,6 +212,32 @@ function registerIpcHandlers(): void {
   });
 }
 
+async function startControlBridge(): Promise<void> {
+  const socketPath = controlSocketPath();
+  await startGideonControlServer({
+    socketPath,
+    handlers: {
+      status: async () => ({
+        ok: true,
+        appVersion: app.getVersion(),
+        socketPath,
+        queue: workerQueue.stats(),
+        apiKeyRequired: false
+      }),
+      listProjects: activeWorkspaceState,
+      getProject: (projectId) => store.getProject(projectId),
+      updateScript: updateScriptFromControl,
+      updateMoment: updateMomentFromControl,
+      enqueueAnalysis: enqueueAnalysisFromControl,
+      enqueueRender: enqueueRenderFromControl
+    }
+  });
+}
+
+function controlSocketPath(): string {
+  return process.env.GIDEON_CONTROL_SOCKET || path.join(app.getPath("userData"), "gideon-control.sock");
+}
+
 async function activeWorkspaceState(): Promise<AppState> {
   const state = await store.load();
   const activeProject = await store.getActiveProject();
@@ -251,6 +246,94 @@ async function activeWorkspaceState(): Promise<AppState> {
     projects: await store.listProjects(),
     activeProjectId: activeProject?.id ?? null
   };
+}
+
+async function updateScriptFromControl(input: {
+  projectId: string;
+  scriptId: string;
+  hook?: string;
+  voiceoverText?: string;
+  cta?: string;
+}): Promise<Project> {
+  const project = await store.getProject(input.projectId);
+  const scripts = project.scripts.map((script) => {
+    if (script.id !== input.scriptId) {
+      return script;
+    }
+    return {
+      ...script,
+      hook: input.hook ?? script.hook,
+      voiceoverText: input.voiceoverText ?? script.voiceoverText,
+      cta: input.cta ?? script.cta,
+      updatedAt: new Date().toISOString()
+    };
+  });
+  if (!scripts.some((script) => script.id === input.scriptId)) {
+    throw new Error(`Script ${input.scriptId} was not found.`);
+  }
+  return store.updateScripts(input.projectId, scripts);
+}
+
+async function updateMomentFromControl(input: {
+  projectId: string;
+  momentId: string;
+  label?: string;
+  evidence?: string;
+  enabled?: boolean;
+}): Promise<Project> {
+  const project = await store.getProject(input.projectId);
+  const moments = project.moments.map((moment) => {
+    if (moment.id !== input.momentId) {
+      return moment;
+    }
+    return {
+      ...moment,
+      label: input.label ?? moment.label,
+      evidence: input.evidence ?? moment.evidence,
+      enabled: input.enabled ?? moment.enabled
+    };
+  });
+  if (!moments.some((moment) => moment.id === input.momentId)) {
+    throw new Error(`Moment ${input.momentId} was not found.`);
+  }
+  return store.updateMoments(input.projectId, moments);
+}
+
+async function enqueueAnalysisFromControl(projectId: string): Promise<Project> {
+  const project = await store.getProject(projectId);
+  if (!project.recording) {
+    throw new Error("Choose a recording before analysis.");
+  }
+  const job = createJob({
+    id: randomUUID(),
+    projectId,
+    kind: "analysis",
+    now: new Date().toISOString(),
+    userMessage: "Waiting to analyze recording."
+  });
+  await store.appendJob(projectId, job);
+  enqueueAnalysisJob(projectId, job.id);
+  return store.getProject(projectId);
+}
+
+async function enqueueRenderFromControl(projectId: string): Promise<Project> {
+  const project = await store.getProject(projectId);
+  if (!project.recording) {
+    throw new Error("Choose a recording before rendering.");
+  }
+  if (project.scripts.length === 0) {
+    throw new Error("Generate scripts before rendering.");
+  }
+  const job = createJob({
+    id: randomUUID(),
+    projectId,
+    kind: "render",
+    now: new Date().toISOString(),
+    userMessage: "Waiting to render selected drafts."
+  });
+  await store.appendJob(projectId, job);
+  enqueueRenderJob(projectId, job.id);
+  return store.getProject(projectId);
 }
 
 function enqueueAnalysisJob(projectId: string, jobId: string): void {

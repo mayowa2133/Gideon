@@ -1,13 +1,15 @@
 import fs from "node:fs/promises";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { callTool, createVideoEditPlan, resolveStorePath } from "./server";
+import { callTool, createVideoEditPlan, resolveControlSocketPath, resolveStorePath } from "./server";
 
 describe("Gideon MCP server tools", () => {
   it("resolves the store path from environment without requiring API keys", () => {
     expect(resolveStorePath({ GIDEON_STORE_PATH: "/tmp/gideon-store.json" }, "/home/test")).toBe("/tmp/gideon-store.json");
     expect(resolveStorePath({ GIDEON_USER_DATA_DIR: "/tmp/gideon" }, "/home/test")).toBe("/tmp/gideon/gideon-store.json");
+    expect(resolveControlSocketPath({ GIDEON_CONTROL_SOCKET: "/tmp/gideon.sock" }, "/home/test")).toBe("/tmp/gideon.sock");
   });
 
   it("lists projects and applies bounded script edits", async () => {
@@ -89,6 +91,45 @@ describe("Gideon MCP server tools", () => {
       suggestedMomentIds: ["moment-1"]
     });
   });
+
+  it("prefers the live app control bridge when available", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-mcp-bridge-"));
+    const controlSocketPath = path.join(dir, "control.sock");
+    const calls: string[] = [];
+    const server = await startFakeControlServer(controlSocketPath, (method) => {
+      calls.push(method);
+      if (method === "listProjects") {
+        return { activeProjectId: "project-1", projects: [{ id: "project-1", name: "Live project" }] };
+      }
+      if (method === "updateScript") {
+        return { id: "project-1", scripts: [{ id: "script-1", hook: "Live hook" }] };
+      }
+      if (method === "enqueueRender") {
+        return { id: "project-1", jobs: [{ id: "job-1", kind: "render", status: "queued" }] };
+      }
+      return { ok: true };
+    });
+
+    try {
+      const listed = await callTool("gideon_list_projects", { controlSocketPath });
+      expect(listed.content[0]?.text).toContain("live_app");
+      expect(listed.content[0]?.text).toContain("Live project");
+
+      const edited = await callTool("gideon_update_script", {
+        controlSocketPath,
+        projectId: "project-1",
+        scriptId: "script-1",
+        hook: "Live hook"
+      });
+      expect(edited.content[0]?.text).toContain("Live hook");
+
+      const enqueued = await callTool("gideon_enqueue_render", { controlSocketPath, projectId: "project-1" });
+      expect(enqueued.content[0]?.text).toContain("queued");
+      expect(calls).toEqual(["listProjects", "updateScript", "enqueueRender"]);
+    } finally {
+      server.close();
+    }
+  });
 });
 
 async function writeStore(state: unknown): Promise<string> {
@@ -96,4 +137,31 @@ async function writeStore(state: unknown): Promise<string> {
   const storePath = path.join(dir, "gideon-store.json");
   await fs.writeFile(storePath, JSON.stringify(state, null, 2));
   return storePath;
+}
+
+async function startFakeControlServer(
+  socketPath: string,
+  handler: (method: string, params: Record<string, unknown>) => unknown
+): Promise<net.Server> {
+  const server = net.createServer((socket) => {
+    let buffer = "";
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk) => {
+      buffer += chunk;
+      const line = buffer.split("\n")[0];
+      if (!line) {
+        return;
+      }
+      const request = JSON.parse(line) as { id: string | number; method: string; params?: Record<string, unknown> };
+      socket.write(`${JSON.stringify({ id: request.id, result: handler(request.method, request.params ?? {}) })}\n`);
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(socketPath, () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  return server;
 }

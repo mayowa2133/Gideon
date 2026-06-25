@@ -24,20 +24,28 @@ It intentionally starts with safe project operations:
 - update a script hook, voiceover text, or CTA;
 - update a detected moment label/evidence/enabled flag;
 - generate a deterministic edit plan from a user instruction.
+- enqueue analysis/render jobs through the running desktop app when its local control socket is available.
 
 This works without `OPENAI_API_KEY` or other provider keys because the MCP client does the reasoning.
+
+When the desktop app is running, MCP tools prefer the live local control socket:
+
+```bash
+GIDEON_CONTROL_SOCKET="$HOME/Library/Application Support/Gideon/gideon-control.sock" pnpm mcp:server
+```
+
+The socket path defaults to the macOS Gideon app data folder. Direct JSON-store access remains a fallback for safe inspection and bounded copy edits when the app is not running, but the intended path is the live bridge so edits flow through Gideon’s in-memory store and durable worker queue.
 
 ## Safety rules
 
 - Tools must use explicit schemas and bounded fields.
 - MCP output must not expose API keys or provider raw payloads.
 - Publishing, deletion, billing changes, and access-control changes are not exposed until implemented with user confirmation and authorization.
-- Future render/analysis tools must enqueue Gideon durable jobs instead of bypassing job state.
+- Render/analysis tools must enqueue Gideon durable jobs instead of bypassing job state.
 - Future hosted mode must enforce workspace membership on every MCP call.
 
 ## Next steps
 
-- Replace direct JSON-store edits with an app/service bridge so a running desktop app receives live updates.
-- Add MCP tools for enqueueing analysis/render jobs once the worker queue has a stable external command surface.
+- Replace direct JSON fallback edits with a fully authoritative service API once hosted/workspace auth exists.
 - Add MCP audit events for every agent action.
 - Add project-scoped approval gates for destructive actions and future publishing.

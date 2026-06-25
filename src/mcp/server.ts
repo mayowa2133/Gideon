@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
@@ -60,6 +61,7 @@ const tools = [
     name: "gideon_status",
     description: "Check whether the local Gideon store is reachable. No provider API keys are required.",
     inputSchema: objectSchema({
+      controlSocketPath: optionalString("Explicit Gideon app control socket path. Defaults to GIDEON_CONTROL_SOCKET or the macOS app data path."),
       storePath: optionalString("Explicit path to gideon-store.json. Defaults to GIDEON_STORE_PATH or the macOS app data path.")
     })
   },
@@ -67,6 +69,7 @@ const tools = [
     name: "gideon_list_projects",
     description: "List local Gideon projects with high-level status for agent review.",
     inputSchema: objectSchema({
+      controlSocketPath: optionalString("Explicit Gideon app control socket path."),
       storePath: optionalString("Explicit path to gideon-store.json.")
     })
   },
@@ -75,6 +78,7 @@ const tools = [
     description: "Inspect one Gideon project including profile, evidence, scripts, renders, and jobs.",
     inputSchema: objectSchema({
       projectId: { type: "string", description: "Gideon project ID." },
+      controlSocketPath: optionalString("Explicit Gideon app control socket path."),
       storePath: optionalString("Explicit path to gideon-store.json.")
     }, ["projectId"])
   },
@@ -87,6 +91,7 @@ const tools = [
       hook: optionalString("Replacement hook text."),
       voiceoverText: optionalString("Replacement voiceover text."),
       cta: optionalString("Replacement CTA text."),
+      controlSocketPath: optionalString("Explicit Gideon app control socket path."),
       storePath: optionalString("Explicit path to gideon-store.json.")
     }, ["projectId", "scriptId"])
   },
@@ -99,8 +104,25 @@ const tools = [
       label: optionalString("Replacement moment label."),
       evidence: optionalString("Replacement evidence text."),
       enabled: { type: "boolean", description: "Whether this moment should be used." },
+      controlSocketPath: optionalString("Explicit Gideon app control socket path."),
       storePath: optionalString("Explicit path to gideon-store.json.")
     }, ["projectId", "momentId"])
+  },
+  {
+    name: "gideon_enqueue_analysis",
+    description: "Ask the running Gideon app to enqueue an analysis job through its local worker queue.",
+    inputSchema: objectSchema({
+      projectId: { type: "string" },
+      controlSocketPath: optionalString("Explicit Gideon app control socket path.")
+    }, ["projectId"])
+  },
+  {
+    name: "gideon_enqueue_render",
+    description: "Ask the running Gideon app to enqueue a render job through its local worker queue.",
+    inputSchema: objectSchema({
+      projectId: { type: "string" },
+      controlSocketPath: optionalString("Explicit Gideon app control socket path.")
+    }, ["projectId"])
   },
   {
     name: "gideon_generate_video_edit_plan",
@@ -108,10 +130,21 @@ const tools = [
     inputSchema: objectSchema({
       instruction: { type: "string", description: "User's desired edit or marketing outcome." },
       projectId: optionalString("Optional project ID to ground the plan."),
+      controlSocketPath: optionalString("Explicit Gideon app control socket path."),
       storePath: optionalString("Explicit path to gideon-store.json.")
     }, ["instruction"])
   }
 ];
+
+export function resolveControlSocketPath(env: NodeJS.ProcessEnv = process.env, homeDir = os.homedir()): string {
+  if (env.GIDEON_CONTROL_SOCKET) {
+    return env.GIDEON_CONTROL_SOCKET;
+  }
+  if (env.GIDEON_USER_DATA_DIR) {
+    return path.join(env.GIDEON_USER_DATA_DIR, "gideon-control.sock");
+  }
+  return path.join(homeDir, "Library", "Application Support", "Gideon", "gideon-control.sock");
+}
 
 export function resolveStorePath(env: NodeJS.ProcessEnv = process.env, homeDir = os.homedir()): string {
   if (env.GIDEON_STORE_PATH) {
@@ -128,13 +161,25 @@ export async function callTool(name: string, args: Record<string, unknown> = {})
     case "gideon_status":
       return textResult(await status(args));
     case "gideon_list_projects":
-      return textResult(listProjects(await readStateFromArgs(args)));
+      return textResult(await listProjectsTool(args));
     case "gideon_get_project":
-      return textResult(getProject(await readStateFromArgs(args), requireString(args.projectId, "projectId")));
+      return textResult(await getProjectTool(args));
     case "gideon_update_script":
       return textResult(await updateScript(args));
     case "gideon_update_moment":
       return textResult(await updateMoment(args));
+    case "gideon_enqueue_analysis":
+      return textResult(
+        await requireLiveControl(args, "enqueueAnalysis", {
+          projectId: requireString(args.projectId, "projectId")
+        })
+      );
+    case "gideon_enqueue_render":
+      return textResult(
+        await requireLiveControl(args, "enqueueRender", {
+          projectId: requireString(args.projectId, "projectId")
+        })
+      );
     case "gideon_generate_video_edit_plan":
       return textResult(await generateVideoEditPlan(args));
     default:
@@ -162,6 +207,8 @@ export function createVideoEditPlan(instruction: string, project?: GideonProject
 
 async function status(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
   const storePath = pathFromArgs(args);
+  const controlSocketPath = controlSocketPathFromArgs(args);
+  const live = await maybeControlRequest(args, "status", {});
   let exists = false;
   let projectCount = 0;
   try {
@@ -175,6 +222,9 @@ async function status(args: Record<string, unknown>): Promise<Record<string, Jso
   }
   return {
     server: "gideon-mcp",
+    liveAppConnected: Boolean(live),
+    liveApp: live ? sanitizeRecord(live) : {},
+    controlSocketPath,
     storePath,
     storeExists: exists,
     projectCount,
@@ -182,7 +232,34 @@ async function status(args: Record<string, unknown>): Promise<Record<string, Jso
   };
 }
 
+async function listProjectsTool(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  const live = await maybeControlRequest(args, "listProjects", {});
+  if (live) {
+    return { mode: "live_app", state: sanitizeRecord(live) };
+  }
+  return { mode: "direct_store", ...listProjects(await readStateFromArgs(args)) };
+}
+
+async function getProjectTool(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  const projectId = requireString(args.projectId, "projectId");
+  const live = await maybeControlRequest(args, "getProject", { projectId });
+  if (live) {
+    return { mode: "live_app", project: sanitizeRecord(live) };
+  }
+  return { mode: "direct_store", ...getProject(await readStateFromArgs(args), projectId) };
+}
+
 async function updateScript(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  const live = await maybeControlRequest(args, "updateScript", {
+    projectId: requireString(args.projectId, "projectId"),
+    scriptId: requireString(args.scriptId, "scriptId"),
+    hook: optionalControlValue(args.hook),
+    voiceoverText: optionalControlValue(args.voiceoverText),
+    cta: optionalControlValue(args.cta)
+  });
+  if (live) {
+    return { mode: "live_app", project: sanitizeRecord(live) };
+  }
   const storePath = pathFromArgs(args);
   const projectId = requireString(args.projectId, "projectId");
   const scriptId = requireString(args.scriptId, "scriptId");
@@ -205,6 +282,7 @@ async function updateScript(args: Record<string, unknown>): Promise<Record<strin
   project.updatedAt = script.updatedAt;
   await writeState(storePath, state);
   return {
+    mode: "direct_store",
     projectId,
     scriptId,
     updatedAt: script.updatedAt,
@@ -213,6 +291,16 @@ async function updateScript(args: Record<string, unknown>): Promise<Record<strin
 }
 
 async function updateMoment(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  const live = await maybeControlRequest(args, "updateMoment", {
+    projectId: requireString(args.projectId, "projectId"),
+    momentId: requireString(args.momentId, "momentId"),
+    label: optionalControlValue(args.label),
+    evidence: optionalControlValue(args.evidence),
+    enabled: typeof args.enabled === "boolean" ? args.enabled : undefined
+  });
+  if (live) {
+    return { mode: "live_app", project: sanitizeRecord(live) };
+  }
   const storePath = pathFromArgs(args);
   const projectId = requireString(args.projectId, "projectId");
   const momentId = requireString(args.momentId, "momentId");
@@ -234,6 +322,7 @@ async function updateMoment(args: Record<string, unknown>): Promise<Record<strin
   project.updatedAt = new Date().toISOString();
   await writeState(storePath, state);
   return {
+    mode: "direct_store",
     projectId,
     momentId,
     updatedAt: project.updatedAt,
@@ -245,7 +334,8 @@ async function generateVideoEditPlan(args: Record<string, unknown>): Promise<Rec
   const instruction = requireString(args.instruction, "instruction");
   let project: GideonProject | undefined;
   if (typeof args.projectId === "string") {
-    project = requireProject(await readStateFromArgs(args), args.projectId);
+    const live = await maybeControlRequest(args, "getProject", { projectId: args.projectId });
+    project = live ? (live as GideonProject) : requireProject(await readStateFromArgs(args), args.projectId);
   }
   return createVideoEditPlan(instruction, project);
 }
@@ -262,6 +352,65 @@ async function writeState(storePath: string, state: GideonState): Promise<void> 
   const temporaryPath = `${storePath}.mcp.tmp`;
   await fs.writeFile(temporaryPath, JSON.stringify(state, null, 2));
   await fs.rename(temporaryPath, storePath);
+}
+
+async function maybeControlRequest(
+  args: Record<string, unknown>,
+  method: string,
+  params: Record<string, unknown>
+): Promise<unknown | null> {
+  try {
+    return await controlRequest(controlSocketPathFromArgs(args), method, params);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ECONNREFUSED" || code === "EACCES") {
+      return null;
+    }
+    return null;
+  }
+}
+
+async function requireLiveControl(
+  args: Record<string, unknown>,
+  method: string,
+  params: Record<string, unknown>
+): Promise<Record<string, JsonValue>> {
+  const result = await maybeControlRequest(args, method, params);
+  if (!result) {
+    throw new Error(
+      `Gideon desktop app is not reachable at ${controlSocketPathFromArgs(args)}. Start the app before using ${method}.`
+    );
+  }
+  return {
+    mode: "live_app",
+    project: sanitizeRecord(result)
+  };
+}
+
+async function controlRequest(socketPath: string, method: string, params: Record<string, unknown>): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const socket = net.createConnection(socketPath);
+    const id = Date.now();
+    let response = "";
+    socket.setEncoding("utf8");
+    socket.on("connect", () => {
+      socket.write(`${JSON.stringify({ id, method, params })}\n`);
+    });
+    socket.on("data", (chunk) => {
+      response += chunk;
+      if (!response.includes("\n")) {
+        return;
+      }
+      socket.end();
+      const parsed = JSON.parse(response.trim()) as { result?: unknown; error?: { message?: string } };
+      if (parsed.error) {
+        reject(new Error(parsed.error.message ?? "Gideon control request failed."));
+      } else {
+        resolve(parsed.result);
+      }
+    });
+    socket.on("error", reject);
+  });
 }
 
 function listProjects(state: GideonState): Record<string, JsonValue> {
@@ -309,6 +458,16 @@ function pathFromArgs(args: Record<string, unknown>): string {
   return typeof args.storePath === "string" && args.storePath.trim()
     ? args.storePath.trim()
     : resolveStorePath();
+}
+
+function controlSocketPathFromArgs(args: Record<string, unknown>): string {
+  return typeof args.controlSocketPath === "string" && args.controlSocketPath.trim()
+    ? args.controlSocketPath.trim()
+    : resolveControlSocketPath();
+}
+
+function optionalControlValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value.trim() : undefined;
 }
 
 function requireString(value: unknown, field: string): string {
