@@ -396,6 +396,10 @@ export interface RenderedVideo {
   status: "queued" | "rendering" | "completed" | "failed";
   outputPath?: string;
   outputUrl?: string;
+  artifactId?: string;
+  storageKey?: string;
+  sha256?: string;
+  sizeBytes?: number;
   error?: string;
   validation?: RenderValidation;
   createdAt: string;

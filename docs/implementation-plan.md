@@ -1,6 +1,6 @@
 # Gideon implementation plan
 
-Last updated: 2026-06-24
+Last updated: 2026-06-25
 
 This plan turns the product requirements, architecture, API contract, schema, and research into an executable delivery sequence. It assumes the MVP will be built as a web application that accepts screen recordings, analyzes them into product moments, generates multiple short-form content angles, creates voiceovers, renders captioned clips, and keeps a human reviewer in control before export.
 
@@ -11,6 +11,7 @@ The plan intentionally separates product scaffolding, media infrastructure, AI o
 - Ship the smallest end-to-end loop before expanding breadth: upload one recording, detect moments, generate angles, approve one script, synthesize one voiceover, render one clip, export one file.
 - Keep every generated artifact versioned. A user should be able to see what prompt, model, input transcript, script, voice, and render settings produced each output.
 - Keep external vendors behind interfaces. LLM, transcription, TTS, storage, and rendering runners must be swappable without database rewrites.
+- Treat Codex/Claude Code control through MCP as a first-class no-Gideon-API-key path. Like Palmier’s agent-control model, external coding agents may bring their own model credentials, inspect Gideon project state, make bounded edits, and enqueue jobs through explicit tools while Gideon enforces RBAC, audit logging, and human approval gates.
 - Do not depend on social posting APIs for MVP value. Exports and copyable captions are enough for first release.
 - Treat video files as untrusted input. All upload, FFmpeg, storage, and download paths must follow the security rules in docs/security-rules.md.
 - Keep Remotion licensing visible before commercial rollout. If the team grows beyond the free license threshold, budget and legal review must happen before production usage expands.
@@ -46,11 +47,19 @@ Create a maintainable codebase layout with reproducible local development, CI, a
    - S3-compatible storage for videos and render artifacts.
    - Optional local object storage through MinIO for deterministic development.
 
+5. Add the local MCP agent control plane.
+   - Provide a stdio MCP server for Codex, Claude Code, and other MCP clients.
+   - Keep this path independent of Gideon-held LLM provider API keys; the MCP client supplies model reasoning.
+   - Route live mutations through the app control socket when the desktop app is running.
+   - Restrict direct-store fallback tools to bounded, auditable edits.
+   - Record MCP edits with `actorType: "mcp_agent"` and enforce workspace role permissions.
+
 ### Acceptance criteria
 
 - A fresh clone can run install, configure environment from .env.example, start local infrastructure, run migrations, and start the app.
 - CI fails on lint, type, test, build, or formatting drift.
 - AGENTS.md and CLAUDE.md accurately describe the repo commands.
+- Codex/Claude Code can connect through MCP, inspect projects, edit approved script/moment fields, and enqueue jobs without Gideon requiring provider API keys for that control path.
 
 ### Verification
 

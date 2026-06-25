@@ -633,6 +633,12 @@ video {
   color: #c8d2e7;
 }
 
+.render-card .storage-key {
+  overflow-wrap: anywhere;
+  color: #9ba8c2;
+  font-size: 0.78rem;
+}
+
 .moment-card small,
 .concept-card small {
   color: #9ba8c2;

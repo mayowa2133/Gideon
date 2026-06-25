@@ -1385,6 +1385,7 @@ function RenderGallery({
               {render.validation.videoCodec}/{render.validation.audioCodec}
             </p>
           ) : null}
+          {render.storageKey ? <p className="storage-key">Private storage: {render.storageKey}</p> : null}
           <div className="action-row">
             <button className="secondary" disabled={render.status !== "completed" || exporting} onClick={() => onExport(render.id)} type="button">
               Export MP4

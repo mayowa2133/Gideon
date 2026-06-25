@@ -636,6 +636,7 @@ async function runRenderJob(projectId: string, jobId: string): Promise<Project> 
     progress: job.progress
   });
   const renders: RenderedVideo[] = [];
+  let reservedRenderStorageBytes = 0;
   try {
     job = await advanceJobStage(projectId, jobId, "quota", 1, scripts.length + 3, "Checking render quota.");
     await store.assertUsageAvailable(projectId, "render_minutes", scripts.length);
@@ -670,6 +671,7 @@ async function runRenderJob(projectId: string, jobId: string): Promise<Project> 
           scriptsToRender.length + 3,
           `Rendering draft ${index + 1}/${scriptsToRender.length}.`
         );
+        const renderId = randomUUID();
         const rendered = await renderDraft({
           projectId,
           projectDir: store.projectDir(projectId),
@@ -680,13 +682,29 @@ async function runRenderJob(projectId: string, jobId: string): Promise<Project> 
           title: concept?.title ?? script.hook,
           voiceoverPath: voiceoverPath ?? undefined
         });
+        const output = await fs.stat(rendered.outputPath);
+        await store.assertUsageAvailable(projectId, "storage_bytes", reservedRenderStorageBytes + output.size);
+        const stored = await createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
+          workspaceId: project.workspaceId,
+          projectId,
+          kind: "render",
+          sourcePath: rendered.outputPath,
+          originalFileName: `${renderId}.mp4`,
+          contentType: "video/mp4"
+        });
+        await store.appendArtifact(projectId, stored.artifact);
+        reservedRenderStorageBytes += stored.artifact.byteSize;
         renders.push({
-          id: randomUUID(),
+          id: renderId,
           scriptId: script.id,
           title: concept?.title ?? script.hook,
           status: "completed",
-          outputPath: rendered.outputPath,
-          outputUrl: rendered.outputUrl,
+          outputPath: stored.filePath,
+          outputUrl: stored.fileUrl,
+          artifactId: stored.artifact.id,
+          storageKey: stored.artifact.storageKey,
+          sha256: stored.artifact.sha256,
+          sizeBytes: stored.artifact.byteSize,
           validation: rendered.validation,
           createdAt
         });
@@ -915,6 +933,15 @@ async function recordRenderUsage(projectId: string, renders: RenderedVideo[]): P
       source: "render",
       idempotencyKey: `render:${projectId}:${render.id}`
     });
+    if (render.artifactId && render.sizeBytes) {
+      await store.recordUsage(projectId, {
+        metric: "storage_bytes",
+        quantity: render.sizeBytes,
+        unit: "byte",
+        source: "render",
+        idempotencyKey: `render:${projectId}:${render.artifactId}:storage_bytes`
+      });
+    }
   }
 }
 

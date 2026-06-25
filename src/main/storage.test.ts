@@ -57,6 +57,28 @@ describe("local private object storage", () => {
     expect(await fs.readFile(stored.filePath, "utf8")).toBe("voiceover bytes");
   });
 
+  it("stores rendered videos as private video artifacts", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-render-storage-"));
+    const sourcePath = path.join(tempDir, "draft.mp4");
+    await fs.writeFile(sourcePath, Buffer.from("render bytes"));
+
+    const storage = new LocalPrivateObjectStorage(path.join(tempDir, "objects"));
+    const stored = await storage.putFile({
+      workspaceId: "workspace-1",
+      projectId: "project-1",
+      kind: "render",
+      sourcePath,
+      originalFileName: "draft.mp4",
+      contentType: "video/mp4"
+    });
+
+    expect(stored.artifact.kind).toBe("render");
+    expect(stored.artifact.contentType).toBe("video/mp4");
+    expect(stored.artifact.storageKey).toContain("workspaces/workspace-1/projects/project-1/render/");
+    expect(stored.artifact.byteSize).toBe("render bytes".length);
+    expect(await fs.readFile(stored.filePath, "utf8")).toBe("render bytes");
+  });
+
   it("loads cloud storage configuration from environment", () => {
     const config = loadStorageConfig({
       GIDEON_STORAGE_PROVIDER: "r2",
