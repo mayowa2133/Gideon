@@ -176,6 +176,7 @@ video {
 .muted-card,
 .runtime-panel,
 .workspace-panel,
+.team-panel,
 .audit-panel {
   width: 100%;
   text-align: left;
@@ -212,6 +213,7 @@ video {
 }
 
 .workspace-panel,
+.team-panel,
 .audit-panel {
   display: grid;
   gap: 0.45rem;
@@ -220,6 +222,7 @@ video {
 
 .workspace-panel small,
 .usage-list,
+.team-panel small,
 .audit-panel small,
 .audit-event span {
   color: #9ba8c2;
@@ -245,6 +248,54 @@ video {
 .audit-event strong {
   color: #edf3ff;
   font-size: 0.78rem;
+}
+
+.team-panel label,
+.team-add-form,
+.team-inline-form,
+.member-list,
+.member-row {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.team-panel label span {
+  color: #9ba8c2;
+  font-size: 0.78rem;
+}
+
+.team-inline-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.team-add-form {
+  grid-template-columns: 1fr;
+}
+
+.member-list {
+  gap: 0.55rem;
+}
+
+.member-row {
+  grid-template-columns: minmax(0, 1fr);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.55rem;
+}
+
+.member-row strong,
+.member-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-panel input,
+.team-panel select {
+  min-height: 2.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #edf3ff;
+  padding: 0 0.65rem;
 }
 
 .status-dot {

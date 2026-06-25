@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertWorkspacePermission, roleAllows } from "./rbac";
+import { assertCanManageWorkspaceRole, assertWorkspacePermission, canManageWorkspaceRole, countWorkspaceOwners, roleAllows } from "./rbac";
 import type { WorkspaceMember, WorkspaceRole } from "./types";
 
 describe("workspace RBAC", () => {
@@ -36,6 +36,20 @@ describe("workspace RBAC", () => {
     expect(() =>
       assertWorkspacePermission({ members, workspaceId: "workspace-1", userId: null, action: "project:read" })
     ).toThrow("No active user");
+  });
+
+  it("allows only owners to manage owner-level membership", () => {
+    expect(canManageWorkspaceRole("owner", "owner")).toBe(true);
+    expect(canManageWorkspaceRole("admin", "editor")).toBe(true);
+    expect(canManageWorkspaceRole("admin", "owner")).toBe(false);
+    expect(canManageWorkspaceRole("editor", "viewer")).toBe(false);
+    expect(() => assertCanManageWorkspaceRole({ actorRole: "admin", targetRole: "owner", action: "add" })).toThrow(
+      "cannot add owner"
+    );
+  });
+
+  it("counts workspace owners for last-owner safeguards", () => {
+    expect(countWorkspaceOwners([member("owner"), member("admin"), { ...member("owner"), id: "member-owner-2", userId: "user-2" }], "workspace-1")).toBe(2);
   });
 });
 

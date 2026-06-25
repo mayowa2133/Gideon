@@ -12,7 +12,21 @@ import { GideonStore } from "./store";
 import { createPrivateObjectStorage, isCloudStorageConfigured, loadStorageConfig } from "./storage";
 import { LocalWorkerQueue } from "./jobQueue";
 import { startGideonControlServer } from "./controlServer";
-import type { AppState, ContentConcept, DetectedMoment, JobRecord, JobStage, Project, ProviderRun, RenderedVideo, ScriptDraft } from "../shared/types";
+import type {
+  AddWorkspaceMemberInput,
+  AppState,
+  ContentConcept,
+  CreateWorkspaceInput,
+  DetectedMoment,
+  JobRecord,
+  JobStage,
+  Project,
+  ProviderRun,
+  RemoveWorkspaceMemberInput,
+  RenderedVideo,
+  ScriptDraft,
+  UpdateWorkspaceMemberRoleInput
+} from "../shared/types";
 import { runAnalysisPipeline, safeProviderError } from "./analysisPipeline";
 import { loadProviderConfig } from "./providers/config";
 import { OpenAiProvider } from "./providers/openai";
@@ -80,6 +94,27 @@ function registerIpcHandlers(): void {
   }));
 
   ipcMain.handle("project:list", async () => activeWorkspaceState());
+
+  ipcMain.handle("workspace:create", async (_event, input: CreateWorkspaceInput) => {
+    await store.createWorkspace(input);
+    return activeWorkspaceState();
+  });
+  ipcMain.handle("workspace:set-active", async (_event, workspaceId: string) => {
+    await store.setActiveWorkspace(workspaceId);
+    return activeWorkspaceState();
+  });
+  ipcMain.handle("workspace:add-member", async (_event, input: AddWorkspaceMemberInput) => {
+    await store.addWorkspaceMember(input);
+    return activeWorkspaceState();
+  });
+  ipcMain.handle("workspace:update-member-role", async (_event, input: UpdateWorkspaceMemberRoleInput) => {
+    await store.updateWorkspaceMemberRole(input);
+    return activeWorkspaceState();
+  });
+  ipcMain.handle("workspace:remove-member", async (_event, input: RemoveWorkspaceMemberInput) => {
+    await store.removeWorkspaceMember(input);
+    return activeWorkspaceState();
+  });
 
   ipcMain.handle("project:set-active", async (_event, projectId: string) => store.setActiveProject(projectId));
   ipcMain.handle("project:create", async (_event, input) => store.createProject(input));

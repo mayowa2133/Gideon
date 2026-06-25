@@ -1,18 +1,30 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
+  AddWorkspaceMemberInput,
   AppState,
   ContentConcept,
   CreateProjectInput,
+  CreateWorkspaceInput,
   DetectedMoment,
   PlatformInfo,
   ProductProfile,
   Project,
-  ScriptDraft
+  RemoveWorkspaceMemberInput,
+  ScriptDraft,
+  UpdateWorkspaceMemberRoleInput
 } from "../shared/types";
 
 const api = {
   platformInfo: (): Promise<PlatformInfo> => ipcRenderer.invoke("platform:info"),
   listProjects: (): Promise<AppState> => ipcRenderer.invoke("project:list"),
+  createWorkspace: (input: CreateWorkspaceInput): Promise<AppState> => ipcRenderer.invoke("workspace:create", input),
+  setActiveWorkspace: (workspaceId: string): Promise<AppState> => ipcRenderer.invoke("workspace:set-active", workspaceId),
+  addWorkspaceMember: (input: AddWorkspaceMemberInput): Promise<AppState> =>
+    ipcRenderer.invoke("workspace:add-member", input),
+  updateWorkspaceMemberRole: (input: UpdateWorkspaceMemberRoleInput): Promise<AppState> =>
+    ipcRenderer.invoke("workspace:update-member-role", input),
+  removeWorkspaceMember: (input: RemoveWorkspaceMemberInput): Promise<AppState> =>
+    ipcRenderer.invoke("workspace:remove-member", input),
   setActiveProject: (projectId: string): Promise<Project> => ipcRenderer.invoke("project:set-active", projectId),
   createProject: (input: CreateProjectInput): Promise<Project> => ipcRenderer.invoke("project:create", input),
   updateProfile: (projectId: string, profile: ProductProfile): Promise<Project> =>

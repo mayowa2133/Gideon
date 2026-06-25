@@ -52,6 +52,11 @@ export type BillingStatus = "not_configured" | "trialing" | "active" | "past_due
 export type AuditActorType = "local_user" | "mcp_agent" | "system";
 
 export type AuditAction =
+  | "workspace.create"
+  | "workspace.switch"
+  | "workspace.member.add"
+  | "workspace.member.update_role"
+  | "workspace.member.remove"
   | "project.create"
   | "project.update_profile"
   | "project.delete"
@@ -69,7 +74,19 @@ export type AuditAction =
   | "job.retry"
   | "usage.record";
 
-export type AuditTargetType = "workspace" | "project" | "recording" | "artifact" | "job" | "moment" | "concept" | "script" | "render" | "usage";
+export type AuditTargetType =
+  | "workspace"
+  | "member"
+  | "user"
+  | "project"
+  | "recording"
+  | "artifact"
+  | "job"
+  | "moment"
+  | "concept"
+  | "script"
+  | "render"
+  | "usage";
 
 export type AuditMetadataValue = string | number | boolean | null;
 
@@ -141,6 +158,7 @@ export interface WorkspaceMember {
   userId: string;
   role: WorkspaceRole;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface UsageEvent {
@@ -411,6 +429,29 @@ export interface PlatformInfo {
 export interface CreateProjectInput {
   name: string;
   profile: ProductProfile;
+}
+
+export interface CreateWorkspaceInput {
+  name: string;
+  slug?: string;
+}
+
+export interface AddWorkspaceMemberInput {
+  workspaceId: string;
+  email: string;
+  displayName?: string;
+  role: WorkspaceRole;
+}
+
+export interface UpdateWorkspaceMemberRoleInput {
+  workspaceId: string;
+  userId: string;
+  role: WorkspaceRole;
+}
+
+export interface RemoveWorkspaceMemberInput {
+  workspaceId: string;
+  userId: string;
 }
 
 export const platformLabels: Record<Platform, string> = {

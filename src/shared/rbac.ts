@@ -49,6 +49,30 @@ export function roleAllows(role: WorkspaceRole, action: WorkspaceAction): boolea
   return rolePermissions[role].has(action);
 }
 
+export function canManageWorkspaceRole(actorRole: WorkspaceRole, targetRole: WorkspaceRole): boolean {
+  if (actorRole === "owner") {
+    return true;
+  }
+  if (actorRole === "admin") {
+    return targetRole !== "owner";
+  }
+  return false;
+}
+
+export function countWorkspaceOwners(members: WorkspaceMember[], workspaceId: string): number {
+  return members.filter((member) => member.workspaceId === workspaceId && member.role === "owner").length;
+}
+
+export function assertCanManageWorkspaceRole(input: {
+  actorRole: WorkspaceRole;
+  targetRole: WorkspaceRole;
+  action: "add" | "update" | "remove";
+}): void {
+  if (!canManageWorkspaceRole(input.actorRole, input.targetRole)) {
+    throw new Error(`Workspace role ${input.actorRole} cannot ${input.action} ${input.targetRole} members.`);
+  }
+}
+
 export function findWorkspaceMembership(
   members: WorkspaceMember[],
   workspaceId: string,

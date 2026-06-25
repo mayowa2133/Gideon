@@ -9,7 +9,8 @@ import type {
   ProductProfile,
   Project,
   ScriptDraft,
-  UsageMetric
+  UsageMetric,
+  WorkspaceRole
 } from "../shared/types";
 import { platformLabels, toneLabels } from "../shared/types";
 import { createDefaultProfile, splitCaptionSegments } from "../shared/contentEngine";
@@ -71,15 +72,23 @@ function App(): JSX.Element {
       .catch(() => undefined);
   };
 
+  const applyAppState = (nextState: AppState, preferredProjectId?: string): void => {
+    setState(nextState);
+    const active =
+      nextState.projects.find((project) => project.id === preferredProjectId) ??
+      nextState.projects.find((project) => project.id === nextState.activeProjectId) ??
+      nextState.projects[0] ??
+      null;
+    setActiveProject(active);
+  };
+
   async function loadInitialState(): Promise<void> {
     setBusy("loading");
     setError(null);
     try {
       const [projects, info] = await Promise.all([window.gideon.listProjects(), window.gideon.platformInfo()]);
-      setState(projects);
+      applyAppState(projects);
       setPlatformInfo(info);
-      const active = projects.projects.find((project) => project.id === projects.activeProjectId) ?? projects.projects[0] ?? null;
-      setActiveProject(active);
     } catch (loadError) {
       setError(messageFromError(loadError));
     } finally {
@@ -90,13 +99,7 @@ function App(): JSX.Element {
   async function refreshState(preferredProjectId?: string): Promise<void> {
     try {
       const projects = await window.gideon.listProjects();
-      setState(projects);
-      const active =
-        projects.projects.find((project) => project.id === preferredProjectId) ??
-        projects.projects.find((project) => project.id === projects.activeProjectId) ??
-        projects.projects[0] ??
-        null;
-      setActiveProject(active);
+      applyAppState(projects, preferredProjectId);
     } catch {
       // Background polling should not interrupt the user's current edit.
     }
@@ -151,6 +154,13 @@ function App(): JSX.Element {
           onSelect={(projectId) => void chooseProject(projectId)}
         />
         <WorkspacePanel state={state} />
+        <TeamPanel
+          state={state}
+          busy={busy === "saving"}
+          onState={applyAppState}
+          setBusy={setBusy}
+          setError={setError}
+        />
         <AuditPanel state={state} />
         <RuntimePanel info={platformInfo} />
       </aside>
@@ -272,6 +282,166 @@ function WorkspacePanel({ state }: { state: AppState }): JSX.Element | null {
     </div>
   );
 }
+
+function TeamPanel({
+  state,
+  busy,
+  onState,
+  setBusy,
+  setError
+}: {
+  state: AppState;
+  busy: boolean;
+  onState: (state: AppState, preferredProjectId?: string) => void;
+  setBusy: (busy: BusyAction) => void;
+  setError: (error: string | null) => void;
+}): JSX.Element | null {
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [role, setRole] = useState<WorkspaceRole>("editor");
+  const workspace = state.workspaces.find((candidate) => candidate.id === state.activeWorkspaceId) ?? state.workspaces[0];
+  if (!workspace) {
+    return null;
+  }
+  const members = state.workspaceMembers.filter((member) => member.workspaceId === workspace.id);
+  const currentUserId = state.activeUserId;
+
+  async function runTeamAction(action: () => Promise<AppState>): Promise<void> {
+    setBusy("saving");
+    setError(null);
+    try {
+      onState(await action());
+    } catch (teamError) {
+      setError(messageFromError(teamError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="team-panel">
+      <p className="eyebrow">Team</p>
+      <label>
+        <span>Workspace</span>
+        <select
+          value={workspace.id}
+          disabled={busy}
+          onChange={(event) => void runTeamAction(() => window.gideon.setActiveWorkspace(event.target.value))}
+        >
+          {state.workspaces.map((candidate) => (
+            <option key={candidate.id} value={candidate.id}>
+              {candidate.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="team-inline-form">
+        <input
+          value={workspaceName}
+          onChange={(event) => setWorkspaceName(event.target.value)}
+          placeholder="New workspace"
+          disabled={busy}
+        />
+        <button
+          className="secondary compact"
+          disabled={busy || workspaceName.trim().length < 2}
+          onClick={() =>
+            void runTeamAction(async () => {
+              const next = await window.gideon.createWorkspace({ name: workspaceName });
+              setWorkspaceName("");
+              return next;
+            })
+          }
+          type="button"
+        >
+          Create
+        </button>
+      </div>
+      <div className="member-list">
+        {members.map((member) => {
+          const user = state.users.find((candidate) => candidate.id === member.userId);
+          return (
+            <div key={member.id} className="member-row">
+              <div>
+                <strong>{user?.displayName ?? user?.email ?? member.userId}</strong>
+                <small>{user?.email ?? member.userId}</small>
+              </div>
+              <select
+                value={member.role}
+                disabled={busy}
+                onChange={(event) =>
+                  void runTeamAction(() =>
+                    window.gideon.updateWorkspaceMemberRole({
+                      workspaceId: workspace.id,
+                      userId: member.userId,
+                      role: event.target.value as WorkspaceRole
+                    })
+                  )
+                }
+              >
+                {workspaceRoles.map((candidateRole) => (
+                  <option key={candidateRole} value={candidateRole}>
+                    {candidateRole}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="ghost compact"
+                disabled={busy || member.userId === currentUserId}
+                onClick={() =>
+                  void runTeamAction(() =>
+                    window.gideon.removeWorkspaceMember({
+                      workspaceId: workspace.id,
+                      userId: member.userId
+                    })
+                  )
+                }
+                type="button"
+              >
+                Remove
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <div className="team-add-form">
+        <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="teammate@email.com" disabled={busy} />
+        <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Display name" disabled={busy} />
+        <select value={role} disabled={busy} onChange={(event) => setRole(event.target.value as WorkspaceRole)}>
+          {workspaceRoles.map((candidateRole) => (
+            <option key={candidateRole} value={candidateRole}>
+              {candidateRole}
+            </option>
+          ))}
+        </select>
+        <button
+          className="secondary compact"
+          disabled={busy || !email.trim()}
+          onClick={() =>
+            void runTeamAction(async () => {
+              const next = await window.gideon.addWorkspaceMember({
+                workspaceId: workspace.id,
+                email,
+                displayName,
+                role
+              });
+              setEmail("");
+              setDisplayName("");
+              setRole("editor");
+              return next;
+            })
+          }
+          type="button"
+        >
+          Add member
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const workspaceRoles: WorkspaceRole[] = ["owner", "admin", "editor", "viewer"];
 
 function AuditPanel({ state }: { state: AppState }): JSX.Element | null {
   const workspaceId = state.activeWorkspaceId ?? state.workspaces[0]?.id;

@@ -17,9 +17,11 @@ import type {
   AuditEvent,
   AuditMetadataValue,
   AuditTargetType,
+  AddWorkspaceMemberInput,
   ArtifactRecord,
   ContentConcept,
   CreateProjectInput,
+  CreateWorkspaceInput,
   DetectedMoment,
   JobEvent,
   JobRecord,
@@ -28,11 +30,16 @@ import type {
   ProductProfile,
   Project,
   RecordingMetadata,
+  RemoveWorkspaceMemberInput,
   RenderedVideo,
   ScriptDraft,
   TranscriptArtifact,
+  UpdateWorkspaceMemberRoleInput,
+  UserAccount,
   UsageEvent,
-  UsageMetric
+  UsageMetric,
+  Workspace,
+  WorkspaceMember
 } from "../shared/types";
 import {
   assertWithinEntitlement,
@@ -49,7 +56,12 @@ import {
   requestJobCancel as requestJobCancelState,
   retryJob as retryJobState
 } from "../shared/jobState";
-import { assertWorkspacePermission, type WorkspaceAction } from "../shared/rbac";
+import {
+  assertCanManageWorkspaceRole,
+  assertWorkspacePermission,
+  countWorkspaceOwners,
+  type WorkspaceAction
+} from "../shared/rbac";
 
 const STORE_FILE = "gideon-store.json";
 const MAX_AUDIT_EVENTS = 500;
@@ -119,6 +131,153 @@ export class GideonStore {
     }
     this.assertProjectAccessInState(state, project, "project:read");
     return project;
+  }
+
+  async createWorkspace(input: CreateWorkspaceInput): Promise<AppState> {
+    const state = await this.load();
+    if (!state.activeUserId) {
+      throw new Error("No active user is selected.");
+    }
+    const now = new Date().toISOString();
+    const slug = uniqueWorkspaceSlug(state.workspaces, input.slug || input.name);
+    const workspace: Workspace = {
+      id: randomUUID(),
+      name: normalizeWorkspaceName(input.name),
+      slug,
+      plan: "local_mvp",
+      billingStatus: "not_configured",
+      entitlements: { ...defaultLocalEntitlements },
+      createdAt: now,
+      updatedAt: now
+    };
+    const membership: WorkspaceMember = {
+      id: randomUUID(),
+      workspaceId: workspace.id,
+      userId: state.activeUserId,
+      role: "owner",
+      createdAt: now,
+      updatedAt: now
+    };
+    state.workspaces = [...state.workspaces, workspace];
+    state.workspaceMembers = [...state.workspaceMembers, membership];
+    state.activeWorkspaceId = workspace.id;
+    state.activeProjectId = null;
+    this.appendAuditToState(state, {
+      workspaceId: workspace.id,
+      action: "workspace.create",
+      targetType: "workspace",
+      targetId: workspace.id,
+      summary: `Created workspace ${workspace.name}.`,
+      metadata: { workspaceName: workspace.name, slug: workspace.slug }
+    });
+    await this.save();
+    return state;
+  }
+
+  async setActiveWorkspace(workspaceId: string): Promise<AppState> {
+    const state = await this.load();
+    requireWorkspace(state, workspaceId);
+    this.assertWorkspaceAccessInState(state, workspaceId, "project:read");
+    state.activeWorkspaceId = workspaceId;
+    state.activeProjectId = state.projects.find((project) => project.workspaceId === workspaceId)?.id ?? null;
+    this.appendAuditToState(state, {
+      workspaceId,
+      action: "workspace.switch",
+      targetType: "workspace",
+      targetId: workspaceId,
+      summary: "Switched active workspace."
+    });
+    await this.save();
+    return state;
+  }
+
+  async addWorkspaceMember(input: AddWorkspaceMemberInput): Promise<AppState> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    const actor = this.assertWorkspaceAccessInState(state, input.workspaceId, "workspace:admin");
+    assertCanManageWorkspaceRole({ actorRole: actor.role, targetRole: input.role, action: "add" });
+    const now = new Date().toISOString();
+    const user = upsertUserByEmail(state.users, input.email, input.displayName, now);
+    state.users = user.users;
+    if (state.workspaceMembers.some((member) => member.workspaceId === input.workspaceId && member.userId === user.account.id)) {
+      throw new Error("User is already a member of this workspace.");
+    }
+    const membership: WorkspaceMember = {
+      id: randomUUID(),
+      workspaceId: input.workspaceId,
+      userId: user.account.id,
+      role: input.role,
+      createdAt: now,
+      updatedAt: now
+    };
+    state.workspaceMembers = [...state.workspaceMembers, membership];
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      action: "workspace.member.add",
+      targetType: "member",
+      targetId: membership.id,
+      summary: `Added ${user.account.email} as ${input.role}.`,
+      metadata: { email: user.account.email, role: input.role }
+    });
+    await this.save();
+    return state;
+  }
+
+  async updateWorkspaceMemberRole(input: UpdateWorkspaceMemberRoleInput): Promise<AppState> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    const actor = this.assertWorkspaceAccessInState(state, input.workspaceId, "workspace:admin");
+    const existing = requireWorkspaceMember(state, input.workspaceId, input.userId);
+    assertCanManageWorkspaceRole({ actorRole: actor.role, targetRole: existing.role, action: "update" });
+    assertCanManageWorkspaceRole({ actorRole: actor.role, targetRole: input.role, action: "update" });
+    if (existing.role === "owner" && input.role !== "owner" && countWorkspaceOwners(state.workspaceMembers, input.workspaceId) <= 1) {
+      throw new Error("Workspace must keep at least one owner.");
+    }
+    const now = new Date().toISOString();
+    state.workspaceMembers = state.workspaceMembers.map((member) =>
+      member.workspaceId === input.workspaceId && member.userId === input.userId
+        ? { ...member, role: input.role, updatedAt: now }
+        : member
+    );
+    const user = state.users.find((candidate) => candidate.id === input.userId);
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      action: "workspace.member.update_role",
+      targetType: "member",
+      targetId: existing.id,
+      summary: `Updated ${user?.email ?? input.userId} from ${existing.role} to ${input.role}.`,
+      metadata: { userId: input.userId, previousRole: existing.role, role: input.role }
+    });
+    await this.save();
+    return state;
+  }
+
+  async removeWorkspaceMember(input: RemoveWorkspaceMemberInput): Promise<AppState> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    const actor = this.assertWorkspaceAccessInState(state, input.workspaceId, "workspace:admin");
+    const existing = requireWorkspaceMember(state, input.workspaceId, input.userId);
+    if (input.userId === state.activeUserId) {
+      throw new Error("Cannot remove the active user from the current workspace.");
+    }
+    assertCanManageWorkspaceRole({ actorRole: actor.role, targetRole: existing.role, action: "remove" });
+    if (existing.role === "owner" && countWorkspaceOwners(state.workspaceMembers, input.workspaceId) <= 1) {
+      throw new Error("Workspace must keep at least one owner.");
+    }
+    const user = state.users.find((candidate) => candidate.id === input.userId);
+    state.workspaceMembers = state.workspaceMembers.filter(
+      (member) => !(member.workspaceId === input.workspaceId && member.userId === input.userId)
+    );
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      action: "workspace.member.remove",
+      targetType: "member",
+      targetId: existing.id,
+      summary: `Removed ${user?.email ?? input.userId} from the workspace.`,
+      metadata: { userId: input.userId, previousRole: existing.role }
+    });
+    await this.save();
+    return state;
   }
 
   async createProject(input: CreateProjectInput): Promise<Project> {
@@ -750,8 +909,8 @@ export class GideonStore {
     return project;
   }
 
-  private assertWorkspaceAccessInState(state: AppState, workspaceId: string, action: WorkspaceAction): void {
-    assertWorkspacePermission({
+  private assertWorkspaceAccessInState(state: AppState, workspaceId: string, action: WorkspaceAction): WorkspaceMember {
+    return assertWorkspacePermission({
       members: state.workspaceMembers,
       workspaceId,
       userId: state.activeUserId,
@@ -858,6 +1017,81 @@ function requireWorkspace(state: AppState, workspaceId: string) {
     throw new Error("Workspace not found.");
   }
   return workspace;
+}
+
+function requireWorkspaceMember(state: AppState, workspaceId: string, userId: string): WorkspaceMember {
+  const member = state.workspaceMembers.find(
+    (candidate) => candidate.workspaceId === workspaceId && candidate.userId === userId
+  );
+  if (!member) {
+    throw new Error("Workspace member not found.");
+  }
+  return member;
+}
+
+function upsertUserByEmail(
+  users: UserAccount[],
+  email: string,
+  displayName: string | undefined,
+  now: string
+): { users: UserAccount[]; account: UserAccount } {
+  const normalizedEmail = normalizeEmail(email);
+  const existing = users.find((user) => user.email.toLowerCase() === normalizedEmail);
+  if (existing) {
+    return { users, account: existing };
+  }
+  const account: UserAccount = {
+    id: randomUUID(),
+    email: normalizedEmail,
+    displayName: normalizeDisplayName(displayName, normalizedEmail),
+    createdAt: now
+  };
+  return { users: [...users, account], account };
+}
+
+function normalizeEmail(email: string): string {
+  const normalized = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    throw new Error("Enter a valid member email address.");
+  }
+  return normalized;
+}
+
+function normalizeDisplayName(displayName: string | undefined, email: string): string {
+  const normalized = displayName?.trim();
+  if (normalized) {
+    return normalized.slice(0, 80);
+  }
+  return email.split("@")[0] ?? email;
+}
+
+function normalizeWorkspaceName(name: string): string {
+  const normalized = name.trim();
+  if (normalized.length < 2 || normalized.length > 80) {
+    throw new Error("Workspace name must be 2–80 characters.");
+  }
+  return normalized;
+}
+
+function uniqueWorkspaceSlug(workspaces: Workspace[], value: string): string {
+  const base = safeSlug(value || "workspace");
+  let candidate = base;
+  let index = 2;
+  const existing = new Set(workspaces.map((workspace) => workspace.slug));
+  while (existing.has(candidate)) {
+    candidate = `${base}-${index}`;
+    index += 1;
+  }
+  return candidate;
+}
+
+function safeSlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64) || "workspace";
 }
 
 export function newProjectTemplate(): CreateProjectInput {
