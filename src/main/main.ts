@@ -796,6 +796,18 @@ async function createProviderVoiceover(projectId: string, script: ScriptDraft): 
       instructions: "Speak in a clear product demo voice. Keep pacing natural and concise.",
       outputPath
     });
+    const project = await store.getProject(projectId);
+    const synthesized = await fs.stat(result.outputPath);
+    await store.assertUsageAvailable(projectId, "storage_bytes", synthesized.size);
+    const stored = await createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
+      workspaceId: project.workspaceId,
+      projectId,
+      kind: "voiceover",
+      sourcePath: result.outputPath,
+      originalFileName: `${script.id}.wav`,
+      contentType: "audio/wav"
+    });
+    await store.appendArtifact(projectId, stored.artifact);
     await store.appendProviderRuns(projectId, [
       {
         id: randomUUID(),
@@ -814,7 +826,14 @@ async function createProviderVoiceover(projectId: string, script: ScriptDraft): 
       source: "tts",
       idempotencyKey: `tts:${projectId}:${script.id}:${startedAt}`
     });
-    return result.outputPath;
+    await store.recordUsage(projectId, {
+      metric: "storage_bytes",
+      quantity: stored.artifact.byteSize,
+      unit: "byte",
+      source: "tts",
+      idempotencyKey: `tts:${projectId}:${stored.artifact.id}:storage_bytes`
+    });
+    return stored.filePath;
   } catch (error) {
     await store.appendProviderRuns(projectId, [
       {

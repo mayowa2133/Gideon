@@ -54,7 +54,7 @@ Supported provider variables:
 - `GIDEON_OPENAI_TTS_MODEL`, default `gpt-4o-mini-tts`
 - `GIDEON_OPENAI_TTS_VOICE`, default `coral`
 
-Provider outputs are treated as untrusted until parsed and validated. If a provider call fails, Gideon records a safe provider-run error and falls back to the local path where possible.
+Provider outputs are treated as untrusted until parsed and validated. If a provider call fails, Gideon records a safe provider-run error and falls back to the local path where possible. Successful provider TTS output is stored as a private `voiceover` artifact before rendering.
 
 ## Local billing and quota controls
 
