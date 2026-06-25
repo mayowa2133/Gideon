@@ -17,7 +17,7 @@ import {
   loadStorageConfig,
   type DirectUploadSession
 } from "./storage";
-import { isWorkerQueueCanceledError, LocalWorkerQueue } from "./jobQueue";
+import { isWorkerQueueCanceledError, loadLocalWorkerQueueOptions, LocalWorkerQueue } from "./jobQueue";
 import { startGideonControlServer } from "./controlServer";
 import type {
   AddWorkspaceMemberInput,
@@ -44,7 +44,7 @@ import { OpenAiProvider } from "./providers/openai";
 import { createJob, failJob, findActiveJob, startJob, succeedJob, updateJobStage } from "../shared/jobState";
 
 const store = new GideonStore();
-const workerQueue = new LocalWorkerQueue({ concurrency: 1 });
+const workerQueue = new LocalWorkerQueue(loadLocalWorkerQueueOptions());
 let mainWindow: BrowserWindow | null = null;
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -102,6 +102,7 @@ function registerIpcHandlers(): void {
     openAiTtsModel: providerConfig.openai.apiKey ? providerConfig.openai.ttsModel : null,
     storageProvider: storageConfig.provider,
     cloudStorageConfigured: isCloudStorageConfigured(storageConfig),
+    queue: workerQueue.stats(),
     ...(await getToolAvailability())
   }));
 

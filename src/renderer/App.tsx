@@ -5,6 +5,7 @@ import type {
   BillingStatus,
   ContentConcept,
   DetectedMoment,
+  JobKind,
   Platform,
   PlatformInfo,
   ProductProfile,
@@ -270,6 +271,11 @@ function RuntimePanel({ info }: { info: PlatformInfo | null }): JSX.Element {
       {info.storageProvider !== "local_private" && !info.cloudStorageConfigured ? (
         <small>Cloud storage is selected but missing endpoint, bucket, or credentials.</small>
       ) : null}
+      <small>
+        Queue: {info.queue.active}/{info.queue.concurrency} active · {info.queue.pending} pending
+        {formatQueueKinds(info.queue.activeByKind) ? ` · active ${formatQueueKinds(info.queue.activeByKind)}` : ""}
+      </small>
+      {formatQueueKinds(info.queue.concurrencyByKind) ? <small>Queue lanes: {formatQueueKinds(info.queue.concurrencyByKind)}</small> : null}
       <small>Data folder: {info.userDataPath}</small>
     </div>
   );
@@ -1441,6 +1447,13 @@ function formatBytes(bytes: number): string {
     unitIndex += 1;
   }
   return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[unitIndex]}`;
+}
+
+function formatQueueKinds(counts: Partial<Record<JobKind, number>>): string {
+  return Object.entries(counts)
+    .filter(([, value]) => value && value > 0)
+    .map(([kind, value]) => `${kind.replace(/_/g, " ")} ${value}`)
+    .join(", ");
 }
 
 function messageFromError(error: unknown): string {

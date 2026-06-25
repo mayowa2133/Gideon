@@ -60,6 +60,19 @@ Provider outputs are treated as untrusted until parsed and validated. If a provi
 
 Workspace owners/admins can change a workspace between the local MVP, starter, team, and enterprise plan definitions from the sidebar. These plan definitions update the workspace entitlements used by quota checks for source minutes, transcription minutes, AI runs, TTS characters, render minutes, storage, exports, and project count. This is a provider-neutral billing foundation: checkout, invoices, customer portals, and webhook reconciliation still need a real billing provider before hosted production use.
 
+## Local worker queue controls
+
+Gideon runs analysis and render work through a local worker queue. By default it runs one job at a time. For local stress testing you can raise the global queue limit and optionally cap specific job kinds:
+
+```bash
+GIDEON_QUEUE_CONCURRENCY=2 \
+GIDEON_ANALYSIS_QUEUE_CONCURRENCY=1 \
+GIDEON_RENDER_QUEUE_CONCURRENCY=1 \
+pnpm start
+```
+
+The runtime panel shows active/pending queue counts and configured lanes. This is still a local queue; Redis/BullMQ-style distributed workers remain a productionization step.
+
 ## Optional private cloud storage
 
 By default, Gideon imports recordings into a private local app-data folder. To upload imported recordings to S3-compatible private object storage while keeping a local processing cache, launch with:

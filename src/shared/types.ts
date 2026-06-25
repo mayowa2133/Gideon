@@ -448,6 +448,16 @@ export interface PlatformInfo {
   openAiTtsModel: string | null;
   storageProvider: string;
   cloudStorageConfigured: boolean;
+  queue: QueueRuntimeStats;
+}
+
+export interface QueueRuntimeStats {
+  active: number;
+  pending: number;
+  concurrency: number;
+  activeByKind: Partial<Record<JobKind, number>>;
+  pendingByKind: Partial<Record<JobKind, number>>;
+  concurrencyByKind: Partial<Record<JobKind, number>>;
 }
 
 export interface CreateProjectInput {
