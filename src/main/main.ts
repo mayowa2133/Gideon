@@ -9,6 +9,7 @@ import {
   renderDraft
 } from "./media";
 import { GideonStore } from "./store";
+import { LocalPrivateObjectStorage } from "./storage";
 import type { AppState, ContentConcept, DetectedMoment, Project, ProviderRun, RenderedVideo, ScriptDraft } from "../shared/types";
 import { runAnalysisPipeline, safeProviderError } from "./analysisPipeline";
 import { loadProviderConfig } from "./providers/config";
@@ -97,24 +98,44 @@ function registerIpcHandlers(): void {
     if (result.canceled || !result.filePaths[0]) {
       return null;
     }
-    const recording = await probeRecording(result.filePaths[0]);
+    const originalPath = result.filePaths[0];
+    const recording = await probeRecording(originalPath);
     const sourceMinutes = minutesForDuration(recording.durationMs);
     await store.assertUsageAvailable(projectId, "source_minutes", sourceMinutes);
     await store.assertUsageAvailable(projectId, "storage_bytes", recording.sizeBytes);
-    await store.attachRecording(projectId, recording);
+    const project = await store.getProject(projectId);
+    const stored = await new LocalPrivateObjectStorage(store.storageRoot()).putFile({
+      workspaceId: project.workspaceId,
+      projectId,
+      kind: "source_recording",
+      sourcePath: originalPath,
+      originalFileName: recording.fileName
+    });
+    const importedRecording = {
+      ...recording,
+      filePath: stored.filePath,
+      fileUrl: stored.fileUrl,
+      originalFilePath: originalPath,
+      artifactId: stored.artifact.id,
+      storageKey: stored.artifact.storageKey,
+      sha256: stored.artifact.sha256,
+      sizeBytes: stored.artifact.byteSize
+    };
+    await store.appendArtifact(projectId, stored.artifact);
+    await store.attachRecording(projectId, importedRecording);
     await store.recordUsage(projectId, {
       metric: "source_minutes",
       quantity: sourceMinutes,
       unit: "minute",
       source: "recording",
-      idempotencyKey: `recording:${projectId}:${recording.validatedAt}:source_minutes`
+      idempotencyKey: `recording:${projectId}:${stored.artifact.id}:source_minutes`
     });
     return store.recordUsage(projectId, {
       metric: "storage_bytes",
-      quantity: recording.sizeBytes,
+      quantity: stored.artifact.byteSize,
       unit: "byte",
       source: "recording",
-      idempotencyKey: `recording:${projectId}:${recording.validatedAt}:storage_bytes`
+      idempotencyKey: `recording:${projectId}:${stored.artifact.id}:storage_bytes`
     });
   });
 

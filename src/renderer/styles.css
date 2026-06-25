@@ -462,6 +462,12 @@ video {
   margin-bottom: 1rem;
 }
 
+.recording-card small {
+  display: block;
+  color: #9ba8c2;
+  overflow-wrap: anywhere;
+}
+
 .moment-grid,
 .concept-grid,
 .render-grid {

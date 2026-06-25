@@ -320,6 +320,7 @@ function ProjectWorkspace({
           <Metric label="Concepts" value={project.concepts.length} />
           <Metric label="Scripts" value={project.scripts.length} />
           <Metric label="Renders" value={project.renders.filter((render) => render.status === "completed").length} />
+          <Metric label="Artifacts" value={project.artifacts.length} />
         </div>
       </header>
 
@@ -355,6 +356,14 @@ function ProjectWorkspace({
                   {project.recording.videoCodec}
                   {project.recording.audioCodec ? ` + ${project.recording.audioCodec}` : " · no audio"}
                 </p>
+                {project.recording.storageKey ? (
+                  <small>
+                    Private storage: {project.recording.storageKey}
+                    {project.recording.sha256 ? ` · sha256 ${project.recording.sha256.slice(0, 12)}…` : ""}
+                  </small>
+                ) : (
+                  <small>Legacy local source path; replace the recording to import it into private storage.</small>
+                )}
               </div>
             </div>
           ) : (

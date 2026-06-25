@@ -42,6 +42,7 @@ describe("analysis pipeline", () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-analysis-"));
     const project: Project = {
       id: "project-1",
+      workspaceId: "workspace-1",
       name: "LeadPilot campaign",
       status: "recording_ready",
       profile,
@@ -51,6 +52,7 @@ describe("analysis pipeline", () => {
       concepts: [],
       scripts: [],
       renders: [],
+      artifacts: [],
       providerRuns: [],
       jobs: [],
       createdAt: "2026-06-25T00:00:00.000Z",

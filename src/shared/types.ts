@@ -34,6 +34,16 @@ export type UsageMetric =
   | "storage_bytes"
   | "exports";
 
+export type ArtifactKind =
+  | "source_recording"
+  | "extracted_audio"
+  | "frame"
+  | "voiceover"
+  | "render"
+  | "export";
+
+export type ArtifactProvider = "local_private" | "s3" | "r2" | "gcs";
+
 export interface UserAccount {
   id: string;
   email: string;
@@ -83,6 +93,22 @@ export interface UsageEvent {
   createdAt: string;
 }
 
+export interface ArtifactRecord {
+  id: string;
+  workspaceId: string;
+  projectId: string;
+  kind: ArtifactKind;
+  provider: ArtifactProvider;
+  storageKey: string;
+  contentType: string;
+  byteSize: number;
+  sha256: string;
+  originalFileName: string;
+  localPath?: string;
+  localUrl?: string;
+  createdAt: string;
+}
+
 export interface JobRecord {
   id: string;
   projectId: string;
@@ -126,6 +152,10 @@ export interface RecordingMetadata {
   filePath: string;
   fileUrl: string;
   fileName: string;
+  originalFilePath?: string;
+  artifactId?: string;
+  storageKey?: string;
+  sha256?: string;
   sizeBytes: number;
   durationMs: number;
   width: number;
@@ -266,6 +296,7 @@ export interface Project {
   concepts: ContentConcept[];
   scripts: ScriptDraft[];
   renders: RenderedVideo[];
+  artifacts: ArtifactRecord[];
   providerRuns: ProviderRun[];
   jobs: JobRecord[];
   createdAt: string;

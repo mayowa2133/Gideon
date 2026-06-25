@@ -12,6 +12,7 @@ import {
 } from "../shared/contentEngine";
 import type {
   AppState,
+  ArtifactRecord,
   ContentConcept,
   CreateProjectInput,
   DetectedMoment,
@@ -111,6 +112,7 @@ export class GideonStore {
       concepts: [],
       scripts: [],
       renders: [],
+      artifacts: [],
       providerRuns: [],
       jobs: [],
       createdAt: now,
@@ -141,6 +143,7 @@ export class GideonStore {
       project.concepts = [];
       project.scripts = [];
       project.renders = [];
+      project.artifacts = project.artifacts ?? [];
       project.providerRuns = project.providerRuns ?? [];
       project.jobs = project.jobs ?? [];
       project.updatedAt = new Date().toISOString();
@@ -247,6 +250,13 @@ export class GideonStore {
   async appendProviderRuns(projectId: string, providerRuns: ProviderRun[]): Promise<Project> {
     return this.updateProject(projectId, (project) => {
       project.providerRuns = [...(project.providerRuns ?? []), ...providerRuns];
+      project.updatedAt = new Date().toISOString();
+    });
+  }
+
+  async appendArtifact(projectId: string, artifact: ArtifactRecord): Promise<Project> {
+    return this.updateProject(projectId, (project) => {
+      project.artifacts = [...(project.artifacts ?? []), artifact];
       project.updatedAt = new Date().toISOString();
     });
   }
@@ -361,6 +371,10 @@ export class GideonStore {
     return path.join(app.getPath("userData"), "projects", projectId);
   }
 
+  storageRoot(): string {
+    return path.join(app.getPath("userData"), "private-storage");
+  }
+
   private async updateProject(projectId: string, updater: (project: Project) => void): Promise<Project> {
     const state = await this.load();
     const project = state.projects.find((candidate) => candidate.id === projectId);
@@ -421,6 +435,7 @@ function normalizeAppState(state: AppState): AppState {
       concepts: project.concepts ?? [],
       scripts: project.scripts ?? [],
       renders: project.renders ?? [],
+      artifacts: project.artifacts ?? [],
       providerRuns: project.providerRuns ?? [],
       jobs: project.jobs ?? []
     }))
