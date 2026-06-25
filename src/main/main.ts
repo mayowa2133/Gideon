@@ -354,14 +354,32 @@ function registerIpcHandlers(): void {
     if (result.canceled || !result.filePath) {
       return null;
     }
+    const exportSize = (await fs.stat(render.outputPath)).size;
     await store.assertUsageAvailable(projectId, "exports", 1);
-    await copyExport(render.outputPath, result.filePath);
+    await store.assertUsageAvailable(projectId, "storage_bytes", exportSize);
+    const stored = await createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
+      workspaceId: project.workspaceId,
+      projectId,
+      kind: "export",
+      sourcePath: render.outputPath,
+      originalFileName: path.basename(result.filePath),
+      contentType: "video/mp4"
+    });
+    await store.appendArtifact(projectId, stored.artifact);
+    await store.recordUsage(projectId, {
+      metric: "storage_bytes",
+      quantity: stored.artifact.byteSize,
+      unit: "byte",
+      source: "export",
+      idempotencyKey: `export:${projectId}:${stored.artifact.id}:storage_bytes`
+    });
+    await copyExport(stored.filePath, result.filePath);
     await store.recordUsage(projectId, {
       metric: "exports",
       quantity: 1,
       unit: "count",
       source: "export",
-      idempotencyKey: `export:${projectId}:${renderId}:${result.filePath}`
+      idempotencyKey: `export:${projectId}:${stored.artifact.id}:exports`
     });
     return result.filePath;
   });
