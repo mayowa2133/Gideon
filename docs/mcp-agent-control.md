@@ -21,6 +21,7 @@ It intentionally starts with safe project operations:
 - report server/store status;
 - list local projects;
 - inspect a project;
+- inspect recent audit events for a project/workspace;
 - update a script hook, voiceover text, or CTA;
 - update a detected moment label/evidence/enabled flag;
 - generate a deterministic edit plan from a user instruction.
@@ -42,10 +43,11 @@ The socket path defaults to the macOS Gideon app data folder. Direct JSON-store 
 - MCP output must not expose API keys or provider raw payloads.
 - Publishing, deletion, billing changes, and access-control changes are not exposed until implemented with user confirmation and authorization.
 - Render/analysis tools must enqueue Gideon durable jobs instead of bypassing job state.
-- Future hosted mode must enforce workspace membership on every MCP call.
+- Local MCP mutations are checked against the active user's workspace role. Viewers can inspect projects but cannot apply MCP edits.
+- Live MCP edits and direct JSON-store fallback edits write audit events with `actorType: "mcp_agent"` so Codex/Claude changes are visible in the app and inspectable through MCP.
+- Future hosted mode must enforce workspace membership through the authoritative service layer on every MCP call.
 
 ## Next steps
 
 - Replace direct JSON fallback edits with a fully authoritative service API once hosted/workspace auth exists.
-- Add MCP audit events for every agent action.
 - Add project-scoped approval gates for destructive actions and future publishing.

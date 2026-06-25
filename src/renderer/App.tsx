@@ -151,6 +151,7 @@ function App(): JSX.Element {
           onSelect={(projectId) => void chooseProject(projectId)}
         />
         <WorkspacePanel state={state} />
+        <AuditPanel state={state} />
         <RuntimePanel info={platformInfo} />
       </aside>
 
@@ -176,6 +177,7 @@ function createEmptyAppState(): AppState {
   return {
     ...createLocalUserWorkspace(),
     usageEvents: [],
+    auditEvents: [],
     projects: [],
     activeProjectId: null
   };
@@ -260,6 +262,37 @@ function WorkspacePanel({ state }: { state: AppState }): JSX.Element | null {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+function AuditPanel({ state }: { state: AppState }): JSX.Element | null {
+  const workspaceId = state.activeWorkspaceId ?? state.workspaces[0]?.id;
+  if (!workspaceId) {
+    return null;
+  }
+  const events = state.auditEvents
+    .filter((event) => event.workspaceId === workspaceId)
+    .slice(-6)
+    .reverse();
+  return (
+    <div className="audit-panel">
+      <p className="eyebrow">Audit trail</p>
+      {events.length === 0 ? (
+        <small>No tracked changes yet.</small>
+      ) : (
+        <div className="audit-list">
+          {events.map((event) => (
+            <div key={event.id} className="audit-event">
+              <strong>{event.action.replace(/\./g, " ")}</strong>
+              <span>{event.summary}</span>
+              <small>
+                {event.actorType.replace(/_/g, " ")} · {new Date(event.createdAt).toLocaleString()}
+              </small>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

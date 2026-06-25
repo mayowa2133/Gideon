@@ -175,7 +175,8 @@ video {
 .project-card,
 .muted-card,
 .runtime-panel,
-.workspace-panel {
+.workspace-panel,
+.audit-panel {
   width: 100%;
   text-align: left;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -210,20 +211,39 @@ video {
   margin-top: 1rem;
 }
 
-.workspace-panel {
+.workspace-panel,
+.audit-panel {
   display: grid;
   gap: 0.45rem;
   margin-top: 1rem;
 }
 
 .workspace-panel small,
-.usage-list {
+.usage-list,
+.audit-panel small,
+.audit-event span {
   color: #9ba8c2;
 }
 
 .usage-list {
   display: grid;
   gap: 0.25rem;
+  font-size: 0.78rem;
+}
+
+.audit-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.audit-event {
+  display: grid;
+  gap: 0.18rem;
+  font-size: 0.78rem;
+}
+
+.audit-event strong {
+  color: #edf3ff;
   font-size: 0.78rem;
 }
 

@@ -55,3 +55,14 @@ Supported provider variables:
 - `GIDEON_OPENAI_TTS_VOICE`, default `coral`
 
 Provider outputs are treated as untrusted until parsed and validated. If a provider call fails, Gideon records a safe provider-run error and falls back to the local path where possible.
+
+## Codex/Claude MCP control without Gideon API keys
+
+Gideon also exposes a local MCP server so Codex, Claude Code, or another MCP client can inspect projects, make bounded script/moment edits, and enqueue app jobs using the agent's own model credentials. Gideon does not need provider API keys for this path.
+
+```bash
+pnpm build:mcp
+pnpm mcp:server
+```
+
+When the desktop app is running, MCP tools use the local control socket and route edits through Gideon's store, RBAC policy, worker queue, and audit trail. If the app is closed, safe direct-store copy edits remain available through `GIDEON_STORE_PATH`.

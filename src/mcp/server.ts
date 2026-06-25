@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
@@ -19,12 +20,17 @@ interface ToolResult {
 
 interface GideonState {
   projects?: GideonProject[];
+  workspaceMembers?: GideonWorkspaceMember[];
+  auditEvents?: GideonAuditEvent[];
+  activeUserId?: string | null;
+  activeWorkspaceId?: string | null;
   activeProjectId?: string | null;
   [key: string]: unknown;
 }
 
 interface GideonProject {
   id: string;
+  workspaceId?: string;
   name?: string;
   status?: string;
   updatedAt?: string;
@@ -37,6 +43,27 @@ interface GideonProject {
   providerRuns?: Array<Record<string, unknown>>;
   frameEvidence?: Array<Record<string, unknown>>;
   [key: string]: unknown;
+}
+
+interface GideonWorkspaceMember {
+  workspaceId?: string;
+  userId?: string;
+  role?: "owner" | "admin" | "editor" | "viewer";
+  [key: string]: unknown;
+}
+
+interface GideonAuditEvent {
+  id: string;
+  workspaceId: string;
+  projectId?: string;
+  actorUserId: string;
+  actorType: "mcp_agent";
+  action: string;
+  targetType: string;
+  targetId?: string;
+  summary: string;
+  metadata?: Record<string, JsonValue>;
+  createdAt: string;
 }
 
 interface GideonScript {
@@ -81,6 +108,16 @@ const tools = [
       controlSocketPath: optionalString("Explicit Gideon app control socket path."),
       storePath: optionalString("Explicit path to gideon-store.json.")
     }, ["projectId"])
+  },
+  {
+    name: "gideon_get_audit_log",
+    description: "Inspect recent local audit events, including Codex/Claude MCP edits.",
+    inputSchema: objectSchema({
+      projectId: optionalString("Optional project ID to filter audit events."),
+      limit: { type: "number", description: "Maximum number of events to return. Defaults to 25." },
+      controlSocketPath: optionalString("Explicit Gideon app control socket path."),
+      storePath: optionalString("Explicit path to gideon-store.json.")
+    })
   },
   {
     name: "gideon_update_script",
@@ -164,6 +201,8 @@ export async function callTool(name: string, args: Record<string, unknown> = {})
       return textResult(await listProjectsTool(args));
     case "gideon_get_project":
       return textResult(await getProjectTool(args));
+    case "gideon_get_audit_log":
+      return textResult(await getAuditLogTool(args));
     case "gideon_update_script":
       return textResult(await updateScript(args));
     case "gideon_update_moment":
@@ -246,7 +285,27 @@ async function getProjectTool(args: Record<string, unknown>): Promise<Record<str
   if (live) {
     return { mode: "live_app", project: sanitizeRecord(live) };
   }
-  return { mode: "direct_store", ...getProject(await readStateFromArgs(args), projectId) };
+  const state = await readStateFromArgs(args);
+  const project = requireProject(state, projectId);
+  assertDirectStorePermission(state, project, "project:read");
+  return { mode: "direct_store", ...projectPayload(state, project) };
+}
+
+async function getAuditLogTool(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  const live = await maybeControlRequest(args, "listProjects", {});
+  const state = live ? (live as GideonState) : await readStateFromArgs(args);
+  const projectId = typeof args.projectId === "string" && args.projectId.trim() ? args.projectId.trim() : null;
+  const limit = typeof args.limit === "number" && Number.isFinite(args.limit) ? Math.max(1, Math.min(100, Math.floor(args.limit))) : 25;
+  if (projectId) {
+    const project = requireProject(state, projectId);
+    assertDirectStorePermission(state, project, "project:read");
+  }
+  const events = (state.auditEvents ?? [])
+    .filter((event) => !projectId || event.projectId === projectId)
+    .slice(-limit)
+    .reverse()
+    .map((event) => sanitizeRecord(event));
+  return { mode: live ? "live_app" : "direct_store", auditEvents: events };
 }
 
 async function updateScript(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
@@ -265,6 +324,7 @@ async function updateScript(args: Record<string, unknown>): Promise<Record<strin
   const scriptId = requireString(args.scriptId, "scriptId");
   const state = await readState(storePath);
   const project = requireProject(state, projectId);
+  assertDirectStorePermission(state, project, "mcp:write");
   const script = (project.scripts ?? []).find((candidate) => candidate.id === scriptId);
   if (!script) {
     throw new Error(`Script ${scriptId} was not found.`);
@@ -280,13 +340,22 @@ async function updateScript(args: Record<string, unknown>): Promise<Record<strin
   }
   script.updatedAt = new Date().toISOString();
   project.updatedAt = script.updatedAt;
+  const changedFields = ["hook", "voiceoverText", "cta"].filter((field) => typeof args[field] === "string");
+  appendMcpAudit(state, {
+    project,
+    action: "scripts.update",
+    targetType: "script",
+    targetId: scriptId,
+    summary: `MCP updated script ${scriptId}.`,
+    metadata: { changedFields: changedFields.join(",") }
+  });
   await writeState(storePath, state);
   return {
     mode: "direct_store",
     projectId,
     scriptId,
     updatedAt: script.updatedAt,
-    changedFields: ["hook", "voiceoverText", "cta"].filter((field) => typeof args[field] === "string")
+    changedFields
   };
 }
 
@@ -306,6 +375,7 @@ async function updateMoment(args: Record<string, unknown>): Promise<Record<strin
   const momentId = requireString(args.momentId, "momentId");
   const state = await readState(storePath);
   const project = requireProject(state, projectId);
+  assertDirectStorePermission(state, project, "mcp:write");
   const moment = (project.moments ?? []).find((candidate) => candidate.id === momentId);
   if (!moment) {
     throw new Error(`Moment ${momentId} was not found.`);
@@ -320,13 +390,22 @@ async function updateMoment(args: Record<string, unknown>): Promise<Record<strin
     moment.enabled = args.enabled;
   }
   project.updatedAt = new Date().toISOString();
+  const changedFields = ["label", "evidence", "enabled"].filter((field) => typeof args[field] !== "undefined");
+  appendMcpAudit(state, {
+    project,
+    action: "moments.update",
+    targetType: "moment",
+    targetId: momentId,
+    summary: `MCP updated moment ${momentId}.`,
+    metadata: { changedFields: changedFields.join(",") }
+  });
   await writeState(storePath, state);
   return {
     mode: "direct_store",
     projectId,
     momentId,
     updatedAt: project.updatedAt,
-    changedFields: ["label", "evidence", "enabled"].filter((field) => typeof args[field] !== "undefined")
+    changedFields
   };
 }
 
@@ -429,8 +508,7 @@ function listProjects(state: GideonState): Record<string, JsonValue> {
   };
 }
 
-function getProject(state: GideonState, projectId: string): Record<string, JsonValue> {
-  const project = requireProject(state, projectId);
+function projectPayload(state: GideonState, project: GideonProject): Record<string, JsonValue> {
   return {
     id: project.id,
     name: project.name ?? "",
@@ -442,7 +520,11 @@ function getProject(state: GideonState, projectId: string): Record<string, JsonV
     scripts: (project.scripts ?? []).map((script) => sanitizeRecord(script)),
     renders: (project.renders ?? []).map((render) => sanitizeRecord(render)),
     jobs: (project.jobs ?? []).map((job) => sanitizeRecord(job)),
-    providerRuns: (project.providerRuns ?? []).map((run) => sanitizeRecord(run))
+    providerRuns: (project.providerRuns ?? []).map((run) => sanitizeRecord(run)),
+    auditEvents: (state.auditEvents ?? [])
+      .filter((event) => event.projectId === project.id)
+      .slice(-10)
+      .map((event) => sanitizeRecord(event))
   };
 }
 
@@ -452,6 +534,62 @@ function requireProject(state: GideonState, projectId: string): GideonProject {
     throw new Error(`Project ${projectId} was not found.`);
   }
   return project;
+}
+
+function assertDirectStorePermission(state: GideonState, project: GideonProject, action: "project:read" | "mcp:write"): void {
+  if (!state.workspaceMembers?.length) {
+    return;
+  }
+  const workspaceId = project.workspaceId ?? state.activeWorkspaceId ?? "local-workspace";
+  const userId = state.activeUserId ?? "local-user";
+  const member = state.workspaceMembers.find(
+    (candidate) => candidate.workspaceId === workspaceId && candidate.userId === userId
+  );
+  if (!member) {
+    throw new Error("The active user is not a member of this workspace.");
+  }
+  if (!directRoleAllows(member.role, action)) {
+    throw new Error(`Workspace role ${member.role} cannot perform ${action}.`);
+  }
+}
+
+function directRoleAllows(role: GideonWorkspaceMember["role"], action: "project:read" | "mcp:write"): boolean {
+  if (role === "owner" || role === "admin") {
+    return true;
+  }
+  if (role === "editor") {
+    return true;
+  }
+  return action === "project:read" && role === "viewer";
+}
+
+function appendMcpAudit(
+  state: GideonState,
+  input: {
+    project: GideonProject;
+    action: string;
+    targetType: string;
+    targetId?: string;
+    summary: string;
+    metadata?: Record<string, JsonValue>;
+  }
+): GideonAuditEvent {
+  const workspaceId = input.project.workspaceId ?? state.activeWorkspaceId ?? "local-workspace";
+  const event: GideonAuditEvent = {
+    id: randomUUID(),
+    workspaceId,
+    projectId: input.project.id,
+    actorUserId: state.activeUserId ?? "local-user",
+    actorType: "mcp_agent",
+    action: input.action,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    summary: input.summary,
+    metadata: input.metadata,
+    createdAt: new Date().toISOString()
+  };
+  state.auditEvents = [...(state.auditEvents ?? []), event].slice(-500);
+  return event;
 }
 
 function pathFromArgs(args: Record<string, unknown>): string {

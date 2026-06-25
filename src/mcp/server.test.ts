@@ -48,12 +48,20 @@ describe("Gideon MCP server tools", () => {
     expect(edit.content[0]?.text).toContain("script-1");
     const saved = JSON.parse(await fs.readFile(storePath, "utf8")) as {
       projects: Array<{ scripts: Array<{ hook: string; voiceoverText: string; cta: string }> }>;
+      auditEvents?: Array<{ actorType: string; action: string; targetId: string }>;
     };
     expect(saved.projects[0]?.scripts[0]).toMatchObject({
       hook: "Show the result first",
       voiceoverText: "Old voiceover",
       cta: "Try the workflow today"
     });
+    expect(saved.auditEvents?.[0]).toMatchObject({
+      actorType: "mcp_agent",
+      action: "scripts.update",
+      targetId: "script-1"
+    });
+    const audit = await callTool("gideon_get_audit_log", { storePath, projectId: "project-1" });
+    expect(audit.content[0]?.text).toContain("scripts.update");
   });
 
   it("updates moment fields and creates deterministic edit plans", async () => {
@@ -90,6 +98,34 @@ describe("Gideon MCP server tools", () => {
       instruction: "Make this punchier",
       suggestedMomentIds: ["moment-1"]
     });
+  });
+
+  it("rejects direct MCP writes when the active workspace role is read-only", async () => {
+    const storePath = await writeStore({
+      activeUserId: "user-1",
+      activeWorkspaceId: "workspace-1",
+      workspaceMembers: [{ workspaceId: "workspace-1", userId: "user-1", role: "viewer" }],
+      projects: [
+        {
+          id: "project-1",
+          workspaceId: "workspace-1",
+          name: "Launch demo",
+          scripts: [{ id: "script-1", hook: "Old hook" }]
+        }
+      ]
+    });
+
+    await expect(
+      callTool("gideon_update_script", {
+        storePath,
+        projectId: "project-1",
+        scriptId: "script-1",
+        hook: "Not allowed"
+      })
+    ).rejects.toThrow("cannot perform mcp:write");
+
+    const project = await callTool("gideon_get_project", { storePath, projectId: "project-1" });
+    expect(project.content[0]?.text).toContain("Launch demo");
   });
 
   it("prefers the live app control bridge when available", async () => {

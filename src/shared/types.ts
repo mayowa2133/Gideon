@@ -25,6 +25,44 @@ export type WorkspacePlan = "local_mvp" | "starter" | "team" | "enterprise";
 
 export type BillingStatus = "not_configured" | "trialing" | "active" | "past_due" | "canceled";
 
+export type AuditActorType = "local_user" | "mcp_agent" | "system";
+
+export type AuditAction =
+  | "project.create"
+  | "project.update_profile"
+  | "project.delete"
+  | "recording.attach"
+  | "analysis.complete"
+  | "moments.update"
+  | "concepts.generate"
+  | "concepts.update"
+  | "scripts.generate"
+  | "scripts.update"
+  | "render.complete"
+  | "artifact.create"
+  | "job.create"
+  | "job.cancel"
+  | "job.retry"
+  | "usage.record";
+
+export type AuditTargetType = "workspace" | "project" | "recording" | "artifact" | "job" | "moment" | "concept" | "script" | "render" | "usage";
+
+export type AuditMetadataValue = string | number | boolean | null;
+
+export interface AuditEvent {
+  id: string;
+  workspaceId: string;
+  projectId?: string;
+  actorUserId: string;
+  actorType: AuditActorType;
+  action: AuditAction;
+  targetType: AuditTargetType;
+  targetId?: string;
+  summary: string;
+  metadata?: Record<string, AuditMetadataValue>;
+  createdAt: string;
+}
+
 export type UsageMetric =
   | "source_minutes"
   | "transcription_minutes"
@@ -308,6 +346,7 @@ export interface AppState {
   workspaces: Workspace[];
   workspaceMembers: WorkspaceMember[];
   usageEvents: UsageEvent[];
+  auditEvents: AuditEvent[];
   activeUserId: string | null;
   activeWorkspaceId: string | null;
   projects: Project[];

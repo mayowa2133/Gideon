@@ -88,6 +88,7 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle("recording:choose", async (_event, projectId: string) => {
+    await store.assertProjectPermission(projectId, "project:update");
     const options = {
       title: "Choose a product walkthrough recording",
       properties: ["openFile"],
@@ -186,6 +187,7 @@ function registerIpcHandlers(): void {
     if (!render?.outputPath) {
       throw new Error("Rendered video not found.");
     }
+    await store.assertProjectPermission(projectId, "export:create");
     const options = {
       title: "Export MP4",
       defaultPath: path.join(app.getPath("downloads"), `${render.title.replace(/[^a-z0-9]+/gi, "-")}.mp4`),
@@ -228,8 +230,8 @@ async function startControlBridge(): Promise<void> {
       getProject: (projectId) => store.getProject(projectId),
       updateScript: updateScriptFromControl,
       updateMoment: updateMomentFromControl,
-      enqueueAnalysis: enqueueAnalysisFromControl,
-      enqueueRender: enqueueRenderFromControl
+      enqueueAnalysis: (projectId) => enqueueAnalysisFromControl(projectId, "mcp_agent"),
+      enqueueRender: (projectId) => enqueueRenderFromControl(projectId, "mcp_agent")
     }
   });
 }
@@ -271,7 +273,7 @@ async function updateScriptFromControl(input: {
   if (!scripts.some((script) => script.id === input.scriptId)) {
     throw new Error(`Script ${input.scriptId} was not found.`);
   }
-  return store.updateScripts(input.projectId, scripts);
+  return store.updateScripts(input.projectId, scripts, "mcp_agent");
 }
 
 async function updateMomentFromControl(input: {
@@ -296,10 +298,10 @@ async function updateMomentFromControl(input: {
   if (!moments.some((moment) => moment.id === input.momentId)) {
     throw new Error(`Moment ${input.momentId} was not found.`);
   }
-  return store.updateMoments(input.projectId, moments);
+  return store.updateMoments(input.projectId, moments, "mcp_agent");
 }
 
-async function enqueueAnalysisFromControl(projectId: string): Promise<Project> {
+async function enqueueAnalysisFromControl(projectId: string, actorType: "local_user" | "mcp_agent" = "local_user"): Promise<Project> {
   const project = await store.getProject(projectId);
   if (!project.recording) {
     throw new Error("Choose a recording before analysis.");
@@ -311,12 +313,12 @@ async function enqueueAnalysisFromControl(projectId: string): Promise<Project> {
     now: new Date().toISOString(),
     userMessage: "Waiting to analyze recording."
   });
-  await store.appendJob(projectId, job);
+  await store.appendJob(projectId, job, actorType);
   enqueueAnalysisJob(projectId, job.id);
   return store.getProject(projectId);
 }
 
-async function enqueueRenderFromControl(projectId: string): Promise<Project> {
+async function enqueueRenderFromControl(projectId: string, actorType: "local_user" | "mcp_agent" = "local_user"): Promise<Project> {
   const project = await store.getProject(projectId);
   if (!project.recording) {
     throw new Error("Choose a recording before rendering.");
@@ -331,7 +333,7 @@ async function enqueueRenderFromControl(projectId: string): Promise<Project> {
     now: new Date().toISOString(),
     userMessage: "Waiting to render selected drafts."
   });
-  await store.appendJob(projectId, job);
+  await store.appendJob(projectId, job, actorType);
   enqueueRenderJob(projectId, job.id);
   return store.getProject(projectId);
 }
