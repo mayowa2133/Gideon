@@ -1,15 +1,18 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
 import {
   copyExport,
-  enrichMomentThumbnails,
   getToolAvailability,
   probeRecording,
   renderDraft
 } from "./media";
 import { GideonStore } from "./store";
 import type { ContentConcept, DetectedMoment, ScriptDraft } from "../shared/types";
+import { runAnalysisPipeline, safeProviderError } from "./analysisPipeline";
+import { loadProviderConfig } from "./providers/config";
+import { OpenAiProvider } from "./providers/openai";
 
 const store = new GideonStore();
 let mainWindow: BrowserWindow | null = null;
@@ -59,6 +62,10 @@ function registerIpcHandlers(): void {
   ipcMain.handle("platform:info", async () => ({
     appVersion: app.getVersion(),
     userDataPath: app.getPath("userData"),
+    openAiConfigured: Boolean(loadProviderConfig().openai.apiKey),
+    openAiLlmModel: loadProviderConfig().openai.apiKey ? loadProviderConfig().openai.llmModel : null,
+    openAiTranscriptionModel: loadProviderConfig().openai.apiKey ? loadProviderConfig().openai.transcriptionModel : null,
+    openAiTtsModel: loadProviderConfig().openai.apiKey ? loadProviderConfig().openai.ttsModel : null,
     ...(await getToolAvailability())
   }));
 
@@ -98,8 +105,8 @@ function registerIpcHandlers(): void {
     if (!project.recording) {
       throw new Error("Choose a recording before analysis.");
     }
-    return store.runAnalysis(projectId, (moments) =>
-      enrichMomentThumbnails(project.recording!, moments, store.projectDir(projectId))
+    return store.runAnalysis(projectId, (analysisProject, moments) =>
+      runAnalysisPipeline(analysisProject, moments, store.projectDir(projectId))
     );
   });
 
@@ -136,6 +143,7 @@ function registerIpcHandlers(): void {
         .map((momentId) => project.moments.find((candidate) => candidate.id === momentId))
         .find(Boolean);
       const createdAt = new Date().toISOString();
+      const voiceoverPath = await createProviderVoiceover(projectId, script);
       try {
         const rendered = await renderDraft({
           projectId,
@@ -144,7 +152,8 @@ function registerIpcHandlers(): void {
           recording: project.recording,
           script,
           moment,
-          title: concept?.title ?? script.hook
+          title: concept?.title ?? script.hook,
+          voiceoverPath: voiceoverPath ?? undefined
         });
         renders.push({
           id: randomUUID(),
@@ -192,4 +201,48 @@ function registerIpcHandlers(): void {
   ipcMain.handle("shell:reveal", async (_event, filePath: string) => {
     shell.showItemInFolder(filePath);
   });
+}
+
+async function createProviderVoiceover(projectId: string, script: ScriptDraft): Promise<string | null> {
+  const config = loadProviderConfig();
+  const provider = new OpenAiProvider({ config: config.openai });
+  if (!provider.isConfigured()) {
+    return null;
+  }
+  const startedAt = new Date().toISOString();
+  const outputPath = path.join(store.projectDir(projectId), "voiceovers", `${script.id}.wav`);
+  try {
+    await fs.mkdir(path.dirname(outputPath), { recursive: true });
+    const result = await provider.synthesizeSpeech({
+      text: script.voiceoverText,
+      instructions: "Speak in a clear product demo voice. Keep pacing natural and concise.",
+      outputPath
+    });
+    await store.appendProviderRuns(projectId, [
+      {
+        id: randomUUID(),
+        kind: "tts",
+        provider: "openai",
+        model: result.model,
+        status: "completed",
+        startedAt,
+        finishedAt: new Date().toISOString()
+      }
+    ]);
+    return result.outputPath;
+  } catch (error) {
+    await store.appendProviderRuns(projectId, [
+      {
+        id: randomUUID(),
+        kind: "tts",
+        provider: "openai",
+        model: config.openai.ttsModel,
+        status: "failed",
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        error: safeProviderError(error)
+      }
+    ]);
+    return null;
+  }
 }

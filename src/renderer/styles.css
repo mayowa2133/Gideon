@@ -500,6 +500,52 @@ video {
   padding: 1rem;
 }
 
+.analysis-evidence {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1rem;
+  border: 1px solid rgba(245, 209, 95, 0.18);
+  border-radius: 22px;
+  background: rgba(245, 209, 95, 0.06);
+  padding: 1rem;
+}
+
+.analysis-evidence p {
+  color: #c8d2e7;
+}
+
+.analysis-evidence blockquote {
+  margin: 0.5rem 0 0;
+  border-left: 3px solid rgba(245, 209, 95, 0.8);
+  color: #edf3ff;
+  padding-left: 0.8rem;
+}
+
+.provider-run-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.provider-run {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c8d2e7;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.provider-run.completed {
+  color: #102017;
+  background: #63e6a5;
+}
+
+.provider-run.failed {
+  color: #2a1010;
+  background: #ffb3b3;
+}
+
 @media (max-width: 1180px) {
   .app-shell,
   .grid.two {
@@ -511,4 +557,3 @@ video {
     height: auto;
   }
 }
-

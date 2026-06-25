@@ -47,6 +47,37 @@ export interface RecordingMetadata {
   validatedAt: string;
 }
 
+export interface TranscriptSegment {
+  id: string;
+  startMs: number;
+  endMs: number;
+  text: string;
+  confidence?: number;
+  speaker?: string;
+}
+
+export interface TranscriptArtifact {
+  id: string;
+  status: "completed" | "skipped" | "failed";
+  provider: "openai" | "local" | "none";
+  model?: string;
+  text: string;
+  segments: TranscriptSegment[];
+  createdAt: string;
+  error?: string;
+}
+
+export interface ProviderRun {
+  id: string;
+  kind: "analysis" | "transcription" | "tts";
+  provider: "openai" | "local" | "none";
+  model?: string;
+  status: "completed" | "skipped" | "failed";
+  startedAt: string;
+  finishedAt: string;
+  error?: string;
+}
+
 export interface DetectedMoment {
   id: string;
   label: string;
@@ -125,10 +156,13 @@ export interface Project {
   status: ProjectStatus;
   profile: ProductProfile;
   recording?: RecordingMetadata;
+  transcript?: TranscriptArtifact;
+  analysisSummary?: string;
   moments: DetectedMoment[];
   concepts: ContentConcept[];
   scripts: ScriptDraft[];
   renders: RenderedVideo[];
+  providerRuns: ProviderRun[];
   createdAt: string;
   updatedAt: string;
 }
@@ -144,6 +178,10 @@ export interface PlatformInfo {
   ffmpegAvailable: boolean;
   ffprobeAvailable: boolean;
   sayAvailable: boolean;
+  openAiConfigured: boolean;
+  openAiLlmModel: string | null;
+  openAiTranscriptionModel: string | null;
+  openAiTtsModel: string | null;
 }
 
 export interface CreateProjectInput {
@@ -166,4 +204,3 @@ export const toneLabels: Record<TonePreset, string> = {
   professional: "Professional",
   educational: "Educational"
 };
-

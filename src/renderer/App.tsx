@@ -171,6 +171,14 @@ function RuntimePanel({ info }: { info: PlatformInfo | null }): JSX.Element {
       <StatusDot ok={info.ffmpegAvailable} label="FFmpeg" />
       <StatusDot ok={info.ffprobeAvailable} label="ffprobe" />
       <StatusDot ok={info.sayAvailable} label="macOS voiceover" />
+      <StatusDot ok={info.openAiConfigured} label="OpenAI providers" />
+      {info.openAiConfigured ? (
+        <small>
+          LLM: {info.openAiLlmModel} · ASR: {info.openAiTranscriptionModel} · TTS: {info.openAiTtsModel}
+        </small>
+      ) : (
+        <small>Set OPENAI_API_KEY or GIDEON_OPENAI_API_KEY before launching to enable real AI, ASR, and provider TTS.</small>
+      )}
       <small>Data folder: {info.userDataPath}</small>
     </div>
   );
@@ -323,6 +331,7 @@ function ProjectWorkspace({
           moments={project.moments}
           onChange={(moments) => void runAction("saving", () => window.gideon.updateMoments(project.id, moments))}
         />
+        <AnalysisEvidence project={project} />
       </Panel>
 
       <Panel title="4. Concepts" eyebrow="10 angles">
@@ -394,6 +403,42 @@ function ProjectWorkspace({
           }
         />
       </Panel>
+    </div>
+  );
+}
+
+function AnalysisEvidence({ project }: { project: Project }): JSX.Element | null {
+  if (!project.analysisSummary && !project.transcript && project.providerRuns.length === 0) {
+    return null;
+  }
+  return (
+    <div className="analysis-evidence">
+      {project.analysisSummary ? (
+        <div>
+          <strong>Analysis summary</strong>
+          <p>{project.analysisSummary}</p>
+        </div>
+      ) : null}
+      {project.transcript ? (
+        <div>
+          <strong>Transcript</strong>
+          <p>
+            {project.transcript.status} · {project.transcript.provider}
+            {project.transcript.model ? ` · ${project.transcript.model}` : ""}
+          </p>
+          {project.transcript.text ? <blockquote>{project.transcript.text.slice(0, 600)}</blockquote> : null}
+          {project.transcript.error ? <small>{project.transcript.error}</small> : null}
+        </div>
+      ) : null}
+      {project.providerRuns.length > 0 ? (
+        <div className="provider-run-list">
+          {project.providerRuns.slice(-6).map((run) => (
+            <span key={run.id} className={`provider-run ${run.status}`}>
+              {run.kind}: {run.provider} · {run.status}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -726,4 +771,3 @@ function messageFromError(error: unknown): string {
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
-

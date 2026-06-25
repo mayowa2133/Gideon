@@ -36,3 +36,22 @@ The `Build macOS app` workflow builds the app on macOS and uploads the DMG/ZIP a
 - macOS
 - FFmpeg and ffprobe available on `PATH`, or at `/opt/homebrew/bin/ffmpeg` and `/opt/homebrew/bin/ffprobe`
 - `/usr/bin/say` for local voiceover generation; if unavailable, Gideon renders with silent audio
+
+## Optional AI provider configuration
+
+Gideon runs without paid provider credentials using deterministic local fallbacks. To enable provider-backed semantic analysis, transcription, and TTS, launch the app with:
+
+```bash
+OPENAI_API_KEY=sk-... pnpm start
+```
+
+Supported provider variables:
+
+- `OPENAI_API_KEY` or `GIDEON_OPENAI_API_KEY`
+- `GIDEON_OPENAI_BASE_URL`, default `https://api.openai.com/v1`
+- `GIDEON_OPENAI_LLM_MODEL`, default `gpt-5.1`
+- `GIDEON_OPENAI_TRANSCRIPTION_MODEL`, default `gpt-4o-transcribe`
+- `GIDEON_OPENAI_TTS_MODEL`, default `gpt-4o-mini-tts`
+- `GIDEON_OPENAI_TTS_VOICE`, default `coral`
+
+Provider outputs are treated as untrusted until parsed and validated. If a provider call fails, Gideon records a safe provider-run error and falls back to the local path where possible.

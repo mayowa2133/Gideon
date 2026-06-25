@@ -15,11 +15,13 @@ import type {
   ContentConcept,
   CreateProjectInput,
   DetectedMoment,
+  ProviderRun,
   ProductProfile,
   Project,
   RecordingMetadata,
   RenderedVideo,
-  ScriptDraft
+  ScriptDraft,
+  TranscriptArtifact
 } from "../shared/types";
 
 const STORE_FILE = "gideon-store.json";
@@ -35,7 +37,7 @@ export class GideonStore {
     const filePath = this.storePath();
     try {
       const raw = await fs.readFile(filePath, "utf8");
-      this.state = JSON.parse(raw) as AppState;
+      this.state = normalizeAppState(JSON.parse(raw) as AppState);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         throw error;
@@ -81,6 +83,7 @@ export class GideonStore {
       concepts: [],
       scripts: [],
       renders: [],
+      providerRuns: [],
       createdAt: now,
       updatedAt: now
     };
@@ -103,26 +106,40 @@ export class GideonStore {
     return this.updateProject(projectId, (project) => {
       project.recording = recording;
       project.status = "recording_ready";
+      project.transcript = undefined;
+      project.analysisSummary = undefined;
       project.moments = [];
       project.concepts = [];
       project.scripts = [];
       project.renders = [];
+      project.providerRuns = project.providerRuns ?? [];
       project.updatedAt = new Date().toISOString();
     });
   }
 
-  async runAnalysis(projectId: string, enrich: (moments: DetectedMoment[]) => Promise<DetectedMoment[]>): Promise<Project> {
+  async runAnalysis(
+    projectId: string,
+    enrich: (project: Project, moments: DetectedMoment[]) => Promise<{
+      moments: DetectedMoment[];
+      transcript?: TranscriptArtifact;
+      analysisSummary?: string;
+      providerRuns?: ProviderRun[];
+    }>
+  ): Promise<Project> {
     const project = await this.getProject(projectId);
     if (!project.recording) {
       throw new Error("Choose and validate a recording before analysis.");
     }
     const moments = createMoments(project.profile, project.recording, randomUUID);
-    const enrichedMoments = await enrich(moments);
+    const analysis = await enrich(project, moments);
     return this.updateProject(projectId, (draft) => {
-      draft.moments = enrichedMoments;
+      draft.moments = analysis.moments;
+      draft.transcript = analysis.transcript;
+      draft.analysisSummary = analysis.analysisSummary;
       draft.concepts = [];
       draft.scripts = [];
       draft.renders = [];
+      draft.providerRuns = [...(draft.providerRuns ?? []), ...(analysis.providerRuns ?? [])];
       draft.status = "analyzed";
       draft.updatedAt = new Date().toISOString();
     });
@@ -131,6 +148,7 @@ export class GideonStore {
   async updateMoments(projectId: string, moments: DetectedMoment[]): Promise<Project> {
     return this.updateProject(projectId, (project) => {
       project.moments = moments;
+      project.analysisSummary = undefined;
       project.concepts = [];
       project.scripts = [];
       project.renders = [];
@@ -188,7 +206,15 @@ export class GideonStore {
   async replaceRenders(projectId: string, renders: RenderedVideo[]): Promise<Project> {
     return this.updateProject(projectId, (project) => {
       project.renders = renders;
+      project.providerRuns = project.providerRuns ?? [];
       project.status = renders.some((render) => render.status === "failed") ? "failed" : "ready";
+      project.updatedAt = new Date().toISOString();
+    });
+  }
+
+  async appendProviderRuns(projectId: string, providerRuns: ProviderRun[]): Promise<Project> {
+    return this.updateProject(projectId, (project) => {
+      project.providerRuns = [...(project.providerRuns ?? []), ...providerRuns];
       project.updatedAt = new Date().toISOString();
     });
   }
@@ -246,6 +272,20 @@ export class GideonStore {
   }
 }
 
+function normalizeAppState(state: AppState): AppState {
+  return {
+    activeProjectId: state.activeProjectId ?? null,
+    projects: (state.projects ?? []).map((project) => ({
+      ...project,
+      moments: project.moments ?? [],
+      concepts: project.concepts ?? [],
+      scripts: project.scripts ?? [],
+      renders: project.renders ?? [],
+      providerRuns: project.providerRuns ?? []
+    }))
+  };
+}
+
 export function newProjectTemplate(): CreateProjectInput {
   return {
     name: "",
@@ -264,4 +304,3 @@ function normalizeProfile(profile: ProductProfile): ProductProfile {
     walkthroughNotes: profile.walkthroughNotes.trim()
   };
 }
-

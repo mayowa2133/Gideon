@@ -44,6 +44,7 @@ interface RenderDraftInput {
   script: ScriptDraft;
   moment?: DetectedMoment;
   title: string;
+  voiceoverPath?: string;
 }
 
 export async function getToolAvailability(): Promise<{
@@ -159,12 +160,12 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   const sourceDurationSec = Math.max(8, durationMs / 1000);
 
   await createCaptionOverlay(input.profile, input.script, overlayPath);
-  const voiceCreated = await createVoiceover(input.script.voiceoverText, voicePath);
-  if (!voiceCreated) {
+  const voiceCreated = input.voiceoverPath ? true : await createVoiceover(input.script.voiceoverText, voicePath);
+  if (!voiceCreated && !input.voiceoverPath) {
     await createSilentAudio(audioPath, sourceDurationSec);
   }
 
-  const audioInput = voiceCreated ? voicePath : audioPath;
+  const audioInput = input.voiceoverPath ?? (voiceCreated ? voicePath : audioPath);
   const filter = [
     `[0:v]${videoFilter()}[base]`,
     "[base][1:v]overlay=0:0:shortest=1[v]",
@@ -251,6 +252,29 @@ export async function validateRenderedVideo(outputPath: string): Promise<RenderV
     audioCodec: audioStream?.codec_name ?? null,
     fastStart: true
   };
+}
+
+export async function extractAudioForTranscription(recording: RecordingMetadata, projectDir: string): Promise<string> {
+  const audioDir = path.join(projectDir, "audio");
+  await fs.mkdir(audioDir, { recursive: true });
+  const outputPath = path.join(audioDir, "transcription.wav");
+  await runCommand(resolveFfmpeg(), [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-i",
+    recording.filePath,
+    "-vn",
+    "-ac",
+    "1",
+    "-ar",
+    "16000",
+    "-c:a",
+    "pcm_s16le",
+    outputPath
+  ]);
+  return outputPath;
 }
 
 export async function copyExport(sourcePath: string, destinationPath: string): Promise<void> {
