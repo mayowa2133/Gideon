@@ -338,6 +338,7 @@ async function createCaptionOverlay(profile: ProductProfile, script: ScriptDraft
   const context = image.getContext("2d");
 
   context.clearRect(0, 0, 1080, 1920);
+  drawFocusFrame(context);
   drawPanel(context, 70, 105, 940, 285, "rgba(5, 7, 13, 0.72)");
   drawPanel(context, 80, 1270, 920, 360, "rgba(5, 7, 13, 0.78)");
   drawPanel(context, 150, 1680, 780, 130, "rgba(245, 209, 95, 0.92)");
@@ -349,6 +350,8 @@ async function createCaptionOverlay(profile: ProductProfile, script: ScriptDraft
   context.fillStyle = "#ffffff";
   context.font = "56pt Arial";
   drawWrappedText(context, script.hook, 110, 245, 860, 68, 3);
+
+  drawVisualBeatCallouts(context, script);
 
   context.fillStyle = "#ffffff";
   context.font = "46pt Arial";
@@ -366,6 +369,82 @@ async function createCaptionOverlay(profile: ProductProfile, script: ScriptDraft
 }
 
 type OverlayContext = ReturnType<ReturnType<typeof PImage.make>["getContext"]>;
+
+function drawFocusFrame(context: OverlayContext): void {
+  drawRectOutline(context, 54, 485, 972, 650, 7, "rgba(245, 209, 95, 0.72)");
+  drawRectOutline(context, 74, 505, 932, 610, 2, "rgba(255, 255, 255, 0.28)");
+  drawPanel(context, 74, 1135, 280, 62, "rgba(245, 209, 95, 0.92)");
+  context.fillStyle = "#10131d";
+  context.font = "24pt Arial";
+  context.fillText("AUTO FOCUS", 112, 1176);
+}
+
+function drawRectOutline(
+  context: OverlayContext,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  thickness: number,
+  fillStyle: string
+): void {
+  drawSolidRect(context, x, y, width, thickness, fillStyle);
+  drawSolidRect(context, x, y + height - thickness, width, thickness, fillStyle);
+  drawSolidRect(context, x, y, thickness, height, fillStyle);
+  drawSolidRect(context, x + width - thickness, y, thickness, height, fillStyle);
+}
+
+function drawSolidRect(
+  context: OverlayContext,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  fillStyle: string
+): void {
+  context.fillStyle = fillStyle;
+  context.beginPath();
+  context.moveTo(x, y);
+  context.lineTo(x + width, y);
+  context.lineTo(x + width, y + height);
+  context.lineTo(x, y + height);
+  context.closePath();
+  context.fill();
+}
+
+function drawVisualBeatCallouts(context: OverlayContext, script: ScriptDraft): void {
+  const beats = script.visualBeats.slice(0, 3);
+  if (beats.length === 0) {
+    return;
+  }
+  const positions = [
+    { x: 90, y: 500, width: 390 },
+    { x: 600, y: 690, width: 390 },
+    { x: 90, y: 910, width: 390 }
+  ];
+  beats.forEach((beat, index) => {
+    const position = positions[index];
+    if (!position) {
+      return;
+    }
+    drawPanel(context, position.x, position.y, position.width, 118, "rgba(5, 7, 13, 0.82)");
+    drawPanel(context, position.x + 18, position.y + 21, 58, 58, "rgba(245, 209, 95, 0.92)");
+    context.fillStyle = "#10131d";
+    context.font = "28pt Arial";
+    context.fillText(String(index + 1), position.x + 40, position.y + 61);
+    context.fillStyle = "#ffffff";
+    context.font = "24pt Arial";
+    drawWrappedText(context, calloutTextFromInstruction(beat.instruction), position.x + 96, position.y + 47, position.width - 125, 30, 2);
+  });
+}
+
+export function calloutTextFromInstruction(instruction: string): string {
+  return instruction
+    .replace(/^show\s+/i, "")
+    .replace(/\s+with readable framing\.?$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 function drawPanel(
   context: OverlayContext,
