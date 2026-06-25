@@ -18,10 +18,34 @@ export interface PutFileInput {
   now?: string;
 }
 
+export interface CreateDirectUploadSessionInput {
+  workspaceId: string;
+  projectId: string;
+  kind: ArtifactKind;
+  originalFileName: string;
+  byteSize: number;
+  contentType?: string;
+  now?: Date;
+  expiresInSeconds?: number;
+}
+
 export interface StoredArtifact {
   artifact: ArtifactRecord;
   filePath: string;
   fileUrl: string;
+}
+
+export interface DirectUploadSession {
+  id: string;
+  provider: Extract<ArtifactProvider, "s3" | "r2">;
+  storageKey: string;
+  uploadUrl: string;
+  method: "PUT";
+  headers: Record<string, string>;
+  expiresAt: string;
+  maxBytes: number;
+  contentType: string;
+  originalFileName: string;
 }
 
 export interface PrivateObjectStorage {
@@ -65,6 +89,8 @@ interface UploadObjectInput {
   contentType: string;
 }
 
+type StorageKeyInput = Pick<PutFileInput, "workspaceId" | "projectId" | "kind">;
+
 export function loadStorageConfig(env: NodeJS.ProcessEnv = process.env): StorageConfig {
   return {
     provider: normalizeStorageProvider(env.GIDEON_STORAGE_PROVIDER),
@@ -106,6 +132,26 @@ export function createPrivateObjectStorage(input: PrivateObjectStorageFactoryInp
   });
 }
 
+export function createDirectUploadSession(
+  factoryInput: PrivateObjectStorageFactoryInput,
+  sessionInput: CreateDirectUploadSessionInput
+): DirectUploadSession {
+  const config = loadStorageConfig(factoryInput.env);
+  if (!isCloudStorageConfigured(config)) {
+    throw new Error("Direct upload sessions require configured S3-compatible cloud storage.");
+  }
+  return new S3CompatibleObjectStorage({
+    provider: config.provider as Extract<ArtifactProvider, "s3" | "r2">,
+    endpoint: config.endpoint!,
+    bucket: config.bucket!,
+    region: config.region,
+    accessKeyId: config.accessKeyId!,
+    secretAccessKey: config.secretAccessKey!,
+    publicBaseUrl: config.publicBaseUrl,
+    cacheRootDir: factoryInput.cloudCacheRootDir ?? path.join(factoryInput.localRootDir, "_cloud-cache")
+  }).createDirectUploadSession(sessionInput);
+}
+
 export class LocalPrivateObjectStorage implements PrivateObjectStorage {
   constructor(private readonly rootDir: string) {}
 
@@ -141,6 +187,38 @@ export class LocalPrivateObjectStorage implements PrivateObjectStorage {
 
 export class S3CompatibleObjectStorage implements PrivateObjectStorage {
   constructor(private readonly config: S3CompatibleObjectStorageConfig) {}
+
+  createDirectUploadSession(input: CreateDirectUploadSessionInput): DirectUploadSession {
+    const artifactId = randomUUID();
+    const contentType = input.contentType ?? inferContentType(input.originalFileName);
+    const storageKey = storageKeyFor(input, artifactId, input.originalFileName);
+    const expiresInSeconds = clamp(input.expiresInSeconds ?? 900, 60, 3600);
+    const now = input.now ?? new Date();
+    const expiresAt = new Date(now.getTime() + expiresInSeconds * 1000).toISOString();
+    const uploadUrl = presignedPutUrl({
+      url: s3ObjectUrl(this.config.endpoint, this.config.bucket, storageKey),
+      region: this.config.region,
+      accessKeyId: this.config.accessKeyId,
+      secretAccessKey: this.config.secretAccessKey,
+      contentType,
+      expiresInSeconds,
+      now
+    });
+    return {
+      id: artifactId,
+      provider: this.config.provider,
+      storageKey,
+      uploadUrl,
+      method: "PUT",
+      headers: {
+        "Content-Type": contentType
+      },
+      expiresAt,
+      maxBytes: input.byteSize,
+      contentType,
+      originalFileName: input.originalFileName
+    };
+  }
 
   async putFile(input: PutFileInput): Promise<StoredArtifact> {
     const artifactId = randomUUID();
@@ -222,7 +300,7 @@ async function copyWithSha256(sourcePath: string, destinationPath: string): Prom
   return { byteSize, sha256: hash.digest("hex") };
 }
 
-function storageKeyFor(input: PutFileInput, artifactId: string, originalFileName: string): string {
+function storageKeyFor(input: StorageKeyInput, artifactId: string, originalFileName: string): string {
   return [
     "workspaces",
     safePathSegment(input.workspaceId),
@@ -231,6 +309,48 @@ function storageKeyFor(input: PutFileInput, artifactId: string, originalFileName
     input.kind,
     `${artifactId}-${safeFileName(originalFileName)}`
   ].join("/");
+}
+
+function presignedPutUrl(input: {
+  url: URL;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  contentType: string;
+  expiresInSeconds: number;
+  now: Date;
+}): string {
+  const amzDate = toAmzDate(input.now);
+  const dateStamp = amzDate.slice(0, 8);
+  const credentialScope = `${dateStamp}/${input.region}/s3/aws4_request`;
+  const signedHeaders = "content-type;host";
+  const query = new URLSearchParams({
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": `${input.accessKeyId}/${credentialScope}`,
+    "X-Amz-Date": amzDate,
+    "X-Amz-Expires": String(input.expiresInSeconds),
+    "X-Amz-SignedHeaders": signedHeaders
+  });
+  const canonicalQueryString = canonicalQuery(query);
+  const canonicalHeaders = `content-type:${input.contentType}\nhost:${input.url.host}\n`;
+  const canonicalRequest = [
+    "PUT",
+    canonicalUri(input.url.pathname),
+    canonicalQueryString,
+    canonicalHeaders,
+    signedHeaders,
+    "UNSIGNED-PAYLOAD"
+  ].join("\n");
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    createHash("sha256").update(canonicalRequest).digest("hex")
+  ].join("\n");
+  const signature = hmac(signingKey(input.secretAccessKey, dateStamp, input.region), stringToSign, "hex");
+  query.set("X-Amz-Signature", signature);
+  input.url.search = canonicalQuery(query);
+  return input.url.toString();
 }
 
 function signedPutHeaders(input: {
@@ -342,6 +462,17 @@ function canonicalUri(pathname: string): string {
     .join("/");
 }
 
+function canonicalQuery(query: URLSearchParams): string {
+  return [...query.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${uriEncode(key)}=${uriEncode(value)}`)
+    .join("&");
+}
+
+function uriEncode(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
 function normalizeStorageProvider(value: string | undefined): StorageProviderMode {
   if (value === "s3" || value === "r2") {
     return value;
@@ -351,6 +482,10 @@ function normalizeStorageProvider(value: string | undefined): StorageProviderMod
 
 function nonEmpty(value: string | undefined): string | null {
   return value?.trim() || null;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
 function safePathSegment(value: string): string {

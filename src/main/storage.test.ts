@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  createDirectUploadSession,
   createPrivateObjectStorage,
   isCloudStorageConfigured,
   loadStorageConfig,
@@ -56,6 +57,84 @@ describe("local private object storage", () => {
         env: { GIDEON_STORAGE_PROVIDER: "s3", GIDEON_STORAGE_BUCKET: "missing-endpoint" }
       })
     ).toThrow("Cloud storage provider s3 requires");
+  });
+
+  it("creates short-lived direct upload sessions for S3-compatible storage", () => {
+    const storage = new S3CompatibleObjectStorage({
+      provider: "s3",
+      endpoint: "https://storage.example.com/base",
+      bucket: "gideon-private",
+      region: "us-east-1",
+      accessKeyId: "test-key",
+      secretAccessKey: "test-secret",
+      cacheRootDir: "/tmp/gideon-cache"
+    });
+
+    const session = storage.createDirectUploadSession({
+      workspaceId: "workspace 1",
+      projectId: "project 1",
+      kind: "source_recording",
+      originalFileName: "Product Demo.MP4",
+      byteSize: 1234,
+      now: new Date("2026-06-25T12:00:00.000Z"),
+      expiresInSeconds: 120
+    });
+
+    const uploadUrl = new URL(session.uploadUrl);
+    expect(session.provider).toBe("s3");
+    expect(session.method).toBe("PUT");
+    expect(session.headers).toEqual({ "Content-Type": "video/mp4" });
+    expect(session.expiresAt).toBe("2026-06-25T12:02:00.000Z");
+    expect(session.maxBytes).toBe(1234);
+    expect(session.storageKey).toContain("workspaces/workspace-1/projects/project-1/source_recording/");
+    expect(uploadUrl.pathname).toContain("/base/gideon-private/workspaces/workspace-1/projects/project-1/source_recording/");
+    expect(uploadUrl.searchParams.get("X-Amz-Algorithm")).toBe("AWS4-HMAC-SHA256");
+    expect(uploadUrl.searchParams.get("X-Amz-Credential")).toContain("test-key/20260625/us-east-1/s3/aws4_request");
+    expect(uploadUrl.searchParams.get("X-Amz-Expires")).toBe("120");
+    expect(uploadUrl.searchParams.get("X-Amz-SignedHeaders")).toBe("content-type;host");
+    expect(uploadUrl.searchParams.get("X-Amz-Signature")).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("creates direct upload sessions from configured cloud storage only", () => {
+    expect(() =>
+      createDirectUploadSession(
+        {
+          localRootDir: "/tmp/gideon-cache",
+          env: {}
+        },
+        {
+          workspaceId: "workspace-1",
+          projectId: "project-1",
+          kind: "source_recording",
+          originalFileName: "demo.mp4",
+          byteSize: 100
+        }
+      )
+    ).toThrow("Direct upload sessions require configured S3-compatible cloud storage.");
+
+    const session = createDirectUploadSession(
+      {
+        localRootDir: "/tmp/gideon-cache",
+        env: {
+          GIDEON_STORAGE_PROVIDER: "r2",
+          GIDEON_STORAGE_ENDPOINT: "https://account.r2.cloudflarestorage.com",
+          GIDEON_STORAGE_BUCKET: "gideon-private",
+          GIDEON_STORAGE_REGION: "auto",
+          GIDEON_STORAGE_ACCESS_KEY_ID: "key",
+          GIDEON_STORAGE_SECRET_ACCESS_KEY: "secret"
+        }
+      },
+      {
+        workspaceId: "workspace-1",
+        projectId: "project-1",
+        kind: "source_recording",
+        originalFileName: "demo.mp4",
+        byteSize: 100,
+        now: new Date("2026-06-25T12:00:00.000Z")
+      }
+    );
+    expect(session.provider).toBe("r2");
+    expect(session.uploadUrl).toContain("X-Amz-Signature=");
   });
 
   it("uploads to S3-compatible private storage and keeps a local processing cache", async () => {
