@@ -9,7 +9,7 @@ import {
   renderDraft
 } from "./media";
 import { GideonStore } from "./store";
-import { LocalPrivateObjectStorage } from "./storage";
+import { createPrivateObjectStorage, isCloudStorageConfigured, loadStorageConfig } from "./storage";
 import { LocalWorkerQueue } from "./jobQueue";
 import { startGideonControlServer } from "./controlServer";
 import type { AppState, ContentConcept, DetectedMoment, Project, ProviderRun, RenderedVideo, ScriptDraft } from "../shared/types";
@@ -65,13 +65,17 @@ app.on("window-all-closed", () => {
 });
 
 function registerIpcHandlers(): void {
+  const providerConfig = loadProviderConfig();
+  const storageConfig = loadStorageConfig();
   ipcMain.handle("platform:info", async () => ({
     appVersion: app.getVersion(),
     userDataPath: app.getPath("userData"),
-    openAiConfigured: Boolean(loadProviderConfig().openai.apiKey),
-    openAiLlmModel: loadProviderConfig().openai.apiKey ? loadProviderConfig().openai.llmModel : null,
-    openAiTranscriptionModel: loadProviderConfig().openai.apiKey ? loadProviderConfig().openai.transcriptionModel : null,
-    openAiTtsModel: loadProviderConfig().openai.apiKey ? loadProviderConfig().openai.ttsModel : null,
+    openAiConfigured: Boolean(providerConfig.openai.apiKey),
+    openAiLlmModel: providerConfig.openai.apiKey ? providerConfig.openai.llmModel : null,
+    openAiTranscriptionModel: providerConfig.openai.apiKey ? providerConfig.openai.transcriptionModel : null,
+    openAiTtsModel: providerConfig.openai.apiKey ? providerConfig.openai.ttsModel : null,
+    storageProvider: storageConfig.provider,
+    cloudStorageConfigured: isCloudStorageConfigured(storageConfig),
     ...(await getToolAvailability())
   }));
 
@@ -109,7 +113,7 @@ function registerIpcHandlers(): void {
     await store.assertUsageAvailable(projectId, "source_minutes", sourceMinutes);
     await store.assertUsageAvailable(projectId, "storage_bytes", recording.sizeBytes);
     const project = await store.getProject(projectId);
-    const stored = await new LocalPrivateObjectStorage(store.storageRoot()).putFile({
+    const stored = await createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
       workspaceId: project.workspaceId,
       projectId,
       kind: "source_recording",

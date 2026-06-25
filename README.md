@@ -56,6 +56,22 @@ Supported provider variables:
 
 Provider outputs are treated as untrusted until parsed and validated. If a provider call fails, Gideon records a safe provider-run error and falls back to the local path where possible.
 
+## Optional private cloud storage
+
+By default, Gideon imports recordings into a private local app-data folder. To upload imported recordings to S3-compatible private object storage while keeping a local processing cache, launch with:
+
+```bash
+GIDEON_STORAGE_PROVIDER=r2 \
+GIDEON_STORAGE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com \
+GIDEON_STORAGE_BUCKET=gideon-private \
+GIDEON_STORAGE_REGION=auto \
+GIDEON_STORAGE_ACCESS_KEY_ID=... \
+GIDEON_STORAGE_SECRET_ACCESS_KEY=... \
+pnpm start
+```
+
+Use `GIDEON_STORAGE_PROVIDER=s3` for AWS/S3-compatible storage, or omit it for local private storage. Gideon signs uploads with AWS Signature V4 and stores objects under workspace/project-prefixed keys.
+
 ## Codex/Claude MCP control without Gideon API keys
 
 Gideon also exposes a local MCP server so Codex, Claude Code, or another MCP client can inspect projects, make bounded script/moment edits, and enqueue app jobs using the agent's own model credentials. Gideon does not need provider API keys for this path.

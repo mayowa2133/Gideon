@@ -228,6 +228,10 @@ function RuntimePanel({ info }: { info: PlatformInfo | null }): JSX.Element {
       <StatusDot ok={info.ffprobeAvailable} label="ffprobe" />
       <StatusDot ok={info.sayAvailable} label="macOS voiceover" />
       <StatusDot ok={info.openAiConfigured} label="OpenAI providers" />
+      <StatusDot
+        ok={info.storageProvider === "local_private" || info.cloudStorageConfigured}
+        label={`Storage: ${info.storageProvider.replace(/_/g, " ")}`}
+      />
       {info.openAiConfigured ? (
         <small>
           LLM: {info.openAiLlmModel} · ASR: {info.openAiTranscriptionModel} · TTS: {info.openAiTtsModel}
@@ -235,6 +239,9 @@ function RuntimePanel({ info }: { info: PlatformInfo | null }): JSX.Element {
       ) : (
         <small>Set OPENAI_API_KEY or GIDEON_OPENAI_API_KEY before launching to enable real AI, ASR, and provider TTS.</small>
       )}
+      {info.storageProvider !== "local_private" && !info.cloudStorageConfigured ? (
+        <small>Cloud storage is selected but missing endpoint, bucket, or credentials.</small>
+      ) : null}
       <small>Data folder: {info.userDataPath}</small>
     </div>
   );

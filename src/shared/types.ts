@@ -363,6 +363,8 @@ export interface PlatformInfo {
   openAiLlmModel: string | null;
   openAiTranscriptionModel: string | null;
   openAiTtsModel: string | null;
+  storageProvider: string;
+  cloudStorageConfigured: boolean;
 }
 
 export interface CreateProjectInput {
