@@ -15,6 +15,7 @@ import type {
   ContentConcept,
   CreateProjectInput,
   DetectedMoment,
+  JobRecord,
   ProviderRun,
   ProductProfile,
   Project,
@@ -84,6 +85,7 @@ export class GideonStore {
       scripts: [],
       renders: [],
       providerRuns: [],
+      jobs: [],
       createdAt: now,
       updatedAt: now
     };
@@ -113,6 +115,7 @@ export class GideonStore {
       project.scripts = [];
       project.renders = [];
       project.providerRuns = project.providerRuns ?? [];
+      project.jobs = project.jobs ?? [];
       project.updatedAt = new Date().toISOString();
     });
   }
@@ -219,6 +222,23 @@ export class GideonStore {
     });
   }
 
+  async appendJob(projectId: string, job: JobRecord): Promise<Project> {
+    return this.updateProject(projectId, (project) => {
+      project.jobs = [...(project.jobs ?? []), job];
+      project.updatedAt = new Date().toISOString();
+    });
+  }
+
+  async updateJob(projectId: string, job: JobRecord): Promise<Project> {
+    return this.updateProject(projectId, (project) => {
+      const jobs = project.jobs ?? [];
+      project.jobs = jobs.some((candidate) => candidate.id === job.id)
+        ? jobs.map((candidate) => (candidate.id === job.id ? job : candidate))
+        : [...jobs, job];
+      project.updatedAt = new Date().toISOString();
+    });
+  }
+
   async setActiveProject(projectId: string): Promise<Project> {
     const state = await this.load();
     const project = state.projects.find((candidate) => candidate.id === projectId);
@@ -281,7 +301,8 @@ function normalizeAppState(state: AppState): AppState {
       concepts: project.concepts ?? [],
       scripts: project.scripts ?? [],
       renders: project.renders ?? [],
-      providerRuns: project.providerRuns ?? []
+      providerRuns: project.providerRuns ?? [],
+      jobs: project.jobs ?? []
     }))
   };
 }

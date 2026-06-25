@@ -13,6 +13,7 @@ import type { ContentConcept, DetectedMoment, ScriptDraft } from "../shared/type
 import { runAnalysisPipeline, safeProviderError } from "./analysisPipeline";
 import { loadProviderConfig } from "./providers/config";
 import { OpenAiProvider } from "./providers/openai";
+import { createJob, failJob, startJob, succeedJob } from "../shared/jobState";
 
 const store = new GideonStore();
 let mainWindow: BrowserWindow | null = null;
@@ -105,9 +106,27 @@ function registerIpcHandlers(): void {
     if (!project.recording) {
       throw new Error("Choose a recording before analysis.");
     }
-    return store.runAnalysis(projectId, (analysisProject, moments) =>
-      runAnalysisPipeline(analysisProject, moments, store.projectDir(projectId))
-    );
+    let job = createJob({
+      id: randomUUID(),
+      projectId,
+      kind: "analysis",
+      now: new Date().toISOString(),
+      userMessage: "Waiting to analyze recording."
+    });
+    await store.appendJob(projectId, job);
+    job = startJob(job, new Date().toISOString(), "Analyzing recording evidence.");
+    await store.updateJob(projectId, job);
+    try {
+      await store.runAnalysis(projectId, (analysisProject, moments) =>
+        runAnalysisPipeline(analysisProject, moments, store.projectDir(projectId))
+      );
+      job = succeedJob(job, new Date().toISOString(), "Analysis completed.");
+      return store.updateJob(projectId, job);
+    } catch (error) {
+      job = failJob(job, new Date().toISOString(), safeProviderError(error));
+      await store.updateJob(projectId, job);
+      throw error;
+    }
   });
 
   ipcMain.handle("analysis:update-moments", async (_event, projectId: string, moments: DetectedMoment[]) =>
@@ -136,47 +155,67 @@ function registerIpcHandlers(): void {
     if (scripts.length === 0) {
       throw new Error("Generate scripts before rendering.");
     }
+    let job = createJob({
+      id: randomUUID(),
+      projectId,
+      kind: "render",
+      now: new Date().toISOString(),
+      userMessage: "Waiting to render selected drafts."
+    });
+    await store.appendJob(projectId, job);
+    job = startJob(job, new Date().toISOString(), "Rendering selected drafts.");
+    await store.updateJob(projectId, job);
     const renders = [];
-    for (const script of scripts.slice(0, 3)) {
-      const concept = project.concepts.find((candidate) => candidate.id === script.conceptId);
-      const moment = concept?.proofMomentIds
-        .map((momentId) => project.moments.find((candidate) => candidate.id === momentId))
-        .find(Boolean);
-      const createdAt = new Date().toISOString();
-      const voiceoverPath = await createProviderVoiceover(projectId, script);
-      try {
-        const rendered = await renderDraft({
-          projectId,
-          projectDir: store.projectDir(projectId),
-          profile: project.profile,
-          recording: project.recording,
-          script,
-          moment,
-          title: concept?.title ?? script.hook,
-          voiceoverPath: voiceoverPath ?? undefined
-        });
-        renders.push({
-          id: randomUUID(),
-          scriptId: script.id,
-          title: concept?.title ?? script.hook,
-          status: "completed" as const,
-          outputPath: rendered.outputPath,
-          outputUrl: rendered.outputUrl,
-          validation: rendered.validation,
-          createdAt
-        });
-      } catch (error) {
-        renders.push({
-          id: randomUUID(),
-          scriptId: script.id,
-          title: concept?.title ?? script.hook,
-          status: "failed" as const,
-          error: error instanceof Error ? error.message : "Render failed.",
-          createdAt
-        });
+    try {
+      for (const script of scripts.slice(0, 3)) {
+        const concept = project.concepts.find((candidate) => candidate.id === script.conceptId);
+        const moment = concept?.proofMomentIds
+          .map((momentId) => project.moments.find((candidate) => candidate.id === momentId))
+          .find(Boolean);
+        const createdAt = new Date().toISOString();
+        const voiceoverPath = await createProviderVoiceover(projectId, script);
+        try {
+          const rendered = await renderDraft({
+            projectId,
+            projectDir: store.projectDir(projectId),
+            profile: project.profile,
+            recording: project.recording,
+            script,
+            moment,
+            title: concept?.title ?? script.hook,
+            voiceoverPath: voiceoverPath ?? undefined
+          });
+          renders.push({
+            id: randomUUID(),
+            scriptId: script.id,
+            title: concept?.title ?? script.hook,
+            status: "completed" as const,
+            outputPath: rendered.outputPath,
+            outputUrl: rendered.outputUrl,
+            validation: rendered.validation,
+            createdAt
+          });
+        } catch (error) {
+          renders.push({
+            id: randomUUID(),
+            scriptId: script.id,
+            title: concept?.title ?? script.hook,
+            status: "failed" as const,
+            error: error instanceof Error ? error.message : "Render failed.",
+            createdAt
+          });
+        }
       }
+      await store.replaceRenders(projectId, renders);
+      job = renders.some((render) => render.status === "failed")
+        ? failJob(job, new Date().toISOString(), "One or more render drafts failed.")
+        : succeedJob(job, new Date().toISOString(), "Rendering completed.");
+      return store.updateJob(projectId, job);
+    } catch (error) {
+      job = failJob(job, new Date().toISOString(), safeProviderError(error));
+      await store.updateJob(projectId, job);
+      throw error;
     }
-    return store.replaceRenders(projectId, renders);
   });
 
   ipcMain.handle("export:video", async (_event, projectId: string, renderId: string) => {

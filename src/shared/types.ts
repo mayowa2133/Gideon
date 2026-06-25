@@ -15,6 +15,32 @@ export type ProjectStatus =
   | "ready"
   | "failed";
 
+export type JobKind = "analysis" | "transcription" | "semantic_analysis" | "tts" | "render" | "export";
+
+export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceling" | "canceled";
+
+export interface JobRecord {
+  id: string;
+  projectId: string;
+  kind: JobKind;
+  status: JobStatus;
+  attempt: number;
+  maxAttempts: number;
+  progress: {
+    current: number;
+    total: number;
+    unit: string;
+  };
+  userMessage: string;
+  cancelable: boolean;
+  retryable: boolean;
+  safeError?: string;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
 export type TonePreset =
   | "direct"
   | "founder"
@@ -163,6 +189,7 @@ export interface Project {
   scripts: ScriptDraft[];
   renders: RenderedVideo[];
   providerRuns: ProviderRun[];
+  jobs: JobRecord[];
   createdAt: string;
   updatedAt: string;
 }

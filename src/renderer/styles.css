@@ -356,6 +356,61 @@ video {
   background: rgba(245, 209, 95, 0.95);
 }
 
+.job-history {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.045);
+  padding: 1rem;
+}
+
+.job-history h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.job-list {
+  display: flex;
+  gap: 0.65rem;
+  overflow-x: auto;
+  padding-bottom: 0.1rem;
+}
+
+.job-pill {
+  min-width: 210px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 0.75rem;
+}
+
+.job-pill strong,
+.job-pill span,
+.job-pill small {
+  display: block;
+}
+
+.job-pill span {
+  color: #f5d15f;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.job-pill small {
+  color: #9ba8c2;
+}
+
+.job-pill.succeeded {
+  border: 1px solid rgba(99, 230, 165, 0.55);
+}
+
+.job-pill.failed {
+  border: 1px solid rgba(255, 179, 179, 0.65);
+}
+
 .grid.two {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

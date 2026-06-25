@@ -274,6 +274,7 @@ function ProjectWorkspace({
       </header>
 
       <Stepper project={project} />
+      <JobHistory project={project} />
 
       <section className="grid two">
         <Panel title="1. Product context" eyebrow="Grounding">
@@ -404,6 +405,31 @@ function ProjectWorkspace({
         />
       </Panel>
     </div>
+  );
+}
+
+function JobHistory({ project }: { project: Project }): JSX.Element | null {
+  if (project.jobs.length === 0) {
+    return null;
+  }
+  return (
+    <section className="job-history" aria-label="Job history">
+      <div>
+        <p className="eyebrow">Jobs</p>
+        <h2>Recent processing</h2>
+      </div>
+      <div className="job-list">
+        {project.jobs.slice(-5).map((job) => (
+          <article key={job.id} className={`job-pill ${job.status}`}>
+            <strong>{job.kind.replace(/_/g, " ")}</strong>
+            <span>{job.status}</span>
+            <small>
+              attempt {job.attempt}/{job.maxAttempts} · {job.userMessage}
+            </small>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
