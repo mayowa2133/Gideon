@@ -51,6 +51,8 @@ export type BillingStatus = "not_configured" | "trialing" | "active" | "past_due
 
 export type BillingProvider = "manual" | "stripe";
 
+export type IdentityProvider = "local" | "email" | "google" | "github" | "oidc";
+
 export type AuditActorType = "local_user" | "mcp_agent" | "system";
 
 export type AuditAction =
@@ -59,6 +61,7 @@ export type AuditAction =
   | "workspace.member.add"
   | "workspace.member.update_role"
   | "workspace.member.remove"
+  | "auth.user.sync"
   | "project.create"
   | "project.update_profile"
   | "project.delete"
@@ -134,6 +137,9 @@ export interface UserAccount {
   id: string;
   email: string;
   displayName: string;
+  authSubject?: string;
+  identityProvider?: IdentityProvider;
+  lastSignedInAt?: string;
   createdAt: string;
 }
 
@@ -518,6 +524,15 @@ export interface ApplyBillingSubscriptionInput {
   currentPeriodEnd?: string;
   cancelAtPeriodEnd?: boolean;
   appliedAt?: string;
+}
+
+export interface SyncAuthenticatedUserInput {
+  authSubject: string;
+  email: string;
+  displayName?: string;
+  identityProvider?: IdentityProvider;
+  defaultWorkspaceName?: string;
+  now?: string;
 }
 
 export interface CreateRecordingUploadSessionInput {

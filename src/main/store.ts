@@ -35,6 +35,7 @@ import type {
   RemoveWorkspaceMemberInput,
   RenderedVideo,
   ScriptDraft,
+  SyncAuthenticatedUserInput,
   TranscriptArtifact,
   UpdateWorkspaceBillingPlanInput,
   UpdateWorkspaceMemberRoleInput,
@@ -137,6 +138,91 @@ export class GideonStore {
     }
     this.assertProjectAccessInState(state, project, "project:read");
     return project;
+  }
+
+  async syncAuthenticatedUser(input: SyncAuthenticatedUserInput): Promise<AppState> {
+    const state = await this.load();
+    const now = input.now ?? new Date().toISOString();
+    const authSubject = normalizeAuthSubject(input.authSubject);
+    const email = normalizeEmail(input.email);
+    const identityProvider = input.identityProvider ?? "oidc";
+    let user = state.users.find((candidate) => candidate.authSubject === authSubject);
+    if (!user) {
+      user = state.users.find((candidate) => !candidate.authSubject && candidate.email.toLowerCase() === email);
+    }
+    const displayName = normalizeDisplayName(input.displayName ?? user?.displayName, email);
+    if (user) {
+      user.email = email;
+      user.displayName = displayName;
+      user.authSubject = authSubject;
+      user.identityProvider = identityProvider;
+      user.lastSignedInAt = now;
+    } else {
+      user = {
+        id: randomUUID(),
+        email,
+        displayName,
+        authSubject,
+        identityProvider,
+        lastSignedInAt: now,
+        createdAt: now
+      };
+      state.users = [...state.users, user];
+    }
+
+    let membership = state.workspaceMembers.find((candidate) => candidate.userId === user.id);
+    if (!membership || !state.workspaces.some((workspace) => workspace.id === membership?.workspaceId)) {
+      state.activeUserId = user.id;
+      const workspaceName = normalizeWorkspaceName(input.defaultWorkspaceName ?? `${user.displayName}'s workspace`);
+      const workspace: Workspace = {
+        id: randomUUID(),
+        name: workspaceName,
+        slug: uniqueWorkspaceSlug(state.workspaces, workspaceName),
+        plan: "local_mvp",
+        billingStatus: "not_configured",
+        billingProvider: "manual",
+        entitlements: entitlementsForPlan("local_mvp"),
+        createdAt: now,
+        updatedAt: now
+      };
+      membership = {
+        id: randomUUID(),
+        workspaceId: workspace.id,
+        userId: user.id,
+        role: "owner",
+        createdAt: now,
+        updatedAt: now
+      };
+      state.workspaces = [...state.workspaces, workspace];
+      state.workspaceMembers = [...state.workspaceMembers, membership];
+      state.activeWorkspaceId = workspace.id;
+      state.activeProjectId = null;
+      this.appendAuditToState(state, {
+        workspaceId: workspace.id,
+        actorType: "system",
+        action: "workspace.create",
+        targetType: "workspace",
+        targetId: workspace.id,
+        summary: `Created default workspace for ${user.email}.`,
+        metadata: { workspaceName: workspace.name, identityProvider }
+      });
+    }
+
+    state.activeUserId = user.id;
+    state.activeWorkspaceId = membership.workspaceId;
+    state.activeProjectId = state.projects.find((project) => project.workspaceId === membership.workspaceId)?.id ?? null;
+    this.appendAuditToState(state, {
+      workspaceId: membership.workspaceId,
+      actorType: "system",
+      action: "auth.user.sync",
+      targetType: "user",
+      targetId: user.id,
+      summary: `Synced authenticated user ${user.email}.`,
+      metadata: { identityProvider, authSubject },
+      createdAt: now
+    });
+    await this.save();
+    return state;
   }
 
   async createWorkspace(input: CreateWorkspaceInput): Promise<AppState> {
@@ -1239,6 +1325,14 @@ function requireWorkspaceMember(state: AppState, workspaceId: string, userId: st
   return member;
 }
 
+function normalizeAuthSubject(authSubject: string): string {
+  const normalized = authSubject.trim();
+  if (normalized.length < 3 || normalized.length > 256) {
+    throw new Error("Auth subject must be 3–256 characters.");
+  }
+  return normalized;
+}
+
 function upsertUserByEmail(
   users: UserAccount[],
   email: string,
@@ -1262,7 +1356,7 @@ function upsertUserByEmail(
 function normalizeEmail(email: string): string {
   const normalized = email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-    throw new Error("Enter a valid member email address.");
+    throw new Error("Enter a valid email address.");
   }
   return normalized;
 }

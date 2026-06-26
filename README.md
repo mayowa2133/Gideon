@@ -37,6 +37,10 @@ The `Build macOS app` workflow builds the app on macOS and uploads the DMG/ZIP a
 - FFmpeg and ffprobe available on `PATH`, or at `/opt/homebrew/bin/ffmpeg` and `/opt/homebrew/bin/ffprobe`
 - `/usr/bin/say` for local voiceover generation; if unavailable, Gideon renders with silent audio
 
+## Hosted auth foundation
+
+Gideon includes hosted-auth primitives for the future web/API service while keeping the current local desktop flow intact. `GIDEON_SESSION_SECRET` enables HMAC-signed session tokens with HttpOnly `SameSite=Lax` cookies, expiry checks, and CSRF validation. `GIDEON_SESSION_COOKIE_NAME`, `GIDEON_SESSION_DURATION_SECONDS`, and `GIDEON_SECURE_COOKIES=false` customize local/dev behavior. Auth provider callbacks should sync the provider subject through the store, which creates or updates the user, creates a default owner workspace when needed, switches the active workspace, and records an `auth.user.sync` audit event.
+
 ## Optional AI provider configuration
 
 Gideon runs without paid provider credentials using deterministic local fallbacks. To enable provider-backed semantic analysis, transcription, and TTS, launch the app with:

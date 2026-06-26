@@ -130,6 +130,9 @@ export function createLocalUserWorkspace(now = DEFAULT_LOCAL_CREATED_AT) {
         id: DEFAULT_LOCAL_USER_ID,
         email: "local@gideon.app",
         displayName: "Local user",
+        authSubject: "local:local-user",
+        identityProvider: "local" as const,
+        lastSignedInAt: now,
         createdAt: now
       }
     ],
