@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createSignedSession } from "./auth";
-import { handleHostedApiRequest, type HostedApiStore } from "./hostedApi";
+import { handleHostedApiRequest, type HostedApiStore, type HostedRecordingUploadService } from "./hostedApi";
 import { requestJobCancel as requestJobCancelState, retryJob as retryJobState } from "../shared/jobState";
 import type {
   AppState,
@@ -10,6 +10,7 @@ import type {
   JobRecord,
   ProductProfile,
   Project,
+  RecordingUploadSessionRecord,
   SyncAuthenticatedUserInput
 } from "../shared/types";
 import { createLocalUserWorkspace } from "../shared/usage";
@@ -356,6 +357,107 @@ describe("hosted API foundation", () => {
     expect(api.store.state.projects[0]?.profile.productName).toBe("Gideon Cloud");
   });
 
+  it("creates direct recording upload sessions through authenticated CSRF-protected hosted API requests", async () => {
+    const uploadService: HostedRecordingUploadService = {
+      async createRecordingUploadSession(input) {
+        expect(input).toMatchObject({
+          workspaceId: "local-workspace",
+          projectId: "project-1",
+          fileName: "walkthrough.mov",
+          byteSize: 1024,
+          contentType: "video/quicktime"
+        });
+        return {
+          id: "upload-1",
+          provider: "r2",
+          storageKey: "workspaces/local-workspace/projects/project-1/source_recording/upload-1-walkthrough.mov",
+          uploadUrl: "https://uploads.example.test/upload-1",
+          method: "PUT",
+          headers: {
+            "Content-Type": "video/quicktime"
+          },
+          expiresAt: "2026-06-25T12:15:00.000Z",
+          maxBytes: 1024,
+          contentType: "video/quicktime",
+          originalFileName: "walkthrough.mov"
+        };
+      }
+    };
+    const api = testApi({ uploadService });
+    api.store.state.projects = [projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Visible project" })];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const rejected = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/recordings/uploads",
+        headers: { cookie: `gideon_session=${created.token}` },
+        body: {
+          filename: "walkthrough.mov",
+          mediaType: "video/quicktime",
+          sizeBytes: 1024
+        },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+    expect(rejected.status).toBe(403);
+    expect(rejected.body).toMatchObject({ error: { code: "csrf_failed" } });
+
+    const accepted = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/recordings/uploads",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1",
+          "x-request-id": "req_recording_upload"
+        },
+        body: {
+          filename: "walkthrough.mov",
+          mediaType: "video/quicktime",
+          sizeBytes: 1024
+        },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(accepted.status).toBe(201);
+    expect(accepted.headers.Location).toBe("/api/v1/projects/project-1/recordings/upload-1");
+    expect(accepted.body).toMatchObject({
+      data: {
+        recordingId: "upload-1",
+        upload: {
+          uploadId: "upload-1",
+          provider: "r2",
+          uploadUrl: "https://uploads.example.test/upload-1",
+          method: "PUT",
+          expiresAt: "2026-06-25T12:15:00.000Z",
+          maxBytes: 1024,
+          contentType: "video/quicktime",
+          originalFileName: "walkthrough.mov"
+        }
+      },
+      meta: { requestId: "req_recording_upload" }
+    });
+    expect((accepted.body as { data: { upload: { storageKey?: string } } }).data.upload.storageKey).toBeUndefined();
+    expect(api.store.state.projects[0]?.uploadSessions).toHaveLength(1);
+    expect(api.store.state.projects[0]?.uploadSessions[0]).toMatchObject({
+      id: "upload-1",
+      artifactId: "upload-1",
+      status: "pending",
+      storageKey: "workspaces/local-workspace/projects/project-1/source_recording/upload-1-walkthrough.mov"
+    });
+  });
+
   it("returns job details without leaking jobs from another workspace", async () => {
     const api = testApi();
     api.store.state.projects = [
@@ -549,7 +651,7 @@ describe("hosted API foundation", () => {
   });
 });
 
-function testApi() {
+function testApi(input: { uploadService?: HostedRecordingUploadService } = {}) {
   const store = new InMemoryHostedApiStore();
   return {
     store,
@@ -568,7 +670,8 @@ function testApi() {
         }
       },
       internalAuthCallbackSecret: "internal-secret"
-    }
+    },
+    uploadService: input.uploadService
   };
 }
 
@@ -710,6 +813,31 @@ class InMemoryHostedApiStore implements HostedApiStore {
     const nextJob = retryJobState(job, "2026-06-25T12:02:00.000Z");
     project.jobs = project.jobs.map((candidate) => (candidate.id === input.jobId ? nextJob : candidate));
     return { project, job: nextJob };
+  }
+
+  async createRecordingUploadSessionRecordForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    session: Omit<RecordingUploadSessionRecord, "createdAt" | "updatedAt">;
+  }): Promise<Project> {
+    this.assertMember(input);
+    const project = this.state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    project.uploadSessions = [
+      ...project.uploadSessions.filter((candidate) => candidate.id !== input.session.id),
+      {
+        ...input.session,
+        createdAt: "2026-06-25T12:01:00.000Z",
+        updatedAt: "2026-06-25T12:01:00.000Z"
+      }
+    ];
+    project.updatedAt = "2026-06-25T12:01:00.000Z";
+    return project;
   }
 
   private assertMember(input: { userId: string; workspaceId: string }): void {

@@ -13,7 +13,7 @@ vi.mock("electron", () => ({
 }));
 
 import { GideonStore } from "./store";
-import type { ProductProfile } from "../shared/types";
+import type { ProductProfile, RecordingUploadSessionRecord } from "../shared/types";
 import { DEFAULT_LOCAL_USER_ID, DEFAULT_LOCAL_WORKSPACE_ID } from "../shared/usage";
 
 describe("GideonStore billing reconciliation", () => {
@@ -223,6 +223,41 @@ describe("GideonStore billing reconciliation", () => {
       state.auditEvents.some((event) => event.action === "job.retry" && event.actorUserId === DEFAULT_LOCAL_USER_ID)
     ).toBe(true);
   });
+
+  it("creates recording upload sessions with explicit hosted session scope", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Hosted project",
+      profile: profileFixture()
+    });
+
+    const updated = await store.createRecordingUploadSessionRecordForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      session: uploadSessionFixture({
+        workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+        projectId: project.id
+      })
+    });
+
+    expect(updated.uploadSessions).toHaveLength(1);
+    expect(updated.uploadSessions[0]).toMatchObject({
+      id: "upload-1",
+      provider: "r2",
+      status: "pending",
+      originalFileName: "walkthrough.mov"
+    });
+    const state = await store.load();
+    expect(
+      state.auditEvents.some(
+        (event) => event.action === "recording.upload_session.create" && event.actorUserId === DEFAULT_LOCAL_USER_ID
+      )
+    ).toBe(true);
+  });
 });
 
 function profileFixture(overrides: Partial<ProductProfile> = {}): ProductProfile {
@@ -234,6 +269,26 @@ function profileFixture(overrides: Partial<ProductProfile> = {}): ProductProfile
     toneGuidance: "specific and direct",
     platforms: ["tiktok", "youtube_shorts"],
     walkthroughNotes: "Focus on the upload-to-export workflow.",
+    ...overrides
+  };
+}
+
+function uploadSessionFixture(
+  overrides: Partial<Omit<RecordingUploadSessionRecord, "createdAt" | "updatedAt">> = {}
+): Omit<RecordingUploadSessionRecord, "createdAt" | "updatedAt"> {
+  return {
+    id: "upload-1",
+    workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+    projectId: "project-1",
+    artifactId: "upload-1",
+    provider: "r2",
+    storageKey: "workspaces/local-workspace/projects/project-1/source_recording/upload-1-walkthrough.mov",
+    status: "pending",
+    method: "PUT",
+    contentType: "video/quicktime",
+    byteSize: 1024,
+    originalFileName: "walkthrough.mov",
+    expiresAt: "2026-06-25T12:15:00.000Z",
     ...overrides
   };
 }

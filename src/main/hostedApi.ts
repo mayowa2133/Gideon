@@ -18,11 +18,13 @@ import {
 import type {
   AppState,
   ApplyBillingSubscriptionInput,
+  ArtifactProvider,
   CreateProjectInput,
   IdentityProvider,
   JobRecord,
   ProductProfile,
   Project,
+  RecordingUploadSessionRecord,
   SyncAuthenticatedUserInput
 } from "../shared/types";
 
@@ -73,11 +75,41 @@ export interface HostedApiStore {
     workspaceId: string;
     jobId: string;
   }): Promise<{ project: Project; job: JobRecord }>;
+  createRecordingUploadSessionRecordForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    session: Omit<RecordingUploadSessionRecord, "createdAt" | "updatedAt">;
+  }): Promise<Project>;
+}
+
+export interface HostedRecordingUploadSession {
+  id: string;
+  provider: Extract<ArtifactProvider, "s3" | "r2">;
+  storageKey: string;
+  uploadUrl: string;
+  method: "PUT";
+  headers: Record<string, string>;
+  expiresAt: string;
+  maxBytes: number;
+  contentType: string;
+  originalFileName: string;
+}
+
+export interface HostedRecordingUploadService {
+  createRecordingUploadSession(input: {
+    workspaceId: string;
+    projectId: string;
+    fileName: string;
+    byteSize: number;
+    contentType?: string;
+  }): Promise<HostedRecordingUploadSession>;
 }
 
 export interface HostedApiDependencies {
   store: HostedApiStore;
   config: HostedApiConfig;
+  uploadService?: HostedRecordingUploadService;
 }
 
 class ApiError extends Error {
@@ -133,6 +165,15 @@ export async function handleHostedApiRequest(
     const projectProfileRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/profile$/);
     if (method === "PATCH" && projectProfileRoute) {
       return await handleUpdateProjectProfile(request, dependencies, requestId, decodeURIComponent(projectProfileRoute[1] ?? ""));
+    }
+    const recordingUploadRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/recordings\/uploads$/);
+    if (method === "POST" && recordingUploadRoute) {
+      return await handleCreateRecordingUploadSession(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(recordingUploadRoute[1] ?? "")
+      );
     }
     const jobRoute = path.match(/^\/api\/v1\/jobs\/([^/]+)$/);
     if (method === "GET" && jobRoute) {
@@ -436,6 +477,75 @@ async function handleRetryJob(
   return jsonResponse(202, { job: jobResource(project, job) }, requestId);
 }
 
+async function handleCreateRecordingUploadSession(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string
+): Promise<HostedApiResponse> {
+  if (!dependencies.uploadService) {
+    throw new ApiError(503, "direct_upload_not_configured", "Hosted direct uploads are not configured.");
+  }
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  const input = hostedRecordingUploadInput(objectBody(request));
+  await storeCall(() =>
+    dependencies.store.getProjectForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId
+    })
+  );
+  let upload: HostedRecordingUploadSession;
+  try {
+    upload = await dependencies.uploadService.createRecordingUploadSession({
+      workspaceId: claims.workspaceId,
+      projectId,
+      fileName: input.fileName,
+      byteSize: input.byteSize,
+      contentType: input.contentType
+    });
+  } catch (error) {
+    throw uploadServiceError(error);
+  }
+  await storeCall(() =>
+    dependencies.store.createRecordingUploadSessionRecordForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId,
+      session: {
+        id: upload.id,
+        workspaceId: claims.workspaceId,
+        projectId,
+        artifactId: upload.id,
+        provider: upload.provider,
+        storageKey: upload.storageKey,
+        status: "pending",
+        method: upload.method,
+        contentType: upload.contentType,
+        byteSize: input.byteSize,
+        originalFileName: upload.originalFileName,
+        expiresAt: upload.expiresAt
+      }
+    })
+  );
+  return jsonResponse(
+    201,
+    {
+      recordingId: upload.id,
+      upload: recordingUploadResource(upload)
+    },
+    requestId,
+    {
+      Location: `/api/v1/projects/${projectId}/recordings/${upload.id}`
+    }
+  );
+}
+
 function requiredSession(request: HostedApiRequest, dependencies: HostedApiDependencies): SessionClaims {
   const token = readSessionTokenFromCookieHeader(header(request, "cookie"), dependencies.config.auth.sessionCookieName);
   if (!token || !dependencies.config.auth.sessionSecret) {
@@ -534,6 +644,20 @@ function jobResource(project: Project, job: JobRecord) {
     ...job,
     workspaceId: project.workspaceId,
     projectId: project.id
+  };
+}
+
+function recordingUploadResource(upload: HostedRecordingUploadSession) {
+  return {
+    uploadId: upload.id,
+    provider: upload.provider,
+    uploadUrl: upload.uploadUrl,
+    method: upload.method,
+    headers: upload.headers,
+    expiresAt: upload.expiresAt,
+    maxBytes: upload.maxBytes,
+    contentType: upload.contentType,
+    originalFileName: upload.originalFileName
   };
 }
 
@@ -661,6 +785,17 @@ function hostedProfileInput(body: Record<string, unknown>): ProductProfile {
   return profile as ProductProfile;
 }
 
+function hostedRecordingUploadInput(body: Record<string, unknown>): {
+  fileName: string;
+  byteSize: number;
+  contentType?: string;
+} {
+  const fileName = normalizeUploadFileName(requiredString(body.filename ?? body.fileName, "filename"));
+  const byteSize = normalizeUploadByteSize(body.sizeBytes ?? body.byteSize);
+  const contentType = normalizeUploadContentType(body.mediaType ?? body.contentType);
+  return { fileName, byteSize, contentType };
+}
+
 async function storeCall<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
@@ -689,6 +824,14 @@ function apiErrorFromStoreError(error: unknown): ApiError {
   return new ApiError(500, "internal_error", "Unexpected API error.");
 }
 
+function uploadServiceError(error: unknown): ApiError {
+  const message = error instanceof Error ? error.message : "Upload service operation failed.";
+  if (/not configured|requires configured|missing/i.test(message)) {
+    return new ApiError(503, "direct_upload_not_configured", message);
+  }
+  return new ApiError(500, "internal_error", "Unexpected upload service error.");
+}
+
 function clearSessionCookie(cookieName: string, secure: boolean): string {
   const parts = [
     `${cookieName}=`,
@@ -713,6 +856,36 @@ function safeEqual(left: string, right: string): boolean {
 function positiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function normalizeUploadFileName(fileName: string): string {
+  const normalized = fileName.trim().replace(/[\u0000-\u001f\u007f]/g, "");
+  if (normalized.length < 1 || normalized.length > 255) {
+    throw new ApiError(422, "validation_failed", "filename must be 1–255 characters.");
+  }
+  if (!/\.(mp4|mov|webm)$/i.test(normalized)) {
+    throw new ApiError(415, "unsupported_media_type", "Recording uploads must be MP4, MOV, or WebM files.");
+  }
+  return normalized;
+}
+
+function normalizeUploadByteSize(value: unknown): number {
+  const byteSize = typeof value === "number" ? value : Number(value);
+  if (!Number.isSafeInteger(byteSize) || byteSize <= 0) {
+    throw new ApiError(422, "validation_failed", "sizeBytes must be a positive integer.");
+  }
+  return byteSize;
+}
+
+function normalizeUploadContentType(value: unknown): string | undefined {
+  const normalized = optionalString(value);
+  if (!normalized) {
+    return undefined;
+  }
+  if (["video/mp4", "video/quicktime", "video/webm", "application/octet-stream"].includes(normalized.toLowerCase())) {
+    return normalized.toLowerCase();
+  }
+  throw new ApiError(415, "unsupported_media_type", "mediaType must be video/mp4, video/quicktime, or video/webm.");
 }
 
 async function readRawBody(request: IncomingMessage): Promise<Buffer> {

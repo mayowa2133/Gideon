@@ -706,6 +706,61 @@ export class GideonStore {
     );
   }
 
+  async createRecordingUploadSessionRecordForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    session: Omit<RecordingUploadSessionRecord, "createdAt" | "updatedAt">;
+  }): Promise<Project> {
+    const state = await this.load();
+    const workspace = requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "project:update"
+    });
+    const project = state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    assertWithinEntitlement({
+      entitlements: workspace.entitlements,
+      summary: summarizeUsage(state.usageEvents, workspace.id),
+      metric: "storage_bytes",
+      additionalQuantity: input.session.byteSize
+    });
+    const now = new Date().toISOString();
+    project.uploadSessions = [
+      ...(project.uploadSessions ?? []).filter((candidate) => candidate.id !== input.session.id),
+      {
+        ...input.session,
+        createdAt: now,
+        updatedAt: now
+      }
+    ];
+    project.updatedAt = now;
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "recording.upload_session.create",
+      targetType: "recording",
+      targetId: input.session.artifactId,
+      summary: `Created direct upload session for ${input.session.originalFileName}.`,
+      metadata: {
+        provider: input.session.provider,
+        contentType: input.session.contentType,
+        byteSize: input.session.byteSize,
+        expiresAt: input.session.expiresAt
+      }
+    });
+    await this.save();
+    return project;
+  }
+
   async getRecordingUploadSession(projectId: string, sessionId: string): Promise<RecordingUploadSessionRecord> {
     const project = await this.getProject(projectId);
     const session = (project.uploadSessions ?? []).find((candidate) => candidate.id === sessionId);

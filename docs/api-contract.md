@@ -290,7 +290,7 @@ Create a new immutable profile version and set active pointer.
 
 ### POST `/projects/{projectId}/recordings/uploads`
 
-Create direct multipart upload session.
+Create direct upload session. The current hosted foundation returns a bounded single-`PUT` S3-compatible upload session; a later production multipart implementation may swap the upload object shape without changing the project-scoped route.
 
 - **Auth:** `member+`.
 - **Headers:** CSRF, `Idempotency-Key`.
@@ -316,17 +316,21 @@ Create direct multipart upload session.
     "recordingId": "uuid",
     "upload": {
       "uploadId": "opaque API upload session ID",
-      "partSizeBytes": 16777216,
-      "partCount": 44,
+      "provider": "r2",
+      "uploadUrl": "https://...",
+      "method": "PUT",
+      "headers": { "Content-Type": "video/quicktime" },
       "expiresAt": "...",
-      "partUrlEndpoint": "/api/v1/projects/.../recordings/.../upload-parts"
+      "maxBytes": 734003200,
+      "contentType": "video/quicktime",
+      "originalFileName": "walkthrough.mov"
     }
   },
   "meta": { "requestId": "req_..." }
 }
 ```
 
-The API may return a bounded initial set of signed part URLs; for large files, client requests batches to avoid oversized responses.
+The API response must not expose private object storage keys. If multipart support is enabled later, the API may return a bounded initial set of signed part URLs; for large files, client requests batches to avoid oversized responses.
 
 - **Errors:** 409 active recording/downstream impact unless replace acknowledged, 413, 415, 422, 429 quota/concurrency.
 - **Rate limit:** 10/hour/workspace.
