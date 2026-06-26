@@ -18,12 +18,14 @@ import {
 import type {
   AppState,
   ApplyBillingSubscriptionInput,
+  ArtifactRecord,
   ArtifactProvider,
   CreateProjectInput,
   IdentityProvider,
   JobRecord,
   ProductProfile,
   Project,
+  RecordingMetadata,
   RecordingUploadSessionRecord,
   SyncAuthenticatedUserInput
 } from "../shared/types";
@@ -81,6 +83,20 @@ export interface HostedApiStore {
     projectId: string;
     session: Omit<RecordingUploadSessionRecord, "createdAt" | "updatedAt">;
   }): Promise<Project>;
+  getRecordingUploadSessionForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    sessionId: string;
+  }): Promise<RecordingUploadSessionRecord>;
+  completeRecordingUploadForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    sessionId: string;
+    artifact: ArtifactRecord;
+    recording: RecordingMetadata;
+  }): Promise<Project>;
 }
 
 export interface HostedRecordingUploadSession {
@@ -104,6 +120,10 @@ export interface HostedRecordingUploadService {
     byteSize: number;
     contentType?: string;
   }): Promise<HostedRecordingUploadSession>;
+  completeRecordingUploadSession(input: {
+    session: RecordingUploadSessionRecord;
+    checksumSha256?: string;
+  }): Promise<{ artifact: ArtifactRecord; recording: RecordingMetadata }>;
 }
 
 export interface HostedApiDependencies {
@@ -173,6 +193,16 @@ export async function handleHostedApiRequest(
         dependencies,
         requestId,
         decodeURIComponent(recordingUploadRoute[1] ?? "")
+      );
+    }
+    const recordingCompleteRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/recordings\/([^/]+)\/complete$/);
+    if (method === "POST" && recordingCompleteRoute) {
+      return await handleCompleteRecordingUpload(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(recordingCompleteRoute[1] ?? ""),
+        decodeURIComponent(recordingCompleteRoute[2] ?? "")
       );
     }
     const jobRoute = path.match(/^\/api\/v1\/jobs\/([^/]+)$/);
@@ -546,6 +576,63 @@ async function handleCreateRecordingUploadSession(
   );
 }
 
+async function handleCompleteRecordingUpload(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string,
+  sessionId: string
+): Promise<HostedApiResponse> {
+  if (!dependencies.uploadService) {
+    throw new ApiError(503, "direct_upload_not_configured", "Hosted direct uploads are not configured.");
+  }
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  const input = hostedRecordingUploadCompletionInput(objectBody(request));
+  const session = await storeCall(() =>
+    dependencies.store.getRecordingUploadSessionForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId,
+      sessionId
+    })
+  );
+  let completed: { artifact: ArtifactRecord; recording: RecordingMetadata };
+  try {
+    completed = await dependencies.uploadService.completeRecordingUploadSession({
+      session,
+      checksumSha256: input.checksumSha256
+    });
+  } catch (error) {
+    throw uploadServiceError(error);
+  }
+  const project = await storeCall(() =>
+    dependencies.store.completeRecordingUploadForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId,
+      sessionId,
+      artifact: completed.artifact,
+      recording: completed.recording
+    })
+  );
+  if (!project.recording) {
+    throw new ApiError(500, "internal_error", "Recording completion did not attach recording metadata.");
+  }
+  return jsonResponse(
+    200,
+    {
+      project: projectResource(project),
+      recording: recordingResource(project.recording)
+    },
+    requestId
+  );
+}
+
 function requiredSession(request: HostedApiRequest, dependencies: HostedApiDependencies): SessionClaims {
   const token = readSessionTokenFromCookieHeader(header(request, "cookie"), dependencies.config.auth.sessionCookieName);
   if (!token || !dependencies.config.auth.sessionSecret) {
@@ -658,6 +745,23 @@ function recordingUploadResource(upload: HostedRecordingUploadSession) {
     maxBytes: upload.maxBytes,
     contentType: upload.contentType,
     originalFileName: upload.originalFileName
+  };
+}
+
+function recordingResource(recording: RecordingMetadata) {
+  return {
+    artifactId: recording.artifactId,
+    fileName: recording.fileName,
+    sizeBytes: recording.sizeBytes,
+    durationMs: recording.durationMs,
+    width: recording.width,
+    height: recording.height,
+    fps: recording.fps,
+    videoCodec: recording.videoCodec,
+    audioCodec: recording.audioCodec,
+    hasAudio: recording.hasAudio,
+    sha256: recording.sha256,
+    validatedAt: recording.validatedAt
   };
 }
 
@@ -796,6 +900,11 @@ function hostedRecordingUploadInput(body: Record<string, unknown>): {
   return { fileName, byteSize, contentType };
 }
 
+function hostedRecordingUploadCompletionInput(body: Record<string, unknown>): { checksumSha256?: string } {
+  const checksumSha256 = optionalChecksumSha256(body.checksumSha256);
+  return checksumSha256 ? { checksumSha256 } : {};
+}
+
 async function storeCall<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
@@ -818,7 +927,7 @@ function apiErrorFromStoreError(error: unknown): ApiError {
   if (/cannot|not retryable|no attempts remaining|already/i.test(message)) {
     return new ApiError(409, "state_conflict", message);
   }
-  if (/must be|required|invalid|enter a valid/i.test(message)) {
+  if (/must be|required|invalid|enter a valid|mismatch|does not match/i.test(message)) {
     return new ApiError(422, "validation_failed", message);
   }
   return new ApiError(500, "internal_error", "Unexpected API error.");
@@ -828,6 +937,12 @@ function uploadServiceError(error: unknown): ApiError {
   const message = error instanceof Error ? error.message : "Upload service operation failed.";
   if (/not configured|requires configured|missing/i.test(message)) {
     return new ApiError(503, "direct_upload_not_configured", message);
+  }
+  if (/mismatch|checksum|does not match|invalid/i.test(message)) {
+    return new ApiError(422, "validation_failed", message);
+  }
+  if (/failed|unavailable|timeout|storage/i.test(message)) {
+    return new ApiError(503, "storage_unavailable", message);
   }
   return new ApiError(500, "internal_error", "Unexpected upload service error.");
 }
@@ -886,6 +1001,17 @@ function normalizeUploadContentType(value: unknown): string | undefined {
     return normalized.toLowerCase();
   }
   throw new ApiError(415, "unsupported_media_type", "mediaType must be video/mp4, video/quicktime, or video/webm.");
+}
+
+function optionalChecksumSha256(value: unknown): string | undefined {
+  const normalized = optionalString(value);
+  if (!normalized) {
+    return undefined;
+  }
+  if (!/^[a-fA-F0-9]{64}$/.test(normalized)) {
+    throw new ApiError(422, "validation_failed", "checksumSha256 must be a 64-character hex string.");
+  }
+  return normalized.toLowerCase();
 }
 
 async function readRawBody(request: IncomingMessage): Promise<Buffer> {

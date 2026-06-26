@@ -770,6 +770,33 @@ export class GideonStore {
     return session;
   }
 
+  async getRecordingUploadSessionForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    sessionId: string;
+  }): Promise<RecordingUploadSessionRecord> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "project:read"
+    });
+    const project = state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const session = (project.uploadSessions ?? []).find((candidate) => candidate.id === input.sessionId);
+    if (!session) {
+      throw new Error("Recording upload session not found.");
+    }
+    return session;
+  }
+
   async completeRecordingUploadSessionRecord(
     projectId: string,
     sessionId: string,
@@ -807,6 +834,142 @@ export class GideonStore {
         }
       }
     );
+  }
+
+  async completeRecordingUploadForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    sessionId: string;
+    artifact: ArtifactRecord;
+    recording: RecordingMetadata;
+  }): Promise<Project> {
+    const state = await this.load();
+    const workspace = requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "project:update"
+    });
+    const project = state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const session = (project.uploadSessions ?? []).find((candidate) => candidate.id === input.sessionId);
+    if (!session) {
+      throw new Error("Recording upload session not found.");
+    }
+    if (session.status !== "pending") {
+      throw new Error(`Recording upload session is already ${session.status}.`);
+    }
+    assertCompletedUploadMatchesSession(session, input.artifact, input.recording);
+    const sourceMinutes = minutesForDuration(input.recording.durationMs);
+    assertWithinEntitlement({
+      entitlements: workspace.entitlements,
+      summary: summarizeUsage(state.usageEvents, workspace.id),
+      metric: "source_minutes",
+      additionalQuantity: sourceMinutes
+    });
+    assertWithinEntitlement({
+      entitlements: workspace.entitlements,
+      summary: summarizeUsage(state.usageEvents, workspace.id),
+      metric: "storage_bytes",
+      additionalQuantity: input.artifact.byteSize
+    });
+    const now = new Date().toISOString();
+    project.uploadSessions = (project.uploadSessions ?? []).map((candidate) =>
+      candidate.id === input.sessionId ? { ...candidate, status: "completed", updatedAt: now } : candidate
+    );
+    project.artifacts = [...(project.artifacts ?? []).filter((candidate) => candidate.id !== input.artifact.id), input.artifact];
+    project.recording = input.recording;
+    project.status = "recording_ready";
+    project.transcript = undefined;
+    project.analysisSummary = undefined;
+    project.frameEvidence = [];
+    project.moments = [];
+    project.concepts = [];
+    project.scripts = [];
+    project.renders = [];
+    project.providerRuns = project.providerRuns ?? [];
+    project.jobs = project.jobs ?? [];
+    project.jobEvents = project.jobEvents ?? [];
+    project.updatedAt = now;
+    state.usageEvents = mergeUsageEvent(state.usageEvents, {
+      id: randomUUID(),
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      metric: "source_minutes",
+      quantity: sourceMinutes,
+      unit: "minute",
+      source: "recording",
+      idempotencyKey: `recording:${project.id}:${input.artifact.id}:source_minutes`,
+      createdAt: now
+    });
+    state.usageEvents = mergeUsageEvent(state.usageEvents, {
+      id: randomUUID(),
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      metric: "storage_bytes",
+      quantity: input.artifact.byteSize,
+      unit: "byte",
+      source: "recording",
+      idempotencyKey: `recording:${project.id}:${input.artifact.id}:storage_bytes`,
+      createdAt: now
+    });
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "recording.upload_session.complete",
+      targetType: "recording",
+      targetId: input.artifact.id,
+      summary: `Completed direct upload for ${input.artifact.originalFileName}.`,
+      metadata: {
+        provider: input.artifact.provider,
+        contentType: input.artifact.contentType,
+        byteSize: input.artifact.byteSize,
+        sha256: input.artifact.sha256
+      }
+    });
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "recording.attach",
+      targetType: "recording",
+      targetId: input.recording.artifactId,
+      summary: `Attached recording ${input.recording.fileName}.`,
+      metadata: {
+        fileName: input.recording.fileName,
+        durationMs: input.recording.durationMs,
+        sizeBytes: input.recording.sizeBytes
+      }
+    });
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "usage.record",
+      targetType: "usage",
+      summary: `Recorded ${sourceMinutes} minute of source_minutes.`,
+      metadata: { metric: "source_minutes", quantity: sourceMinutes, unit: "minute", source: "recording" },
+      createdAt: now
+    });
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "usage.record",
+      targetType: "usage",
+      summary: `Recorded ${input.artifact.byteSize} byte of storage_bytes.`,
+      metadata: { metric: "storage_bytes", quantity: input.artifact.byteSize, unit: "byte", source: "recording" },
+      createdAt: now
+    });
+    await this.save();
+    return project;
   }
 
   async runAnalysis(
@@ -1703,6 +1866,41 @@ function safeSlug(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 64) || "workspace";
+}
+
+function assertCompletedUploadMatchesSession(
+  session: RecordingUploadSessionRecord,
+  artifact: ArtifactRecord,
+  recording: RecordingMetadata
+): void {
+  if (artifact.id !== session.artifactId) {
+    throw new Error("Uploaded artifact does not match the recording upload session.");
+  }
+  if (
+    artifact.workspaceId !== session.workspaceId ||
+    artifact.projectId !== session.projectId ||
+    artifact.kind !== "source_recording" ||
+    artifact.provider !== session.provider ||
+    artifact.storageKey !== session.storageKey ||
+    artifact.contentType !== session.contentType ||
+    artifact.byteSize !== session.byteSize ||
+    artifact.originalFileName !== session.originalFileName
+  ) {
+    throw new Error("Uploaded artifact metadata does not match the recording upload session.");
+  }
+  if (
+    recording.artifactId !== artifact.id ||
+    recording.storageKey !== artifact.storageKey ||
+    recording.sha256 !== artifact.sha256 ||
+    recording.sizeBytes !== artifact.byteSize ||
+    recording.fileName !== artifact.originalFileName
+  ) {
+    throw new Error("Recording metadata does not match the uploaded artifact.");
+  }
+}
+
+function minutesForDuration(durationMs: number): number {
+  return Math.max(1, Math.ceil(durationMs / 60_000));
 }
 
 export function newProjectTemplate(): CreateProjectInput {

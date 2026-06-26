@@ -13,7 +13,7 @@ vi.mock("electron", () => ({
 }));
 
 import { GideonStore } from "./store";
-import type { ProductProfile, RecordingUploadSessionRecord } from "../shared/types";
+import type { ArtifactRecord, ProductProfile, RecordingMetadata, RecordingUploadSessionRecord } from "../shared/types";
 import { DEFAULT_LOCAL_USER_ID, DEFAULT_LOCAL_WORKSPACE_ID } from "../shared/usage";
 
 describe("GideonStore billing reconciliation", () => {
@@ -258,6 +258,72 @@ describe("GideonStore billing reconciliation", () => {
       )
     ).toBe(true);
   });
+
+  it("completes recording uploads with explicit hosted session scope", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Hosted project",
+      profile: profileFixture()
+    });
+    const session = uploadSessionFixture({
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id
+    });
+    await store.createRecordingUploadSessionRecordForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      session
+    });
+
+    const artifact = artifactFixture({
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      storageKey: session.storageKey,
+      contentType: session.contentType,
+      byteSize: session.byteSize,
+      originalFileName: session.originalFileName
+    });
+    const recording = recordingFixture({
+      artifactId: artifact.id,
+      storageKey: artifact.storageKey,
+      sha256: artifact.sha256,
+      sizeBytes: artifact.byteSize,
+      fileName: artifact.originalFileName
+    });
+    const completed = await store.completeRecordingUploadForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      sessionId: session.id,
+      artifact,
+      recording
+    });
+
+    expect(completed.status).toBe("recording_ready");
+    expect(completed.uploadSessions[0]).toMatchObject({ id: "upload-1", status: "completed" });
+    expect(completed.artifacts[0]).toMatchObject({ id: "upload-1", kind: "source_recording" });
+    expect(completed.recording).toMatchObject({ artifactId: "upload-1", fileName: "walkthrough.mov" });
+    const state = await store.load();
+    expect(state.activeProjectId).toBeNull();
+    expect(state.usageEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ metric: "source_minutes", quantity: 1, source: "recording" }),
+        expect.objectContaining({ metric: "storage_bytes", quantity: 1024, source: "recording" })
+      ])
+    );
+    expect(
+      state.auditEvents.some(
+        (event) => event.action === "recording.upload_session.complete" && event.actorUserId === DEFAULT_LOCAL_USER_ID
+      )
+    ).toBe(true);
+    expect(
+      state.auditEvents.some((event) => event.action === "recording.attach" && event.actorUserId === DEFAULT_LOCAL_USER_ID)
+    ).toBe(true);
+  });
 });
 
 function profileFixture(overrides: Partial<ProductProfile> = {}): ProductProfile {
@@ -289,6 +355,46 @@ function uploadSessionFixture(
     byteSize: 1024,
     originalFileName: "walkthrough.mov",
     expiresAt: "2026-06-25T12:15:00.000Z",
+    ...overrides
+  };
+}
+
+function artifactFixture(overrides: Partial<ArtifactRecord> = {}): ArtifactRecord {
+  return {
+    id: "upload-1",
+    workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+    projectId: "project-1",
+    kind: "source_recording",
+    provider: "r2",
+    storageKey: "workspaces/local-workspace/projects/project-1/source_recording/upload-1-walkthrough.mov",
+    contentType: "video/quicktime",
+    byteSize: 1024,
+    sha256: "a".repeat(64),
+    originalFileName: "walkthrough.mov",
+    localPath: "/private/cache/walkthrough.mov",
+    localUrl: "file:///private/cache/walkthrough.mov",
+    createdAt: "2026-06-25T12:02:00.000Z",
+    ...overrides
+  };
+}
+
+function recordingFixture(overrides: Partial<RecordingMetadata> = {}): RecordingMetadata {
+  return {
+    filePath: "/private/cache/walkthrough.mov",
+    fileUrl: "file:///private/cache/walkthrough.mov",
+    fileName: "walkthrough.mov",
+    artifactId: "upload-1",
+    storageKey: "workspaces/local-workspace/projects/project-1/source_recording/upload-1-walkthrough.mov",
+    sha256: "a".repeat(64),
+    sizeBytes: 1024,
+    durationMs: 42_000,
+    width: 1280,
+    height: 720,
+    fps: 30,
+    videoCodec: "h264",
+    audioCodec: "aac",
+    hasAudio: true,
+    validatedAt: "2026-06-25T12:02:00.000Z",
     ...overrides
   };
 }

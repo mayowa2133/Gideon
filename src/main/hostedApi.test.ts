@@ -6,10 +6,12 @@ import { requestJobCancel as requestJobCancelState, retryJob as retryJobState } 
 import type {
   AppState,
   ApplyBillingSubscriptionInput,
+  ArtifactRecord,
   CreateProjectInput,
   JobRecord,
   ProductProfile,
   Project,
+  RecordingMetadata,
   RecordingUploadSessionRecord,
   SyncAuthenticatedUserInput
 } from "../shared/types";
@@ -381,6 +383,9 @@ describe("hosted API foundation", () => {
           contentType: "video/quicktime",
           originalFileName: "walkthrough.mov"
         };
+      },
+      async completeRecordingUploadSession() {
+        throw new Error("Unexpected completion call.");
       }
     };
     const api = testApi({ uploadService });
@@ -456,6 +461,111 @@ describe("hosted API foundation", () => {
       status: "pending",
       storageKey: "workspaces/local-workspace/projects/project-1/source_recording/upload-1-walkthrough.mov"
     });
+  });
+
+  it("completes direct recording uploads without exposing private object keys", async () => {
+    const artifact = artifactFixture({ projectId: "project-1" });
+    const recording = recordingFixture({
+      artifactId: artifact.id,
+      storageKey: artifact.storageKey,
+      sha256: artifact.sha256,
+      sizeBytes: artifact.byteSize
+    });
+    const uploadService: HostedRecordingUploadService = {
+      async createRecordingUploadSession() {
+        throw new Error("Unexpected create call.");
+      },
+      async completeRecordingUploadSession(input) {
+        expect(input.session).toMatchObject({
+          id: "upload-1",
+          projectId: "project-1",
+          status: "pending"
+        });
+        expect(input.checksumSha256).toBe("a".repeat(64));
+        return { artifact, recording };
+      }
+    };
+    const api = testApi({ uploadService });
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        uploadSessions: [
+          uploadSessionFixture({
+            projectId: "project-1",
+            artifactId: artifact.id,
+            storageKey: artifact.storageKey,
+            byteSize: artifact.byteSize,
+            contentType: artifact.contentType,
+            originalFileName: artifact.originalFileName
+          })
+        ]
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const rejected = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/recordings/upload-1/complete",
+        headers: { cookie: `gideon_session=${created.token}` },
+        body: { checksumSha256: "a".repeat(64) },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+    expect(rejected.status).toBe(403);
+    expect(rejected.body).toMatchObject({ error: { code: "csrf_failed" } });
+
+    const accepted = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/recordings/upload-1/complete",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1",
+          "x-request-id": "req_complete_upload"
+        },
+        body: { checksumSha256: "a".repeat(64) },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(accepted.status).toBe(200);
+    expect(accepted.body).toMatchObject({
+      data: {
+        project: {
+          id: "project-1",
+          status: "recording_ready",
+          hasRecording: true,
+          artifactsCount: 1
+        },
+        recording: {
+          artifactId: "upload-1",
+          fileName: "walkthrough.mov",
+          durationMs: 42_000,
+          sizeBytes: 2048,
+          hasAudio: true
+        }
+      },
+      meta: { requestId: "req_complete_upload" }
+    });
+    const recordingBody = (accepted.body as { data: { recording: { filePath?: string; fileUrl?: string; storageKey?: string } } }).data
+      .recording;
+    expect(recordingBody.filePath).toBeUndefined();
+    expect(recordingBody.fileUrl).toBeUndefined();
+    expect(recordingBody.storageKey).toBeUndefined();
+    expect(api.store.state.projects[0]?.uploadSessions[0]?.status).toBe("completed");
+    expect(api.store.state.projects[0]?.recording?.artifactId).toBe("upload-1");
   });
 
   it("returns job details without leaking jobs from another workspace", async () => {
@@ -840,6 +950,55 @@ class InMemoryHostedApiStore implements HostedApiStore {
     return project;
   }
 
+  async getRecordingUploadSessionForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    sessionId: string;
+  }): Promise<RecordingUploadSessionRecord> {
+    this.assertMember(input);
+    const project = this.state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    const session = project?.uploadSessions.find((candidate) => candidate.id === input.sessionId);
+    if (!session) {
+      throw new Error("Recording upload session not found.");
+    }
+    return session;
+  }
+
+  async completeRecordingUploadForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    sessionId: string;
+    artifact: ArtifactRecord;
+    recording: RecordingMetadata;
+  }): Promise<Project> {
+    this.assertMember(input);
+    const project = this.state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const session = project.uploadSessions.find((candidate) => candidate.id === input.sessionId);
+    if (!session) {
+      throw new Error("Recording upload session not found.");
+    }
+    if (session.status !== "pending") {
+      throw new Error(`Recording upload session is already ${session.status}.`);
+    }
+    project.uploadSessions = project.uploadSessions.map((candidate) =>
+      candidate.id === input.sessionId ? { ...candidate, status: "completed", updatedAt: "2026-06-25T12:02:00.000Z" } : candidate
+    );
+    project.artifacts = [input.artifact];
+    project.recording = input.recording;
+    project.status = "recording_ready";
+    project.updatedAt = "2026-06-25T12:02:00.000Z";
+    return project;
+  }
+
   private assertMember(input: { userId: string; workspaceId: string }): void {
     const membership = this.state.workspaceMembers.find(
       (candidate) => candidate.userId === input.userId && candidate.workspaceId === input.workspaceId
@@ -881,21 +1040,25 @@ function projectFixture(input: {
   workspaceId: string;
   name: string;
   profile?: Project["profile"];
+  uploadSessions?: RecordingUploadSessionRecord[];
+  artifacts?: ArtifactRecord[];
+  recording?: RecordingMetadata;
   jobs?: JobRecord[];
 }): Project {
   return {
     id: input.id,
     workspaceId: input.workspaceId,
     name: input.name,
-    status: "draft",
+    status: input.recording ? "recording_ready" : "draft",
     profile: input.profile ?? profileFixture(),
+    recording: input.recording,
     moments: [],
     frameEvidence: [],
     concepts: [],
     scripts: [],
     renders: [],
-    artifacts: [],
-    uploadSessions: [],
+    artifacts: input.artifacts ?? [],
+    uploadSessions: input.uploadSessions ?? [],
     providerRuns: [],
     jobs: input.jobs ?? [],
     jobEvents: [],
@@ -923,5 +1086,65 @@ function jobFixture(input: Partial<JobRecord> & { id: string; projectId: string 
     createdAt: "2026-06-25T12:00:00.000Z",
     updatedAt: "2026-06-25T12:00:00.000Z",
     ...input
+  };
+}
+
+function uploadSessionFixture(overrides: Partial<RecordingUploadSessionRecord> = {}): RecordingUploadSessionRecord {
+  return {
+    id: "upload-1",
+    workspaceId: "local-workspace",
+    projectId: "project-1",
+    artifactId: "upload-1",
+    provider: "r2",
+    storageKey: "workspaces/local-workspace/projects/project-1/source_recording/upload-1-walkthrough.mov",
+    status: "pending",
+    method: "PUT",
+    contentType: "video/quicktime",
+    byteSize: 2048,
+    originalFileName: "walkthrough.mov",
+    expiresAt: "2026-06-25T12:15:00.000Z",
+    createdAt: "2026-06-25T12:00:00.000Z",
+    updatedAt: "2026-06-25T12:00:00.000Z",
+    ...overrides
+  };
+}
+
+function artifactFixture(overrides: Partial<ArtifactRecord> = {}): ArtifactRecord {
+  return {
+    id: "upload-1",
+    workspaceId: "local-workspace",
+    projectId: "project-1",
+    kind: "source_recording",
+    provider: "r2",
+    storageKey: "workspaces/local-workspace/projects/project-1/source_recording/upload-1-walkthrough.mov",
+    contentType: "video/quicktime",
+    byteSize: 2048,
+    sha256: "a".repeat(64),
+    originalFileName: "walkthrough.mov",
+    localPath: "/private/cache/walkthrough.mov",
+    localUrl: "file:///private/cache/walkthrough.mov",
+    createdAt: "2026-06-25T12:02:00.000Z",
+    ...overrides
+  };
+}
+
+function recordingFixture(overrides: Partial<RecordingMetadata> = {}): RecordingMetadata {
+  return {
+    filePath: "/private/cache/walkthrough.mov",
+    fileUrl: "file:///private/cache/walkthrough.mov",
+    fileName: "walkthrough.mov",
+    artifactId: "upload-1",
+    storageKey: "workspaces/local-workspace/projects/project-1/source_recording/upload-1-walkthrough.mov",
+    sha256: "a".repeat(64),
+    sizeBytes: 2048,
+    durationMs: 42_000,
+    width: 1280,
+    height: 720,
+    fps: 30,
+    videoCodec: "h264",
+    audioCodec: "aac",
+    hasAudio: true,
+    validatedAt: "2026-06-25T12:02:00.000Z",
+    ...overrides
   };
 }

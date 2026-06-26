@@ -348,7 +348,7 @@ Issue signed URLs for specific multipart part numbers.
 
 ### POST `/projects/{projectId}/recordings/{recordingId}/complete`
 
-Complete multipart upload and enqueue validation.
+Complete a direct upload and validate/cache the private object as the project recording. The current hosted foundation completes the single-`PUT` upload synchronously through the upload service and returns the validated recording; a production multipart implementation can keep the route and return `202` with a validation job when validation is delegated to workers.
 
 - **Auth:** `member+`.
 - **Headers:** CSRF, `Idempotency-Key`.
@@ -356,15 +356,40 @@ Complete multipart upload and enqueue validation.
 
 ```json
 {
-  "parts": [
-    { "partNumber": 1, "etag": "provider-etag" }
-  ],
   "checksumSha256": "optional-64-hex"
 }
 ```
 
-- **Validation:** complete unique part set; ETag bounded safe string; object expected size; project state.
-- **Response 202:** Recording `uploaded/validating` plus validation Job.
+- **Validation:** active pending upload session, object expected size, optional checksum, project/workspace ownership, source-minute and storage quota.
+- **Response 200:** Project summary plus safe recording metadata. Private file paths, object keys, signed URLs, and cache paths are not returned.
+
+```json
+{
+  "data": {
+    "project": {
+      "id": "uuid",
+      "status": "recording_ready",
+      "hasRecording": true
+    },
+    "recording": {
+      "artifactId": "uuid",
+      "fileName": "walkthrough.mov",
+      "durationMs": 42000,
+      "sizeBytes": 734003200,
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "hasAudio": true,
+      "sha256": "64-hex",
+      "validatedAt": "..."
+    }
+  },
+  "meta": { "requestId": "req_..." }
+}
+```
+
 - **Errors:** 404, 409 incomplete/already completed/invalid state, 422 mismatch, 503 storage.
 - **Rate limit:** 20/hour/upload.
 
