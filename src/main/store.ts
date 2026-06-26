@@ -79,6 +79,7 @@ interface AuditInput {
   targetType: AuditTargetType;
   targetId?: string;
   summary: string;
+  actorUserId?: string;
   actorType?: AuditActorType;
   metadata?: Record<string, AuditMetadataValue>;
   createdAt?: string;
@@ -483,6 +484,71 @@ export class GideonStore {
     this.appendAuditToState(state, {
       workspaceId,
       projectId: project.id,
+      action: "project.create",
+      targetType: "project",
+      targetId: project.id,
+      summary: `Created project ${project.name}.`,
+      metadata: { projectName: project.name }
+    });
+    await this.save();
+    return project;
+  }
+
+  async listProjectsForSession(input: { userId: string; workspaceId: string }): Promise<Project[]> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "project:read"
+    });
+    return state.projects.filter((project) => project.workspaceId === input.workspaceId);
+  }
+
+  async createProjectForSession(input: CreateProjectInput & { userId: string; workspaceId: string }): Promise<Project> {
+    const profile = normalizeProfile(input.profile);
+    const errors = validateProfile(profile);
+    if (errors.length > 0) {
+      throw new Error(errors.join(" "));
+    }
+    const state = await this.load();
+    const workspace = requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "project:create"
+    });
+    const workspaceProjectCount = state.projects.filter((project) => project.workspaceId === input.workspaceId).length;
+    if (workspaceProjectCount >= workspace.entitlements.maxProjects) {
+      throw new Error(`Project limit exceeded. This workspace allows ${workspace.entitlements.maxProjects} projects.`);
+    }
+    const now = new Date().toISOString();
+    const project: Project = {
+      id: randomUUID(),
+      workspaceId: input.workspaceId,
+      name: input.name.trim() || profile.productName,
+      status: "draft",
+      profile,
+      moments: [],
+      frameEvidence: [],
+      concepts: [],
+      scripts: [],
+      renders: [],
+      artifacts: [],
+      uploadSessions: [],
+      providerRuns: [],
+      jobs: [],
+      jobEvents: [],
+      createdAt: now,
+      updatedAt: now
+    };
+    state.projects.unshift(project);
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
       action: "project.create",
       targetType: "project",
       targetId: project.id,
@@ -1225,7 +1291,7 @@ export class GideonStore {
       id: randomUUID(),
       workspaceId: input.workspaceId,
       projectId: input.projectId,
-      actorUserId: state.activeUserId ?? DEFAULT_LOCAL_USER_ID,
+      actorUserId: input.actorUserId ?? state.activeUserId ?? DEFAULT_LOCAL_USER_ID,
       actorType: input.actorType ?? "local_user",
       action: input.action,
       targetType: input.targetType,

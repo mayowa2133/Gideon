@@ -108,4 +108,42 @@ describe("GideonStore billing reconciliation", () => {
       lastSignedInAt: "2026-06-25T14:00:00.000Z"
     });
   });
+
+  it("creates and lists projects with explicit hosted session scope", async () => {
+    const store = new GideonStore();
+    await store.load();
+
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Hosted project",
+      profile: profileFixture()
+    });
+    const projects = await store.listProjectsForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID
+    });
+
+    expect(project).toMatchObject({
+      name: "Hosted project",
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      status: "draft"
+    });
+    expect(projects.map((candidate) => candidate.id)).toContain(project.id);
+    const state = await store.load();
+    expect(state.activeProjectId).toBeNull();
+    expect(state.auditEvents.some((event) => event.action === "project.create" && event.actorUserId === DEFAULT_LOCAL_USER_ID)).toBe(true);
+  });
 });
+
+function profileFixture() {
+  return {
+    productName: "Gideon",
+    targetCustomer: "SaaS founders",
+    productDescription: "Turns product walkthroughs into short-form marketing videos.",
+    preferredTone: "founder" as const,
+    toneGuidance: "specific and direct",
+    platforms: ["tiktok", "youtube_shorts"] as const,
+    walkthroughNotes: "Focus on the upload-to-export workflow."
+  };
+}
