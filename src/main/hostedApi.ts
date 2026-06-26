@@ -20,6 +20,7 @@ import type {
   ApplyBillingSubscriptionInput,
   CreateProjectInput,
   IdentityProvider,
+  ProductProfile,
   Project,
   SyncAuthenticatedUserInput
 } from "../shared/types";
@@ -52,7 +53,14 @@ export interface HostedApiStore {
   syncAuthenticatedUser(input: SyncAuthenticatedUserInput): Promise<AppState>;
   applyBillingSubscriptionUpdate(input: ApplyBillingSubscriptionInput): Promise<AppState>;
   listProjectsForSession(input: { userId: string; workspaceId: string }): Promise<Project[]>;
+  getProjectForSession(input: { userId: string; workspaceId: string; projectId: string }): Promise<Project>;
   createProjectForSession(input: CreateProjectInput & { userId: string; workspaceId: string }): Promise<Project>;
+  updateProfileForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    profile: ProductProfile;
+  }): Promise<Project>;
 }
 
 export interface HostedApiDependencies {
@@ -105,6 +113,14 @@ export async function handleHostedApiRequest(
     }
     if (method === "POST" && path === "/api/v1/projects") {
       return await handleCreateProject(request, dependencies, requestId);
+    }
+    const projectRoute = path.match(/^\/api\/v1\/projects\/([^/]+)$/);
+    if (method === "GET" && projectRoute) {
+      return await handleGetProject(request, dependencies, requestId, decodeURIComponent(projectRoute[1] ?? ""));
+    }
+    const projectProfileRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/profile$/);
+    if (method === "PATCH" && projectProfileRoute) {
+      return await handleUpdateProjectProfile(request, dependencies, requestId, decodeURIComponent(projectProfileRoute[1] ?? ""));
     }
     if (method === "POST" && path === "/api/v1/webhooks/stripe") {
       return await handleStripeWebhook(request, dependencies, requestId);
@@ -295,6 +311,47 @@ async function handleCreateProject(
   });
 }
 
+async function handleGetProject(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string
+): Promise<HostedApiResponse> {
+  const claims = requiredSession(request, dependencies);
+  const project = await storeCall(() =>
+    dependencies.store.getProjectForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId
+    })
+  );
+  return jsonResponse(200, { project: projectResource(project) }, requestId);
+}
+
+async function handleUpdateProjectProfile(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string
+): Promise<HostedApiResponse> {
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  const profile = hostedProfileInput(objectBody(request));
+  const project = await storeCall(() =>
+    dependencies.store.updateProfileForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId,
+      profile
+    })
+  );
+  return jsonResponse(200, { project: projectResource(project) }, requestId);
+}
+
 function requiredSession(request: HostedApiRequest, dependencies: HostedApiDependencies): SessionClaims {
   const token = readSessionTokenFromCookieHeader(header(request, "cookie"), dependencies.config.auth.sessionCookieName);
   if (!token || !dependencies.config.auth.sessionSecret) {
@@ -370,6 +427,21 @@ function projectSummary(project: Project) {
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
     productName: project.profile.productName
+  };
+}
+
+function projectResource(project: Project) {
+  return {
+    ...projectSummary(project),
+    profile: project.profile,
+    hasRecording: Boolean(project.recording),
+    transcriptStatus: project.transcript?.status ?? null,
+    momentsCount: project.moments.length,
+    conceptsCount: project.concepts.length,
+    scriptsCount: project.scripts.length,
+    rendersCount: project.renders.length,
+    artifactsCount: project.artifacts.length,
+    jobsCount: project.jobs.length
   };
 }
 
@@ -483,14 +555,18 @@ function optionalIdentityProvider(value: unknown): IdentityProvider | undefined 
 }
 
 function hostedProjectInput(body: Record<string, unknown>): CreateProjectInput {
+  return {
+    name: optionalString(body.name) ?? "",
+    profile: hostedProfileInput(body)
+  };
+}
+
+function hostedProfileInput(body: Record<string, unknown>): ProductProfile {
   const profile = body.profile;
   if (typeof profile !== "object" || profile === null || Array.isArray(profile)) {
     throw new ApiError(422, "validation_failed", "profile is required.");
   }
-  return {
-    name: optionalString(body.name) ?? "",
-    profile: profile as CreateProjectInput["profile"]
-  };
+  return profile as ProductProfile;
 }
 
 async function storeCall<T>(operation: () => Promise<T>): Promise<T> {

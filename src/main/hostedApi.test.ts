@@ -2,7 +2,14 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createSignedSession } from "./auth";
 import { handleHostedApiRequest, type HostedApiStore } from "./hostedApi";
-import type { AppState, ApplyBillingSubscriptionInput, CreateProjectInput, Project, SyncAuthenticatedUserInput } from "../shared/types";
+import type {
+  AppState,
+  ApplyBillingSubscriptionInput,
+  CreateProjectInput,
+  ProductProfile,
+  Project,
+  SyncAuthenticatedUserInput
+} from "../shared/types";
 import { createLocalUserWorkspace } from "../shared/usage";
 
 describe("hosted API foundation", () => {
@@ -166,6 +173,63 @@ describe("hosted API foundation", () => {
     });
   });
 
+  it("returns project details without leaking projects from another workspace", async () => {
+    const api = testApi();
+    api.store.state.projects = [
+      projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Visible project" }),
+      projectFixture({ id: "project-2", workspaceId: "other-workspace", name: "Hidden project" })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const visible = await handleHostedApiRequest(
+      {
+        method: "GET",
+        path: "/api/v1/projects/project-1",
+        headers: { cookie: `gideon_session=${created.token}` },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(visible.status).toBe(200);
+    expect(visible.body).toMatchObject({
+      data: {
+        project: {
+          id: "project-1",
+          workspaceId: "local-workspace",
+          profile: {
+            productName: "Gideon"
+          },
+          momentsCount: 0,
+          scriptsCount: 0,
+          rendersCount: 0,
+          artifactsCount: 0,
+          hasRecording: false
+        }
+      }
+    });
+
+    const hidden = await handleHostedApiRequest(
+      {
+        method: "GET",
+        path: "/api/v1/projects/project-2",
+        headers: { cookie: `gideon_session=${created.token}` },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(hidden.status).toBe(404);
+    expect(hidden.body).toMatchObject({ error: { code: "not_found" } });
+  });
+
   it("creates projects through authenticated CSRF-protected hosted API requests", async () => {
     const api = testApi();
     const created = createSignedSession({
@@ -226,6 +290,68 @@ describe("hosted API foundation", () => {
       meta: { requestId: "req_create_project" }
     });
     expect(api.store.state.projects).toHaveLength(1);
+  });
+
+  it("updates project profiles through authenticated CSRF-protected hosted API requests", async () => {
+    const api = testApi();
+    api.store.state.projects = [projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Existing project" })];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+    const updatedProfile = profileFixture({
+      productName: "Gideon Cloud",
+      targetCustomer: "Product teams"
+    });
+
+    const rejected = await handleHostedApiRequest(
+      {
+        method: "PATCH",
+        path: "/api/v1/projects/project-1/profile",
+        headers: { cookie: `gideon_session=${created.token}` },
+        body: { profile: updatedProfile },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+    expect(rejected.status).toBe(403);
+    expect(rejected.body).toMatchObject({ error: { code: "csrf_failed" } });
+
+    const accepted = await handleHostedApiRequest(
+      {
+        method: "PATCH",
+        path: "/api/v1/projects/project-1/profile",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1",
+          "x-request-id": "req_update_profile"
+        },
+        body: { profile: updatedProfile },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(accepted.status).toBe(200);
+    expect(accepted.body).toMatchObject({
+      data: {
+        project: {
+          id: "project-1",
+          workspaceId: "local-workspace",
+          productName: "Gideon Cloud",
+          profile: {
+            productName: "Gideon Cloud",
+            targetCustomer: "Product teams"
+          }
+        }
+      },
+      meta: { requestId: "req_update_profile" }
+    });
+    expect(api.store.state.projects[0]?.profile.productName).toBe("Gideon Cloud");
   });
 
   it("verifies Stripe webhooks and applies subscription updates", async () => {
@@ -359,6 +485,17 @@ class InMemoryHostedApiStore implements HostedApiStore {
     return this.state.projects.filter((project) => project.workspaceId === input.workspaceId);
   }
 
+  async getProjectForSession(input: { userId: string; workspaceId: string; projectId: string }): Promise<Project> {
+    this.assertMember(input);
+    const project = this.state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    return project;
+  }
+
   async createProjectForSession(input: CreateProjectInput & { userId: string; workspaceId: string }): Promise<Project> {
     this.assertMember(input);
     const project = projectFixture({
@@ -368,6 +505,25 @@ class InMemoryHostedApiStore implements HostedApiStore {
       profile: input.profile
     });
     this.state.projects = [project, ...this.state.projects];
+    return project;
+  }
+
+  async updateProfileForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    profile: ProductProfile;
+  }): Promise<Project> {
+    this.assertMember(input);
+    const project = this.state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    project.profile = input.profile;
+    project.name = project.name.trim() || input.profile.productName;
+    project.updatedAt = "2026-06-25T12:01:00.000Z";
     return project;
   }
 
@@ -381,7 +537,7 @@ class InMemoryHostedApiStore implements HostedApiStore {
   }
 }
 
-function profileFixture(): Project["profile"] {
+function profileFixture(overrides: Partial<ProductProfile> = {}): Project["profile"] {
   return {
     productName: "Gideon",
     targetCustomer: "SaaS founders",
@@ -389,7 +545,8 @@ function profileFixture(): Project["profile"] {
     preferredTone: "founder",
     toneGuidance: "specific and direct",
     platforms: ["tiktok", "youtube_shorts"],
-    walkthroughNotes: "Focus on the upload-to-export workflow."
+    walkthroughNotes: "Focus on the upload-to-export workflow.",
+    ...overrides
   };
 }
 

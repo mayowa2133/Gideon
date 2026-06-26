@@ -506,6 +506,24 @@ export class GideonStore {
     return state.projects.filter((project) => project.workspaceId === input.workspaceId);
   }
 
+  async getProjectForSession(input: { userId: string; workspaceId: string; projectId: string }): Promise<Project> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "project:read"
+    });
+    const project = state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    return project;
+  }
+
   async createProjectForSession(input: CreateProjectInput & { userId: string; workspaceId: string }): Promise<Project> {
     const profile = normalizeProfile(input.profile);
     const errors = validateProfile(profile);
@@ -554,6 +572,48 @@ export class GideonStore {
       targetId: project.id,
       summary: `Created project ${project.name}.`,
       metadata: { projectName: project.name }
+    });
+    await this.save();
+    return project;
+  }
+
+  async updateProfileForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    profile: ProductProfile;
+  }): Promise<Project> {
+    const normalized = normalizeProfile(input.profile);
+    const errors = validateProfile(normalized);
+    if (errors.length > 0) {
+      throw new Error(errors.join(" "));
+    }
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "project:update"
+    });
+    const project = state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    project.profile = normalized;
+    project.name = project.name.trim() || normalized.productName;
+    project.updatedAt = new Date().toISOString();
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "project.update_profile",
+      targetType: "project",
+      targetId: project.id,
+      summary: `Updated product context for ${normalized.productName}.`,
+      metadata: { productName: normalized.productName }
     });
     await this.save();
     return project;

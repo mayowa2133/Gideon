@@ -12,6 +12,7 @@ vi.mock("electron", () => ({
 }));
 
 import { GideonStore } from "./store";
+import type { ProductProfile } from "../shared/types";
 import { DEFAULT_LOCAL_USER_ID, DEFAULT_LOCAL_WORKSPACE_ID } from "../shared/usage";
 
 describe("GideonStore billing reconciliation", () => {
@@ -134,16 +135,56 @@ describe("GideonStore billing reconciliation", () => {
     expect(state.activeProjectId).toBeNull();
     expect(state.auditEvents.some((event) => event.action === "project.create" && event.actorUserId === DEFAULT_LOCAL_USER_ID)).toBe(true);
   });
+
+  it("gets and updates project profiles with explicit hosted session scope", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Hosted project",
+      profile: profileFixture()
+    });
+
+    const updated = await store.updateProfileForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      profile: profileFixture({
+        productName: "Gideon Cloud",
+        targetCustomer: "Product teams"
+      })
+    });
+    const fetched = await store.getProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id
+    });
+
+    expect(updated.profile).toMatchObject({
+      productName: "Gideon Cloud",
+      targetCustomer: "Product teams"
+    });
+    expect(fetched.profile.productName).toBe("Gideon Cloud");
+    const state = await store.load();
+    expect(state.activeProjectId).toBeNull();
+    expect(
+      state.auditEvents.some(
+        (event) => event.action === "project.update_profile" && event.actorUserId === DEFAULT_LOCAL_USER_ID
+      )
+    ).toBe(true);
+  });
 });
 
-function profileFixture() {
+function profileFixture(overrides: Partial<ProductProfile> = {}): ProductProfile {
   return {
     productName: "Gideon",
     targetCustomer: "SaaS founders",
     productDescription: "Turns product walkthroughs into short-form marketing videos.",
-    preferredTone: "founder" as const,
+    preferredTone: "founder",
     toneGuidance: "specific and direct",
-    platforms: ["tiktok", "youtube_shorts"] as const,
-    walkthroughNotes: "Focus on the upload-to-export workflow."
+    platforms: ["tiktok", "youtube_shorts"],
+    walkthroughNotes: "Focus on the upload-to-export workflow.",
+    ...overrides
   };
 }
