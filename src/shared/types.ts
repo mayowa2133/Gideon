@@ -49,6 +49,8 @@ export type WorkspacePlan = "local_mvp" | "starter" | "team" | "enterprise";
 
 export type BillingStatus = "not_configured" | "trialing" | "active" | "past_due" | "canceled";
 
+export type BillingProvider = "manual" | "stripe";
+
 export type AuditActorType = "local_user" | "mcp_agent" | "system";
 
 export type AuditAction =
@@ -75,7 +77,8 @@ export type AuditAction =
   | "job.cancel"
   | "job.retry"
   | "usage.record"
-  | "billing.plan.update";
+  | "billing.plan.update"
+  | "billing.webhook.apply";
 
 export type AuditTargetType =
   | "workspace"
@@ -151,6 +154,12 @@ export interface Workspace {
   slug: string;
   plan: WorkspacePlan;
   billingStatus: BillingStatus;
+  billingProvider?: BillingProvider;
+  billingCustomerId?: string;
+  billingSubscriptionId?: string;
+  billingCurrentPeriodEnd?: string;
+  billingCancelAtPeriodEnd?: boolean;
+  billingLastEventId?: string;
   entitlements: WorkspaceEntitlements;
   createdAt: string;
   updatedAt: string;
@@ -496,6 +505,19 @@ export interface UpdateWorkspaceBillingPlanInput {
   workspaceId: string;
   plan: WorkspacePlan;
   billingStatus?: BillingStatus;
+}
+
+export interface ApplyBillingSubscriptionInput {
+  workspaceId: string;
+  provider: BillingProvider;
+  providerEventId: string;
+  providerCustomerId: string;
+  providerSubscriptionId: string;
+  plan: WorkspacePlan;
+  billingStatus: BillingStatus;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd?: boolean;
+  appliedAt?: string;
 }
 
 export interface CreateRecordingUploadSessionInput {

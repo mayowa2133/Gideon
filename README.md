@@ -60,6 +60,8 @@ Provider outputs are treated as untrusted until parsed and validated. If a provi
 
 Workspace owners/admins can change a workspace between the local MVP, starter, team, and enterprise plan definitions from the sidebar. These plan definitions update the workspace entitlements used by quota checks for source minutes, transcription minutes, AI runs, TTS characters, render minutes, storage, exports, and project count. This is a provider-neutral billing foundation: checkout, invoices, customer portals, and webhook reconciliation still need a real billing provider before hosted production use.
 
+The billing provider foundation includes Stripe-style webhook signature verification and subscription-event normalization. Hosted webhook handlers should verify the raw request body with `STRIPE_WEBHOOK_SECRET` or `GIDEON_STRIPE_WEBHOOK_SECRET`, map price IDs with `GIDEON_STRIPE_STARTER_PRICE_ID`, `GIDEON_STRIPE_TEAM_PRICE_ID`, and `GIDEON_STRIPE_ENTERPRISE_PRICE_ID`, then apply the normalized subscription event to the workspace. Billing webhooks are idempotent by provider event ID and update workspace plan/status, provider customer/subscription IDs, entitlements, and audit history.
+
 ## Local worker queue controls
 
 Gideon runs analysis and render work through a local worker queue. By default it runs one job at a time. For local stress testing you can raise the global queue limit and optionally cap specific job kinds:

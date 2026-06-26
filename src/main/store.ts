@@ -18,6 +18,7 @@ import type {
   AuditMetadataValue,
   AuditTargetType,
   AddWorkspaceMemberInput,
+  ApplyBillingSubscriptionInput,
   ArtifactRecord,
   ContentConcept,
   CreateProjectInput,
@@ -151,6 +152,7 @@ export class GideonStore {
       slug,
       plan: "local_mvp",
       billingStatus: "not_configured",
+      billingProvider: "manual",
       entitlements: entitlementsForPlan("local_mvp"),
       createdAt: now,
       updatedAt: now
@@ -293,6 +295,7 @@ export class GideonStore {
     const now = new Date().toISOString();
     workspace.plan = definition.id;
     workspace.billingStatus = input.billingStatus ?? definition.billingStatus;
+    workspace.billingProvider = "manual";
     workspace.entitlements = entitlementsForPlan(definition.id);
     workspace.updatedAt = now;
     this.appendAuditToState(state, {
@@ -306,6 +309,49 @@ export class GideonStore {
         billingStatus: workspace.billingStatus,
         monthlyPriceCents: definition.monthlyPriceCents
       },
+      createdAt: now
+    });
+    await this.save();
+    return state;
+  }
+
+  async applyBillingSubscriptionUpdate(input: ApplyBillingSubscriptionInput): Promise<AppState> {
+    const state = await this.load();
+    const workspace = requireWorkspace(state, input.workspaceId);
+    const alreadyApplied = state.auditEvents.some(
+      (event) => event.action === "billing.webhook.apply" && event.targetId === input.providerEventId
+    );
+    if (alreadyApplied) {
+      return state;
+    }
+    const definition = workspacePlanDefinition(input.plan);
+    const now = input.appliedAt ?? new Date().toISOString();
+    workspace.plan = definition.id;
+    workspace.billingStatus = input.billingStatus;
+    workspace.billingProvider = input.provider;
+    workspace.billingCustomerId = input.providerCustomerId;
+    workspace.billingSubscriptionId = input.providerSubscriptionId;
+    workspace.billingCurrentPeriodEnd = input.currentPeriodEnd;
+    workspace.billingCancelAtPeriodEnd = input.cancelAtPeriodEnd;
+    workspace.billingLastEventId = input.providerEventId;
+    workspace.entitlements = entitlementsForPlan(definition.id);
+    workspace.updatedAt = now;
+    this.appendAuditToState(state, {
+      workspaceId: workspace.id,
+      actorType: "system",
+      action: "billing.webhook.apply",
+      targetType: "billing",
+      targetId: input.providerEventId,
+      summary: `Applied ${input.provider} billing event for ${definition.label}.`,
+      metadata: compactAuditMetadata({
+        provider: input.provider,
+        providerCustomerId: input.providerCustomerId,
+        providerSubscriptionId: input.providerSubscriptionId,
+        plan: definition.id,
+        billingStatus: input.billingStatus,
+        currentPeriodEnd: input.currentPeriodEnd,
+        cancelAtPeriodEnd: input.cancelAtPeriodEnd
+      }),
       createdAt: now
     });
     await this.save();
@@ -1129,6 +1175,7 @@ function normalizeAppState(state: AppState): AppState {
   const workspaces = raw.workspaces?.length
     ? raw.workspaces.map((workspace) => ({
         ...workspace,
+        billingProvider: workspace.billingProvider ?? "manual",
         entitlements: {
           ...defaultLocalEntitlements,
           ...workspace.entitlements
@@ -1234,6 +1281,12 @@ function normalizeWorkspaceName(name: string): string {
     throw new Error("Workspace name must be 2–80 characters.");
   }
   return normalized;
+}
+
+function compactAuditMetadata(
+  input: Record<string, AuditMetadataValue | undefined>
+): Record<string, AuditMetadataValue> {
+  return Object.fromEntries(Object.entries(input).filter((entry): entry is [string, AuditMetadataValue] => entry[1] !== undefined));
 }
 
 function uniqueWorkspaceSlug(workspaces: Workspace[], value: string): string {

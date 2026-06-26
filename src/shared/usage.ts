@@ -140,6 +140,7 @@ export function createLocalUserWorkspace(now = DEFAULT_LOCAL_CREATED_AT) {
         slug: "local",
         plan: "local_mvp" as const,
         billingStatus: "not_configured" as const,
+        billingProvider: "manual" as const,
         entitlements: entitlementsForPlan("local_mvp"),
         createdAt: now,
         updatedAt: now
