@@ -743,6 +743,18 @@ Authorize and mint one short-lived signed GET URL.
 - **Errors:** 404.
 - **Rate limit:** 120/min.
 
+### POST `/jobs/{jobId}/cancel`
+
+Cancel a queued job immediately or request cooperative cancellation for a running job.
+
+- **Auth:** `member+`.
+- **Headers:** CSRF.
+- **Request:** `{}`.
+- **Validation:** status queued/running; job marked cancelable.
+- **Response 202:** Updated Job with `canceled` or `canceling` status.
+- **Errors:** 404, 409 not cancelable.
+- **Rate limit:** 30/hour/workspace.
+
 ### POST `/jobs/{jobId}/retry`
 
 Retry terminal retryable job using same immutable inputs.

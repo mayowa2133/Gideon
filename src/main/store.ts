@@ -1117,6 +1117,22 @@ export class GideonStore {
     return job;
   }
 
+  async getJobForSession(input: {
+    userId: string;
+    workspaceId: string;
+    jobId: string;
+  }): Promise<{ project: Project; job: JobRecord }> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "project:read"
+    });
+    return this.findJobInWorkspace(state, input.workspaceId, input.jobId);
+  }
+
   async requestJobCancel(projectId: string, jobId: string): Promise<Project> {
     const job = await this.getJob(projectId, jobId);
     const now = new Date().toISOString();
@@ -1151,6 +1167,51 @@ export class GideonStore {
         }
       }
     );
+  }
+
+  async requestJobCancelForSession(input: {
+    userId: string;
+    workspaceId: string;
+    jobId: string;
+  }): Promise<{ project: Project; job: JobRecord }> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "job:write"
+    });
+    const { project, job } = this.findJobInWorkspace(state, input.workspaceId, input.jobId);
+    const now = new Date().toISOString();
+    const nextJob = requestJobCancelState(job, now);
+    project.jobs = (project.jobs ?? []).map((candidate) => (candidate.id === input.jobId ? nextJob : candidate));
+    project.jobEvents = [
+      ...(project.jobEvents ?? []),
+      createJobEvent({
+        id: randomUUID(),
+        projectId: project.id,
+        jobId: input.jobId,
+        kind: job.status === "queued" ? "canceled" : "cancel_requested",
+        stage: "cancel",
+        message: nextJob.userMessage,
+        progress: nextJob.progress,
+        now
+      })
+    ].slice(-MAX_PROJECT_JOB_EVENTS);
+    project.updatedAt = now;
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "job.cancel",
+      targetType: "job",
+      targetId: input.jobId,
+      summary: `Requested cancel for ${job.kind} job.`,
+      metadata: { jobKind: job.kind, status: job.status }
+    });
+    await this.save();
+    return { project, job: nextJob };
   }
 
   async finishJobCancel(projectId: string, jobId: string): Promise<Project> {
@@ -1216,6 +1277,52 @@ export class GideonStore {
       }
     );
     return retried;
+  }
+
+  async retryJobForSession(input: {
+    userId: string;
+    workspaceId: string;
+    jobId: string;
+  }): Promise<{ project: Project; job: JobRecord }> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "job:write"
+    });
+    const { project, job } = this.findJobInWorkspace(state, input.workspaceId, input.jobId);
+    const now = new Date().toISOString();
+    const retried = retryJobState(job, now);
+    project.jobs = (project.jobs ?? []).map((candidate) => (candidate.id === input.jobId ? retried : candidate));
+    project.jobEvents = [
+      ...(project.jobEvents ?? []),
+      createJobEvent({
+        id: randomUUID(),
+        projectId: project.id,
+        jobId: input.jobId,
+        kind: "retried",
+        stage: "queued",
+        message: retried.userMessage,
+        progress: retried.progress,
+        metadata: { nextAttempt: retried.attempt },
+        now
+      })
+    ].slice(-MAX_PROJECT_JOB_EVENTS);
+    project.updatedAt = now;
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "job.retry",
+      targetType: "job",
+      targetId: input.jobId,
+      summary: `Retried ${job.kind} job.`,
+      metadata: { jobKind: job.kind, nextAttempt: retried.attempt }
+    });
+    await this.save();
+    return { project, job: retried };
   }
 
   async recoverInterruptedJobs(): Promise<JobRecord[]> {
@@ -1341,6 +1448,19 @@ export class GideonStore {
   private assertProjectAccessInState(state: AppState, project: Project, action: WorkspaceAction): void {
     requireWorkspace(state, project.workspaceId);
     this.assertWorkspaceAccessInState(state, project.workspaceId, action);
+  }
+
+  private findJobInWorkspace(state: AppState, workspaceId: string, jobId: string): { project: Project; job: JobRecord } {
+    for (const project of state.projects) {
+      if (project.workspaceId !== workspaceId) {
+        continue;
+      }
+      const job = (project.jobs ?? []).find((candidate) => candidate.id === jobId);
+      if (job) {
+        return { project, job };
+      }
+    }
+    throw new Error("Job not found.");
   }
 
   private appendAuditToState(

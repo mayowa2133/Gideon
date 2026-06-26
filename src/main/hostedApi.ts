@@ -20,6 +20,7 @@ import type {
   ApplyBillingSubscriptionInput,
   CreateProjectInput,
   IdentityProvider,
+  JobRecord,
   ProductProfile,
   Project,
   SyncAuthenticatedUserInput
@@ -61,6 +62,17 @@ export interface HostedApiStore {
     projectId: string;
     profile: ProductProfile;
   }): Promise<Project>;
+  getJobForSession(input: { userId: string; workspaceId: string; jobId: string }): Promise<{ project: Project; job: JobRecord }>;
+  requestJobCancelForSession(input: {
+    userId: string;
+    workspaceId: string;
+    jobId: string;
+  }): Promise<{ project: Project; job: JobRecord }>;
+  retryJobForSession(input: {
+    userId: string;
+    workspaceId: string;
+    jobId: string;
+  }): Promise<{ project: Project; job: JobRecord }>;
 }
 
 export interface HostedApiDependencies {
@@ -121,6 +133,17 @@ export async function handleHostedApiRequest(
     const projectProfileRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/profile$/);
     if (method === "PATCH" && projectProfileRoute) {
       return await handleUpdateProjectProfile(request, dependencies, requestId, decodeURIComponent(projectProfileRoute[1] ?? ""));
+    }
+    const jobRoute = path.match(/^\/api\/v1\/jobs\/([^/]+)$/);
+    if (method === "GET" && jobRoute) {
+      return await handleGetJob(request, dependencies, requestId, decodeURIComponent(jobRoute[1] ?? ""));
+    }
+    const jobActionRoute = path.match(/^\/api\/v1\/jobs\/([^/]+)\/(cancel|retry)$/);
+    if (method === "POST" && jobActionRoute) {
+      const jobId = decodeURIComponent(jobActionRoute[1] ?? "");
+      return jobActionRoute[2] === "cancel"
+        ? await handleCancelJob(request, dependencies, requestId, jobId)
+        : await handleRetryJob(request, dependencies, requestId, jobId);
     }
     if (method === "POST" && path === "/api/v1/webhooks/stripe") {
       return await handleStripeWebhook(request, dependencies, requestId);
@@ -352,6 +375,67 @@ async function handleUpdateProjectProfile(
   return jsonResponse(200, { project: projectResource(project) }, requestId);
 }
 
+async function handleGetJob(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  jobId: string
+): Promise<HostedApiResponse> {
+  const claims = requiredSession(request, dependencies);
+  const { project, job } = await storeCall(() =>
+    dependencies.store.getJobForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      jobId
+    })
+  );
+  return jsonResponse(200, { job: jobResource(project, job) }, requestId);
+}
+
+async function handleCancelJob(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  jobId: string
+): Promise<HostedApiResponse> {
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  const { project, job } = await storeCall(() =>
+    dependencies.store.requestJobCancelForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      jobId
+    })
+  );
+  return jsonResponse(202, { job: jobResource(project, job) }, requestId);
+}
+
+async function handleRetryJob(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  jobId: string
+): Promise<HostedApiResponse> {
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  const { project, job } = await storeCall(() =>
+    dependencies.store.retryJobForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      jobId
+    })
+  );
+  return jsonResponse(202, { job: jobResource(project, job) }, requestId);
+}
+
 function requiredSession(request: HostedApiRequest, dependencies: HostedApiDependencies): SessionClaims {
   const token = readSessionTokenFromCookieHeader(header(request, "cookie"), dependencies.config.auth.sessionCookieName);
   if (!token || !dependencies.config.auth.sessionSecret) {
@@ -442,6 +526,14 @@ function projectResource(project: Project) {
     rendersCount: project.renders.length,
     artifactsCount: project.artifacts.length,
     jobsCount: project.jobs.length
+  };
+}
+
+function jobResource(project: Project, job: JobRecord) {
+  return {
+    ...job,
+    workspaceId: project.workspaceId,
+    projectId: project.id
   };
 }
 
@@ -587,6 +679,9 @@ function apiErrorFromStoreError(error: unknown): ApiError {
   }
   if (/quota exceeded|limit exceeded/i.test(message)) {
     return new ApiError(402, "quota_exceeded", message);
+  }
+  if (/cannot|not retryable|no attempts remaining|already/i.test(message)) {
+    return new ApiError(409, "state_conflict", message);
   }
   if (/must be|required|invalid|enter a valid/i.test(message)) {
     return new ApiError(422, "validation_failed", message);

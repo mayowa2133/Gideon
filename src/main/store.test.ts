@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createJob } from "../shared/jobState";
 
 const electronMock = vi.hoisted(() => ({ userDataDir: "" }));
 
@@ -172,6 +173,54 @@ describe("GideonStore billing reconciliation", () => {
       state.auditEvents.some(
         (event) => event.action === "project.update_profile" && event.actorUserId === DEFAULT_LOCAL_USER_ID
       )
+    ).toBe(true);
+  });
+
+  it("gets, cancels, and retries jobs with explicit hosted session scope", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Hosted project",
+      profile: profileFixture()
+    });
+    await store.appendJob(
+      project.id,
+      createJob({
+        id: "job-1",
+        projectId: project.id,
+        kind: "analysis",
+        now: "2026-06-25T12:00:00.000Z"
+      })
+    );
+
+    const fetched = await store.getJobForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      jobId: "job-1"
+    });
+    const canceled = await store.requestJobCancelForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      jobId: "job-1"
+    });
+    const retried = await store.retryJobForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      jobId: "job-1"
+    });
+
+    expect(fetched.project.id).toBe(project.id);
+    expect(fetched.job.status).toBe("queued");
+    expect(canceled.job).toMatchObject({ id: "job-1", status: "canceled", retryable: true });
+    expect(retried.job).toMatchObject({ id: "job-1", status: "queued", retryable: false });
+    const state = await store.load();
+    expect(
+      state.auditEvents.some((event) => event.action === "job.cancel" && event.actorUserId === DEFAULT_LOCAL_USER_ID)
+    ).toBe(true);
+    expect(
+      state.auditEvents.some((event) => event.action === "job.retry" && event.actorUserId === DEFAULT_LOCAL_USER_ID)
     ).toBe(true);
   });
 });

@@ -4,9 +4,9 @@ Gideon is a macOS desktop app that turns a product walkthrough recording into ed
 
 ## Implementation progress
 
-Current engineering estimate: **62% complete** toward the full original product vision.
+Current engineering estimate: **63% complete** toward the full original product vision.
 
-This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, and hosted auth/API primitives in place. Remaining work is mainly production-hosted persistence, full hosted upload/job/render/export API coverage, hosted checkout/customer portal flows, distributed workers, observability, deployment hardening, and later non-MVP expansion items.
+This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, and hosted auth/API/job primitives in place. Remaining work is mainly production-hosted persistence, full hosted upload/render/export API coverage, hosted checkout/customer portal flows, distributed workers, observability, deployment hardening, and later non-MVP expansion items.
 
 ## Local development
 
@@ -45,7 +45,7 @@ The `Build macOS app` workflow builds the app on macOS and uploads the DMG/ZIP a
 
 ## Hosted auth foundation
 
-Gideon includes hosted-auth primitives for the future web/API service while keeping the current local desktop flow intact. `GIDEON_SESSION_SECRET` enables HMAC-signed session tokens with HttpOnly `SameSite=Lax` cookies, expiry checks, and CSRF validation. `GIDEON_SESSION_COOKIE_NAME`, `GIDEON_SESSION_DURATION_SECONDS`, and `GIDEON_SECURE_COOKIES=false` customize local/dev behavior. The hosted API foundation exposes typed handlers for `GET /api/v1/auth/session`, internal `POST /api/v1/auth/provider-callback`, CSRF-protected `POST /api/v1/auth/session/logout`, authenticated `GET/POST /api/v1/projects`, authenticated `GET /api/v1/projects/:id`, CSRF-protected `PATCH /api/v1/projects/:id/profile`, and verified `POST /api/v1/webhooks/stripe`. Auth provider callbacks must include `GIDEON_AUTH_CALLBACK_SECRET`; they sync the provider subject through the store, create or update the user, create a default owner workspace when needed, switch the active workspace, and record an `auth.user.sync` audit event.
+Gideon includes hosted-auth primitives for the future web/API service while keeping the current local desktop flow intact. `GIDEON_SESSION_SECRET` enables HMAC-signed session tokens with HttpOnly `SameSite=Lax` cookies, expiry checks, and CSRF validation. `GIDEON_SESSION_COOKIE_NAME`, `GIDEON_SESSION_DURATION_SECONDS`, and `GIDEON_SECURE_COOKIES=false` customize local/dev behavior. The hosted API foundation exposes typed handlers for `GET /api/v1/auth/session`, internal `POST /api/v1/auth/provider-callback`, CSRF-protected `POST /api/v1/auth/session/logout`, authenticated `GET/POST /api/v1/projects`, authenticated `GET /api/v1/projects/:id`, CSRF-protected `PATCH /api/v1/projects/:id/profile`, authenticated `GET /api/v1/jobs/:id`, CSRF-protected `POST /api/v1/jobs/:id/cancel`, CSRF-protected `POST /api/v1/jobs/:id/retry`, and verified `POST /api/v1/webhooks/stripe`. Auth provider callbacks must include `GIDEON_AUTH_CALLBACK_SECRET`; they sync the provider subject through the store, create or update the user, create a default owner workspace when needed, switch the active workspace, and record an `auth.user.sync` audit event.
 
 ## Optional AI provider configuration
 

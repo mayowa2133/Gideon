@@ -2,10 +2,12 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createSignedSession } from "./auth";
 import { handleHostedApiRequest, type HostedApiStore } from "./hostedApi";
+import { requestJobCancel as requestJobCancelState, retryJob as retryJobState } from "../shared/jobState";
 import type {
   AppState,
   ApplyBillingSubscriptionInput,
   CreateProjectInput,
+  JobRecord,
   ProductProfile,
   Project,
   SyncAuthenticatedUserInput
@@ -354,6 +356,156 @@ describe("hosted API foundation", () => {
     expect(api.store.state.projects[0]?.profile.productName).toBe("Gideon Cloud");
   });
 
+  it("returns job details without leaking jobs from another workspace", async () => {
+    const api = testApi();
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        jobs: [jobFixture({ id: "job-1", projectId: "project-1" })]
+      }),
+      projectFixture({
+        id: "project-2",
+        workspaceId: "other-workspace",
+        name: "Hidden project",
+        jobs: [jobFixture({ id: "job-2", projectId: "project-2" })]
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const visible = await handleHostedApiRequest(
+      {
+        method: "GET",
+        path: "/api/v1/jobs/job-1",
+        headers: { cookie: `gideon_session=${created.token}` },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(visible.status).toBe(200);
+    expect(visible.body).toMatchObject({
+      data: {
+        job: {
+          id: "job-1",
+          projectId: "project-1",
+          workspaceId: "local-workspace",
+          kind: "analysis",
+          status: "queued"
+        }
+      }
+    });
+
+    const hidden = await handleHostedApiRequest(
+      {
+        method: "GET",
+        path: "/api/v1/jobs/job-2",
+        headers: { cookie: `gideon_session=${created.token}` },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(hidden.status).toBe(404);
+    expect(hidden.body).toMatchObject({ error: { code: "not_found" } });
+  });
+
+  it("cancels and retries jobs through authenticated CSRF-protected hosted API requests", async () => {
+    const api = testApi();
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        jobs: [jobFixture({ id: "job-1", projectId: "project-1" })]
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const rejected = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/jobs/job-1/cancel",
+        headers: { cookie: `gideon_session=${created.token}` },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+    expect(rejected.status).toBe(403);
+    expect(rejected.body).toMatchObject({ error: { code: "csrf_failed" } });
+
+    const canceled = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/jobs/job-1/cancel",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1",
+          "x-request-id": "req_cancel_job"
+        },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(canceled.status).toBe(202);
+    expect(canceled.body).toMatchObject({
+      data: {
+        job: {
+          id: "job-1",
+          status: "canceled",
+          retryable: true,
+          workspaceId: "local-workspace"
+        }
+      },
+      meta: { requestId: "req_cancel_job" }
+    });
+
+    const retried = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/jobs/job-1/retry",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1"
+        },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:02:00.000Z")
+      },
+      api
+    );
+
+    expect(retried.status).toBe(202);
+    expect(retried.body).toMatchObject({
+      data: {
+        job: {
+          id: "job-1",
+          status: "queued",
+          retryable: false,
+          workspaceId: "local-workspace"
+        }
+      }
+    });
+    expect(api.store.state.projects[0]?.jobs[0]?.status).toBe("queued");
+  });
+
   it("verifies Stripe webhooks and applies subscription updates", async () => {
     const api = testApi();
     const event = {
@@ -527,6 +679,39 @@ class InMemoryHostedApiStore implements HostedApiStore {
     return project;
   }
 
+  async getJobForSession(input: {
+    userId: string;
+    workspaceId: string;
+    jobId: string;
+  }): Promise<{ project: Project; job: JobRecord }> {
+    this.assertMember(input);
+    return this.findJob(input);
+  }
+
+  async requestJobCancelForSession(input: {
+    userId: string;
+    workspaceId: string;
+    jobId: string;
+  }): Promise<{ project: Project; job: JobRecord }> {
+    this.assertMember(input);
+    const { project, job } = this.findJob(input);
+    const nextJob = requestJobCancelState(job, "2026-06-25T12:01:00.000Z");
+    project.jobs = project.jobs.map((candidate) => (candidate.id === input.jobId ? nextJob : candidate));
+    return { project, job: nextJob };
+  }
+
+  async retryJobForSession(input: {
+    userId: string;
+    workspaceId: string;
+    jobId: string;
+  }): Promise<{ project: Project; job: JobRecord }> {
+    this.assertMember(input);
+    const { project, job } = this.findJob(input);
+    const nextJob = retryJobState(job, "2026-06-25T12:02:00.000Z");
+    project.jobs = project.jobs.map((candidate) => (candidate.id === input.jobId ? nextJob : candidate));
+    return { project, job: nextJob };
+  }
+
   private assertMember(input: { userId: string; workspaceId: string }): void {
     const membership = this.state.workspaceMembers.find(
       (candidate) => candidate.userId === input.userId && candidate.workspaceId === input.workspaceId
@@ -534,6 +719,19 @@ class InMemoryHostedApiStore implements HostedApiStore {
     if (!membership) {
       throw new Error("The active user is not a member of this workspace.");
     }
+  }
+
+  private findJob(input: { workspaceId: string; jobId: string }): { project: Project; job: JobRecord } {
+    for (const project of this.state.projects) {
+      if (project.workspaceId !== input.workspaceId) {
+        continue;
+      }
+      const job = project.jobs.find((candidate) => candidate.id === input.jobId);
+      if (job) {
+        return { project, job };
+      }
+    }
+    throw new Error("Job not found.");
   }
 }
 
@@ -555,6 +753,7 @@ function projectFixture(input: {
   workspaceId: string;
   name: string;
   profile?: Project["profile"];
+  jobs?: JobRecord[];
 }): Project {
   return {
     id: input.id,
@@ -570,9 +769,31 @@ function projectFixture(input: {
     artifacts: [],
     uploadSessions: [],
     providerRuns: [],
-    jobs: [],
+    jobs: input.jobs ?? [],
     jobEvents: [],
     createdAt: "2026-06-25T12:00:00.000Z",
     updatedAt: "2026-06-25T12:00:00.000Z"
+  };
+}
+
+function jobFixture(input: Partial<JobRecord> & { id: string; projectId: string }): JobRecord {
+  return {
+    id: input.id,
+    projectId: input.projectId,
+    kind: "analysis",
+    status: "queued",
+    attempt: 0,
+    maxAttempts: 3,
+    progress: {
+      current: 0,
+      total: 1,
+      unit: "step"
+    },
+    userMessage: "Waiting to start.",
+    cancelable: true,
+    retryable: false,
+    createdAt: "2026-06-25T12:00:00.000Z",
+    updatedAt: "2026-06-25T12:00:00.000Z",
+    ...input
   };
 }
