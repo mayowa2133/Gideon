@@ -57,8 +57,10 @@ import {
   workspacePlanDefinition
 } from "../shared/usage";
 import {
+  createJob,
   createJobEvent,
   finishJobCancel as finishJobCancelState,
+  findActiveJob,
   recoverInterruptedJob,
   requestJobCancel as requestJobCancelState,
   retryJob as retryJobState
@@ -1282,6 +1284,69 @@ export class GideonStore {
         }
       }
     );
+  }
+
+  async createAnalysisJobForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+  }): Promise<{ project: Project; job: JobRecord; reused: boolean }> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "job:write"
+    });
+    const project = state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    if (!project.recording) {
+      throw new Error("Choose a recording before analysis.");
+    }
+    const activeJob = findActiveJob(project.jobs ?? [], "analysis");
+    if (activeJob) {
+      return { project, job: activeJob, reused: true };
+    }
+    const now = new Date().toISOString();
+    const job = createJob({
+      id: randomUUID(),
+      projectId: project.id,
+      kind: "analysis",
+      now,
+      userMessage: "Waiting to analyze recording."
+    });
+    project.jobs = [...(project.jobs ?? []), job];
+    project.jobEvents = [
+      ...(project.jobEvents ?? []),
+      createJobEvent({
+        id: randomUUID(),
+        projectId: project.id,
+        jobId: job.id,
+        kind: "queued",
+        stage: "queued",
+        message: job.userMessage,
+        progress: job.progress,
+        now
+      })
+    ].slice(-MAX_PROJECT_JOB_EVENTS);
+    project.updatedAt = now;
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "job.create",
+      targetType: "job",
+      targetId: job.id,
+      summary: "Queued analysis job.",
+      metadata: { jobKind: job.kind, status: job.status }
+    });
+    await this.save();
+    return { project, job, reused: false };
   }
 
   async appendJobEvent(projectId: string, input: JobEventInput): Promise<Project> {

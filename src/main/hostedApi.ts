@@ -97,6 +97,11 @@ export interface HostedApiStore {
     artifact: ArtifactRecord;
     recording: RecordingMetadata;
   }): Promise<Project>;
+  createAnalysisJobForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+  }): Promise<{ project: Project; job: JobRecord; reused: boolean }>;
 }
 
 export interface HostedRecordingUploadSession {
@@ -126,10 +131,15 @@ export interface HostedRecordingUploadService {
   }): Promise<{ artifact: ArtifactRecord; recording: RecordingMetadata }>;
 }
 
+export interface HostedJobQueueService {
+  enqueueAnalysisJob(input: { projectId: string; jobId: string }): Promise<void> | void;
+}
+
 export interface HostedApiDependencies {
   store: HostedApiStore;
   config: HostedApiConfig;
   uploadService?: HostedRecordingUploadService;
+  jobQueueService?: HostedJobQueueService;
 }
 
 class ApiError extends Error {
@@ -204,6 +214,10 @@ export async function handleHostedApiRequest(
         decodeURIComponent(recordingCompleteRoute[1] ?? ""),
         decodeURIComponent(recordingCompleteRoute[2] ?? "")
       );
+    }
+    const analysisRunsRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/analysis-runs$/);
+    if (method === "POST" && analysisRunsRoute) {
+      return await handleCreateAnalysisRun(request, dependencies, requestId, decodeURIComponent(analysisRunsRoute[1] ?? ""));
     }
     const jobRoute = path.match(/^\/api\/v1\/jobs\/([^/]+)$/);
     if (method === "GET" && jobRoute) {
@@ -633,6 +647,55 @@ async function handleCompleteRecordingUpload(
   );
 }
 
+async function handleCreateAnalysisRun(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string
+): Promise<HostedApiResponse> {
+  if (!dependencies.jobQueueService) {
+    throw new ApiError(503, "job_queue_not_configured", "Hosted job queue is not configured.");
+  }
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  objectBody(request);
+  const { project, job, reused } = await storeCall(() =>
+    dependencies.store.createAnalysisJobForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId
+    })
+  );
+  if (!reused) {
+    try {
+      await dependencies.jobQueueService.enqueueAnalysisJob({ projectId, jobId: job.id });
+    } catch (error) {
+      throw jobQueueError(error);
+    }
+  }
+  return jsonResponse(
+    202,
+    {
+      analysisRun: {
+        id: job.id,
+        projectId,
+        workspaceId: project.workspaceId,
+        status: job.status,
+        reused
+      },
+      job: jobResource(project, job)
+    },
+    requestId,
+    {
+      Location: `/api/v1/jobs/${job.id}`
+    }
+  );
+}
+
 function requiredSession(request: HostedApiRequest, dependencies: HostedApiDependencies): SessionClaims {
   const token = readSessionTokenFromCookieHeader(header(request, "cookie"), dependencies.config.auth.sessionCookieName);
   if (!token || !dependencies.config.auth.sessionSecret) {
@@ -945,6 +1008,14 @@ function uploadServiceError(error: unknown): ApiError {
     return new ApiError(503, "storage_unavailable", message);
   }
   return new ApiError(500, "internal_error", "Unexpected upload service error.");
+}
+
+function jobQueueError(error: unknown): ApiError {
+  const message = error instanceof Error ? error.message : "Job queue operation failed.";
+  if (/not configured|missing/i.test(message)) {
+    return new ApiError(503, "job_queue_not_configured", message);
+  }
+  return new ApiError(503, "temporarily_unavailable", message);
 }
 
 function clearSessionCookie(cookieName: string, secure: boolean): string {

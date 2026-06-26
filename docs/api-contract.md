@@ -420,9 +420,32 @@ Start full analysis for active verified recording/profile.
 
 - **Auth:** `member+`.
 - **Headers:** CSRF, `Idempotency-Key`.
-- **Request:** `{ "recordingId": "uuid", "productProfileId": "uuid", "languageHint": "en" }`.
-- **Validation:** IDs belong to same project/workspace and are active/verified; language BCP-47 or omitted; no equivalent active run; quota reservation.
-- **Response 202:** Analysis run + top-level Job.
+- **Request:** `{}`. The current hosted foundation analyzes the active validated project recording/profile; future language hints can be added without changing the route.
+- **Validation:** project belongs to session workspace, active recording exists, hosted job queue is configured, no equivalent active analysis job.
+- **Response 202:** Analysis run projection plus top-level Job. If an equivalent active analysis job already exists, the API returns it with `reused=true` and does not enqueue a duplicate.
+
+```json
+{
+  "data": {
+    "analysisRun": {
+      "id": "job-uuid",
+      "projectId": "uuid",
+      "workspaceId": "uuid",
+      "status": "queued",
+      "reused": false
+    },
+    "job": {
+      "id": "job-uuid",
+      "projectId": "uuid",
+      "workspaceId": "uuid",
+      "kind": "analysis",
+      "status": "queued"
+    }
+  },
+  "meta": { "requestId": "req_..." }
+}
+```
+
 - **Errors:** 404, 409 invalid state/active run, 422 media/profile, 429 quota/concurrency, 503.
 - **Rate limit:** 20/hour/workspace; one active analysis/project.
 

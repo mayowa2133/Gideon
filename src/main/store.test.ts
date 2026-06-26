@@ -324,6 +324,71 @@ describe("GideonStore billing reconciliation", () => {
       state.auditEvents.some((event) => event.action === "recording.attach" && event.actorUserId === DEFAULT_LOCAL_USER_ID)
     ).toBe(true);
   });
+
+  it("creates analysis jobs with explicit hosted session scope", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Hosted project",
+      profile: profileFixture()
+    });
+    const session = uploadSessionFixture({
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id
+    });
+    await store.createRecordingUploadSessionRecordForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      session
+    });
+    const artifact = artifactFixture({
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      storageKey: session.storageKey,
+      contentType: session.contentType,
+      byteSize: session.byteSize,
+      originalFileName: session.originalFileName
+    });
+    await store.completeRecordingUploadForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      sessionId: session.id,
+      artifact,
+      recording: recordingFixture({
+        artifactId: artifact.id,
+        storageKey: artifact.storageKey,
+        sha256: artifact.sha256,
+        sizeBytes: artifact.byteSize,
+        fileName: artifact.originalFileName
+      })
+    });
+
+    const created = await store.createAnalysisJobForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id
+    });
+    const duplicate = await store.createAnalysisJobForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id
+    });
+
+    expect(created.reused).toBe(false);
+    expect(created.job).toMatchObject({ kind: "analysis", status: "queued" });
+    expect(duplicate.reused).toBe(true);
+    expect(duplicate.job.id).toBe(created.job.id);
+    const state = await store.load();
+    expect(state.activeProjectId).toBeNull();
+    expect(state.projects.find((candidate) => candidate.id === project.id)?.jobs).toHaveLength(1);
+    expect(
+      state.auditEvents.some((event) => event.action === "job.create" && event.actorUserId === DEFAULT_LOCAL_USER_ID)
+    ).toBe(true);
+  });
 });
 
 function profileFixture(overrides: Partial<ProductProfile> = {}): ProductProfile {
