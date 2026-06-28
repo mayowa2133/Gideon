@@ -10,6 +10,7 @@ import {
   type SessionClaims
 } from "./auth";
 import {
+  createStripeBillingService,
   loadBillingConfig,
   normalizeStripeSubscriptionEvent,
   verifyStripeWebhookSignature,
@@ -224,6 +225,26 @@ export function loadHostedApiConfig(env: NodeJS.ProcessEnv = process.env): Hoste
   };
 }
 
+export function createHostedApiDependencies(input: {
+  store: HostedApiStore;
+  config?: HostedApiConfig;
+  env?: NodeJS.ProcessEnv;
+  uploadService?: HostedRecordingUploadService;
+  jobQueueService?: HostedJobQueueService;
+  exportService?: HostedExportService;
+  billingService?: HostedBillingService;
+}): HostedApiDependencies {
+  const config = input.config ?? loadHostedApiConfig(input.env);
+  return {
+    store: input.store,
+    config,
+    uploadService: input.uploadService,
+    jobQueueService: input.jobQueueService,
+    exportService: input.exportService,
+    billingService: input.billingService ?? createHostedBillingService(config.billing)
+  };
+}
+
 export async function handleHostedApiRequest(
   request: HostedApiRequest,
   dependencies: HostedApiDependencies
@@ -355,6 +376,13 @@ export function createHostedApiNodeHandler(dependencies: HostedApiDependencies) 
     response.statusCode = result.status;
     response.end(JSON.stringify(result.body));
   };
+}
+
+function createHostedBillingService(config: BillingConfig): HostedBillingService | undefined {
+  if (config.provider === "stripe" && config.stripeSecretKey) {
+    return createStripeBillingService(config);
+  }
+  return undefined;
 }
 
 async function handleGetSession(

@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createSignedSession } from "./auth";
 import {
+  createHostedApiDependencies,
   handleHostedApiRequest,
   type HostedBillingService,
   type HostedApiStore,
@@ -44,6 +45,67 @@ describe("hosted API foundation", () => {
       data: { session: null },
       meta: { requestId: "req_test_1" }
     });
+  });
+
+  it("auto-wires configured Stripe billing service into hosted dependencies", () => {
+    const store = new InMemoryHostedApiStore();
+    const dependencies = createHostedApiDependencies({
+      store,
+      env: {
+        GIDEON_SESSION_SECRET: "session-secret",
+        GIDEON_AUTH_CALLBACK_SECRET: "internal-secret",
+        GIDEON_BILLING_PROVIDER: "stripe",
+        STRIPE_SECRET_KEY: "sk_test",
+        GIDEON_STRIPE_API_BASE_URL: "https://stripe.example.test",
+        GIDEON_STRIPE_TEAM_PRICE_ID: "price_team"
+      }
+    });
+
+    expect(dependencies.store).toBe(store);
+    expect(dependencies.config.billing.provider).toBe("stripe");
+    expect(dependencies.config.billing.stripeSecretKey).toBe("sk_test");
+    expect(dependencies.billingService).toBeDefined();
+  });
+
+  it("leaves hosted billing disabled when Stripe billing is missing a secret key", async () => {
+    const dependencies = createHostedApiDependencies({
+      store: new InMemoryHostedApiStore(),
+      env: {
+        GIDEON_SESSION_SECRET: "session-secret",
+        GIDEON_BILLING_PROVIDER: "stripe",
+        GIDEON_STRIPE_TEAM_PRICE_ID: "price_team"
+      }
+    });
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    expect(dependencies.billingService).toBeUndefined();
+    const response = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/workspaces/local-workspace/billing/checkout-sessions",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1"
+        },
+        body: {
+          plan: "team",
+          successUrl: "https://gideon.example.test/success",
+          cancelUrl: "https://gideon.example.test/cancel"
+        },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      dependencies
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.body).toMatchObject({ error: { code: "billing_not_configured" } });
   });
 
   it("syncs trusted auth callbacks and returns a signed cookie session", async () => {
