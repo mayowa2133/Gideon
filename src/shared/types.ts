@@ -247,6 +247,9 @@ export interface JobRecord {
   updatedAt: string;
   startedAt?: string;
   finishedAt?: string;
+  workerId?: string;
+  heartbeatAt?: string;
+  leaseExpiresAt?: string;
 }
 
 export interface JobEvent {

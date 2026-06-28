@@ -22,6 +22,19 @@ export interface CreateJobEventInput {
   metadata?: JobEvent["metadata"];
 }
 
+export interface StartJobLeaseInput {
+  now: string;
+  workerId: string;
+  leaseSeconds: number;
+  userMessage?: string;
+}
+
+export interface HeartbeatJobLeaseInput {
+  now: string;
+  workerId: string;
+  leaseSeconds: number;
+}
+
 export interface RecoverInterruptedJobResult {
   job: JobRecord;
   event: {
@@ -92,6 +105,31 @@ export function startJob(job: JobRecord, now: string, userMessage = "Running."):
   };
 }
 
+export function startJobLease(job: JobRecord, input: StartJobLeaseInput): JobRecord {
+  assertWorkerLeaseInput(input.workerId, input.leaseSeconds);
+  const running = startJob(job, input.now, input.userMessage ?? "Running.");
+  return {
+    ...running,
+    workerId: input.workerId,
+    heartbeatAt: input.now,
+    leaseExpiresAt: addSeconds(input.now, input.leaseSeconds)
+  };
+}
+
+export function heartbeatJobLease(job: JobRecord, input: HeartbeatJobLeaseInput): JobRecord {
+  assertStatus(job, ["running", "canceling"], "heartbeat");
+  assertWorkerLeaseInput(input.workerId, input.leaseSeconds);
+  if (job.workerId !== input.workerId) {
+    throw new Error("Worker lease does not belong to this worker.");
+  }
+  return {
+    ...job,
+    heartbeatAt: input.now,
+    leaseExpiresAt: addSeconds(input.now, input.leaseSeconds),
+    updatedAt: input.now
+  };
+}
+
 export function updateJobProgress(
   job: JobRecord,
   progress: JobRecord["progress"],
@@ -119,6 +157,9 @@ export function succeedJob(job: JobRecord, now: string, userMessage = "Completed
     userMessage,
     cancelable: false,
     retryable: false,
+    workerId: undefined,
+    heartbeatAt: undefined,
+    leaseExpiresAt: undefined,
     finishedAt: now,
     updatedAt: now
   };
@@ -134,6 +175,9 @@ export function failJob(job: JobRecord, now: string, safeError: string): JobReco
     userMessage: retryable ? "This job failed and can be retried." : "This job failed.",
     cancelable: false,
     retryable,
+    workerId: undefined,
+    heartbeatAt: undefined,
+    leaseExpiresAt: undefined,
     finishedAt: now,
     updatedAt: now
   };
@@ -163,6 +207,9 @@ export function finishJobCancel(job: JobRecord, now: string): JobRecord {
     userMessage: "Canceled.",
     cancelable: false,
     retryable: true,
+    workerId: undefined,
+    heartbeatAt: undefined,
+    leaseExpiresAt: undefined,
     finishedAt: now,
     updatedAt: now
   };
@@ -189,8 +236,36 @@ export function retryJob(job: JobRecord, now: string): JobRecord {
     cancelable: true,
     retryable: false,
     startedAt: undefined,
+    workerId: undefined,
+    heartbeatAt: undefined,
+    leaseExpiresAt: undefined,
     finishedAt: undefined,
     updatedAt: now
+  };
+}
+
+export function recoverExpiredJobLease(
+  job: JobRecord,
+  now: string,
+  safeError = "Worker lease expired before this job finished."
+): RecoverInterruptedJobResult | null {
+  if (job.status !== "running" || !job.leaseExpiresAt || Date.parse(job.leaseExpiresAt) > Date.parse(now)) {
+    return null;
+  }
+  const recovered = failJob(job, now, safeError);
+  return {
+    job: recovered,
+    event: {
+      kind: "failed",
+      stage: "finalize",
+      message: recovered.safeError ?? recovered.userMessage,
+      metadata: {
+        recoveredFromStatus: job.status,
+        recoveredFromWorkerId: job.workerId ?? "unknown",
+        leaseExpiredAt: job.leaseExpiresAt,
+        retryable: recovered.retryable
+      }
+    }
   };
 }
 
@@ -250,4 +325,21 @@ function assertStatus(job: JobRecord, allowed: JobRecord["status"][], action: st
   if (!allowed.includes(job.status)) {
     throw new Error(`Cannot ${action} ${job.status} job.`);
   }
+}
+
+function assertWorkerLeaseInput(workerId: string, leaseSeconds: number): void {
+  if (!workerId.trim()) {
+    throw new Error("workerId is required.");
+  }
+  if (!Number.isInteger(leaseSeconds) || leaseSeconds < 1) {
+    throw new Error("leaseSeconds must be a positive integer.");
+  }
+}
+
+function addSeconds(value: string, seconds: number): string {
+  const dateMs = Date.parse(value);
+  if (!Number.isFinite(dateMs)) {
+    throw new Error("now must be a valid ISO timestamp.");
+  }
+  return new Date(dateMs + seconds * 1000).toISOString();
 }
