@@ -5,7 +5,8 @@ import {
   isWorkerQueueCanceledError,
   loadHostedJobQueueConfig,
   loadLocalWorkerQueueOptions,
-  LocalWorkerQueue
+  LocalWorkerQueue,
+  verifyHostedWorkerQueueRequest
 } from "./jobQueue";
 
 describe("local worker queue", () => {
@@ -311,5 +312,71 @@ describe("local worker queue", () => {
     await expect(service.enqueueRenderJob({ projectId: "project-1", jobId: "job-1" })).rejects.toThrow(
       "failed with [redacted]"
     );
+  });
+
+  it("verifies signed hosted worker queue intake requests", () => {
+    const body = JSON.stringify({ kind: "render", projectId: "project-1", jobId: "job-1" });
+    const signature = createHmac("sha256", "queue-secret").update(`1777000000.${body}`).digest("hex");
+
+    expect(
+      verifyHostedWorkerQueueRequest({
+        signingSecret: "queue-secret",
+        headers: {
+          "x-gideon-queue-timestamp": "1777000000",
+          "x-gideon-queue-signature": `sha256=${signature}`
+        },
+        body,
+        nowMs: 1_777_000_000_000
+      })
+    ).toEqual({
+      kind: "render",
+      projectId: "project-1",
+      jobId: "job-1"
+    });
+  });
+
+  it("rejects stale or incorrectly signed hosted worker queue intake requests", () => {
+    const body = JSON.stringify({ kind: "analysis", projectId: "project-1", jobId: "job-1" });
+    const signature = createHmac("sha256", "queue-secret").update(`1777000000.${body}`).digest("hex");
+
+    expect(() =>
+      verifyHostedWorkerQueueRequest({
+        signingSecret: "queue-secret",
+        headers: {
+          "x-gideon-queue-timestamp": "1776999000",
+          "x-gideon-queue-signature": `sha256=${signature}`
+        },
+        body,
+        nowMs: 1_777_000_000_000
+      })
+    ).toThrow("outside the allowed tolerance");
+    expect(() =>
+      verifyHostedWorkerQueueRequest({
+        signingSecret: "queue-secret",
+        headers: {
+          "x-gideon-queue-timestamp": "1777000000",
+          "x-gideon-queue-signature": `sha256=${"0".repeat(64)}`
+        },
+        body,
+        nowMs: 1_777_000_000_000
+      })
+    ).toThrow("verification failed");
+  });
+
+  it("rejects malformed hosted worker queue jobs after signature verification", () => {
+    const body = JSON.stringify({ kind: "export", projectId: "project-1", jobId: "job-1" });
+    const signature = createHmac("sha256", "queue-secret").update(`1777000000.${body}`).digest("hex");
+
+    expect(() =>
+      verifyHostedWorkerQueueRequest({
+        signingSecret: "queue-secret",
+        headers: {
+          "x-gideon-queue-timestamp": "1777000000",
+          "x-gideon-queue-signature": `sha256=${signature}`
+        },
+        body,
+        nowMs: 1_777_000_000_000
+      })
+    ).toThrow("job kind is invalid");
   });
 });

@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { HostedJobQueueService } from "./hostedApi";
 import type { JobKind, QueueRuntimeStats } from "../shared/types";
 
@@ -18,6 +18,19 @@ export interface HostedJobQueueConfig {
   provider: "none" | "http";
   httpEndpointUrl: string | null;
   signingSecret: string | null;
+}
+
+export interface HostedWorkerQueueJob {
+  kind: Extract<JobKind, "analysis" | "render">;
+  projectId: string;
+  jobId: string;
+}
+
+export interface HostedWorkerQueueRequest {
+  headers: Record<string, string | string[] | undefined>;
+  body: string | Buffer;
+  nowMs?: number;
+  toleranceSeconds?: number;
 }
 
 type QueueFetch = (
@@ -204,6 +217,20 @@ export function createHttpHostedJobQueueService(
   };
 }
 
+export function verifyHostedWorkerQueueRequest(input: HostedWorkerQueueRequest & { signingSecret: string }): HostedWorkerQueueJob {
+  const body = Buffer.isBuffer(input.body) ? input.body.toString("utf8") : input.body;
+  const timestamp = requiredHeader(input.headers, "x-gideon-queue-timestamp");
+  const signature = requiredHeader(input.headers, "x-gideon-queue-signature");
+  assertFreshQueueTimestamp(timestamp, input.nowMs, input.toleranceSeconds);
+  assertValidQueueSignature({
+    timestamp,
+    body,
+    providedSignature: signature,
+    signingSecret: input.signingSecret
+  });
+  return hostedWorkerQueueJobFromBody(body);
+}
+
 async function enqueueHostedJob(input: {
   endpointUrl: string;
   signingSecret: string;
@@ -233,6 +260,73 @@ async function enqueueHostedJob(input: {
     const text = await response.text();
     throw new Error(`Hosted worker queue enqueue failed with ${response.status}: ${sanitizeQueueError(text)}`);
   }
+}
+
+function hostedWorkerQueueJobFromBody(body: string): HostedWorkerQueueJob {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new Error("Hosted worker queue body must be valid JSON.");
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("Hosted worker queue body must be a JSON object.");
+  }
+  const record = parsed as Record<string, unknown>;
+  const kind = stringValue(record.kind);
+  if (kind !== "analysis" && kind !== "render") {
+    throw new Error("Hosted worker queue job kind is invalid.");
+  }
+  const projectId = stringValue(record.projectId);
+  const jobId = stringValue(record.jobId);
+  if (!projectId || !jobId) {
+    throw new Error("Hosted worker queue job requires projectId and jobId.");
+  }
+  return { kind, projectId, jobId };
+}
+
+function assertFreshQueueTimestamp(timestamp: string, nowMs = Date.now(), toleranceSeconds = 300): void {
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isInteger(timestampSeconds) || timestampSeconds < 0) {
+    throw new Error("Hosted worker queue timestamp is invalid.");
+  }
+  if (Math.abs(Math.floor(nowMs / 1000) - timestampSeconds) > toleranceSeconds) {
+    throw new Error("Hosted worker queue timestamp is outside the allowed tolerance.");
+  }
+}
+
+function assertValidQueueSignature(input: {
+  timestamp: string;
+  body: string;
+  providedSignature: string;
+  signingSecret: string;
+}): void {
+  const signature = input.providedSignature.startsWith("sha256=")
+    ? input.providedSignature.slice("sha256=".length)
+    : input.providedSignature;
+  if (!/^[a-f0-9]{64}$/i.test(signature)) {
+    throw new Error("Hosted worker queue signature is invalid.");
+  }
+  const expected = createHmac("sha256", input.signingSecret).update(`${input.timestamp}.${input.body}`).digest("hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+  const actualBuffer = Buffer.from(signature, "hex");
+  if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) {
+    throw new Error("Hosted worker queue signature verification failed.");
+  }
+}
+
+function requiredHeader(headers: HostedWorkerQueueRequest["headers"], name: string): string {
+  const expected = name.toLowerCase();
+  for (const [candidate, value] of Object.entries(headers)) {
+    if (candidate.toLowerCase() !== expected) {
+      continue;
+    }
+    const normalized = Array.isArray(value) ? value[0] : value;
+    if (normalized?.trim()) {
+      return normalized.trim();
+    }
+  }
+  throw new Error(`Hosted worker queue ${name} header is required.`);
 }
 
 function normalizeConcurrencyByKind(input: WorkerQueueOptions["concurrencyByKind"]): Partial<Record<JobKind, number>> {
@@ -282,6 +376,10 @@ function normalizeHttpUrl(value: string | undefined): string | null {
 function nonEmpty(value: string | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function sanitizeQueueError(value: string): string {

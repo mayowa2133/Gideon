@@ -4,9 +4,9 @@ Gideon is a macOS desktop app that turns a product walkthrough recording into ed
 
 ## Implementation progress
 
-Current engineering estimate: **73% complete** toward the full original product vision.
+Current engineering estimate: **74% complete** toward the full original product vision.
 
-This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, hosted analysis/render/export/download/billing-session primitives, Stripe REST session wiring, and a signed hosted worker-queue handoff. Remaining work is mainly production-hosted persistence, full worker execution/retry infrastructure, observability, deployment hardening, and later non-MVP expansion items.
+This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, hosted analysis/render/export/download/billing-session primitives, Stripe REST session wiring, and signed hosted worker-queue enqueue/intake verification. Remaining work is mainly production-hosted persistence, full worker execution/retry infrastructure, observability, deployment hardening, and later non-MVP expansion items.
 
 ## Local development
 
@@ -83,7 +83,7 @@ GIDEON_RENDER_QUEUE_CONCURRENCY=1 \
 pnpm start
 ```
 
-The runtime panel shows active/pending queue counts and configured lanes. Hosted dependency creation can also auto-wire a signed HTTP worker-queue handoff when `GIDEON_HOSTED_QUEUE_URL` or `GIDEON_WORKER_QUEUE_URL` is paired with `GIDEON_HOSTED_QUEUE_SECRET` or `GIDEON_WORKER_QUEUE_SECRET`; hosted analysis/render job routes then POST signed enqueue messages to that endpoint. This is a production handoff boundary, not a full Redis/BullMQ worker runtime yet.
+The runtime panel shows active/pending queue counts and configured lanes. Hosted dependency creation can also auto-wire a signed HTTP worker-queue handoff when `GIDEON_HOSTED_QUEUE_URL` or `GIDEON_WORKER_QUEUE_URL` is paired with `GIDEON_HOSTED_QUEUE_SECRET` or `GIDEON_WORKER_QUEUE_SECRET`; hosted analysis/render job routes then POST signed enqueue messages to that endpoint. The shared queue module also verifies signed worker-intake requests with timestamp tolerance and payload validation. This is a production handoff boundary, not a full Redis/BullMQ worker runtime yet.
 
 ## Optional private cloud storage
 

@@ -135,7 +135,7 @@ Implement in vertical slices that keep the app usable after each commit:
 ### Scope
 
 - Move heavy media, ASR, AI, TTS, and render work to worker processes.
-- Extend the signed hosted HTTP queue handoff into a durable Redis/BullMQ or equivalent backend.
+- Extend the signed hosted HTTP queue handoff and intake verifier into a durable Redis/BullMQ or equivalent backend.
 - Add idempotency keys, concurrency limits, job leases, and stale-lock recovery.
 - Add structured logs, metrics, and safe error reporting.
 
