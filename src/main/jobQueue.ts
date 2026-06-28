@@ -12,6 +12,7 @@ export interface WorkerQueueTask<T> {
 
 export interface DetachedWorkerQueueOptions {
   onError?: (error: unknown, task: Pick<WorkerQueueTask<unknown>, "id" | "projectId" | "kind">) => void;
+  onComplete?: (task: Pick<WorkerQueueTask<unknown>, "id" | "projectId" | "kind">) => void;
 }
 
 export interface WorkerQueueOptions {
@@ -65,6 +66,15 @@ export interface HostedWorkerJobExecutor {
   runAnalysisJob(input: { projectId: string; jobId: string }): Promise<void> | void;
   runRenderJob(input: { projectId: string; jobId: string }): Promise<void> | void;
 }
+
+export interface HostedWorkerJobBroker {
+  enqueue(job: HostedWorkerQueueJob): Promise<void> | void;
+  subscribe(processor: HostedWorkerJobProcessor): () => void;
+  cancel?(jobId: string): boolean;
+  stats(): QueueRuntimeStats;
+}
+
+export type HostedWorkerJobProcessor = (job: HostedWorkerQueueJob) => Promise<void> | void;
 
 export interface HostedWorkerRuntimeOptions {
   workerId: string;
@@ -194,7 +204,9 @@ export class LocalWorkerQueue {
     this.assertNotQueuedOrRunning(task.id);
     this.pending.push({
       ...task,
-      resolve: () => undefined,
+      resolve: () => {
+        options.onComplete?.(task);
+      },
       reject: (error) => {
         options.onError?.(error, task);
       }
@@ -331,6 +343,105 @@ export function createHttpHostedJobQueueService(
   };
 }
 
+export function createBrokeredHostedJobQueueService(broker: HostedWorkerJobBroker): HostedJobQueueService {
+  return {
+    enqueueAnalysisJob(input) {
+      return broker.enqueue({ kind: "analysis", projectId: input.projectId, jobId: input.jobId });
+    },
+    enqueueRenderJob(input) {
+      return broker.enqueue({ kind: "render", projectId: input.projectId, jobId: input.jobId });
+    }
+  };
+}
+
+export class InMemoryHostedWorkerJobBroker implements HostedWorkerJobBroker {
+  private readonly queue: LocalWorkerQueue;
+  private readonly pendingJobs: HostedWorkerQueueJob[] = [];
+  private readonly inFlightJobIds = new Set<string>();
+  private processor: HostedWorkerJobProcessor | null = null;
+  private readonly onError?: (error: unknown, job: HostedWorkerQueueJob) => void;
+
+  constructor(options: WorkerQueueOptions & { onError?: (error: unknown, job: HostedWorkerQueueJob) => void } = {}) {
+    this.queue = new LocalWorkerQueue(options);
+    this.onError = options.onError;
+  }
+
+  enqueue(job: HostedWorkerQueueJob): void {
+    if (this.inFlightJobIds.has(job.jobId) || this.pendingJobs.some((candidate) => candidate.jobId === job.jobId)) {
+      throw new Error(`Hosted worker job ${job.jobId} is already queued or running.`);
+    }
+    this.pendingJobs.push(job);
+    this.drain();
+  }
+
+  subscribe(processor: HostedWorkerJobProcessor): () => void {
+    if (this.processor) {
+      throw new Error("Hosted worker broker already has a processor.");
+    }
+    this.processor = processor;
+    this.drain();
+    return () => {
+      if (this.processor === processor) {
+        this.processor = null;
+      }
+    };
+  }
+
+  cancel(jobId: string): boolean {
+    const pendingIndex = this.pendingJobs.findIndex((candidate) => candidate.jobId === jobId);
+    if (pendingIndex !== -1) {
+      this.pendingJobs.splice(pendingIndex, 1);
+      return true;
+    }
+    return this.queue.cancel(jobId);
+  }
+
+  stats(): QueueRuntimeStats {
+    const queueStats = this.queue.stats();
+    return {
+      ...queueStats,
+      pending: queueStats.pending + this.pendingJobs.length,
+      pendingByKind: addKindCounts(queueStats.pendingByKind, countKinds(this.pendingJobs)),
+      concurrencyByKind: queueStats.concurrencyByKind
+    };
+  }
+
+  private drain(): void {
+    if (!this.processor) {
+      return;
+    }
+    const processor = this.processor;
+    while (this.pendingJobs.length > 0) {
+      const job = this.pendingJobs.shift();
+      if (!job) {
+        return;
+      }
+      this.inFlightJobIds.add(job.jobId);
+      this.queue.enqueueDetached(
+        {
+          id: job.jobId,
+          projectId: job.projectId,
+          kind: job.kind,
+          run: async () => {
+            await processor(job);
+          }
+        },
+        {
+          onComplete: () => {
+            this.inFlightJobIds.delete(job.jobId);
+            this.drain();
+          },
+          onError: (error) => {
+            this.inFlightJobIds.delete(job.jobId);
+            this.onError?.(error, job);
+            this.drain();
+          }
+        }
+      );
+    }
+  }
+}
+
 export class HostedWorkerRuntime implements HostedWorkerJobDispatcher, HostedWorkerJobLeaseCoordinator {
   private readonly workerId: string;
   private readonly leaseSeconds: number;
@@ -368,6 +479,18 @@ export class HostedWorkerRuntime implements HostedWorkerJobDispatcher, HostedWor
 
   dispatchRenderJob(input: { projectId: string; jobId: string }): void {
     this.enqueueRuntimeJob({ kind: "render", projectId: input.projectId, jobId: input.jobId });
+  }
+
+  async runBrokeredJob(job: HostedWorkerQueueJob): Promise<void> {
+    const now = currentIsoTimestamp(this.nowMs());
+    await this.recoverExpiredJobLeases({ now });
+    await this.claimJobLease({
+      job,
+      workerId: this.workerId,
+      leaseSeconds: this.leaseSeconds,
+      now
+    });
+    await this.runLeasedJob(job);
   }
 
   claimJobLease(input: HostedWorkerJobLeaseInput): Promise<void> | void {
@@ -447,6 +570,13 @@ export class HostedWorkerRuntime implements HostedWorkerJobDispatcher, HostedWor
       now: currentIsoTimestamp(this.nowMs())
     });
   }
+}
+
+export function connectHostedWorkerRuntimeToBroker(
+  broker: HostedWorkerJobBroker,
+  runtime: Pick<HostedWorkerRuntime, "runBrokeredJob">
+): () => void {
+  return broker.subscribe((job) => runtime.runBrokeredJob(job));
 }
 
 export function createStoreBackedWorkerLeaseCoordinator(store: StoreBackedWorkerLeaseStore): HostedWorkerJobLeaseCoordinator {
@@ -757,6 +887,19 @@ function countKinds(tasks: Array<Pick<WorkerQueueTask<unknown>, "kind">>): Parti
     counts[task.kind] = (counts[task.kind] ?? 0) + 1;
     return counts;
   }, {});
+}
+
+function addKindCounts(
+  left: Partial<Record<JobKind, number>>,
+  right: Partial<Record<JobKind, number>>
+): Partial<Record<JobKind, number>> {
+  const combined: Partial<Record<JobKind, number>> = { ...left };
+  for (const [kind, count] of Object.entries(right) as Array<[JobKind, number | undefined]>) {
+    if (count) {
+      combined[kind] = (combined[kind] ?? 0) + count;
+    }
+  }
+  return combined;
 }
 
 function parsePositiveInteger(value: string | undefined): number | undefined {

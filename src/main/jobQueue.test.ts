@@ -1,11 +1,14 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  connectHostedWorkerRuntimeToBroker,
+  createBrokeredHostedJobQueueService,
   createHostedWorkerIntakeService,
   createHttpHostedJobQueueService,
   createStoreBackedWorkerLeaseCoordinator,
   handleHostedWorkerIntakeRequest,
   HostedWorkerRuntime,
+  InMemoryHostedWorkerJobBroker,
   isWorkerQueueCanceledError,
   loadHostedJobQueueConfig,
   loadLocalWorkerQueueOptions,
@@ -376,6 +379,125 @@ describe("local worker queue", () => {
     await expect(service.enqueueRenderJob({ projectId: "project-1", jobId: "job-1" })).rejects.toThrow(
       "failed with [redacted]"
     );
+  });
+
+  it("enqueues hosted jobs through a brokered queue service", async () => {
+    const broker = new InMemoryHostedWorkerJobBroker();
+    const service = createBrokeredHostedJobQueueService(broker);
+    const processed: string[] = [];
+
+    await service.enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" });
+    await service.enqueueRenderJob({ projectId: "project-2", jobId: "job-2" });
+
+    expect(broker.stats()).toMatchObject({ active: 0, pending: 2 });
+    expect(broker.stats().pendingByKind).toEqual({ analysis: 1, render: 1 });
+
+    broker.subscribe((job) => {
+      processed.push(`${job.kind}:${job.projectId}:${job.jobId}`);
+    });
+    await flushQueue();
+
+    expect(processed).toEqual(["analysis:project-1:job-1", "render:project-2:job-2"]);
+    expect(broker.stats()).toMatchObject({ active: 0, pending: 0 });
+    expect(() => service.enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" })).not.toThrow();
+    expect(() => service.enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" })).toThrow("already queued or running");
+  });
+
+  it("connects brokered hosted jobs to the worker runtime", async () => {
+    const events: string[] = [];
+    const broker = new InMemoryHostedWorkerJobBroker({
+      onError(error, job) {
+        events.push(`broker-error:${job.jobId}:${error instanceof Error ? error.message : "unknown"}`);
+      }
+    });
+    const runtime = new HostedWorkerRuntime({
+      workerId: "worker-1",
+      leaseSeconds: 60,
+      heartbeatIntervalMs: 0,
+      nowMs: () => 1_777_000_000_000,
+      leaseCoordinator: {
+        recoverExpiredJobLeases(input) {
+          events.push(`recover:${input.now}`);
+        },
+        claimJobLease(input) {
+          events.push(`claim:${input.workerId}:${input.job.jobId}:${input.now}`);
+        },
+        heartbeatJobLease(input) {
+          events.push(`heartbeat:${input.workerId}:${input.job.jobId}:${input.now}`);
+        },
+        failJobLease(input) {
+          events.push(`fail:${input.workerId}:${input.job.jobId}:${input.safeError}`);
+        }
+      },
+      executor: {
+        runAnalysisJob(input) {
+          events.push(`run-analysis:${input.projectId}:${input.jobId}`);
+        },
+        runRenderJob(input) {
+          events.push(`run-render:${input.projectId}:${input.jobId}`);
+        }
+      },
+      onError(error, job) {
+        events.push(`runtime-error:${job.jobId}:${error instanceof Error ? error.message : "unknown"}`);
+      }
+    });
+    connectHostedWorkerRuntimeToBroker(broker, runtime);
+
+    await createBrokeredHostedJobQueueService(broker).enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" });
+    await flushQueue();
+
+    expect(events).toEqual([
+      "recover:2026-04-24T03:06:40.000Z",
+      "claim:worker-1:job-1:2026-04-24T03:06:40.000Z",
+      "heartbeat:worker-1:job-1:2026-04-24T03:06:40.000Z",
+      "run-analysis:project-1:job-1",
+      "heartbeat:worker-1:job-1:2026-04-24T03:06:40.000Z"
+    ]);
+  });
+
+  it("routes brokered worker runtime failures through lease failure and broker errors", async () => {
+    const events: string[] = [];
+    const broker = new InMemoryHostedWorkerJobBroker({
+      onError(error, job) {
+        events.push(`broker-error:${job.jobId}:${error instanceof Error ? error.message : "unknown"}`);
+      }
+    });
+    const runtime = new HostedWorkerRuntime({
+      workerId: "worker-1",
+      leaseSeconds: 60,
+      heartbeatIntervalMs: 0,
+      nowMs: () => 1_777_000_000_000,
+      leaseCoordinator: {
+        claimJobLease(input) {
+          events.push(`claim:${input.job.jobId}`);
+        },
+        heartbeatJobLease(input) {
+          events.push(`heartbeat:${input.job.jobId}`);
+        },
+        failJobLease(input) {
+          events.push(`fail:${input.job.jobId}:${input.safeError}`);
+        }
+      },
+      executor: {
+        runAnalysisJob() {
+          throw new Error("worker secret_token_123 exploded");
+        },
+        runRenderJob() {
+          throw new Error("Unexpected render.");
+        }
+      }
+    });
+    connectHostedWorkerRuntimeToBroker(broker, runtime);
+
+    await createBrokeredHostedJobQueueService(broker).enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" });
+    await flushQueue();
+
+    expect(events).toEqual([
+      "claim:job-1",
+      "heartbeat:job-1",
+      "fail:job-1:worker [redacted] exploded",
+      "broker-error:job-1:worker secret_token_123 exploded"
+    ]);
   });
 
   it("verifies signed hosted worker queue intake requests", () => {
