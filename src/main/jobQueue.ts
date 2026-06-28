@@ -21,7 +21,7 @@ export interface WorkerQueueOptions {
 }
 
 export interface HostedJobQueueConfig {
-  provider: "none" | "http";
+  provider: "none" | "http" | "memory";
   httpEndpointUrl: string | null;
   signingSecret: string | null;
 }
@@ -297,8 +297,9 @@ export function loadLocalWorkerQueueOptions(env: NodeJS.ProcessEnv = process.env
 export function loadHostedJobQueueConfig(env: NodeJS.ProcessEnv = process.env): HostedJobQueueConfig {
   const endpoint = normalizeHttpUrl(env.GIDEON_HOSTED_QUEUE_URL ?? env.GIDEON_WORKER_QUEUE_URL);
   const signingSecret = nonEmpty(env.GIDEON_HOSTED_QUEUE_SECRET ?? env.GIDEON_WORKER_QUEUE_SECRET);
+  const requestedProvider = nonEmpty(env.GIDEON_HOSTED_QUEUE_PROVIDER ?? env.GIDEON_WORKER_QUEUE_PROVIDER)?.toLowerCase();
   return {
-    provider: endpoint && signingSecret ? "http" : "none",
+    provider: requestedProvider === "memory" || requestedProvider === "in_memory" ? "memory" : endpoint && signingSecret ? "http" : "none",
     httpEndpointUrl: endpoint,
     signingSecret
   };

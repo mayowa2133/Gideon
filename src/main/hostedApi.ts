@@ -17,9 +17,12 @@ import {
   type BillingConfig
 } from "./billing";
 import {
+  createBrokeredHostedJobQueueService,
   createHttpHostedJobQueueService,
+  InMemoryHostedWorkerJobBroker,
   loadHostedJobQueueConfig,
-  type HostedJobQueueConfig
+  type HostedJobQueueConfig,
+  type HostedWorkerJobBroker
 } from "./jobQueue";
 import type {
   AppState,
@@ -204,6 +207,7 @@ export interface HostedApiDependencies {
   config: HostedApiConfig;
   uploadService?: HostedRecordingUploadService;
   jobQueueService?: HostedJobQueueService;
+  jobQueueBroker?: HostedWorkerJobBroker;
   exportService?: HostedExportService;
   billingService?: HostedBillingService;
 }
@@ -238,15 +242,18 @@ export function createHostedApiDependencies(input: {
   env?: NodeJS.ProcessEnv;
   uploadService?: HostedRecordingUploadService;
   jobQueueService?: HostedJobQueueService;
+  jobQueueBroker?: HostedWorkerJobBroker;
   exportService?: HostedExportService;
   billingService?: HostedBillingService;
 }): HostedApiDependencies {
   const config = input.config ?? loadHostedApiConfig(input.env);
+  const jobQueueBroker = input.jobQueueBroker ?? createHostedJobQueueBroker(config.jobQueue);
   return {
     store: input.store,
     config,
     uploadService: input.uploadService,
-    jobQueueService: input.jobQueueService ?? createHostedJobQueueService(config.jobQueue),
+    jobQueueService: input.jobQueueService ?? createHostedJobQueueService(config.jobQueue, jobQueueBroker),
+    jobQueueBroker,
     exportService: input.exportService,
     billingService: input.billingService ?? createHostedBillingService(config.billing)
   };
@@ -392,9 +399,22 @@ function createHostedBillingService(config: BillingConfig): HostedBillingService
   return undefined;
 }
 
-function createHostedJobQueueService(config: HostedJobQueueConfig): HostedJobQueueService | undefined {
+function createHostedJobQueueBroker(config: HostedJobQueueConfig): HostedWorkerJobBroker | undefined {
+  if (config.provider === "memory") {
+    return new InMemoryHostedWorkerJobBroker();
+  }
+  return undefined;
+}
+
+function createHostedJobQueueService(
+  config: HostedJobQueueConfig,
+  broker?: HostedWorkerJobBroker
+): HostedJobQueueService | undefined {
   if (config.provider === "http" && config.httpEndpointUrl && config.signingSecret) {
     return createHttpHostedJobQueueService(config);
+  }
+  if (config.provider === "memory" && broker) {
+    return createBrokeredHostedJobQueueService(broker);
   }
   return undefined;
 }

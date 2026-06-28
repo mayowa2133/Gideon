@@ -320,6 +320,15 @@ describe("local worker queue", () => {
       httpEndpointUrl: null,
       signingSecret: "queue-secret"
     });
+    expect(
+      loadHostedJobQueueConfig({
+        GIDEON_HOSTED_QUEUE_PROVIDER: "memory"
+      })
+    ).toEqual({
+      provider: "memory",
+      httpEndpointUrl: null,
+      signingSecret: null
+    });
   });
 
   it("enqueues hosted jobs through a signed HTTP worker queue request", async () => {

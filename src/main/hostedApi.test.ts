@@ -126,6 +126,73 @@ describe("hosted API foundation", () => {
     expect(dependencies.jobQueueService).toBeDefined();
   });
 
+  it("auto-wires in-memory hosted worker broker queue service into hosted dependencies", async () => {
+    const dependencies = createHostedApiDependencies({
+      store: new InMemoryHostedApiStore(),
+      env: {
+        GIDEON_SESSION_SECRET: "session-secret",
+        GIDEON_HOSTED_QUEUE_PROVIDER: "memory"
+      }
+    });
+
+    expect(dependencies.config.jobQueue).toEqual({
+      provider: "memory",
+      httpEndpointUrl: null,
+      signingSecret: null
+    });
+    expect(dependencies.jobQueueService).toBeDefined();
+    expect(dependencies.jobQueueBroker).toBeDefined();
+
+    await dependencies.jobQueueService?.enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" });
+
+    expect(dependencies.jobQueueBroker?.stats()).toMatchObject({ active: 0, pending: 1 });
+    expect(dependencies.jobQueueBroker?.stats().pendingByKind).toEqual({ analysis: 1 });
+  });
+
+  it("creates hosted analysis jobs through auto-wired memory broker queue", async () => {
+    const api = createHostedApiDependencies({
+      store: new InMemoryHostedApiStore(),
+      env: {
+        GIDEON_SESSION_SECRET: "session-secret",
+        GIDEON_HOSTED_QUEUE_PROVIDER: "memory"
+      }
+    });
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        recording: recordingFixture({ artifactId: "recording-1" })
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const response = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/analysis-runs",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1"
+        },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(response.status).toBe(202);
+    expect(api.jobQueueBroker?.stats()).toMatchObject({ active: 0, pending: 1 });
+    expect(api.jobQueueBroker?.stats().pendingByKind).toEqual({ analysis: 1 });
+  });
+
   it("syncs trusted auth callbacks and returns a signed cookie session", async () => {
     const api = testApi();
     const response = await handleHostedApiRequest(
