@@ -489,8 +489,20 @@ describe("GideonStore billing reconciliation", () => {
       renderId: "render-1",
       artifact
     });
+    const storedArtifact = await store.getExportArtifactForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      exportId: artifact.id
+    });
 
     expect(updated.artifacts).toEqual(expect.arrayContaining([expect.objectContaining({ id: "export-1", kind: "export" })]));
+    expect(storedArtifact).toMatchObject({
+      id: "export-1",
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      kind: "export"
+    });
     const state = await store.load();
     expect(state.usageEvents).toEqual(
       expect.arrayContaining([

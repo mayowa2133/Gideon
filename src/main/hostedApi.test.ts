@@ -777,6 +777,9 @@ describe("hosted API foundation", () => {
         expect(input.project.id).toBe("project-1");
         expect(input.render.id).toBe("render-1");
         return { artifact: exportArtifact };
+      },
+      async createDownloadUrl() {
+        throw new Error("createDownloadUrl should not be called by export creation");
       }
     };
     const api = testApi({ exportService });
@@ -853,6 +856,92 @@ describe("hosted API foundation", () => {
     expect(exportBody.localUrl).toBeUndefined();
     expect(api.store.state.projects[0]?.artifacts).toHaveLength(1);
     expect(api.store.state.projects[0]?.artifacts[0]).toMatchObject({ id: "export-1", kind: "export" });
+  });
+
+  it("creates short-lived hosted export download URLs without exposing storage keys", async () => {
+    const exportArtifact = exportArtifactFixture({ projectId: "project-1" });
+    const exportService: HostedExportService = {
+      async createExport() {
+        throw new Error("createExport should not be called by download-url creation");
+      },
+      async createDownloadUrl(input) {
+        expect(input.project.id).toBe("project-1");
+        expect(input.artifact.id).toBe("export-1");
+        return {
+          downloadUrl: "https://downloads.example.test/export-1?sig=ok",
+          expiresAt: "2026-06-25T12:16:00.000Z"
+        };
+      }
+    };
+    const api = testApi({ exportService });
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        artifacts: [exportArtifact]
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const rejected = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/exports/export-1/download-url",
+        headers: { cookie: `gideon_session=${created.token}` },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+    expect(rejected.status).toBe(403);
+    expect(rejected.body).toMatchObject({ error: { code: "csrf_failed" } });
+
+    const accepted = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/exports/export-1/download-url",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1",
+          "x-request-id": "req_download_export"
+        },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(accepted.status).toBe(200);
+    expect(accepted.headers["Cache-Control"]).toBe("no-store");
+    expect(accepted.body).toMatchObject({
+      data: {
+        download: {
+          exportId: "export-1",
+          projectId: "project-1",
+          workspaceId: "local-workspace",
+          url: "https://downloads.example.test/export-1?sig=ok",
+          expiresAt: "2026-06-25T12:16:00.000Z",
+          filename: "gideon-export.mp4",
+          contentType: "video/mp4",
+          byteSize: 4096
+        }
+      },
+      meta: { requestId: "req_download_export" }
+    });
+    const downloadBody = (accepted.body as {
+      data: { download: { storageKey?: string; localPath?: string; localUrl?: string } };
+    }).data.download;
+    expect(downloadBody.storageKey).toBeUndefined();
+    expect(downloadBody.localPath).toBeUndefined();
+    expect(downloadBody.localUrl).toBeUndefined();
   });
 
   it("returns job details without leaking jobs from another workspace", async () => {
@@ -1389,6 +1478,26 @@ class InMemoryHostedApiStore implements HostedApiStore {
     project.artifacts = [...project.artifacts.filter((candidate) => candidate.id !== input.artifact.id), input.artifact];
     project.updatedAt = "2026-06-25T12:04:00.000Z";
     return project;
+  }
+
+  async getExportArtifactForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    exportId: string;
+  }): Promise<ArtifactRecord> {
+    this.assertMember(input);
+    const project = this.state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const artifact = project.artifacts.find((candidate) => candidate.id === input.exportId && candidate.kind === "export");
+    if (!artifact) {
+      throw new Error("Export artifact not found.");
+    }
+    return artifact;
   }
 
   private assertMember(input: { userId: string; workspaceId: string }): void {

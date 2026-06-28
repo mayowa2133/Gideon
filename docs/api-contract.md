@@ -779,7 +779,7 @@ Create/reuse final export from a completed render. If only preview or queued ren
 - **Headers:** CSRF, `Idempotency-Key`.
 - **Request:** `{ "renderId": "uuid" }`. Future final-profile/generated-video aliases may be accepted once generated video resources are split from render records.
 - **Validation:** project belongs to session workspace, render exists and is completed, export service is configured, export/storage quota.
-- **Response 201:** Safe export artifact projection plus project summary. Private object keys, local cache paths, and signed download URLs are not returned here; use the download-url endpoint when implemented.
+- **Response 201:** Safe export artifact projection plus project summary. Private object keys, local cache paths, and signed download URLs are not returned here; use the download-url endpoint.
 
 ```json
 {
@@ -821,7 +821,25 @@ Authorize and mint one short-lived signed GET URL.
 - **Auth:** Active member.
 - **Headers:** CSRF (POST prevents link prefetch side effects/rate use); no idempotency required.
 - **Request:** `{}`.
-- **Response 200:** `{ "data": { "url": "signed", "expiresAt": "...", "filename": "..." } }`, `Cache-Control: no-store`.
+- **Response 200:** Safe download payload with one short-lived URL; private object keys, local cache paths, and provider internals are not returned. `Cache-Control: no-store`.
+
+```json
+{
+  "data": {
+    "download": {
+      "exportId": "uuid",
+      "projectId": "uuid",
+      "workspaceId": "uuid",
+      "url": "signed",
+      "expiresAt": "...",
+      "filename": "leadpilot-launch.mp4",
+      "contentType": "video/mp4",
+      "byteSize": 123456
+    }
+  },
+  "meta": { "requestId": "req_..." }
+}
+```
 - **Validation:** export ready/not deleted/retention valid; workspace authorized.
 - **Errors:** 404, 409 expired/not ready, 429.
 - **Rate limit:** 60/hour/user.

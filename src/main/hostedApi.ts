@@ -115,6 +115,12 @@ export interface HostedApiStore {
     renderId: string;
     artifact: ArtifactRecord;
   }): Promise<Project>;
+  getExportArtifactForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    exportId: string;
+  }): Promise<ArtifactRecord>;
 }
 
 export interface HostedRecordingUploadSession {
@@ -151,6 +157,10 @@ export interface HostedJobQueueService {
 
 export interface HostedExportService {
   createExport(input: { project: Project; render: RenderedVideo }): Promise<{ artifact: ArtifactRecord }>;
+  createDownloadUrl(input: {
+    project: Project;
+    artifact: ArtifactRecord;
+  }): Promise<{ downloadUrl: string; expiresAt: string }>;
 }
 
 export interface HostedApiDependencies {
@@ -245,6 +255,16 @@ export async function handleHostedApiRequest(
     const exportsRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/exports$/);
     if (method === "POST" && exportsRoute) {
       return await handleCreateExport(request, dependencies, requestId, decodeURIComponent(exportsRoute[1] ?? ""));
+    }
+    const exportDownloadUrlRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/exports\/([^/]+)\/download-url$/);
+    if (method === "POST" && exportDownloadUrlRoute) {
+      return await handleCreateExportDownloadUrl(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(exportDownloadUrlRoute[1] ?? ""),
+        decodeURIComponent(exportDownloadUrlRoute[2] ?? "")
+      );
     }
     const jobRoute = path.match(/^\/api\/v1\/jobs\/([^/]+)$/);
     if (method === "GET" && jobRoute) {
@@ -827,6 +847,51 @@ async function handleCreateExport(
   );
 }
 
+async function handleCreateExportDownloadUrl(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string,
+  exportId: string
+): Promise<HostedApiResponse> {
+  if (!dependencies.exportService) {
+    throw new ApiError(503, "export_not_configured", "Hosted exports are not configured.");
+  }
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  objectBody(request);
+  const [project, artifact] = await Promise.all([
+    storeCall(() =>
+      dependencies.store.getProjectForSession({
+        userId: claims.userId,
+        workspaceId: claims.workspaceId,
+        projectId
+      })
+    ),
+    storeCall(() =>
+      dependencies.store.getExportArtifactForSession({
+        userId: claims.userId,
+        workspaceId: claims.workspaceId,
+        projectId,
+        exportId
+      })
+    )
+  ]);
+  let signed: { downloadUrl: string; expiresAt: string };
+  try {
+    signed = await dependencies.exportService.createDownloadUrl({ project, artifact });
+  } catch (error) {
+    throw exportServiceError(error);
+  }
+  return jsonResponse(200, { download: exportDownloadResource(artifact, signed) }, requestId, {
+    "Cache-Control": "no-store"
+  });
+}
+
 function requiredSession(request: HostedApiRequest, dependencies: HostedApiDependencies): SessionClaims {
   const token = readSessionTokenFromCookieHeader(header(request, "cookie"), dependencies.config.auth.sessionCookieName);
   if (!token || !dependencies.config.auth.sessionSecret) {
@@ -970,6 +1035,22 @@ function exportResource(artifact: ArtifactRecord, renderId: string) {
     sha256: artifact.sha256,
     originalFileName: artifact.originalFileName,
     createdAt: artifact.createdAt
+  };
+}
+
+function exportDownloadResource(
+  artifact: ArtifactRecord,
+  signed: { downloadUrl: string; expiresAt: string }
+) {
+  return {
+    exportId: artifact.id,
+    projectId: artifact.projectId,
+    workspaceId: artifact.workspaceId,
+    url: signed.downloadUrl,
+    expiresAt: signed.expiresAt,
+    filename: artifact.originalFileName,
+    contentType: artifact.contentType,
+    byteSize: artifact.byteSize
   };
 }
 

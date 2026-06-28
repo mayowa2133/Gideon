@@ -1285,6 +1285,33 @@ export class GideonStore {
     return project;
   }
 
+  async getExportArtifactForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    exportId: string;
+  }): Promise<ArtifactRecord> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "project:read"
+    });
+    const project = state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const artifact = (project.artifacts ?? []).find((candidate) => candidate.id === input.exportId && candidate.kind === "export");
+    if (!artifact) {
+      throw new Error("Export artifact not found.");
+    }
+    return artifact;
+  }
+
   async assertProjectPermission(projectId: string, action: WorkspaceAction): Promise<void> {
     const state = await this.load();
     const project = state.projects.find((candidate) => candidate.id === projectId);
