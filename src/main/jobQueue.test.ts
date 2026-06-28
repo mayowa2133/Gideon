@@ -421,6 +421,78 @@ describe("local worker queue", () => {
     expect(dispatched).toEqual(["analysis:project-1:job-1", "render:project-2:job-2"]);
   });
 
+  it("coordinates worker leases around verified dispatch", async () => {
+    const events: string[] = [];
+    const service = createHostedWorkerIntakeService({
+      signingSecret: "queue-secret",
+      nowMs: () => 1_777_000_000_000,
+      workerId: "worker-1",
+      leaseSeconds: 45,
+      leaseCoordinator: {
+        recoverExpiredJobLeases(input) {
+          events.push(`recover:${input.now}`);
+        },
+        claimJobLease(input) {
+          events.push(`claim:${input.workerId}:${input.leaseSeconds}:${input.job.kind}:${input.job.jobId}:${input.now}`);
+        },
+        heartbeatJobLease(input) {
+          events.push(`heartbeat:${input.workerId}:${input.leaseSeconds}:${input.job.jobId}:${input.now}`);
+        }
+      },
+      dispatcher: {
+        dispatchAnalysisJob(input) {
+          events.push(`dispatch:${input.projectId}:${input.jobId}`);
+        },
+        dispatchRenderJob() {
+          throw new Error("Unexpected render dispatch.");
+        }
+      }
+    });
+    const body = JSON.stringify({ kind: "analysis", projectId: "project-1", jobId: "job-1" });
+
+    await service.accept({ headers: signedQueueHeaders(body), body });
+
+    expect(events).toEqual([
+      "recover:2026-04-24T03:06:40.000Z",
+      "claim:worker-1:45:analysis:job-1:2026-04-24T03:06:40.000Z",
+      "dispatch:project-1:job-1",
+      "heartbeat:worker-1:45:job-1:2026-04-24T03:06:40.000Z"
+    ]);
+  });
+
+  it("marks leased jobs failed when hosted dispatch fails", async () => {
+    const failures: string[] = [];
+    const service = createHostedWorkerIntakeService({
+      signingSecret: "queue-secret",
+      nowMs: () => 1_777_000_000_000,
+      workerId: "worker-1",
+      leaseCoordinator: {
+        claimJobLease(input) {
+          failures.push(`claim:${input.job.jobId}`);
+        },
+        heartbeatJobLease(input) {
+          failures.push(`heartbeat:${input.job.jobId}`);
+        },
+        failJobLease(input) {
+          failures.push(`fail:${input.workerId}:${input.job.jobId}:${input.safeError}`);
+        }
+      },
+      dispatcher: {
+        dispatchAnalysisJob() {
+          throw new Error("worker secret_token_123 backend failed");
+        },
+        dispatchRenderJob() {
+          throw new Error("Unexpected render dispatch.");
+        }
+      }
+    });
+    const body = JSON.stringify({ kind: "analysis", projectId: "project-1", jobId: "job-1" });
+
+    await expect(service.accept({ headers: signedQueueHeaders(body), body })).rejects.toThrow("secret_token_123");
+
+    expect(failures).toEqual(["claim:job-1", "fail:worker-1:job-1:worker [redacted] backend failed"]);
+  });
+
   it("does not dispatch worker intake requests that fail verification", async () => {
     const dispatched: string[] = [];
     const service = createHostedWorkerIntakeService({

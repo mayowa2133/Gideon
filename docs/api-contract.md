@@ -448,7 +448,7 @@ Start full analysis for active verified recording/profile.
 
 - **Errors:** 404, 409 invalid state/active run, 422 media/profile, 429 quota/concurrency, 503.
 - **Rate limit:** 20/hour/workspace; one active analysis/project.
-- **Queue handoff:** When `GIDEON_HOSTED_QUEUE_URL`/`GIDEON_WORKER_QUEUE_URL` and matching queue secret are configured, hosted dependencies enqueue analysis jobs by POSTing `{ kind, projectId, jobId }` to the worker endpoint with `X-Gideon-Queue-Timestamp` and HMAC `X-Gideon-Queue-Signature`. Worker intake must verify the timestamp tolerance, HMAC, JSON shape, and allowed `analysis|render` kind before dispatching to the worker executor.
+- **Queue handoff:** When `GIDEON_HOSTED_QUEUE_URL`/`GIDEON_WORKER_QUEUE_URL` and matching queue secret are configured, hosted dependencies enqueue analysis jobs by POSTing `{ kind, projectId, jobId }` to the worker endpoint with `X-Gideon-Queue-Timestamp` and HMAC `X-Gideon-Queue-Signature`. Worker intake must verify the timestamp tolerance, HMAC, JSON shape, and allowed `analysis|render` kind before dispatching to the worker executor. A configured intake lease coordinator claims the job lease before dispatch, heartbeats after dispatch, marks dispatch failures against the owning worker lease, and recovers expired leases before accepting new work.
 - **Worker intake response:** Valid worker intake returns `202 { "accepted": true, "job": { ... } }`; invalid signatures return 401, malformed jobs return 400, and dispatch failures return sanitized 503 errors.
 
 ### GET `/projects/{projectId}/analysis-runs/{analysisRunId}`

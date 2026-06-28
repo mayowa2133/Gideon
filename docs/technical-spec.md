@@ -314,7 +314,7 @@ stateDiagram-v2
   failed --> [*]
 ```
 
-Progress is stage plus optional units (`bytes`, `frames`, `segments`) and bounded percent. Workers heartbeat leases. Stalled jobs are recovered only when the previous lease expires; every effect is idempotent. The shared job-state helpers model `workerId`, `heartbeatAt`, and `leaseExpiresAt`, renew leases on heartbeat, reject mismatched worker heartbeats, and turn expired running leases into retryable failures for durable worker recovery.
+Progress is stage plus optional units (`bytes`, `frames`, `segments`) and bounded percent. Workers heartbeat leases. Stalled jobs are recovered only when the previous lease expires; every effect is idempotent. The shared job-state helpers and store methods model `workerId`, `heartbeatAt`, and `leaseExpiresAt`, renew leases on heartbeat, reject mismatched worker heartbeats, mark dispatch failures against the owning lease, and turn expired running leases into retryable failures for durable worker recovery. Hosted worker intake can call these methods through a lease coordinator before and after verified dispatch.
 
 ### Retry policy
 

@@ -252,6 +252,97 @@ describe("GideonStore billing reconciliation", () => {
     ).toBe(true);
   });
 
+  it("persists worker job leases, heartbeats, and expired lease recovery", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Hosted project",
+      profile: profileFixture()
+    });
+    await store.appendJob(
+      project.id,
+      createJob({
+        id: "job-1",
+        projectId: project.id,
+        kind: "analysis",
+        now: "2026-06-25T12:00:00.000Z"
+      })
+    );
+
+    const leased = await store.claimWorkerJobLease({
+      projectId: project.id,
+      jobId: "job-1",
+      workerId: "worker-1",
+      leaseSeconds: 60,
+      now: "2026-06-25T12:01:00.000Z",
+      userMessage: "Worker claimed analysis."
+    });
+    const heartbeat = await store.heartbeatWorkerJobLease({
+      projectId: project.id,
+      jobId: "job-1",
+      workerId: "worker-1",
+      leaseSeconds: 120,
+      now: "2026-06-25T12:02:00.000Z"
+    });
+    const earlyRecovery = await store.recoverExpiredWorkerJobLeases("2026-06-25T12:03:00.000Z");
+    const recovered = await store.recoverExpiredWorkerJobLeases("2026-06-25T12:05:00.000Z");
+
+    expect(leased).toMatchObject({
+      status: "running",
+      workerId: "worker-1",
+      heartbeatAt: "2026-06-25T12:01:00.000Z",
+      leaseExpiresAt: "2026-06-25T12:02:00.000Z"
+    });
+    expect(heartbeat).toMatchObject({
+      status: "running",
+      workerId: "worker-1",
+      heartbeatAt: "2026-06-25T12:02:00.000Z",
+      leaseExpiresAt: "2026-06-25T12:04:00.000Z"
+    });
+    expect(earlyRecovery).toEqual([]);
+    expect(recovered).toHaveLength(1);
+    expect(recovered[0]).toMatchObject({
+      id: "job-1",
+      status: "failed",
+      retryable: true,
+      workerId: undefined,
+      heartbeatAt: undefined,
+      leaseExpiresAt: undefined
+    });
+    await expect(
+      store.heartbeatWorkerJobLease({
+        projectId: project.id,
+        jobId: "job-1",
+        workerId: "worker-2",
+        leaseSeconds: 60,
+        now: "2026-06-25T12:06:00.000Z"
+      })
+    ).rejects.toThrow("Cannot heartbeat failed job.");
+
+    const state = await store.load();
+    const storedJob = state.projects.find((candidate) => candidate.id === project.id)?.jobs.find((job) => job.id === "job-1");
+    expect(storedJob).toMatchObject({ status: "failed", retryable: true });
+    expect(state.projects.find((candidate) => candidate.id === project.id)?.jobEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          jobId: "job-1",
+          kind: "started",
+          metadata: expect.objectContaining({ workerId: "worker-1" })
+        }),
+        expect.objectContaining({
+          jobId: "job-1",
+          kind: "failed",
+          metadata: expect.objectContaining({
+            recoveredFromWorkerId: "worker-1",
+            leaseExpiredAt: "2026-06-25T12:04:00.000Z"
+          })
+        })
+      ])
+    );
+  });
+
   it("creates recording upload sessions with explicit hosted session scope", async () => {
     const store = new GideonStore();
     await store.load();

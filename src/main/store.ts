@@ -59,11 +59,15 @@ import {
 import {
   createJob,
   createJobEvent,
+  failJob as failJobState,
   finishJobCancel as finishJobCancelState,
   findActiveJob,
+  heartbeatJobLease as heartbeatJobLeaseState,
+  recoverExpiredJobLease,
   recoverInterruptedJob,
   requestJobCancel as requestJobCancelState,
-  retryJob as retryJobState
+  retryJob as retryJobState,
+  startJobLease as startJobLeaseState
 } from "../shared/jobState";
 import {
   assertCanManageWorkspaceRole,
@@ -1602,6 +1606,180 @@ export class GideonStore {
     return job;
   }
 
+  async claimWorkerJobLease(input: {
+    projectId: string;
+    jobId: string;
+    workerId: string;
+    leaseSeconds: number;
+    now?: string;
+    userMessage?: string;
+  }): Promise<JobRecord> {
+    const now = input.now ?? new Date().toISOString();
+    let leased: JobRecord | null = null;
+    await this.updateProject(
+      input.projectId,
+      (project) => {
+        const job = (project.jobs ?? []).find((candidate) => candidate.id === input.jobId);
+        if (!job) {
+          throw new Error("Job not found.");
+        }
+        leased = startJobLeaseState(job, {
+          now,
+          workerId: input.workerId,
+          leaseSeconds: input.leaseSeconds,
+          userMessage: input.userMessage
+        });
+        project.jobs = (project.jobs ?? []).map((candidate) => (candidate.id === input.jobId ? leased! : candidate));
+        project.jobEvents = [
+          ...(project.jobEvents ?? []),
+          createJobEvent({
+            id: randomUUID(),
+            projectId: input.projectId,
+            jobId: input.jobId,
+            kind: "started",
+            stage: "queued",
+            message: leased.userMessage,
+            progress: leased.progress,
+            metadata: {
+              workerId: input.workerId,
+              leaseExpiresAt: leased.leaseExpiresAt ?? ""
+            },
+            now
+          })
+        ].slice(-MAX_PROJECT_JOB_EVENTS);
+        project.updatedAt = now;
+      },
+      { action: "job:write" }
+    );
+    if (!leased) {
+      throw new Error("Job not found.");
+    }
+    return leased;
+  }
+
+  async heartbeatWorkerJobLease(input: {
+    projectId: string;
+    jobId: string;
+    workerId: string;
+    leaseSeconds: number;
+    now?: string;
+  }): Promise<JobRecord> {
+    const now = input.now ?? new Date().toISOString();
+    let heartbeat: JobRecord | null = null;
+    await this.updateProject(
+      input.projectId,
+      (project) => {
+        const job = (project.jobs ?? []).find((candidate) => candidate.id === input.jobId);
+        if (!job) {
+          throw new Error("Job not found.");
+        }
+        heartbeat = heartbeatJobLeaseState(job, {
+          now,
+          workerId: input.workerId,
+          leaseSeconds: input.leaseSeconds
+        });
+        project.jobs = (project.jobs ?? []).map((candidate) => (candidate.id === input.jobId ? heartbeat! : candidate));
+        project.updatedAt = now;
+      },
+      { action: "job:write" }
+    );
+    if (!heartbeat) {
+      throw new Error("Job not found.");
+    }
+    return heartbeat;
+  }
+
+  async failWorkerJobLease(input: {
+    projectId: string;
+    jobId: string;
+    workerId: string;
+    safeError: string;
+    now?: string;
+  }): Promise<JobRecord> {
+    const now = input.now ?? new Date().toISOString();
+    let failed: JobRecord | null = null;
+    await this.updateProject(
+      input.projectId,
+      (project) => {
+        const job = (project.jobs ?? []).find((candidate) => candidate.id === input.jobId);
+        if (!job) {
+          throw new Error("Job not found.");
+        }
+        if (job.workerId !== input.workerId) {
+          throw new Error("Worker lease does not belong to this worker.");
+        }
+        failed = failJobState(job, now, input.safeError);
+        project.jobs = (project.jobs ?? []).map((candidate) => (candidate.id === input.jobId ? failed! : candidate));
+        project.jobEvents = [
+          ...(project.jobEvents ?? []),
+          createJobEvent({
+            id: randomUUID(),
+            projectId: input.projectId,
+            jobId: input.jobId,
+            kind: "failed",
+            stage: "finalize",
+            message: failed.safeError ?? failed.userMessage,
+            progress: failed.progress,
+            metadata: {
+              workerId: input.workerId,
+              retryable: failed.retryable
+            },
+            now
+          })
+        ].slice(-MAX_PROJECT_JOB_EVENTS);
+        project.updatedAt = now;
+      },
+      { action: "job:write" }
+    );
+    if (!failed) {
+      throw new Error("Job not found.");
+    }
+    return failed;
+  }
+
+  async recoverExpiredWorkerJobLeases(now = new Date().toISOString()): Promise<JobRecord[]> {
+    const state = await this.load();
+    const recoveredJobs: JobRecord[] = [];
+    let changed = false;
+    for (const project of state.projects) {
+      let projectChanged = false;
+      const nextJobs: JobRecord[] = [];
+      for (const job of project.jobs ?? []) {
+        const recovered = recoverExpiredJobLease(job, now);
+        if (!recovered) {
+          nextJobs.push(job);
+          continue;
+        }
+        changed = true;
+        projectChanged = true;
+        recoveredJobs.push(recovered.job);
+        nextJobs.push(recovered.job);
+        project.jobEvents = [
+          ...(project.jobEvents ?? []),
+          createJobEvent({
+            id: randomUUID(),
+            projectId: project.id,
+            jobId: job.id,
+            kind: recovered.event.kind,
+            stage: recovered.event.stage,
+            message: recovered.event.message,
+            progress: recovered.job.progress,
+            metadata: recovered.event.metadata,
+            now
+          })
+        ].slice(-MAX_PROJECT_JOB_EVENTS);
+      }
+      if (projectChanged) {
+        project.jobs = nextJobs;
+        project.updatedAt = now;
+      }
+    }
+    if (changed) {
+      await this.save();
+    }
+    return recoveredJobs;
+  }
+
   async getJobForSession(input: {
     userId: string;
     workspaceId: string;
@@ -1819,7 +1997,8 @@ export class GideonStore {
       let projectChanged = false;
       const nextJobs: JobRecord[] = [];
       for (const job of project.jobs ?? []) {
-        const recovered = recoverInterruptedJob(job, now);
+        const recovered =
+          recoverExpiredJobLease(job, now) ?? (job.status === "running" && job.leaseExpiresAt ? null : recoverInterruptedJob(job, now));
         if (!recovered) {
           nextJobs.push(job);
           continue;

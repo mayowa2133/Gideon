@@ -39,6 +39,24 @@ export interface HostedWorkerJobDispatcher {
   dispatchRenderJob(input: { projectId: string; jobId: string }): Promise<void> | void;
 }
 
+export interface HostedWorkerJobLeaseCoordinator {
+  claimJobLease(input: HostedWorkerJobLeaseInput): Promise<void> | void;
+  heartbeatJobLease(input: HostedWorkerJobLeaseInput): Promise<void> | void;
+  failJobLease?(input: HostedWorkerJobLeaseFailureInput): Promise<void> | void;
+  recoverExpiredJobLeases?(input: { now: string }): Promise<void> | void;
+}
+
+export interface HostedWorkerJobLeaseInput {
+  job: HostedWorkerQueueJob;
+  workerId: string;
+  leaseSeconds: number;
+  now: string;
+}
+
+export interface HostedWorkerJobLeaseFailureInput extends HostedWorkerJobLeaseInput {
+  safeError: string;
+}
+
 export interface HostedWorkerIntakeResult {
   accepted: true;
   job: HostedWorkerQueueJob;
@@ -263,21 +281,54 @@ export function verifyHostedWorkerQueueRequest(input: HostedWorkerQueueRequest &
 export function createHostedWorkerIntakeService(input: {
   signingSecret: string;
   dispatcher: HostedWorkerJobDispatcher;
+  leaseCoordinator?: HostedWorkerJobLeaseCoordinator;
+  workerId?: string;
+  leaseSeconds?: number;
   nowMs?: () => number;
   toleranceSeconds?: number;
 }): HostedWorkerIntakeService {
   return {
     async accept(request: HostedWorkerQueueRequest): Promise<HostedWorkerIntakeResult> {
+      const requestNowMs = request.nowMs ?? input.nowMs?.();
       const job = verifyHostedWorkerQueueRequest({
         ...request,
         signingSecret: input.signingSecret,
-        nowMs: request.nowMs ?? input.nowMs?.(),
+        nowMs: requestNowMs,
         toleranceSeconds: request.toleranceSeconds ?? input.toleranceSeconds
       });
-      if (job.kind === "analysis") {
-        await input.dispatcher.dispatchAnalysisJob({ projectId: job.projectId, jobId: job.jobId });
-      } else {
-        await input.dispatcher.dispatchRenderJob({ projectId: job.projectId, jobId: job.jobId });
+      const lease = createHostedWorkerLeaseInput({
+        job,
+        requestNowMs,
+        workerId: input.workerId,
+        leaseSeconds: input.leaseSeconds
+      });
+      if (input.leaseCoordinator) {
+        await input.leaseCoordinator.recoverExpiredJobLeases?.({ now: lease.now });
+        await input.leaseCoordinator.claimJobLease(lease);
+      }
+      try {
+        if (job.kind === "analysis") {
+          await input.dispatcher.dispatchAnalysisJob({ projectId: job.projectId, jobId: job.jobId });
+        } else {
+          await input.dispatcher.dispatchRenderJob({ projectId: job.projectId, jobId: job.jobId });
+        }
+      } catch (error) {
+        try {
+          await input.leaseCoordinator?.failJobLease?.({
+            ...lease,
+            now: currentIsoTimestamp(requestNowMs),
+            safeError: sanitizeQueueError(error instanceof Error ? error.message : "Worker dispatch failed.")
+          });
+        } catch {
+          // Preserve the original dispatch failure for the caller; failed lease recording is recoverable via expiry.
+        }
+        throw error;
+      }
+      if (input.leaseCoordinator) {
+        await input.leaseCoordinator.heartbeatJobLease({
+          ...lease,
+          now: currentIsoTimestamp(requestNowMs)
+        });
       }
       return { accepted: true, job };
     }
@@ -442,6 +493,24 @@ function workerJsonResponse(status: number, body: unknown): HostedWorkerIntakeHt
     headers: { "Content-Type": "application/json" },
     body
   };
+}
+
+function createHostedWorkerLeaseInput(input: {
+  job: HostedWorkerQueueJob;
+  requestNowMs?: number;
+  workerId?: string;
+  leaseSeconds?: number;
+}): HostedWorkerJobLeaseInput {
+  return {
+    job: input.job,
+    workerId: input.workerId?.trim() || `hosted-worker-${process.pid}`,
+    leaseSeconds: input.leaseSeconds ?? 300,
+    now: currentIsoTimestamp(input.requestNowMs)
+  };
+}
+
+function currentIsoTimestamp(nowMs?: number): string {
+  return new Date(nowMs ?? Date.now()).toISOString();
 }
 
 async function readRawBody(request: IncomingMessage): Promise<Buffer> {
