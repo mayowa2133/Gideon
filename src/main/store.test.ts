@@ -73,6 +73,27 @@ describe("GideonStore billing reconciliation", () => {
     expect(duplicate.auditEvents.filter((event) => event.action === "billing.webhook.apply")).toHaveLength(1);
   });
 
+  it("authorizes hosted billing sessions with explicit workspace scope", async () => {
+    const store = new GideonStore();
+    await store.load();
+
+    const workspace = await store.getWorkspaceForBillingSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID
+    });
+
+    expect(workspace).toMatchObject({
+      id: DEFAULT_LOCAL_WORKSPACE_ID,
+      billingProvider: "manual"
+    });
+    await expect(
+      store.getWorkspaceForBillingSession({
+        userId: "missing-user",
+        workspaceId: DEFAULT_LOCAL_WORKSPACE_ID
+      })
+    ).rejects.toThrow("not a member");
+  });
+
   it("syncs provider-authenticated users into owned workspaces", async () => {
     const store = new GideonStore();
     await store.load();

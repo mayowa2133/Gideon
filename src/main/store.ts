@@ -447,6 +447,18 @@ export class GideonStore {
     return state;
   }
 
+  async getWorkspaceForBillingSession(input: { userId: string; workspaceId: string }): Promise<Workspace> {
+    const state = await this.load();
+    const workspace = requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "billing:manage"
+    });
+    return workspace;
+  }
+
   async createProject(input: CreateProjectInput): Promise<Project> {
     const profile = normalizeProfile(input.profile);
     const errors = validateProfile(profile);

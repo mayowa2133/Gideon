@@ -28,7 +28,9 @@ import type {
   RecordingMetadata,
   RecordingUploadSessionRecord,
   RenderedVideo,
-  SyncAuthenticatedUserInput
+  SyncAuthenticatedUserInput,
+  Workspace,
+  WorkspacePlan
 } from "../shared/types";
 
 type HostedApiHeaderValue = string | string[] | undefined;
@@ -78,6 +80,10 @@ export interface HostedApiStore {
     workspaceId: string;
     jobId: string;
   }): Promise<{ project: Project; job: JobRecord }>;
+  getWorkspaceForBillingSession(input: {
+    userId: string;
+    workspaceId: string;
+  }): Promise<Workspace>;
   createRecordingUploadSessionRecordForSession(input: {
     userId: string;
     workspaceId: string;
@@ -155,6 +161,29 @@ export interface HostedJobQueueService {
   enqueueRenderJob(input: { projectId: string; jobId: string }): Promise<void> | void;
 }
 
+export interface HostedBillingSession {
+  id: string;
+  url: string;
+  provider: Exclude<BillingConfig["provider"], "none">;
+  expiresAt?: string;
+}
+
+export interface HostedBillingService {
+  createCheckoutSession(input: {
+    userId: string;
+    workspace: Workspace;
+    plan: Exclude<WorkspacePlan, "local_mvp">;
+    priceId: string;
+    successUrl: string;
+    cancelUrl: string;
+  }): Promise<HostedBillingSession>;
+  createCustomerPortalSession(input: {
+    userId: string;
+    workspace: Workspace;
+    returnUrl: string;
+  }): Promise<HostedBillingSession>;
+}
+
 export interface HostedExportService {
   createExport(input: { project: Project; render: RenderedVideo }): Promise<{ artifact: ArtifactRecord }>;
   createDownloadUrl(input: {
@@ -169,6 +198,7 @@ export interface HostedApiDependencies {
   uploadService?: HostedRecordingUploadService;
   jobQueueService?: HostedJobQueueService;
   exportService?: HostedExportService;
+  billingService?: HostedBillingService;
 }
 
 class ApiError extends Error {
@@ -264,6 +294,24 @@ export async function handleHostedApiRequest(
         requestId,
         decodeURIComponent(exportDownloadUrlRoute[1] ?? ""),
         decodeURIComponent(exportDownloadUrlRoute[2] ?? "")
+      );
+    }
+    const billingCheckoutRoute = path.match(/^\/api\/v1\/workspaces\/([^/]+)\/billing\/checkout-sessions$/);
+    if (method === "POST" && billingCheckoutRoute) {
+      return await handleCreateBillingCheckoutSession(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(billingCheckoutRoute[1] ?? "")
+      );
+    }
+    const billingPortalRoute = path.match(/^\/api\/v1\/workspaces\/([^/]+)\/billing\/portal-sessions$/);
+    if (method === "POST" && billingPortalRoute) {
+      return await handleCreateBillingPortalSession(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(billingPortalRoute[1] ?? "")
       );
     }
     const jobRoute = path.match(/^\/api\/v1\/jobs\/([^/]+)$/);
@@ -892,6 +940,92 @@ async function handleCreateExportDownloadUrl(
   });
 }
 
+async function handleCreateBillingCheckoutSession(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  workspaceId: string
+): Promise<HostedApiResponse> {
+  if (!dependencies.billingService || dependencies.config.billing.provider === "none") {
+    throw new ApiError(503, "billing_not_configured", "Hosted billing is not configured.");
+  }
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  if (workspaceId !== claims.workspaceId) {
+    throw new ApiError(403, "action_forbidden", "Action is not allowed for this workspace.");
+  }
+  const input = hostedBillingCheckoutInput(objectBody(request), dependencies.config.billing);
+  const workspace = await storeCall(() =>
+    dependencies.store.getWorkspaceForBillingSession({
+      userId: claims.userId,
+      workspaceId
+    })
+  );
+  let session: HostedBillingSession;
+  try {
+    session = await dependencies.billingService.createCheckoutSession({
+      userId: claims.userId,
+      workspace,
+      plan: input.plan,
+      priceId: input.priceId,
+      successUrl: input.successUrl,
+      cancelUrl: input.cancelUrl
+    });
+  } catch (error) {
+    throw billingServiceError(error);
+  }
+  return jsonResponse(201, { checkoutSession: billingSessionResource(workspace, session, input.plan) }, requestId, {
+    "Cache-Control": "no-store"
+  });
+}
+
+async function handleCreateBillingPortalSession(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  workspaceId: string
+): Promise<HostedApiResponse> {
+  if (!dependencies.billingService || dependencies.config.billing.provider === "none") {
+    throw new ApiError(503, "billing_not_configured", "Hosted billing is not configured.");
+  }
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  if (workspaceId !== claims.workspaceId) {
+    throw new ApiError(403, "action_forbidden", "Action is not allowed for this workspace.");
+  }
+  const input = hostedBillingPortalInput(objectBody(request));
+  const workspace = await storeCall(() =>
+    dependencies.store.getWorkspaceForBillingSession({
+      userId: claims.userId,
+      workspaceId
+    })
+  );
+  if (!workspace.billingCustomerId) {
+    throw new ApiError(409, "state_conflict", "Workspace does not have a billing customer yet.");
+  }
+  let session: HostedBillingSession;
+  try {
+    session = await dependencies.billingService.createCustomerPortalSession({
+      userId: claims.userId,
+      workspace,
+      returnUrl: input.returnUrl
+    });
+  } catch (error) {
+    throw billingServiceError(error);
+  }
+  return jsonResponse(201, { portalSession: billingSessionResource(workspace, session) }, requestId, {
+    "Cache-Control": "no-store"
+  });
+}
+
 function requiredSession(request: HostedApiRequest, dependencies: HostedApiDependencies): SessionClaims {
   const token = readSessionTokenFromCookieHeader(header(request, "cookie"), dependencies.config.auth.sessionCookieName);
   if (!token || !dependencies.config.auth.sessionSecret) {
@@ -1054,6 +1188,17 @@ function exportDownloadResource(
   };
 }
 
+function billingSessionResource(workspace: Workspace, session: HostedBillingSession, plan?: Exclude<WorkspacePlan, "local_mvp">) {
+  return {
+    id: session.id,
+    workspaceId: workspace.id,
+    provider: session.provider,
+    plan: plan ?? workspace.plan,
+    url: session.url,
+    expiresAt: session.expiresAt ?? null
+  };
+}
+
 function jsonResponse(
   status: number,
   data: unknown,
@@ -1200,6 +1345,50 @@ function hostedExportInput(body: Record<string, unknown>): { renderId: string } 
   };
 }
 
+function hostedBillingCheckoutInput(
+  body: Record<string, unknown>,
+  billingConfig: BillingConfig
+): {
+  plan: Exclude<WorkspacePlan, "local_mvp">;
+  priceId: string;
+  successUrl: string;
+  cancelUrl: string;
+} {
+  const plan = requiredString(body.plan, "plan");
+  if (!["starter", "team", "enterprise"].includes(plan)) {
+    throw new ApiError(422, "validation_failed", "plan must be starter, team, or enterprise.");
+  }
+  const priceId = billingConfig.stripePriceIds[plan as Exclude<WorkspacePlan, "local_mvp">];
+  if (!priceId) {
+    throw new ApiError(503, "billing_not_configured", `Billing price for ${plan} is not configured.`);
+  }
+  return {
+    plan: plan as Exclude<WorkspacePlan, "local_mvp">,
+    priceId,
+    successUrl: requiredHttpUrl(body.successUrl, "successUrl"),
+    cancelUrl: requiredHttpUrl(body.cancelUrl, "cancelUrl")
+  };
+}
+
+function hostedBillingPortalInput(body: Record<string, unknown>): { returnUrl: string } {
+  return {
+    returnUrl: requiredHttpUrl(body.returnUrl, "returnUrl")
+  };
+}
+
+function requiredHttpUrl(value: unknown, field: string): string {
+  const raw = requiredString(value, field);
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new Error("Unsupported protocol.");
+    }
+    return parsed.toString();
+  } catch {
+    throw new ApiError(422, "validation_failed", `${field} must be an absolute http(s) URL.`);
+  }
+}
+
 async function storeCall<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
@@ -1256,6 +1445,20 @@ function exportServiceError(error: unknown): ApiError {
     return new ApiError(503, "export_not_configured", message);
   }
   if (/mismatch|invalid|does not match/i.test(message)) {
+    return new ApiError(422, "validation_failed", message);
+  }
+  return new ApiError(503, "temporarily_unavailable", message);
+}
+
+function billingServiceError(error: unknown): ApiError {
+  const message = error instanceof Error ? error.message : "Billing service operation failed.";
+  if (/not configured|missing|price/i.test(message)) {
+    return new ApiError(503, "billing_not_configured", message);
+  }
+  if (/customer|subscription|already|cannot|expired/i.test(message)) {
+    return new ApiError(409, "state_conflict", message);
+  }
+  if (/invalid|mismatch|does not match/i.test(message)) {
     return new ApiError(422, "validation_failed", message);
   }
   return new ApiError(503, "temporarily_unavailable", message);

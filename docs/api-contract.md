@@ -901,6 +901,64 @@ Retry terminal retryable job using same immutable inputs.
 - **Errors:** 404.
 - **Rate limit:** 60/min.
 
+### POST `/workspaces/{workspaceId}/billing/checkout-sessions`
+
+Create a hosted billing checkout session for a new paid workspace plan. The API authorizes the workspace and validates the requested plan before delegating provider-specific session creation to the billing adapter.
+
+- **Auth:** owner/admin.
+- **Headers:** CSRF.
+- **Request:** `{ "plan": "starter|team|enterprise", "successUrl": "https://...", "cancelUrl": "https://..." }`.
+- **Validation:** session workspace must match URL workspace, billing provider configured, price ID mapped for requested plan, absolute http(s) return URLs.
+- **Response 201:** Provider checkout session URL. `Cache-Control: no-store`.
+
+```json
+{
+  "data": {
+    "checkoutSession": {
+      "id": "cs_...",
+      "workspaceId": "uuid",
+      "provider": "stripe",
+      "plan": "team",
+      "url": "https://checkout.stripe.com/...",
+      "expiresAt": "..."
+    }
+  },
+  "meta": { "requestId": "req_..." }
+}
+```
+
+- **Errors:** 403, 422 invalid plan/URL, 503 billing not configured.
+- **Rate limit:** 20/hour/workspace.
+
+### POST `/workspaces/{workspaceId}/billing/portal-sessions`
+
+Create a hosted customer portal session for an existing billing customer.
+
+- **Auth:** owner/admin.
+- **Headers:** CSRF.
+- **Request:** `{ "returnUrl": "https://..." }`.
+- **Validation:** session workspace must match URL workspace, billing provider configured, workspace has a provider customer ID, absolute http(s) return URL.
+- **Response 201:** Provider customer portal URL. `Cache-Control: no-store`.
+
+```json
+{
+  "data": {
+    "portalSession": {
+      "id": "bps_...",
+      "workspaceId": "uuid",
+      "provider": "stripe",
+      "plan": "team",
+      "url": "https://billing.stripe.com/...",
+      "expiresAt": null
+    }
+  },
+  "meta": { "requestId": "req_..." }
+}
+```
+
+- **Errors:** 403, 409 missing billing customer, 422 invalid URL, 503 billing not configured.
+- **Rate limit:** 20/hour/workspace.
+
 ## Future social scheduling endpoints — not implemented in MVP
 
 These reserve contract direction only. Do not expose routes until platform review, secure token storage, consent, retries, delete/revoke, and policy compliance are complete.

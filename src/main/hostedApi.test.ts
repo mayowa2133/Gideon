@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createSignedSession } from "./auth";
 import {
   handleHostedApiRequest,
+  type HostedBillingService,
   type HostedApiStore,
   type HostedExportService,
   type HostedJobQueueService,
@@ -21,7 +22,8 @@ import type {
   RecordingUploadSessionRecord,
   RenderedVideo,
   ScriptDraft,
-  SyncAuthenticatedUserInput
+  SyncAuthenticatedUserInput,
+  Workspace
 } from "../shared/types";
 import { createLocalUserWorkspace } from "../shared/usage";
 
@@ -1135,6 +1137,174 @@ describe("hosted API foundation", () => {
       billingStatus: "active"
     });
   });
+
+  it("creates hosted billing checkout sessions for billing managers", async () => {
+    const createdSessions: Array<{
+      workspaceId: string;
+      userId: string;
+      plan: string;
+      priceId: string;
+      successUrl: string;
+      cancelUrl: string;
+    }> = [];
+    const billingService: HostedBillingService = {
+      async createCheckoutSession(input) {
+        createdSessions.push({
+          workspaceId: input.workspace.id,
+          userId: input.userId,
+          plan: input.plan,
+          priceId: input.priceId,
+          successUrl: input.successUrl,
+          cancelUrl: input.cancelUrl
+        });
+        return {
+          id: "cs_test_1",
+          provider: "stripe",
+          url: "https://checkout.stripe.test/session/cs_test_1",
+          expiresAt: "2026-06-25T12:30:00.000Z"
+        };
+      },
+      async createCustomerPortalSession() {
+        throw new Error("createCustomerPortalSession should not be called by checkout");
+      }
+    };
+    const api = testApi({ billingService });
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const rejected = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/workspaces/local-workspace/billing/checkout-sessions",
+        headers: { cookie: `gideon_session=${created.token}` },
+        body: {
+          plan: "team",
+          successUrl: "https://gideon.example.test/billing/success",
+          cancelUrl: "https://gideon.example.test/billing/cancel"
+        },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+    expect(rejected.status).toBe(403);
+    expect(rejected.body).toMatchObject({ error: { code: "csrf_failed" } });
+
+    const accepted = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/workspaces/local-workspace/billing/checkout-sessions",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1",
+          "x-request-id": "req_checkout"
+        },
+        body: {
+          plan: "team",
+          successUrl: "https://gideon.example.test/billing/success",
+          cancelUrl: "https://gideon.example.test/billing/cancel"
+        },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(accepted.status).toBe(201);
+    expect(accepted.headers["Cache-Control"]).toBe("no-store");
+    expect(accepted.body).toMatchObject({
+      data: {
+        checkoutSession: {
+          id: "cs_test_1",
+          workspaceId: "local-workspace",
+          provider: "stripe",
+          plan: "team",
+          url: "https://checkout.stripe.test/session/cs_test_1",
+          expiresAt: "2026-06-25T12:30:00.000Z"
+        }
+      },
+      meta: { requestId: "req_checkout" }
+    });
+    expect(createdSessions).toEqual([
+      {
+        workspaceId: "local-workspace",
+        userId: "local-user",
+        plan: "team",
+        priceId: "price_team",
+        successUrl: "https://gideon.example.test/billing/success",
+        cancelUrl: "https://gideon.example.test/billing/cancel"
+      }
+    ]);
+  });
+
+  it("creates hosted billing customer portal sessions for existing billing customers", async () => {
+    const billingService: HostedBillingService = {
+      async createCheckoutSession() {
+        throw new Error("createCheckoutSession should not be called by portal");
+      },
+      async createCustomerPortalSession(input) {
+        expect(input.workspace.id).toBe("local-workspace");
+        expect(input.workspace.billingCustomerId).toBe("cus_1");
+        expect(input.returnUrl).toBe("https://gideon.example.test/settings/billing");
+        return {
+          id: "bps_test_1",
+          provider: "stripe",
+          url: "https://billing.stripe.test/session/bps_test_1"
+        };
+      }
+    };
+    const api = testApi({ billingService });
+    api.store.state.workspaces = api.store.state.workspaces.map((workspace) =>
+      workspace.id === "local-workspace"
+        ? { ...workspace, billingProvider: "stripe", billingCustomerId: "cus_1", billingStatus: "active" }
+        : workspace
+    );
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const accepted = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/workspaces/local-workspace/billing/portal-sessions",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1",
+          "x-request-id": "req_portal"
+        },
+        body: {
+          returnUrl: "https://gideon.example.test/settings/billing"
+        },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(accepted.status).toBe(201);
+    expect(accepted.headers["Cache-Control"]).toBe("no-store");
+    expect(accepted.body).toMatchObject({
+      data: {
+        portalSession: {
+          id: "bps_test_1",
+          workspaceId: "local-workspace",
+          provider: "stripe",
+          plan: "local_mvp",
+          url: "https://billing.stripe.test/session/bps_test_1",
+          expiresAt: null
+        }
+      },
+      meta: { requestId: "req_portal" }
+    });
+  });
 });
 
 function testApi(
@@ -1142,6 +1312,7 @@ function testApi(
     uploadService?: HostedRecordingUploadService;
     jobQueueService?: HostedJobQueueService;
     exportService?: HostedExportService;
+    billingService?: HostedBillingService;
   } = {}
 ) {
   const store = new InMemoryHostedApiStore();
@@ -1165,7 +1336,8 @@ function testApi(
     },
     uploadService: input.uploadService,
     jobQueueService: input.jobQueueService,
-    exportService: input.exportService
+    exportService: input.exportService,
+    billingService: input.billingService
   };
 }
 
@@ -1227,6 +1399,23 @@ class InMemoryHostedApiStore implements HostedApiStore {
   async applyBillingSubscriptionUpdate(input: ApplyBillingSubscriptionInput): Promise<AppState> {
     this.appliedBillingUpdates.push(input);
     return this.state;
+  }
+
+  async getWorkspaceForBillingSession(input: { userId: string; workspaceId: string }): Promise<Workspace> {
+    const membership = this.state.workspaceMembers.find(
+      (candidate) => candidate.userId === input.userId && candidate.workspaceId === input.workspaceId
+    );
+    if (!membership) {
+      throw new Error("The active user is not a member of this workspace.");
+    }
+    if (membership.role !== "owner" && membership.role !== "admin") {
+      throw new Error(`Workspace role ${membership.role} cannot perform billing:manage.`);
+    }
+    const workspace = this.state.workspaces.find((candidate) => candidate.id === input.workspaceId);
+    if (!workspace) {
+      throw new Error("Workspace not found.");
+    }
+    return workspace;
   }
 
   async listProjectsForSession(input: { userId: string; workspaceId: string }): Promise<Project[]> {
