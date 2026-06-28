@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  createHostedWorkerIntakeService,
   createHttpHostedJobQueueService,
   isWorkerQueueCanceledError,
   loadHostedJobQueueConfig,
@@ -379,4 +380,78 @@ describe("local worker queue", () => {
       })
     ).toThrow("job kind is invalid");
   });
+
+  it("accepts verified worker intake requests and dispatches by job kind", async () => {
+    const dispatched: string[] = [];
+    const service = createHostedWorkerIntakeService({
+      signingSecret: "queue-secret",
+      nowMs: () => 1_777_000_000_000,
+      dispatcher: {
+        dispatchAnalysisJob(input) {
+          dispatched.push(`analysis:${input.projectId}:${input.jobId}`);
+        },
+        dispatchRenderJob(input) {
+          dispatched.push(`render:${input.projectId}:${input.jobId}`);
+        }
+      }
+    });
+    const analysisBody = JSON.stringify({ kind: "analysis", projectId: "project-1", jobId: "job-1" });
+    const renderBody = JSON.stringify({ kind: "render", projectId: "project-2", jobId: "job-2" });
+
+    await expect(
+      service.accept({
+        headers: signedQueueHeaders(analysisBody),
+        body: analysisBody
+      })
+    ).resolves.toEqual({
+      accepted: true,
+      job: { kind: "analysis", projectId: "project-1", jobId: "job-1" }
+    });
+    await expect(
+      service.accept({
+        headers: signedQueueHeaders(renderBody),
+        body: renderBody
+      })
+    ).resolves.toEqual({
+      accepted: true,
+      job: { kind: "render", projectId: "project-2", jobId: "job-2" }
+    });
+
+    expect(dispatched).toEqual(["analysis:project-1:job-1", "render:project-2:job-2"]);
+  });
+
+  it("does not dispatch worker intake requests that fail verification", async () => {
+    const dispatched: string[] = [];
+    const service = createHostedWorkerIntakeService({
+      signingSecret: "queue-secret",
+      nowMs: () => 1_777_000_000_000,
+      dispatcher: {
+        dispatchAnalysisJob(input) {
+          dispatched.push(`analysis:${input.projectId}:${input.jobId}`);
+        },
+        dispatchRenderJob(input) {
+          dispatched.push(`render:${input.projectId}:${input.jobId}`);
+        }
+      }
+    });
+
+    await expect(
+      service.accept({
+        headers: {
+          "x-gideon-queue-timestamp": "1777000000",
+          "x-gideon-queue-signature": `sha256=${"0".repeat(64)}`
+        },
+        body: JSON.stringify({ kind: "analysis", projectId: "project-1", jobId: "job-1" })
+      })
+    ).rejects.toThrow("verification failed");
+    expect(dispatched).toEqual([]);
+  });
 });
+
+function signedQueueHeaders(body: string): Record<string, string> {
+  const signature = createHmac("sha256", "queue-secret").update(`1777000000.${body}`).digest("hex");
+  return {
+    "x-gideon-queue-timestamp": "1777000000",
+    "x-gideon-queue-signature": `sha256=${signature}`
+  };
+}

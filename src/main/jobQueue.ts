@@ -33,6 +33,16 @@ export interface HostedWorkerQueueRequest {
   toleranceSeconds?: number;
 }
 
+export interface HostedWorkerJobDispatcher {
+  dispatchAnalysisJob(input: { projectId: string; jobId: string }): Promise<void> | void;
+  dispatchRenderJob(input: { projectId: string; jobId: string }): Promise<void> | void;
+}
+
+export interface HostedWorkerIntakeResult {
+  accepted: true;
+  job: HostedWorkerQueueJob;
+}
+
 type QueueFetch = (
   url: string,
   init: {
@@ -229,6 +239,30 @@ export function verifyHostedWorkerQueueRequest(input: HostedWorkerQueueRequest &
     signingSecret: input.signingSecret
   });
   return hostedWorkerQueueJobFromBody(body);
+}
+
+export function createHostedWorkerIntakeService(input: {
+  signingSecret: string;
+  dispatcher: HostedWorkerJobDispatcher;
+  nowMs?: () => number;
+  toleranceSeconds?: number;
+}) {
+  return {
+    async accept(request: HostedWorkerQueueRequest): Promise<HostedWorkerIntakeResult> {
+      const job = verifyHostedWorkerQueueRequest({
+        ...request,
+        signingSecret: input.signingSecret,
+        nowMs: request.nowMs ?? input.nowMs?.(),
+        toleranceSeconds: request.toleranceSeconds ?? input.toleranceSeconds
+      });
+      if (job.kind === "analysis") {
+        await input.dispatcher.dispatchAnalysisJob({ projectId: job.projectId, jobId: job.jobId });
+      } else {
+        await input.dispatcher.dispatchRenderJob({ projectId: job.projectId, jobId: job.jobId });
+      }
+      return { accepted: true, job };
+    }
+  };
 }
 
 async function enqueueHostedJob(input: {
