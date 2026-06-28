@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type { HostedJobQueueService } from "./hostedApi";
 import type { JobKind, QueueRuntimeStats } from "../shared/types";
 
@@ -41,6 +42,24 @@ export interface HostedWorkerJobDispatcher {
 export interface HostedWorkerIntakeResult {
   accepted: true;
   job: HostedWorkerQueueJob;
+}
+
+export interface HostedWorkerIntakeService {
+  accept(request: HostedWorkerQueueRequest): Promise<HostedWorkerIntakeResult>;
+}
+
+export interface HostedWorkerIntakeHttpRequest {
+  method: string;
+  path?: string;
+  headers?: Record<string, string | string[] | undefined>;
+  body?: string | Buffer;
+  nowMs?: number;
+}
+
+export interface HostedWorkerIntakeHttpResponse {
+  status: number;
+  headers: Record<string, string>;
+  body: unknown;
 }
 
 type QueueFetch = (
@@ -246,7 +265,7 @@ export function createHostedWorkerIntakeService(input: {
   dispatcher: HostedWorkerJobDispatcher;
   nowMs?: () => number;
   toleranceSeconds?: number;
-}) {
+}): HostedWorkerIntakeService {
   return {
     async accept(request: HostedWorkerQueueRequest): Promise<HostedWorkerIntakeResult> {
       const job = verifyHostedWorkerQueueRequest({
@@ -262,6 +281,44 @@ export function createHostedWorkerIntakeService(input: {
       }
       return { accepted: true, job };
     }
+  };
+}
+
+export async function handleHostedWorkerIntakeRequest(
+  request: HostedWorkerIntakeHttpRequest,
+  service: HostedWorkerIntakeService
+): Promise<HostedWorkerIntakeHttpResponse> {
+  if (request.method.toUpperCase() !== "POST") {
+    return workerJsonResponse(405, { error: { code: "method_not_allowed", message: "POST is required." } });
+  }
+  try {
+    const accepted = await service.accept({
+      headers: request.headers ?? {},
+      body: request.body ?? "",
+      nowMs: request.nowMs
+    });
+    return workerJsonResponse(202, { accepted: true, job: accepted.job });
+  } catch (error) {
+    return workerIntakeErrorResponse(error);
+  }
+}
+
+export function createHostedWorkerIntakeNodeHandler(service: HostedWorkerIntakeService) {
+  return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
+    const result = await handleHostedWorkerIntakeRequest(
+      {
+        method: request.method ?? "GET",
+        path: request.url ?? "/",
+        headers: request.headers,
+        body: await readRawBody(request)
+      },
+      service
+    );
+    for (const [key, value] of Object.entries(result.headers)) {
+      response.setHeader(key, value);
+    }
+    response.statusCode = result.status;
+    response.end(JSON.stringify(result.body));
   };
 }
 
@@ -361,6 +418,38 @@ function requiredHeader(headers: HostedWorkerQueueRequest["headers"], name: stri
     }
   }
   throw new Error(`Hosted worker queue ${name} header is required.`);
+}
+
+function workerIntakeErrorResponse(error: unknown): HostedWorkerIntakeHttpResponse {
+  const message = error instanceof Error ? error.message : "Worker queue intake failed.";
+  if (/signature|timestamp|header/i.test(message)) {
+    return workerJsonResponse(401, { error: { code: "invalid_queue_signature", message } });
+  }
+  if (/json|body|kind|requires/i.test(message)) {
+    return workerJsonResponse(400, { error: { code: "invalid_queue_job", message } });
+  }
+  return workerJsonResponse(503, {
+    error: {
+      code: "worker_dispatch_failed",
+      message: sanitizeQueueError(message)
+    }
+  });
+}
+
+function workerJsonResponse(status: number, body: unknown): HostedWorkerIntakeHttpResponse {
+  return {
+    status,
+    headers: { "Content-Type": "application/json" },
+    body
+  };
+}
+
+async function readRawBody(request: IncomingMessage): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
 }
 
 function normalizeConcurrencyByKind(input: WorkerQueueOptions["concurrencyByKind"]): Partial<Record<JobKind, number>> {

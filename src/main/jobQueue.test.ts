@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createHostedWorkerIntakeService,
   createHttpHostedJobQueueService,
+  handleHostedWorkerIntakeRequest,
   isWorkerQueueCanceledError,
   loadHostedJobQueueConfig,
   loadLocalWorkerQueueOptions,
@@ -445,6 +446,98 @@ describe("local worker queue", () => {
       })
     ).rejects.toThrow("verification failed");
     expect(dispatched).toEqual([]);
+  });
+
+  it("handles hosted worker intake HTTP requests", async () => {
+    const dispatched: string[] = [];
+    const service = createHostedWorkerIntakeService({
+      signingSecret: "queue-secret",
+      nowMs: () => 1_777_000_000_000,
+      dispatcher: {
+        dispatchAnalysisJob(input) {
+          dispatched.push(`analysis:${input.projectId}:${input.jobId}`);
+        },
+        dispatchRenderJob(input) {
+          dispatched.push(`render:${input.projectId}:${input.jobId}`);
+        }
+      }
+    });
+    const body = JSON.stringify({ kind: "analysis", projectId: "project-1", jobId: "job-1" });
+
+    await expect(
+      handleHostedWorkerIntakeRequest(
+        {
+          method: "POST",
+          headers: signedQueueHeaders(body),
+          body
+        },
+        service
+      )
+    ).resolves.toEqual({
+      status: 202,
+      headers: { "Content-Type": "application/json" },
+      body: {
+        accepted: true,
+        job: { kind: "analysis", projectId: "project-1", jobId: "job-1" }
+      }
+    });
+    expect(dispatched).toEqual(["analysis:project-1:job-1"]);
+  });
+
+  it("maps hosted worker intake HTTP failures to safe responses", async () => {
+    const service = createHostedWorkerIntakeService({
+      signingSecret: "queue-secret",
+      nowMs: () => 1_777_000_000_000,
+      dispatcher: {
+        dispatchAnalysisJob() {
+          throw new Error("worker secret_token_123 backend failed");
+        },
+        dispatchRenderJob() {
+          throw new Error("should not dispatch render");
+        }
+      }
+    });
+    const body = JSON.stringify({ kind: "analysis", projectId: "project-1", jobId: "job-1" });
+
+    await expect(handleHostedWorkerIntakeRequest({ method: "GET" }, service)).resolves.toMatchObject({
+      status: 405,
+      body: { error: { code: "method_not_allowed" } }
+    });
+    await expect(
+      handleHostedWorkerIntakeRequest(
+        {
+          method: "POST",
+          headers: {
+            "x-gideon-queue-timestamp": "1777000000",
+            "x-gideon-queue-signature": `sha256=${"0".repeat(64)}`
+          },
+          body
+        },
+        service
+      )
+    ).resolves.toMatchObject({
+      status: 401,
+      body: { error: { code: "invalid_queue_signature" } }
+    });
+    await expect(
+      handleHostedWorkerIntakeRequest(
+        {
+          method: "POST",
+          headers: signedQueueHeaders(body),
+          body
+        },
+        service
+      )
+    ).resolves.toEqual({
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+      body: {
+        error: {
+          code: "worker_dispatch_failed",
+          message: "worker [redacted] backend failed"
+        }
+      }
+    });
   });
 });
 
