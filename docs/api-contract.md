@@ -448,6 +448,7 @@ Start full analysis for active verified recording/profile.
 
 - **Errors:** 404, 409 invalid state/active run, 422 media/profile, 429 quota/concurrency, 503.
 - **Rate limit:** 20/hour/workspace; one active analysis/project.
+- **Queue handoff:** When `GIDEON_HOSTED_QUEUE_URL`/`GIDEON_WORKER_QUEUE_URL` and matching queue secret are configured, hosted dependencies enqueue analysis jobs by POSTing `{ kind, projectId, jobId }` to the worker endpoint with `X-Gideon-Queue-Timestamp` and HMAC `X-Gideon-Queue-Signature`.
 
 ### GET `/projects/{projectId}/analysis-runs/{analysisRunId}`
 
@@ -691,6 +692,7 @@ Compile current approved script/edit choices into immutable manifest and render.
 
 - **Validation:** project belongs to session workspace, active recording exists, at least one script exists, hosted job queue is configured, no equivalent active render job. Future manifest mode additionally validates approved/current script; completed voiceover if provided; template/profile allowlist; source bounds; x/y 0..1, scale 1..configured max; gain bounds; caption/overlay preflight; all IDs same project/workspace; quota.
 - **Response 202:** Render job projection plus top-level Job. If an equivalent active render job already exists, the API returns it with `reused=true` and does not enqueue a duplicate. Future manifest mode may return an existing completed generated video for identical idempotent manifest with `200 reused=true`.
+- **Queue handoff:** Same signed hosted worker endpoint contract as analysis jobs, with `kind: "render"`.
 
 ```json
 {

@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+import type { HostedJobQueueService } from "./hostedApi";
 import type { JobKind, QueueRuntimeStats } from "../shared/types";
 
 export interface WorkerQueueTask<T> {
@@ -11,6 +13,25 @@ export interface WorkerQueueOptions {
   concurrency?: number;
   concurrencyByKind?: Partial<Record<JobKind, number>>;
 }
+
+export interface HostedJobQueueConfig {
+  provider: "none" | "http";
+  httpEndpointUrl: string | null;
+  signingSecret: string | null;
+}
+
+type QueueFetch = (
+  url: string,
+  init: {
+    method: "POST";
+    headers: Record<string, string>;
+    body: string;
+  }
+) => Promise<{
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+}>;
 
 interface PendingTask<T> extends WorkerQueueTask<T> {
   resolve: (value: T) => void;
@@ -134,6 +155,86 @@ export function loadLocalWorkerQueueOptions(env: NodeJS.ProcessEnv = process.env
   };
 }
 
+export function loadHostedJobQueueConfig(env: NodeJS.ProcessEnv = process.env): HostedJobQueueConfig {
+  const endpoint = normalizeHttpUrl(env.GIDEON_HOSTED_QUEUE_URL ?? env.GIDEON_WORKER_QUEUE_URL);
+  const signingSecret = nonEmpty(env.GIDEON_HOSTED_QUEUE_SECRET ?? env.GIDEON_WORKER_QUEUE_SECRET);
+  return {
+    provider: endpoint && signingSecret ? "http" : "none",
+    httpEndpointUrl: endpoint,
+    signingSecret
+  };
+}
+
+export function createHttpHostedJobQueueService(
+  config: Pick<HostedJobQueueConfig, "provider" | "httpEndpointUrl" | "signingSecret">,
+  fetcher: QueueFetch = fetch,
+  nowMs: () => number = Date.now
+): HostedJobQueueService {
+  if (config.provider !== "http" || !config.httpEndpointUrl) {
+    throw new Error("Hosted HTTP worker queue endpoint is not configured.");
+  }
+  if (!config.signingSecret) {
+    throw new Error("Hosted HTTP worker queue signing secret is not configured.");
+  }
+  const endpointUrl = config.httpEndpointUrl;
+  const signingSecret = config.signingSecret;
+  return {
+    enqueueAnalysisJob(input) {
+      return enqueueHostedJob({
+        endpointUrl,
+        signingSecret,
+        fetcher,
+        nowMs,
+        kind: "analysis",
+        projectId: input.projectId,
+        jobId: input.jobId
+      });
+    },
+    enqueueRenderJob(input) {
+      return enqueueHostedJob({
+        endpointUrl,
+        signingSecret,
+        fetcher,
+        nowMs,
+        kind: "render",
+        projectId: input.projectId,
+        jobId: input.jobId
+      });
+    }
+  };
+}
+
+async function enqueueHostedJob(input: {
+  endpointUrl: string;
+  signingSecret: string;
+  fetcher: QueueFetch;
+  nowMs: () => number;
+  kind: Extract<JobKind, "analysis" | "render">;
+  projectId: string;
+  jobId: string;
+}): Promise<void> {
+  const body = JSON.stringify({
+    kind: input.kind,
+    projectId: input.projectId,
+    jobId: input.jobId
+  });
+  const timestamp = Math.floor(input.nowMs() / 1000).toString();
+  const signature = createHmac("sha256", input.signingSecret).update(`${timestamp}.${body}`).digest("hex");
+  const response = await input.fetcher(input.endpointUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Gideon-Queue-Timestamp": timestamp,
+      "X-Gideon-Queue-Signature": `sha256=${signature}`
+    },
+    body
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Hosted worker queue enqueue failed with ${response.status}: ${sanitizeQueueError(text)}`);
+  }
+}
+
 function normalizeConcurrencyByKind(input: WorkerQueueOptions["concurrencyByKind"]): Partial<Record<JobKind, number>> {
   const normalized: Partial<Record<JobKind, number>> = {};
   for (const [kind, value] of Object.entries(input ?? {}) as Array<[JobKind, number | undefined]>) {
@@ -160,4 +261,29 @@ function parsePositiveInteger(value: string | undefined): number | undefined {
     return undefined;
   }
   return parsed;
+}
+
+function normalizeHttpUrl(value: string | undefined): string | null {
+  const trimmed = nonEmpty(value);
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return null;
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function nonEmpty(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function sanitizeQueueError(value: string): string {
+  return value.replace(/(sk|whsec|secret|token|key)_[a-zA-Z0-9_-]+/g, "[redacted]").slice(0, 300) || "Worker queue error.";
 }

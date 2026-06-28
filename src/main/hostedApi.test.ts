@@ -108,6 +108,24 @@ describe("hosted API foundation", () => {
     expect(response.body).toMatchObject({ error: { code: "billing_not_configured" } });
   });
 
+  it("auto-wires configured HTTP hosted worker queue service into hosted dependencies", () => {
+    const dependencies = createHostedApiDependencies({
+      store: new InMemoryHostedApiStore(),
+      env: {
+        GIDEON_SESSION_SECRET: "session-secret",
+        GIDEON_HOSTED_QUEUE_URL: "https://workers.example.test/enqueue",
+        GIDEON_HOSTED_QUEUE_SECRET: "queue-secret"
+      }
+    });
+
+    expect(dependencies.config.jobQueue).toEqual({
+      provider: "http",
+      httpEndpointUrl: "https://workers.example.test/enqueue",
+      signingSecret: "queue-secret"
+    });
+    expect(dependencies.jobQueueService).toBeDefined();
+  });
+
   it("syncs trusted auth callbacks and returns a signed cookie session", async () => {
     const api = testApi();
     const response = await handleHostedApiRequest(
@@ -1390,9 +1408,16 @@ function testApi(
       billing: {
         provider: "stripe" as const,
         stripeWebhookSecret: "stripe-secret",
+        stripeSecretKey: null,
+        stripeApiBaseUrl: "https://api.stripe.com",
         stripePriceIds: {
           team: "price_team"
         }
+      },
+      jobQueue: {
+        provider: "none" as const,
+        httpEndpointUrl: null,
+        signingSecret: null
       },
       internalAuthCallbackSecret: "internal-secret"
     },

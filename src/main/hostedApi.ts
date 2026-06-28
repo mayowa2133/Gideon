@@ -16,6 +16,11 @@ import {
   verifyStripeWebhookSignature,
   type BillingConfig
 } from "./billing";
+import {
+  createHttpHostedJobQueueService,
+  loadHostedJobQueueConfig,
+  type HostedJobQueueConfig
+} from "./jobQueue";
 import type {
   AppState,
   ApplyBillingSubscriptionInput,
@@ -54,6 +59,7 @@ export interface HostedApiResponse {
 export interface HostedApiConfig {
   auth: AuthConfig;
   billing: BillingConfig;
+  jobQueue: HostedJobQueueConfig;
   internalAuthCallbackSecret: string | null;
 }
 
@@ -221,6 +227,7 @@ export function loadHostedApiConfig(env: NodeJS.ProcessEnv = process.env): Hoste
       secureCookies: env.GIDEON_SECURE_COOKIES !== "false"
     },
     billing: loadBillingConfig(env),
+    jobQueue: loadHostedJobQueueConfig(env),
     internalAuthCallbackSecret: env.GIDEON_AUTH_CALLBACK_SECRET?.trim() || null
   };
 }
@@ -239,7 +246,7 @@ export function createHostedApiDependencies(input: {
     store: input.store,
     config,
     uploadService: input.uploadService,
-    jobQueueService: input.jobQueueService,
+    jobQueueService: input.jobQueueService ?? createHostedJobQueueService(config.jobQueue),
     exportService: input.exportService,
     billingService: input.billingService ?? createHostedBillingService(config.billing)
   };
@@ -381,6 +388,13 @@ export function createHostedApiNodeHandler(dependencies: HostedApiDependencies) 
 function createHostedBillingService(config: BillingConfig): HostedBillingService | undefined {
   if (config.provider === "stripe" && config.stripeSecretKey) {
     return createStripeBillingService(config);
+  }
+  return undefined;
+}
+
+function createHostedJobQueueService(config: HostedJobQueueConfig): HostedJobQueueService | undefined {
+  if (config.provider === "http" && config.httpEndpointUrl && config.signingSecret) {
+    return createHttpHostedJobQueueService(config);
   }
   return undefined;
 }

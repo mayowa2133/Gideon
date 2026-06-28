@@ -1,5 +1,12 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { isWorkerQueueCanceledError, loadLocalWorkerQueueOptions, LocalWorkerQueue } from "./jobQueue";
+import {
+  createHttpHostedJobQueueService,
+  isWorkerQueueCanceledError,
+  loadHostedJobQueueConfig,
+  loadLocalWorkerQueueOptions,
+  LocalWorkerQueue
+} from "./jobQueue";
 
 describe("local worker queue", () => {
   it("runs queued jobs serially by default", async () => {
@@ -213,5 +220,96 @@ describe("local worker queue", () => {
         render: 1
       }
     });
+  });
+
+  it("loads hosted worker queue options only when endpoint and secret are configured", () => {
+    expect(
+      loadHostedJobQueueConfig({
+        GIDEON_HOSTED_QUEUE_URL: "https://workers.example.test/enqueue",
+        GIDEON_HOSTED_QUEUE_SECRET: "queue-secret"
+      })
+    ).toEqual({
+      provider: "http",
+      httpEndpointUrl: "https://workers.example.test/enqueue",
+      signingSecret: "queue-secret"
+    });
+    expect(
+      loadHostedJobQueueConfig({
+        GIDEON_HOSTED_QUEUE_URL: "https://workers.example.test/enqueue"
+      })
+    ).toEqual({
+      provider: "none",
+      httpEndpointUrl: "https://workers.example.test/enqueue",
+      signingSecret: null
+    });
+    expect(
+      loadHostedJobQueueConfig({
+        GIDEON_HOSTED_QUEUE_URL: "file:///tmp/queue",
+        GIDEON_HOSTED_QUEUE_SECRET: "queue-secret"
+      })
+    ).toEqual({
+      provider: "none",
+      httpEndpointUrl: null,
+      signingSecret: "queue-secret"
+    });
+  });
+
+  it("enqueues hosted jobs through a signed HTTP worker queue request", async () => {
+    const requests: Array<{ url: string; headers: Record<string, string>; body: string }> = [];
+    const service = createHttpHostedJobQueueService(
+      {
+        provider: "http",
+        httpEndpointUrl: "https://workers.example.test/enqueue",
+        signingSecret: "queue-secret"
+      },
+      async (url, init) => {
+        requests.push({ url, headers: init.headers, body: init.body });
+        return {
+          ok: true,
+          status: 202,
+          async text() {
+            return "";
+          }
+        };
+      },
+      () => 1_777_000_000_000
+    );
+
+    await service.enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" });
+
+    const body = JSON.stringify({ kind: "analysis", projectId: "project-1", jobId: "job-1" });
+    const signature = createHmac("sha256", "queue-secret").update(`1777000000.${body}`).digest("hex");
+    expect(requests).toEqual([
+      {
+        url: "https://workers.example.test/enqueue",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Gideon-Queue-Timestamp": "1777000000",
+          "X-Gideon-Queue-Signature": `sha256=${signature}`
+        },
+        body
+      }
+    ]);
+  });
+
+  it("sanitizes hosted worker queue failures", async () => {
+    const service = createHttpHostedJobQueueService(
+      {
+        provider: "http",
+        httpEndpointUrl: "https://workers.example.test/enqueue",
+        signingSecret: "queue-secret"
+      },
+      async () => ({
+        ok: false,
+        status: 500,
+        async text() {
+          return "failed with token_abc123";
+        }
+      })
+    );
+
+    await expect(service.enqueueRenderJob({ projectId: "project-1", jobId: "job-1" })).rejects.toThrow(
+      "failed with [redacted]"
+    );
   });
 });
