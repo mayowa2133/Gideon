@@ -4,9 +4,9 @@ Gideon is a macOS desktop app that turns a product walkthrough recording into ed
 
 ## Implementation progress
 
-Current engineering estimate: **70% complete** toward the full original product vision.
+Current engineering estimate: **71% complete** toward the full original product vision.
 
-This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, and hosted analysis/render/export/download/billing-session primitives in place. Remaining work is mainly production-hosted persistence, provider-backed checkout/customer portal wiring, distributed workers, observability, deployment hardening, and later non-MVP expansion items.
+This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, and hosted analysis/render/export/download/billing-session primitives with Stripe REST session wiring in place. Remaining work is mainly production-hosted persistence, billing deployment operations, distributed workers, observability, deployment hardening, and later non-MVP expansion items.
 
 ## Local development
 
@@ -68,9 +68,9 @@ Provider outputs are treated as untrusted until parsed and validated. If a provi
 
 ## Local billing and quota controls
 
-Workspace owners/admins can change a workspace between the local MVP, starter, team, and enterprise plan definitions from the sidebar. These plan definitions update the workspace entitlements used by quota checks for source minutes, transcription minutes, AI runs, TTS characters, render minutes, storage, exports, and project count. This is a provider-neutral billing foundation: hosted checkout and customer portal session routes now enforce session workspace scope, CSRF, and billing-manager authorization, while real provider session creation, invoices, and production reconciliation still need a deployed billing provider before hosted production use.
+Workspace owners/admins can change a workspace between the local MVP, starter, team, and enterprise plan definitions from the sidebar. These plan definitions update the workspace entitlements used by quota checks for source minutes, transcription minutes, AI runs, TTS characters, render minutes, storage, exports, and project count. This is a provider-neutral billing foundation: hosted checkout and customer portal session routes enforce session workspace scope, CSRF, and billing-manager authorization, then a Stripe REST adapter can create provider sessions when configured. Invoices, tax settings, product catalog operations, and production reconciliation still need a deployed billing-provider setup before hosted production use.
 
-The billing provider foundation includes Stripe-style webhook signature verification and subscription-event normalization. Hosted webhook handlers should verify the raw request body with `STRIPE_WEBHOOK_SECRET` or `GIDEON_STRIPE_WEBHOOK_SECRET`, map price IDs with `GIDEON_STRIPE_STARTER_PRICE_ID`, `GIDEON_STRIPE_TEAM_PRICE_ID`, and `GIDEON_STRIPE_ENTERPRISE_PRICE_ID`, then apply the normalized subscription event to the workspace. Billing webhooks are idempotent by provider event ID and update workspace plan/status, provider customer/subscription IDs, entitlements, and audit history.
+The billing provider foundation includes Stripe-style webhook signature verification, subscription-event normalization, checkout session creation, and customer portal session creation. Set `GIDEON_BILLING_PROVIDER=stripe`, `STRIPE_SECRET_KEY` or `GIDEON_STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` or `GIDEON_STRIPE_WEBHOOK_SECRET`, and price IDs with `GIDEON_STRIPE_STARTER_PRICE_ID`, `GIDEON_STRIPE_TEAM_PRICE_ID`, and `GIDEON_STRIPE_ENTERPRISE_PRICE_ID`. `GIDEON_STRIPE_API_BASE_URL` can point tests or private deployments at a Stripe-compatible API base; it defaults to `https://api.stripe.com`. Billing webhooks are idempotent by provider event ID and update workspace plan/status, provider customer/subscription IDs, entitlements, and audit history.
 
 ## Local worker queue controls
 

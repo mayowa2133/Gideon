@@ -909,6 +909,7 @@ Create a hosted billing checkout session for a new paid workspace plan. The API 
 - **Headers:** CSRF.
 - **Request:** `{ "plan": "starter|team|enterprise", "successUrl": "https://...", "cancelUrl": "https://..." }`.
 - **Validation:** session workspace must match URL workspace, billing provider configured, price ID mapped for requested plan, absolute http(s) return URLs.
+- **Provider wiring:** Stripe adapter posts `mode=subscription`, the configured price ID, workspace/user/plan metadata, and existing customer ID when present. Requires `GIDEON_BILLING_PROVIDER=stripe` plus `STRIPE_SECRET_KEY` or `GIDEON_STRIPE_SECRET_KEY`.
 - **Response 201:** Provider checkout session URL. `Cache-Control: no-store`.
 
 ```json
@@ -938,6 +939,7 @@ Create a hosted customer portal session for an existing billing customer.
 - **Headers:** CSRF.
 - **Request:** `{ "returnUrl": "https://..." }`.
 - **Validation:** session workspace must match URL workspace, billing provider configured, workspace has a provider customer ID, absolute http(s) return URL.
+- **Provider wiring:** Stripe adapter posts the stored provider customer ID and return URL to the customer portal sessions API.
 - **Response 201:** Provider customer portal URL. `Cache-Control: no-store`.
 
 ```json
