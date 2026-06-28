@@ -13,7 +13,7 @@ vi.mock("electron", () => ({
 }));
 
 import { GideonStore } from "./store";
-import type { ArtifactRecord, ProductProfile, RecordingMetadata, RecordingUploadSessionRecord } from "../shared/types";
+import type { ArtifactRecord, ProductProfile, RecordingMetadata, RecordingUploadSessionRecord, ScriptDraft } from "../shared/types";
 import { DEFAULT_LOCAL_USER_ID, DEFAULT_LOCAL_WORKSPACE_ID } from "../shared/usage";
 
 describe("GideonStore billing reconciliation", () => {
@@ -389,6 +389,76 @@ describe("GideonStore billing reconciliation", () => {
       state.auditEvents.some((event) => event.action === "job.create" && event.actorUserId === DEFAULT_LOCAL_USER_ID)
     ).toBe(true);
   });
+
+  it("creates render jobs with explicit hosted session scope", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Hosted project",
+      profile: profileFixture()
+    });
+    const session = uploadSessionFixture({
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id
+    });
+    await store.createRecordingUploadSessionRecordForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      session
+    });
+    const artifact = artifactFixture({
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      storageKey: session.storageKey,
+      contentType: session.contentType,
+      byteSize: session.byteSize,
+      originalFileName: session.originalFileName
+    });
+    await store.completeRecordingUploadForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      sessionId: session.id,
+      artifact,
+      recording: recordingFixture({
+        artifactId: artifact.id,
+        storageKey: artifact.storageKey,
+        sha256: artifact.sha256,
+        sizeBytes: artifact.byteSize,
+        fileName: artifact.originalFileName
+      })
+    });
+    await store.updateScripts(project.id, [scriptFixture()]);
+
+    const created = await store.createRenderJobForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id
+    });
+    const duplicate = await store.createRenderJobForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id
+    });
+
+    expect(created.reused).toBe(false);
+    expect(created.job).toMatchObject({ kind: "render", status: "queued" });
+    expect(duplicate.reused).toBe(true);
+    expect(duplicate.job.id).toBe(created.job.id);
+    const state = await store.load();
+    expect(state.projects.find((candidate) => candidate.id === project.id)?.jobs).toHaveLength(1);
+    expect(
+      state.auditEvents.some(
+        (event) =>
+          event.action === "job.create" &&
+          event.actorUserId === DEFAULT_LOCAL_USER_ID &&
+          event.metadata?.jobKind === "render"
+      )
+    ).toBe(true);
+  });
 });
 
 function profileFixture(overrides: Partial<ProductProfile> = {}): ProductProfile {
@@ -420,6 +490,34 @@ function uploadSessionFixture(
     byteSize: 1024,
     originalFileName: "walkthrough.mov",
     expiresAt: "2026-06-25T12:15:00.000Z",
+    ...overrides
+  };
+}
+
+function scriptFixture(overrides: Partial<ScriptDraft> = {}): ScriptDraft {
+  return {
+    id: "script-1",
+    conceptId: "concept-1",
+    hook: "Stop stitching walkthrough clips manually.",
+    voiceoverText: "Gideon turns one product recording into short-form video drafts.",
+    captions: [
+      {
+        startMs: 0,
+        endMs: 2_000,
+        text: "Turn recordings into video drafts"
+      }
+    ],
+    cta: "Try Gideon",
+    visualBeats: [
+      {
+        startMs: 0,
+        endMs: 2_000,
+        momentId: "moment-1",
+        instruction: "Show the upload-to-export workflow."
+      }
+    ],
+    approved: true,
+    updatedAt: "2026-06-25T12:00:00.000Z",
     ...overrides
   };
 }

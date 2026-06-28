@@ -102,6 +102,11 @@ export interface HostedApiStore {
     workspaceId: string;
     projectId: string;
   }): Promise<{ project: Project; job: JobRecord; reused: boolean }>;
+  createRenderJobForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+  }): Promise<{ project: Project; job: JobRecord; reused: boolean }>;
 }
 
 export interface HostedRecordingUploadSession {
@@ -133,6 +138,7 @@ export interface HostedRecordingUploadService {
 
 export interface HostedJobQueueService {
   enqueueAnalysisJob(input: { projectId: string; jobId: string }): Promise<void> | void;
+  enqueueRenderJob(input: { projectId: string; jobId: string }): Promise<void> | void;
 }
 
 export interface HostedApiDependencies {
@@ -218,6 +224,10 @@ export async function handleHostedApiRequest(
     const analysisRunsRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/analysis-runs$/);
     if (method === "POST" && analysisRunsRoute) {
       return await handleCreateAnalysisRun(request, dependencies, requestId, decodeURIComponent(analysisRunsRoute[1] ?? ""));
+    }
+    const renderJobsRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/render-jobs$/);
+    if (method === "POST" && renderJobsRoute) {
+      return await handleCreateRenderJob(request, dependencies, requestId, decodeURIComponent(renderJobsRoute[1] ?? ""));
     }
     const jobRoute = path.match(/^\/api\/v1\/jobs\/([^/]+)$/);
     if (method === "GET" && jobRoute) {
@@ -681,6 +691,55 @@ async function handleCreateAnalysisRun(
     202,
     {
       analysisRun: {
+        id: job.id,
+        projectId,
+        workspaceId: project.workspaceId,
+        status: job.status,
+        reused
+      },
+      job: jobResource(project, job)
+    },
+    requestId,
+    {
+      Location: `/api/v1/jobs/${job.id}`
+    }
+  );
+}
+
+async function handleCreateRenderJob(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string
+): Promise<HostedApiResponse> {
+  if (!dependencies.jobQueueService) {
+    throw new ApiError(503, "job_queue_not_configured", "Hosted job queue is not configured.");
+  }
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  objectBody(request);
+  const { project, job, reused } = await storeCall(() =>
+    dependencies.store.createRenderJobForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId
+    })
+  );
+  if (!reused) {
+    try {
+      await dependencies.jobQueueService.enqueueRenderJob({ projectId, jobId: job.id });
+    } catch (error) {
+      throw jobQueueError(error);
+    }
+  }
+  return jsonResponse(
+    202,
+    {
+      renderJob: {
         id: job.id,
         projectId,
         workspaceId: project.workspaceId,

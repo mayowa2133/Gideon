@@ -18,6 +18,7 @@ import type {
   Project,
   RecordingMetadata,
   RecordingUploadSessionRecord,
+  ScriptDraft,
   SyncAuthenticatedUserInput
 } from "../shared/types";
 import { createLocalUserWorkspace } from "../shared/usage";
@@ -578,6 +579,9 @@ describe("hosted API foundation", () => {
     const jobQueueService: HostedJobQueueService = {
       enqueueAnalysisJob(input) {
         enqueued.push(input);
+      },
+      enqueueRenderJob() {
+        throw new Error("Unexpected render enqueue.");
       }
     };
     const api = testApi({ jobQueueService });
@@ -663,6 +667,103 @@ describe("hosted API foundation", () => {
     );
     expect(duplicate.status).toBe(202);
     expect(duplicate.body).toMatchObject({ data: { analysisRun: { id: "job-1", reused: true } } });
+    expect(enqueued).toEqual([{ projectId: "project-1", jobId: "job-1" }]);
+  });
+
+  it("creates hosted render jobs and hands them to the queue service", async () => {
+    const enqueued: Array<{ projectId: string; jobId: string }> = [];
+    const jobQueueService: HostedJobQueueService = {
+      enqueueAnalysisJob() {
+        throw new Error("Unexpected analysis enqueue.");
+      },
+      enqueueRenderJob(input) {
+        enqueued.push(input);
+      }
+    };
+    const api = testApi({ jobQueueService });
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        recording: recordingFixture({ artifactId: "recording-1" }),
+        scripts: [scriptFixture({ id: "script-1" })]
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const rejected = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/render-jobs",
+        headers: { cookie: `gideon_session=${created.token}` },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+    expect(rejected.status).toBe(403);
+    expect(rejected.body).toMatchObject({ error: { code: "csrf_failed" } });
+
+    const accepted = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/render-jobs",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1",
+          "x-request-id": "req_render_job"
+        },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(accepted.status).toBe(202);
+    expect(accepted.headers.Location).toBe("/api/v1/jobs/job-1");
+    expect(accepted.body).toMatchObject({
+      data: {
+        renderJob: {
+          id: "job-1",
+          projectId: "project-1",
+          workspaceId: "local-workspace",
+          status: "queued",
+          reused: false
+        },
+        job: {
+          id: "job-1",
+          kind: "render",
+          status: "queued",
+          workspaceId: "local-workspace"
+        }
+      },
+      meta: { requestId: "req_render_job" }
+    });
+    expect(enqueued).toEqual([{ projectId: "project-1", jobId: "job-1" }]);
+
+    const duplicate = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/render-jobs",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1"
+        },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:02:00.000Z")
+      },
+      api
+    );
+    expect(duplicate.status).toBe(202);
+    expect(duplicate.body).toMatchObject({ data: { renderJob: { id: "job-1", reused: true } } });
     expect(enqueued).toEqual([{ projectId: "project-1", jobId: "job-1" }]);
   });
 
@@ -1130,6 +1231,41 @@ class InMemoryHostedApiStore implements HostedApiStore {
     return { project, job, reused: false };
   }
 
+  async createRenderJobForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+  }): Promise<{ project: Project; job: JobRecord; reused: boolean }> {
+    this.assertMember(input);
+    const project = this.state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    if (!project.recording) {
+      throw new Error("Choose a recording before rendering.");
+    }
+    if (project.scripts.length === 0) {
+      throw new Error("Generate scripts before rendering.");
+    }
+    const activeJob = project.jobs.find(
+      (candidate) => candidate.kind === "render" && ["queued", "running", "canceling"].includes(candidate.status)
+    );
+    if (activeJob) {
+      return { project, job: activeJob, reused: true };
+    }
+    const job = jobFixture({
+      id: `job-${project.jobs.length + 1}`,
+      projectId: project.id,
+      kind: "render",
+      userMessage: "Waiting to render selected drafts."
+    });
+    project.jobs = [...project.jobs, job];
+    project.updatedAt = "2026-06-25T12:03:00.000Z";
+    return { project, job, reused: false };
+  }
+
   private assertMember(input: { userId: string; workspaceId: string }): void {
     const membership = this.state.workspaceMembers.find(
       (candidate) => candidate.userId === input.userId && candidate.workspaceId === input.workspaceId
@@ -1174,6 +1310,7 @@ function projectFixture(input: {
   uploadSessions?: RecordingUploadSessionRecord[];
   artifacts?: ArtifactRecord[];
   recording?: RecordingMetadata;
+  scripts?: ScriptDraft[];
   jobs?: JobRecord[];
 }): Project {
   return {
@@ -1186,7 +1323,7 @@ function projectFixture(input: {
     moments: [],
     frameEvidence: [],
     concepts: [],
-    scripts: [],
+    scripts: input.scripts ?? [],
     renders: [],
     artifacts: input.artifacts ?? [],
     uploadSessions: input.uploadSessions ?? [],
@@ -1195,6 +1332,34 @@ function projectFixture(input: {
     jobEvents: [],
     createdAt: "2026-06-25T12:00:00.000Z",
     updatedAt: "2026-06-25T12:00:00.000Z"
+  };
+}
+
+function scriptFixture(overrides: Partial<ScriptDraft> = {}): ScriptDraft {
+  return {
+    id: "script-1",
+    conceptId: "concept-1",
+    hook: "Stop stitching walkthrough clips manually.",
+    voiceoverText: "Gideon turns one product recording into short-form video drafts.",
+    captions: [
+      {
+        startMs: 0,
+        endMs: 2_000,
+        text: "Turn recordings into video drafts"
+      }
+    ],
+    cta: "Try Gideon",
+    visualBeats: [
+      {
+        startMs: 0,
+        endMs: 2_000,
+        momentId: "moment-1",
+        instruction: "Show the upload-to-export workflow."
+      }
+    ],
+    approved: true,
+    updatedAt: "2026-06-25T12:00:00.000Z",
+    ...overrides
   };
 }
 

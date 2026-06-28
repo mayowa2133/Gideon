@@ -666,11 +666,11 @@ Start voiceover generation for approved script.
 
 ### POST `/projects/{projectId}/render-jobs`
 
-Compile current approved script/edit choices into immutable manifest and render.
+Compile current approved script/edit choices into immutable manifest and render. The current hosted foundation queues render work for the project’s existing scripts and returns a top-level Job; future manifest/profile inputs can be enabled on the same route.
 
 - **Auth:** `member+`.
 - **Headers:** CSRF, `Idempotency-Key`.
-- **Request:**
+- **Request:** `{}` for the current hosted foundation. Future manifest-specific render requests may use:
 
 ```json
 {
@@ -689,8 +689,31 @@ Compile current approved script/edit choices into immutable manifest and render.
 }
 ```
 
-- **Validation:** approved/current script; completed voiceover if provided; template/profile allowlist; source bounds; x/y 0..1, scale 1..configured max; gain bounds; caption/overlay preflight; all IDs same project/workspace; quota.
-- **Response 202:** Render job and manifest hash; may return existing completed generated video for identical idempotent manifest with `200 reused=true`.
+- **Validation:** project belongs to session workspace, active recording exists, at least one script exists, hosted job queue is configured, no equivalent active render job. Future manifest mode additionally validates approved/current script; completed voiceover if provided; template/profile allowlist; source bounds; x/y 0..1, scale 1..configured max; gain bounds; caption/overlay preflight; all IDs same project/workspace; quota.
+- **Response 202:** Render job projection plus top-level Job. If an equivalent active render job already exists, the API returns it with `reused=true` and does not enqueue a duplicate. Future manifest mode may return an existing completed generated video for identical idempotent manifest with `200 reused=true`.
+
+```json
+{
+  "data": {
+    "renderJob": {
+      "id": "job-uuid",
+      "projectId": "uuid",
+      "workspaceId": "uuid",
+      "status": "queued",
+      "reused": false
+    },
+    "job": {
+      "id": "job-uuid",
+      "projectId": "uuid",
+      "workspaceId": "uuid",
+      "kind": "render",
+      "status": "queued"
+    }
+  },
+  "meta": { "requestId": "req_..." }
+}
+```
+
 - **Errors:** 404, 409 stale/active equivalent/invalid state, 422 manifest preflight, 429.
 - **Rate limit:** 30/hour/workspace; concurrency entitlement.
 

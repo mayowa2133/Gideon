@@ -1349,6 +1349,72 @@ export class GideonStore {
     return { project, job, reused: false };
   }
 
+  async createRenderJobForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+  }): Promise<{ project: Project; job: JobRecord; reused: boolean }> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "job:write"
+    });
+    const project = state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    if (!project.recording) {
+      throw new Error("Choose a recording before rendering.");
+    }
+    if ((project.scripts ?? []).length === 0) {
+      throw new Error("Generate scripts before rendering.");
+    }
+    const activeJob = findActiveJob(project.jobs ?? [], "render");
+    if (activeJob) {
+      return { project, job: activeJob, reused: true };
+    }
+    const now = new Date().toISOString();
+    const job = createJob({
+      id: randomUUID(),
+      projectId: project.id,
+      kind: "render",
+      now,
+      userMessage: "Waiting to render selected drafts."
+    });
+    project.jobs = [...(project.jobs ?? []), job];
+    project.jobEvents = [
+      ...(project.jobEvents ?? []),
+      createJobEvent({
+        id: randomUUID(),
+        projectId: project.id,
+        jobId: job.id,
+        kind: "queued",
+        stage: "queued",
+        message: job.userMessage,
+        progress: job.progress,
+        now
+      })
+    ].slice(-MAX_PROJECT_JOB_EVENTS);
+    project.updatedAt = now;
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "job.create",
+      targetType: "job",
+      targetId: job.id,
+      summary: "Queued render job.",
+      metadata: { jobKind: job.kind, status: job.status }
+    });
+    await this.save();
+    return { project, job, reused: false };
+  }
+
   async appendJobEvent(projectId: string, input: JobEventInput): Promise<Project> {
     return this.updateProject(
       projectId,
