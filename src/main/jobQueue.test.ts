@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   createHostedWorkerIntakeService,
   createHttpHostedJobQueueService,
+  createStoreBackedWorkerLeaseCoordinator,
   handleHostedWorkerIntakeRequest,
+  HostedWorkerRuntime,
   isWorkerQueueCanceledError,
   loadHostedJobQueueConfig,
   loadLocalWorkerQueueOptions,
@@ -79,6 +81,66 @@ describe("local worker queue", () => {
     ).rejects.toThrow("already queued or running");
     release();
     await first;
+  });
+
+  it("runs detached worker jobs and reports background errors", async () => {
+    const queue = new LocalWorkerQueue();
+    const events: string[] = [];
+    const errors: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    queue.enqueueDetached(
+      {
+        id: "job-1",
+        projectId: "project-1",
+        kind: "analysis",
+        run: async () => {
+          events.push("first:start");
+          await gate;
+          events.push("first:end");
+        }
+      },
+      {
+        onError(error, task) {
+          errors.push(`${task.id}:${error instanceof Error ? error.message : "unknown"}`);
+        }
+      }
+    );
+    expect(() =>
+      queue.enqueueDetached({
+        id: "job-1",
+        projectId: "project-1",
+        kind: "analysis",
+        run: async () => undefined
+      })
+    ).toThrow("already queued or running");
+
+    release();
+    await flushQueue();
+
+    queue.enqueueDetached(
+      {
+        id: "job-2",
+        projectId: "project-1",
+        kind: "render",
+        run: async () => {
+          throw new Error("detached boom");
+        }
+      },
+      {
+        onError(error, task) {
+          errors.push(`${task.id}:${error instanceof Error ? error.message : "unknown"}`);
+        }
+      }
+    );
+    await flushQueue();
+
+    expect(events).toEqual(["first:start", "first:end"]);
+    expect(errors).toEqual(["job-2:detached boom"]);
+    expect(queue.stats()).toMatchObject({ active: 0, pending: 0 });
   });
 
   it("continues draining after a failed job", async () => {
@@ -493,6 +555,136 @@ describe("local worker queue", () => {
     expect(failures).toEqual(["claim:job-1", "fail:worker-1:job-1:worker [redacted] backend failed"]);
   });
 
+  it("runs hosted worker runtime jobs through detached execution with lease heartbeats", async () => {
+    const events: string[] = [];
+    const runtime = new HostedWorkerRuntime({
+      workerId: "worker-1",
+      leaseSeconds: 60,
+      heartbeatIntervalMs: 0,
+      nowMs: () => 1_777_000_000_000,
+      leaseCoordinator: {
+        claimJobLease(input) {
+          events.push(`claim:${input.job.jobId}`);
+        },
+        heartbeatJobLease(input) {
+          events.push(`heartbeat:${input.workerId}:${input.job.jobId}:${input.now}`);
+        },
+        failJobLease(input) {
+          events.push(`fail:${input.job.jobId}:${input.safeError}`);
+        }
+      },
+      executor: {
+        runAnalysisJob(input) {
+          events.push(`run-analysis:${input.projectId}:${input.jobId}`);
+        },
+        runRenderJob(input) {
+          events.push(`run-render:${input.projectId}:${input.jobId}`);
+        }
+      },
+      onError(error, job) {
+        events.push(`error:${job.jobId}:${error instanceof Error ? error.message : "unknown"}`);
+      }
+    });
+
+    runtime.dispatchAnalysisJob({ projectId: "project-1", jobId: "job-1" });
+    await flushQueue();
+
+    expect(events).toEqual([
+      "heartbeat:worker-1:job-1:2026-04-24T03:06:40.000Z",
+      "run-analysis:project-1:job-1",
+      "heartbeat:worker-1:job-1:2026-04-24T03:06:40.000Z"
+    ]);
+    expect(runtime.stats()).toMatchObject({ active: 0, pending: 0 });
+  });
+
+  it("marks hosted worker runtime execution failures against the lease", async () => {
+    const events: string[] = [];
+    const runtime = new HostedWorkerRuntime({
+      workerId: "worker-1",
+      leaseSeconds: 60,
+      heartbeatIntervalMs: 0,
+      nowMs: () => 1_777_000_000_000,
+      leaseCoordinator: {
+        claimJobLease() {
+          events.push("claim");
+        },
+        heartbeatJobLease(input) {
+          events.push(`heartbeat:${input.job.jobId}`);
+        },
+        failJobLease(input) {
+          events.push(`fail:${input.workerId}:${input.job.jobId}:${input.safeError}`);
+        }
+      },
+      executor: {
+        runAnalysisJob() {
+          throw new Error("worker secret_token_123 failed");
+        },
+        runRenderJob() {
+          throw new Error("Unexpected render.");
+        }
+      },
+      onError(error, job) {
+        events.push(`error:${job.jobId}:${error instanceof Error ? error.message : "unknown"}`);
+      }
+    });
+
+    runtime.dispatchAnalysisJob({ projectId: "project-1", jobId: "job-1" });
+    await flushQueue();
+
+    expect(events).toEqual([
+      "heartbeat:job-1",
+      "fail:worker-1:job-1:worker [redacted] failed",
+      "error:job-1:worker secret_token_123 failed"
+    ]);
+  });
+
+  it("maps the store-backed hosted worker lease coordinator to store methods", async () => {
+    const calls: string[] = [];
+    const coordinator = createStoreBackedWorkerLeaseCoordinator({
+      claimWorkerJobLease(input) {
+        calls.push(`claim:${input.projectId}:${input.jobId}:${input.workerId}:${input.leaseSeconds}:${input.now}:${input.userMessage}`);
+      },
+      heartbeatWorkerJobLease(input) {
+        calls.push(`heartbeat:${input.projectId}:${input.jobId}:${input.workerId}:${input.leaseSeconds}:${input.now}`);
+      },
+      failWorkerJobLease(input) {
+        calls.push(`fail:${input.projectId}:${input.jobId}:${input.workerId}:${input.now}:${input.safeError}`);
+      },
+      recoverExpiredWorkerJobLeases(now) {
+        calls.push(`recover:${now}`);
+      }
+    });
+    const job = { kind: "render" as const, projectId: "project-1", jobId: "job-1" };
+
+    await coordinator.recoverExpiredJobLeases?.({ now: "2026-06-25T12:00:00.000Z" });
+    await coordinator.claimJobLease({
+      job,
+      workerId: "worker-1",
+      leaseSeconds: 60,
+      now: "2026-06-25T12:01:00.000Z"
+    });
+    await coordinator.heartbeatJobLease({
+      job,
+      workerId: "worker-1",
+      leaseSeconds: 60,
+      now: "2026-06-25T12:02:00.000Z"
+    });
+    await coordinator.failJobLease?.({
+      job,
+      workerId: "worker-1",
+      leaseSeconds: 60,
+      now: "2026-06-25T12:03:00.000Z",
+      safeError: "Worker failed."
+    });
+
+    expect(calls).toEqual([
+      "recover:2026-06-25T12:00:00.000Z",
+      "claim:project-1:job-1:worker-1:60:2026-06-25T12:01:00.000Z:Worker worker-1 claimed render job.",
+      "heartbeat:project-1:job-1:worker-1:60:2026-06-25T12:02:00.000Z",
+      "fail:project-1:job-1:worker-1:2026-06-25T12:03:00.000Z:Worker failed."
+    ]);
+  });
+
   it("does not dispatch worker intake requests that fail verification", async () => {
     const dispatched: string[] = [];
     const service = createHostedWorkerIntakeService({
@@ -619,4 +811,10 @@ function signedQueueHeaders(body: string): Record<string, string> {
     "x-gideon-queue-timestamp": "1777000000",
     "x-gideon-queue-signature": `sha256=${signature}`
   };
+}
+
+async function flushQueue(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
 }

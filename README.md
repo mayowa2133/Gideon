@@ -4,9 +4,9 @@ Gideon is a macOS desktop app that turns a product walkthrough recording into ed
 
 ## Implementation progress
 
-Current engineering estimate: **78% complete** toward the full original product vision.
+Current engineering estimate: **79% complete** toward the full original product vision.
 
-This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, hosted analysis/render/export/download/billing-session primitives, Stripe REST session wiring, signed hosted worker-queue enqueue/intake HTTP dispatch boundaries, and hosted worker lease/heartbeat/recovery coordination through the store layer. Remaining work is mainly production-hosted persistence, a durable Redis/BullMQ-style worker runtime, observability, deployment hardening, and later non-MVP expansion items.
+This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, hosted analysis/render/export/download/billing-session primitives, Stripe REST session wiring, signed hosted worker-queue enqueue/intake HTTP dispatch boundaries, hosted worker lease/heartbeat/recovery coordination through the store layer, and a reusable hosted worker runtime adapter for detached execution. Remaining work is mainly production-hosted persistence, Redis/BullMQ-style broker durability, observability, deployment hardening, and later non-MVP expansion items.
 
 ## Local development
 
@@ -83,7 +83,7 @@ GIDEON_RENDER_QUEUE_CONCURRENCY=1 \
 pnpm start
 ```
 
-The runtime panel shows active/pending queue counts and configured lanes. Hosted dependency creation can also auto-wire a signed HTTP worker-queue handoff when `GIDEON_HOSTED_QUEUE_URL` or `GIDEON_WORKER_QUEUE_URL` is paired with `GIDEON_HOSTED_QUEUE_SECRET` or `GIDEON_WORKER_QUEUE_SECRET`; hosted analysis/render job routes then POST signed enqueue messages to that endpoint. The shared queue module verifies signed worker-intake requests with timestamp tolerance and payload validation, dispatches verified analysis/render jobs through a worker dispatcher interface, and exposes an HTTP/Node handler that returns safe JSON responses. Worker intake can now coordinate persisted job lease claims, heartbeat renewal, dispatch-failure marking, and expired-lease recovery through the store layer. This is a production handoff boundary, not a full Redis/BullMQ worker runtime yet.
+The runtime panel shows active/pending queue counts and configured lanes. Hosted dependency creation can also auto-wire a signed HTTP worker-queue handoff when `GIDEON_HOSTED_QUEUE_URL` or `GIDEON_WORKER_QUEUE_URL` is paired with `GIDEON_HOSTED_QUEUE_SECRET` or `GIDEON_WORKER_QUEUE_SECRET`; hosted analysis/render job routes then POST signed enqueue messages to that endpoint. The shared queue module verifies signed worker-intake requests with timestamp tolerance and payload validation, dispatches verified analysis/render jobs through a worker dispatcher interface, and exposes an HTTP/Node handler that returns safe JSON responses. Worker intake can coordinate persisted job lease claims, heartbeat renewal, dispatch-failure marking, and expired-lease recovery through the store layer. A hosted worker runtime adapter can detach accepted jobs into the local queue, heartbeat during execution, map execution failures back to the owning lease, and expose queue stats. This is a production handoff and runtime seam, not a full Redis/BullMQ broker yet.
 
 ## Optional private cloud storage
 

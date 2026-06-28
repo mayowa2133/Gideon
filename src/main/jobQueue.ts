@@ -10,6 +10,10 @@ export interface WorkerQueueTask<T> {
   run: () => Promise<T>;
 }
 
+export interface DetachedWorkerQueueOptions {
+  onError?: (error: unknown, task: Pick<WorkerQueueTask<unknown>, "id" | "projectId" | "kind">) => void;
+}
+
 export interface WorkerQueueOptions {
   concurrency?: number;
   concurrencyByKind?: Partial<Record<JobKind, number>>;
@@ -55,6 +59,49 @@ export interface HostedWorkerJobLeaseInput {
 
 export interface HostedWorkerJobLeaseFailureInput extends HostedWorkerJobLeaseInput {
   safeError: string;
+}
+
+export interface HostedWorkerJobExecutor {
+  runAnalysisJob(input: { projectId: string; jobId: string }): Promise<void> | void;
+  runRenderJob(input: { projectId: string; jobId: string }): Promise<void> | void;
+}
+
+export interface HostedWorkerRuntimeOptions {
+  workerId: string;
+  leaseSeconds: number;
+  queue?: LocalWorkerQueue;
+  queueOptions?: WorkerQueueOptions;
+  heartbeatIntervalMs?: number;
+  nowMs?: () => number;
+  leaseCoordinator: HostedWorkerJobLeaseCoordinator;
+  executor: HostedWorkerJobExecutor;
+  onError?: (error: unknown, job: HostedWorkerQueueJob) => void;
+}
+
+export interface StoreBackedWorkerLeaseStore {
+  claimWorkerJobLease(input: {
+    projectId: string;
+    jobId: string;
+    workerId: string;
+    leaseSeconds: number;
+    now?: string;
+    userMessage?: string;
+  }): Promise<unknown> | unknown;
+  heartbeatWorkerJobLease(input: {
+    projectId: string;
+    jobId: string;
+    workerId: string;
+    leaseSeconds: number;
+    now?: string;
+  }): Promise<unknown> | unknown;
+  failWorkerJobLease(input: {
+    projectId: string;
+    jobId: string;
+    workerId: string;
+    safeError: string;
+    now?: string;
+  }): Promise<unknown> | unknown;
+  recoverExpiredWorkerJobLeases(now?: string): Promise<unknown> | unknown;
 }
 
 export interface HostedWorkerIntakeResult {
@@ -128,8 +175,10 @@ export class LocalWorkerQueue {
   }
 
   enqueue<T>(task: WorkerQueueTask<T>): Promise<T> {
-    if (this.activeTasks.has(task.id) || this.pending.some((candidate) => candidate.id === task.id)) {
-      return Promise.reject(new Error(`Job ${task.id} is already queued or running.`));
+    try {
+      this.assertNotQueuedOrRunning(task.id);
+    } catch (error) {
+      return Promise.reject(error);
     }
     return new Promise<T>((resolve, reject) => {
       this.pending.push({
@@ -139,6 +188,18 @@ export class LocalWorkerQueue {
       });
       this.drain();
     });
+  }
+
+  enqueueDetached<T>(task: WorkerQueueTask<T>, options: DetachedWorkerQueueOptions = {}): void {
+    this.assertNotQueuedOrRunning(task.id);
+    this.pending.push({
+      ...task,
+      resolve: () => undefined,
+      reject: (error) => {
+        options.onError?.(error, task);
+      }
+    });
+    this.drain();
   }
 
   cancel(jobId: string): boolean {
@@ -185,6 +246,12 @@ export class LocalWorkerQueue {
   private canRun(task: WorkerQueueTask<unknown>): boolean {
     const kindLimit = this.concurrencyByKind[task.kind] ?? this.concurrency;
     return (countKinds([...this.activeTasks.values()])[task.kind] ?? 0) < kindLimit;
+  }
+
+  private assertNotQueuedOrRunning(jobId: string): void {
+    if (this.activeTasks.has(jobId) || this.pending.some((candidate) => candidate.id === jobId)) {
+      throw new Error(`Job ${jobId} is already queued or running.`);
+    }
   }
 
   private async runTask<T>(task: PendingTask<T>): Promise<void> {
@@ -260,6 +327,160 @@ export function createHttpHostedJobQueueService(
         projectId: input.projectId,
         jobId: input.jobId
       });
+    }
+  };
+}
+
+export class HostedWorkerRuntime implements HostedWorkerJobDispatcher, HostedWorkerJobLeaseCoordinator {
+  private readonly workerId: string;
+  private readonly leaseSeconds: number;
+  private readonly heartbeatIntervalMs: number;
+  private readonly nowMs: () => number;
+  private readonly queue: LocalWorkerQueue;
+  private readonly leaseCoordinator: HostedWorkerJobLeaseCoordinator;
+  private readonly executor: HostedWorkerJobExecutor;
+  private readonly onError?: (error: unknown, job: HostedWorkerQueueJob) => void;
+
+  constructor(options: HostedWorkerRuntimeOptions) {
+    this.workerId = options.workerId.trim();
+    if (!this.workerId) {
+      throw new Error("Hosted worker runtime requires a workerId.");
+    }
+    if (!Number.isInteger(options.leaseSeconds) || options.leaseSeconds < 1) {
+      throw new Error("Hosted worker runtime leaseSeconds must be a positive integer.");
+    }
+    this.leaseSeconds = options.leaseSeconds;
+    this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? Math.max(1_000, Math.floor(options.leaseSeconds * 500));
+    this.nowMs = options.nowMs ?? Date.now;
+    this.queue = options.queue ?? new LocalWorkerQueue(options.queueOptions);
+    this.leaseCoordinator = options.leaseCoordinator;
+    this.executor = options.executor;
+    this.onError = options.onError;
+  }
+
+  stats(): QueueRuntimeStats {
+    return this.queue.stats();
+  }
+
+  dispatchAnalysisJob(input: { projectId: string; jobId: string }): void {
+    this.enqueueRuntimeJob({ kind: "analysis", projectId: input.projectId, jobId: input.jobId });
+  }
+
+  dispatchRenderJob(input: { projectId: string; jobId: string }): void {
+    this.enqueueRuntimeJob({ kind: "render", projectId: input.projectId, jobId: input.jobId });
+  }
+
+  claimJobLease(input: HostedWorkerJobLeaseInput): Promise<void> | void {
+    return this.leaseCoordinator.claimJobLease(input);
+  }
+
+  heartbeatJobLease(input: HostedWorkerJobLeaseInput): Promise<void> | void {
+    return this.leaseCoordinator.heartbeatJobLease(input);
+  }
+
+  failJobLease(input: HostedWorkerJobLeaseFailureInput): Promise<void> | void {
+    return this.leaseCoordinator.failJobLease?.(input);
+  }
+
+  recoverExpiredJobLeases(input: { now: string }): Promise<void> | void {
+    return this.leaseCoordinator.recoverExpiredJobLeases?.(input);
+  }
+
+  private enqueueRuntimeJob(job: HostedWorkerQueueJob): void {
+    this.queue.enqueueDetached(
+      {
+        id: job.jobId,
+        projectId: job.projectId,
+        kind: job.kind,
+        run: () => this.runLeasedJob(job)
+      },
+      {
+        onError: (error) => {
+          this.onError?.(error, job);
+        }
+      }
+    );
+  }
+
+  private async runLeasedJob(job: HostedWorkerQueueJob): Promise<void> {
+    let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+    if (this.heartbeatIntervalMs > 0) {
+      heartbeatTimer = setInterval(() => {
+        void Promise.resolve(this.heartbeatRuntimeJob(job)).catch((error: unknown) => {
+          this.onError?.(error, job);
+        });
+      }, this.heartbeatIntervalMs);
+    }
+    try {
+      await this.heartbeatRuntimeJob(job);
+      if (job.kind === "analysis") {
+        await this.executor.runAnalysisJob({ projectId: job.projectId, jobId: job.jobId });
+      } else {
+        await this.executor.runRenderJob({ projectId: job.projectId, jobId: job.jobId });
+      }
+      await this.heartbeatRuntimeJob(job);
+    } catch (error) {
+      try {
+        await this.leaseCoordinator.failJobLease?.({
+          job,
+          workerId: this.workerId,
+          leaseSeconds: this.leaseSeconds,
+          now: currentIsoTimestamp(this.nowMs()),
+          safeError: sanitizeQueueError(error instanceof Error ? error.message : "Worker execution failed.")
+        });
+      } catch {
+        // Expired-lease recovery can reconcile failed failure recording later.
+      }
+      throw error;
+    } finally {
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+      }
+    }
+  }
+
+  private heartbeatRuntimeJob(job: HostedWorkerQueueJob): Promise<void> | void {
+    return this.leaseCoordinator.heartbeatJobLease({
+      job,
+      workerId: this.workerId,
+      leaseSeconds: this.leaseSeconds,
+      now: currentIsoTimestamp(this.nowMs())
+    });
+  }
+}
+
+export function createStoreBackedWorkerLeaseCoordinator(store: StoreBackedWorkerLeaseStore): HostedWorkerJobLeaseCoordinator {
+  return {
+    async claimJobLease(input) {
+      await store.claimWorkerJobLease({
+        projectId: input.job.projectId,
+        jobId: input.job.jobId,
+        workerId: input.workerId,
+        leaseSeconds: input.leaseSeconds,
+        now: input.now,
+        userMessage: `Worker ${input.workerId} claimed ${input.job.kind} job.`
+      });
+    },
+    async heartbeatJobLease(input) {
+      await store.heartbeatWorkerJobLease({
+        projectId: input.job.projectId,
+        jobId: input.job.jobId,
+        workerId: input.workerId,
+        leaseSeconds: input.leaseSeconds,
+        now: input.now
+      });
+    },
+    async failJobLease(input) {
+      await store.failWorkerJobLease({
+        projectId: input.job.projectId,
+        jobId: input.job.jobId,
+        workerId: input.workerId,
+        safeError: input.safeError,
+        now: input.now
+      });
+    },
+    async recoverExpiredJobLeases(input) {
+      await store.recoverExpiredWorkerJobLeases(input.now);
     }
   };
 }
