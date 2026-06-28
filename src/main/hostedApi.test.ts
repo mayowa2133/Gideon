@@ -4,6 +4,7 @@ import { createSignedSession } from "./auth";
 import {
   handleHostedApiRequest,
   type HostedApiStore,
+  type HostedExportService,
   type HostedJobQueueService,
   type HostedRecordingUploadService
 } from "./hostedApi";
@@ -18,6 +19,7 @@ import type {
   Project,
   RecordingMetadata,
   RecordingUploadSessionRecord,
+  RenderedVideo,
   ScriptDraft,
   SyncAuthenticatedUserInput
 } from "../shared/types";
@@ -767,6 +769,92 @@ describe("hosted API foundation", () => {
     expect(enqueued).toEqual([{ projectId: "project-1", jobId: "job-1" }]);
   });
 
+  it("creates hosted exports from completed renders without exposing private storage keys", async () => {
+    const render = renderFixture({ id: "render-1", projectId: "project-1" });
+    const exportArtifact = exportArtifactFixture({ projectId: "project-1" });
+    const exportService: HostedExportService = {
+      async createExport(input) {
+        expect(input.project.id).toBe("project-1");
+        expect(input.render.id).toBe("render-1");
+        return { artifact: exportArtifact };
+      }
+    };
+    const api = testApi({ exportService });
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        renders: [render]
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const rejected = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/exports",
+        headers: { cookie: `gideon_session=${created.token}` },
+        body: { renderId: "render-1" },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+    expect(rejected.status).toBe(403);
+    expect(rejected.body).toMatchObject({ error: { code: "csrf_failed" } });
+
+    const accepted = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/exports",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1",
+          "x-request-id": "req_create_export"
+        },
+        body: { renderId: "render-1" },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(accepted.status).toBe(201);
+    expect(accepted.headers.Location).toBe("/api/v1/projects/project-1/exports/export-1");
+    expect(accepted.body).toMatchObject({
+      data: {
+        export: {
+          id: "export-1",
+          projectId: "project-1",
+          workspaceId: "local-workspace",
+          renderId: "render-1",
+          contentType: "video/mp4",
+          byteSize: 4096,
+          sha256: "b".repeat(64),
+          originalFileName: "gideon-export.mp4"
+        },
+        project: {
+          id: "project-1",
+          artifactsCount: 1
+        }
+      },
+      meta: { requestId: "req_create_export" }
+    });
+    const exportBody = (accepted.body as { data: { export: { storageKey?: string; localPath?: string; localUrl?: string } } }).data
+      .export;
+    expect(exportBody.storageKey).toBeUndefined();
+    expect(exportBody.localPath).toBeUndefined();
+    expect(exportBody.localUrl).toBeUndefined();
+    expect(api.store.state.projects[0]?.artifacts).toHaveLength(1);
+    expect(api.store.state.projects[0]?.artifacts[0]).toMatchObject({ id: "export-1", kind: "export" });
+  });
+
   it("returns job details without leaking jobs from another workspace", async () => {
     const api = testApi();
     api.store.state.projects = [
@@ -960,7 +1048,13 @@ describe("hosted API foundation", () => {
   });
 });
 
-function testApi(input: { uploadService?: HostedRecordingUploadService; jobQueueService?: HostedJobQueueService } = {}) {
+function testApi(
+  input: {
+    uploadService?: HostedRecordingUploadService;
+    jobQueueService?: HostedJobQueueService;
+    exportService?: HostedExportService;
+  } = {}
+) {
   const store = new InMemoryHostedApiStore();
   return {
     store,
@@ -981,7 +1075,8 @@ function testApi(input: { uploadService?: HostedRecordingUploadService; jobQueue
       internalAuthCallbackSecret: "internal-secret"
     },
     uploadService: input.uploadService,
-    jobQueueService: input.jobQueueService
+    jobQueueService: input.jobQueueService,
+    exportService: input.exportService
   };
 }
 
@@ -1266,6 +1361,36 @@ class InMemoryHostedApiStore implements HostedApiStore {
     return { project, job, reused: false };
   }
 
+  async createExportForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    renderId: string;
+    artifact: ArtifactRecord;
+  }): Promise<Project> {
+    this.assertMember(input);
+    const project = this.state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const render = project.renders.find((candidate) => candidate.id === input.renderId && candidate.status === "completed");
+    if (!render) {
+      throw new Error("Completed render not found.");
+    }
+    if (
+      input.artifact.workspaceId !== input.workspaceId ||
+      input.artifact.projectId !== input.projectId ||
+      input.artifact.kind !== "export"
+    ) {
+      throw new Error("Export artifact metadata does not match the project.");
+    }
+    project.artifacts = [...project.artifacts.filter((candidate) => candidate.id !== input.artifact.id), input.artifact];
+    project.updatedAt = "2026-06-25T12:04:00.000Z";
+    return project;
+  }
+
   private assertMember(input: { userId: string; workspaceId: string }): void {
     const membership = this.state.workspaceMembers.find(
       (candidate) => candidate.userId === input.userId && candidate.workspaceId === input.workspaceId
@@ -1311,6 +1436,7 @@ function projectFixture(input: {
   artifacts?: ArtifactRecord[];
   recording?: RecordingMetadata;
   scripts?: ScriptDraft[];
+  renders?: RenderedVideo[];
   jobs?: JobRecord[];
 }): Project {
   return {
@@ -1324,7 +1450,7 @@ function projectFixture(input: {
     frameEvidence: [],
     concepts: [],
     scripts: input.scripts ?? [],
-    renders: [],
+    renders: input.renders ?? [],
     artifacts: input.artifacts ?? [],
     uploadSessions: input.uploadSessions ?? [],
     providerRuns: [],
@@ -1332,6 +1458,31 @@ function projectFixture(input: {
     jobEvents: [],
     createdAt: "2026-06-25T12:00:00.000Z",
     updatedAt: "2026-06-25T12:00:00.000Z"
+  };
+}
+
+function renderFixture(overrides: Partial<RenderedVideo> & { id: string; projectId: string }): RenderedVideo {
+  return {
+    id: overrides.id,
+    scriptId: "script-1",
+    title: "Gideon Export",
+    status: "completed",
+    outputPath: "/private/cache/render.mp4",
+    outputUrl: "file:///private/cache/render.mp4",
+    artifactId: "render-artifact-1",
+    storageKey: "workspaces/local-workspace/projects/project-1/render/render-artifact-1.mp4",
+    sha256: "c".repeat(64),
+    sizeBytes: 4096,
+    validation: {
+      width: 1080,
+      height: 1920,
+      durationMs: 30_000,
+      videoCodec: "h264",
+      audioCodec: "aac",
+      fastStart: true
+    },
+    createdAt: "2026-06-25T12:00:00.000Z",
+    ...overrides
   };
 }
 
@@ -1420,6 +1571,25 @@ function artifactFixture(overrides: Partial<ArtifactRecord> = {}): ArtifactRecor
     localPath: "/private/cache/walkthrough.mov",
     localUrl: "file:///private/cache/walkthrough.mov",
     createdAt: "2026-06-25T12:02:00.000Z",
+    ...overrides
+  };
+}
+
+function exportArtifactFixture(overrides: Partial<ArtifactRecord> = {}): ArtifactRecord {
+  return {
+    id: "export-1",
+    workspaceId: "local-workspace",
+    projectId: "project-1",
+    kind: "export",
+    provider: "r2",
+    storageKey: "workspaces/local-workspace/projects/project-1/export/export-1-gideon-export.mp4",
+    contentType: "video/mp4",
+    byteSize: 4096,
+    sha256: "b".repeat(64),
+    originalFileName: "gideon-export.mp4",
+    localPath: "/private/cache/gideon-export.mp4",
+    localUrl: "file:///private/cache/gideon-export.mp4",
+    createdAt: "2026-06-25T12:04:00.000Z",
     ...overrides
   };
 }

@@ -773,13 +773,37 @@ Create a new EDL/manifest draft from a completed video; does not mutate encoded 
 
 ### POST `/projects/{projectId}/exports`
 
-Create/reuse final export from a ready, non-stale final-profile video. If only preview exists, client must start final render first; API does not hide that stage.
+Create/reuse final export from a completed render. If only preview or queued render state exists, client must start or wait for render first; API does not hide that stage.
 
 - **Auth:** `member+`.
 - **Headers:** CSRF, `Idempotency-Key`.
-- **Request:** `{ "generatedVideoId": "uuid", "downloadFilename": "leadpilot-launch.mp4" }`.
-- **Validation:** video ready, current/non-stale, `short_vertical_v1`, QA passes policy; filename 1–180 sanitized basename ending `.mp4`; quota.
-- **Response 201/202:** Export resource; 201 if existing artifact reference ready, 202 if packaging/copy job required.
+- **Request:** `{ "renderId": "uuid" }`. Future final-profile/generated-video aliases may be accepted once generated video resources are split from render records.
+- **Validation:** project belongs to session workspace, render exists and is completed, export service is configured, export/storage quota.
+- **Response 201:** Safe export artifact projection plus project summary. Private object keys, local cache paths, and signed download URLs are not returned here; use the download-url endpoint when implemented.
+
+```json
+{
+  "data": {
+    "export": {
+      "id": "uuid",
+      "projectId": "uuid",
+      "workspaceId": "uuid",
+      "renderId": "uuid",
+      "contentType": "video/mp4",
+      "byteSize": 123456,
+      "sha256": "64-hex",
+      "originalFileName": "leadpilot-launch.mp4",
+      "createdAt": "..."
+    },
+    "project": {
+      "id": "uuid",
+      "artifactsCount": 4
+    }
+  },
+  "meta": { "requestId": "req_..." }
+}
+```
+
 - **Errors:** 404, 409 stale/not-final/not-ready, 422 filename/QA, 429.
 - **Rate limit:** 30/hour/workspace.
 

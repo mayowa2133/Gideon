@@ -27,6 +27,7 @@ import type {
   Project,
   RecordingMetadata,
   RecordingUploadSessionRecord,
+  RenderedVideo,
   SyncAuthenticatedUserInput
 } from "../shared/types";
 
@@ -107,6 +108,13 @@ export interface HostedApiStore {
     workspaceId: string;
     projectId: string;
   }): Promise<{ project: Project; job: JobRecord; reused: boolean }>;
+  createExportForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    renderId: string;
+    artifact: ArtifactRecord;
+  }): Promise<Project>;
 }
 
 export interface HostedRecordingUploadSession {
@@ -141,11 +149,16 @@ export interface HostedJobQueueService {
   enqueueRenderJob(input: { projectId: string; jobId: string }): Promise<void> | void;
 }
 
+export interface HostedExportService {
+  createExport(input: { project: Project; render: RenderedVideo }): Promise<{ artifact: ArtifactRecord }>;
+}
+
 export interface HostedApiDependencies {
   store: HostedApiStore;
   config: HostedApiConfig;
   uploadService?: HostedRecordingUploadService;
   jobQueueService?: HostedJobQueueService;
+  exportService?: HostedExportService;
 }
 
 class ApiError extends Error {
@@ -228,6 +241,10 @@ export async function handleHostedApiRequest(
     const renderJobsRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/render-jobs$/);
     if (method === "POST" && renderJobsRoute) {
       return await handleCreateRenderJob(request, dependencies, requestId, decodeURIComponent(renderJobsRoute[1] ?? ""));
+    }
+    const exportsRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/exports$/);
+    if (method === "POST" && exportsRoute) {
+      return await handleCreateExport(request, dependencies, requestId, decodeURIComponent(exportsRoute[1] ?? ""));
     }
     const jobRoute = path.match(/^\/api\/v1\/jobs\/([^/]+)$/);
     if (method === "GET" && jobRoute) {
@@ -755,6 +772,61 @@ async function handleCreateRenderJob(
   );
 }
 
+async function handleCreateExport(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string
+): Promise<HostedApiResponse> {
+  if (!dependencies.exportService) {
+    throw new ApiError(503, "export_not_configured", "Hosted exports are not configured.");
+  }
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  const input = hostedExportInput(objectBody(request));
+  const project = await storeCall(() =>
+    dependencies.store.getProjectForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId
+    })
+  );
+  const render = project.renders.find((candidate) => candidate.id === input.renderId && candidate.status === "completed");
+  if (!render) {
+    throw new ApiError(404, "not_found", "Completed render not found.");
+  }
+  let created: { artifact: ArtifactRecord };
+  try {
+    created = await dependencies.exportService.createExport({ project, render });
+  } catch (error) {
+    throw exportServiceError(error);
+  }
+  const updated = await storeCall(() =>
+    dependencies.store.createExportForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId,
+      renderId: input.renderId,
+      artifact: created.artifact
+    })
+  );
+  return jsonResponse(
+    201,
+    {
+      export: exportResource(created.artifact, input.renderId),
+      project: projectResource(updated)
+    },
+    requestId,
+    {
+      Location: `/api/v1/projects/${projectId}/exports/${created.artifact.id}`
+    }
+  );
+}
+
 function requiredSession(request: HostedApiRequest, dependencies: HostedApiDependencies): SessionClaims {
   const token = readSessionTokenFromCookieHeader(header(request, "cookie"), dependencies.config.auth.sessionCookieName);
   if (!token || !dependencies.config.auth.sessionSecret) {
@@ -884,6 +956,20 @@ function recordingResource(recording: RecordingMetadata) {
     hasAudio: recording.hasAudio,
     sha256: recording.sha256,
     validatedAt: recording.validatedAt
+  };
+}
+
+function exportResource(artifact: ArtifactRecord, renderId: string) {
+  return {
+    id: artifact.id,
+    projectId: artifact.projectId,
+    workspaceId: artifact.workspaceId,
+    renderId,
+    contentType: artifact.contentType,
+    byteSize: artifact.byteSize,
+    sha256: artifact.sha256,
+    originalFileName: artifact.originalFileName,
+    createdAt: artifact.createdAt
   };
 }
 
@@ -1027,6 +1113,12 @@ function hostedRecordingUploadCompletionInput(body: Record<string, unknown>): { 
   return checksumSha256 ? { checksumSha256 } : {};
 }
 
+function hostedExportInput(body: Record<string, unknown>): { renderId: string } {
+  return {
+    renderId: requiredString(body.renderId, "renderId")
+  };
+}
+
 async function storeCall<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
@@ -1073,6 +1165,17 @@ function jobQueueError(error: unknown): ApiError {
   const message = error instanceof Error ? error.message : "Job queue operation failed.";
   if (/not configured|missing/i.test(message)) {
     return new ApiError(503, "job_queue_not_configured", message);
+  }
+  return new ApiError(503, "temporarily_unavailable", message);
+}
+
+function exportServiceError(error: unknown): ApiError {
+  const message = error instanceof Error ? error.message : "Export service operation failed.";
+  if (/not configured|missing/i.test(message)) {
+    return new ApiError(503, "export_not_configured", message);
+  }
+  if (/mismatch|invalid|does not match/i.test(message)) {
+    return new ApiError(422, "validation_failed", message);
   }
   return new ApiError(503, "temporarily_unavailable", message);
 }

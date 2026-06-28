@@ -1188,6 +1188,103 @@ export class GideonStore {
     );
   }
 
+  async createExportForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    renderId: string;
+    artifact: ArtifactRecord;
+  }): Promise<Project> {
+    const state = await this.load();
+    const workspace = requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "export:create"
+    });
+    const project = state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const render = (project.renders ?? []).find((candidate) => candidate.id === input.renderId);
+    if (!render || render.status !== "completed") {
+      throw new Error("Completed render not found.");
+    }
+    assertExportArtifactMatchesProject(input.artifact, project);
+    assertWithinEntitlement({
+      entitlements: workspace.entitlements,
+      summary: summarizeUsage(state.usageEvents, workspace.id),
+      metric: "exports",
+      additionalQuantity: 1
+    });
+    assertWithinEntitlement({
+      entitlements: workspace.entitlements,
+      summary: summarizeUsage(state.usageEvents, workspace.id),
+      metric: "storage_bytes",
+      additionalQuantity: input.artifact.byteSize
+    });
+    const now = new Date().toISOString();
+    project.artifacts = [...(project.artifacts ?? []).filter((candidate) => candidate.id !== input.artifact.id), input.artifact];
+    project.updatedAt = now;
+    state.usageEvents = mergeUsageEvent(state.usageEvents, {
+      id: randomUUID(),
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      metric: "storage_bytes",
+      quantity: input.artifact.byteSize,
+      unit: "byte",
+      source: "export",
+      idempotencyKey: `export:${project.id}:${input.artifact.id}:storage_bytes`,
+      createdAt: now
+    });
+    state.usageEvents = mergeUsageEvent(state.usageEvents, {
+      id: randomUUID(),
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      metric: "exports",
+      quantity: 1,
+      unit: "count",
+      source: "export",
+      idempotencyKey: `export:${project.id}:${input.artifact.id}:exports`,
+      createdAt: now
+    });
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "artifact.create",
+      targetType: "artifact",
+      targetId: input.artifact.id,
+      summary: `Stored export artifact ${input.artifact.originalFileName}.`,
+      metadata: { kind: input.artifact.kind, byteSize: input.artifact.byteSize, provider: input.artifact.provider }
+    });
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "usage.record",
+      targetType: "usage",
+      summary: `Recorded 1 count of exports.`,
+      metadata: { metric: "exports", quantity: 1, unit: "count", source: "export" },
+      createdAt: now
+    });
+    this.appendAuditToState(state, {
+      workspaceId: input.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      action: "usage.record",
+      targetType: "usage",
+      summary: `Recorded ${input.artifact.byteSize} byte of storage_bytes.`,
+      metadata: { metric: "storage_bytes", quantity: input.artifact.byteSize, unit: "byte", source: "export" },
+      createdAt: now
+    });
+    await this.save();
+    return project;
+  }
+
   async assertProjectPermission(projectId: string, action: WorkspaceAction): Promise<void> {
     const state = await this.load();
     const project = state.projects.find((candidate) => candidate.id === projectId);
@@ -2027,6 +2124,20 @@ function assertCompletedUploadMatchesSession(
     recording.fileName !== artifact.originalFileName
   ) {
     throw new Error("Recording metadata does not match the uploaded artifact.");
+  }
+}
+
+function assertExportArtifactMatchesProject(artifact: ArtifactRecord, project: Project): void {
+  if (
+    artifact.workspaceId !== project.workspaceId ||
+    artifact.projectId !== project.id ||
+    artifact.kind !== "export" ||
+    artifact.contentType !== "video/mp4" ||
+    artifact.byteSize <= 0 ||
+    !artifact.sha256 ||
+    !artifact.originalFileName.toLowerCase().endsWith(".mp4")
+  ) {
+    throw new Error("Export artifact metadata does not match the project.");
   }
 }
 

@@ -13,7 +13,14 @@ vi.mock("electron", () => ({
 }));
 
 import { GideonStore } from "./store";
-import type { ArtifactRecord, ProductProfile, RecordingMetadata, RecordingUploadSessionRecord, ScriptDraft } from "../shared/types";
+import type {
+  ArtifactRecord,
+  ProductProfile,
+  RecordingMetadata,
+  RecordingUploadSessionRecord,
+  RenderedVideo,
+  ScriptDraft
+} from "../shared/types";
 import { DEFAULT_LOCAL_USER_ID, DEFAULT_LOCAL_WORKSPACE_ID } from "../shared/usage";
 
 describe("GideonStore billing reconciliation", () => {
@@ -459,6 +466,44 @@ describe("GideonStore billing reconciliation", () => {
       )
     ).toBe(true);
   });
+
+  it("creates exports with explicit hosted session scope", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Hosted project",
+      profile: profileFixture()
+    });
+    await store.replaceRenders(project.id, [renderFixture({ id: "render-1" })]);
+    const artifact = exportArtifactFixture({
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id
+    });
+
+    const updated = await store.createExportForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      renderId: "render-1",
+      artifact
+    });
+
+    expect(updated.artifacts).toEqual(expect.arrayContaining([expect.objectContaining({ id: "export-1", kind: "export" })]));
+    const state = await store.load();
+    expect(state.usageEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ metric: "exports", quantity: 1, source: "export" }),
+        expect.objectContaining({ metric: "storage_bytes", quantity: artifact.byteSize, source: "export" })
+      ])
+    );
+    expect(
+      state.auditEvents.some(
+        (event) => event.action === "artifact.create" && event.actorUserId === DEFAULT_LOCAL_USER_ID && event.targetId === "export-1"
+      )
+    ).toBe(true);
+  });
 });
 
 function profileFixture(overrides: Partial<ProductProfile> = {}): ProductProfile {
@@ -522,6 +567,31 @@ function scriptFixture(overrides: Partial<ScriptDraft> = {}): ScriptDraft {
   };
 }
 
+function renderFixture(overrides: Partial<RenderedVideo> & { id: string }): RenderedVideo {
+  return {
+    id: overrides.id,
+    scriptId: "script-1",
+    title: "Gideon Export",
+    status: "completed",
+    outputPath: "/private/cache/render.mp4",
+    outputUrl: "file:///private/cache/render.mp4",
+    artifactId: "render-artifact-1",
+    storageKey: "workspaces/local-workspace/projects/project-1/render/render-artifact-1.mp4",
+    sha256: "c".repeat(64),
+    sizeBytes: 4096,
+    validation: {
+      width: 1080,
+      height: 1920,
+      durationMs: 30_000,
+      videoCodec: "h264",
+      audioCodec: "aac",
+      fastStart: true
+    },
+    createdAt: "2026-06-25T12:00:00.000Z",
+    ...overrides
+  };
+}
+
 function artifactFixture(overrides: Partial<ArtifactRecord> = {}): ArtifactRecord {
   return {
     id: "upload-1",
@@ -537,6 +607,25 @@ function artifactFixture(overrides: Partial<ArtifactRecord> = {}): ArtifactRecor
     localPath: "/private/cache/walkthrough.mov",
     localUrl: "file:///private/cache/walkthrough.mov",
     createdAt: "2026-06-25T12:02:00.000Z",
+    ...overrides
+  };
+}
+
+function exportArtifactFixture(overrides: Partial<ArtifactRecord> = {}): ArtifactRecord {
+  return {
+    id: "export-1",
+    workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+    projectId: "project-1",
+    kind: "export",
+    provider: "r2",
+    storageKey: "workspaces/local-workspace/projects/project-1/export/export-1-gideon-export.mp4",
+    contentType: "video/mp4",
+    byteSize: 4096,
+    sha256: "b".repeat(64),
+    originalFileName: "gideon-export.mp4",
+    localPath: "/private/cache/gideon-export.mp4",
+    localUrl: "file:///private/cache/gideon-export.mp4",
+    createdAt: "2026-06-25T12:04:00.000Z",
     ...overrides
   };
 }
