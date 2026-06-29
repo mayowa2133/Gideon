@@ -192,7 +192,7 @@ These remain out of the core productionization path until the evidence-to-render
 
 The next implementation slice is Milestone 5:
 
-1. Add deeper observability hooks for queue depth, lease recovery counts, provider latency, storage latency, and render duration.
+1. Add deeper observability hooks for persisted queue depth, queue age, lease recovery counts, and terminal failure rates.
 2. Add a Redis-backed integration smoke test path for the hosted broker when Redis is available.
 3. Add deployment configuration for a separately scaled hosted worker process using `pnpm worker:hosted`.
 4. Preserve the shared `createGideonJobExecutor` path for desktop, hosted worker, and MCP-enqueued analysis/render jobs.

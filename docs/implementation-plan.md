@@ -377,7 +377,7 @@ Prepare the MVP for real users by adding usage tracking, quotas, admin visibilit
 
 3. Add observability.
    - Structured logs with request IDs and job IDs.
-   - Metrics for queue latency, job failure rate, render duration, provider errors, and storage usage.
+   - Metrics for queue latency, job failure rate, provider latency/errors, render duration, storage latency/bytes, and usage records.
    - Error tracking with sensitive-data scrubbing.
 
 4. Add admin support views.

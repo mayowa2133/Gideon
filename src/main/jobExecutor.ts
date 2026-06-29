@@ -24,6 +24,81 @@ import type {
 } from "../shared/types";
 
 type JobEventInput = Omit<JobEvent, "id" | "createdAt" | "projectId"> & { createdAt?: string };
+type UsageRecordInput = Omit<UsageEvent, "id" | "workspaceId" | "projectId" | "createdAt"> & { createdAt?: string };
+
+export type GideonJobExecutorMetricEvent =
+  | {
+      name: "analysis_pipeline_finished";
+      projectId: string;
+      jobId: string;
+      durationMs: number;
+      moments: number;
+      frameEvidence: number;
+      providerRuns: number;
+      transcript: boolean;
+    }
+  | {
+      name: "analysis_pipeline_failed";
+      projectId: string;
+      jobId: string;
+      durationMs: number;
+      safeError: string;
+    }
+  | {
+      name: "tts_provider_finished";
+      projectId: string;
+      scriptId: string;
+      durationMs: number;
+      characters: number;
+      model: string;
+    }
+  | {
+      name: "tts_provider_failed";
+      projectId: string;
+      scriptId: string;
+      durationMs: number;
+      safeError: string;
+    }
+  | {
+      name: "render_draft_finished";
+      projectId: string;
+      jobId: string;
+      scriptId: string;
+      renderId: string;
+      durationMs: number;
+      outputDurationMs?: number;
+    }
+  | {
+      name: "render_draft_failed";
+      projectId: string;
+      jobId: string;
+      scriptId: string;
+      durationMs: number;
+      safeError: string;
+    }
+  | {
+      name: "artifact_storage_finished";
+      projectId: string;
+      kind: "voiceover" | "render";
+      durationMs: number;
+      artifactId: string;
+      byteSize: number;
+    }
+  | {
+      name: "artifact_storage_failed";
+      projectId: string;
+      kind: "voiceover" | "render";
+      durationMs: number;
+      safeError: string;
+    }
+  | {
+      name: "usage_recorded";
+      projectId: string;
+      metric: UsageMetric;
+      source: UsageEvent["source"];
+      quantity: number;
+      unit: UsageEvent["unit"];
+    };
 
 interface AnalysisPipelineResult {
   moments: DetectedMoment[];
@@ -87,6 +162,8 @@ export interface GideonJobExecutorOptions {
   statFile?: (filePath: string) => Promise<{ size: number }>;
   makeId?: () => string;
   now?: () => string;
+  nowMs?: () => number;
+  onMetric?: (event: GideonJobExecutorMetricEvent) => void;
 }
 
 export function createGideonJobExecutor(options: GideonJobExecutorOptions): GideonJobExecutor {
@@ -100,6 +177,10 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
   const statFile = options.statFile ?? ((filePath: string) => fs.stat(filePath));
   const makeId = options.makeId ?? randomUUID;
   const now = options.now ?? (() => new Date().toISOString());
+  const nowMs = options.nowMs ?? Date.now;
+  const emitMetric = (event: GideonJobExecutorMetricEvent): void => {
+    options.onMetric?.(event);
+  };
 
   async function runAnalysisJob(projectId: string, jobId: string): Promise<Project> {
     const project = await store.getProject(projectId);
@@ -130,9 +211,32 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
       job = await advanceJobStage(projectId, jobId, "transcription", 3, 5, "Transcribing source audio when configured.");
       job = await advanceJobStage(projectId, jobId, "ocr", 4, 5, "Reading UI text from extracted frames when configured.");
       job = await advanceJobStage(projectId, jobId, "semantic_analysis", 5, 5, "Analyzing product flow and moments.");
-      const analyzed = await store.runAnalysis(projectId, (analysisProject, moments) =>
-        runAnalysisPipeline(analysisProject, moments, store.projectDir(projectId))
-      );
+      const analysisStartedAtMs = nowMs();
+      let analyzed: Project;
+      try {
+        analyzed = await store.runAnalysis(projectId, (analysisProject, moments) =>
+          runAnalysisPipeline(analysisProject, moments, store.projectDir(projectId))
+        );
+        emitMetric({
+          name: "analysis_pipeline_finished",
+          projectId,
+          jobId,
+          durationMs: Math.max(0, nowMs() - analysisStartedAtMs),
+          moments: analyzed.moments.length,
+          frameEvidence: analyzed.frameEvidence.length,
+          providerRuns: analyzed.providerRuns.length - providerRunStartCount,
+          transcript: Boolean(analyzed.transcript)
+        });
+      } catch (error) {
+        emitMetric({
+          name: "analysis_pipeline_failed",
+          projectId,
+          jobId,
+          durationMs: Math.max(0, nowMs() - analysisStartedAtMs),
+          safeError: safeProviderError(error)
+        });
+        throw error;
+      }
       await store.appendJobEvent(projectId, {
         jobId,
         kind: "stage",
@@ -223,26 +327,51 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
             `Rendering draft ${index + 1}/${scriptsToRender.length}.`
           );
           const renderId = makeId();
-          const rendered = await renderDraft({
-            projectId,
-            projectDir: store.projectDir(projectId),
-            profile: project.profile,
-            recording: project.recording,
-            script,
-            moment,
-            title: concept?.title ?? script.hook,
-            voiceoverPath: voiceoverPath ?? undefined
-          });
+          const renderStartedAtMs = nowMs();
+          let rendered: RenderDraftResult;
+          try {
+            rendered = await renderDraft({
+              projectId,
+              projectDir: store.projectDir(projectId),
+              profile: project.profile,
+              recording: project.recording,
+              script,
+              moment,
+              title: concept?.title ?? script.hook,
+              voiceoverPath: voiceoverPath ?? undefined
+            });
+            emitMetric({
+              name: "render_draft_finished",
+              projectId,
+              jobId,
+              scriptId: script.id,
+              renderId,
+              durationMs: Math.max(0, nowMs() - renderStartedAtMs),
+              outputDurationMs: rendered.validation?.durationMs
+            });
+          } catch (error) {
+            emitMetric({
+              name: "render_draft_failed",
+              projectId,
+              jobId,
+              scriptId: script.id,
+              durationMs: Math.max(0, nowMs() - renderStartedAtMs),
+              safeError: safeProviderError(error)
+            });
+            throw error;
+          }
           const output = await statFile(rendered.outputPath);
           await store.assertUsageAvailable(projectId, "storage_bytes", reservedRenderStorageBytes + output.size);
-          const stored = await createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
-            workspaceId: project.workspaceId,
-            projectId,
-            kind: "render",
-            sourcePath: rendered.outputPath,
-            originalFileName: `${renderId}.mp4`,
-            contentType: "video/mp4"
-          });
+          const stored = await storeArtifactWithMetrics(projectId, "render", () =>
+            createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
+              workspaceId: project.workspaceId,
+              projectId,
+              kind: "render",
+              sourcePath: rendered.outputPath,
+              originalFileName: `${renderId}.mp4`,
+              contentType: "video/mp4"
+            })
+          );
           await store.appendArtifact(projectId, stored.artifact);
           reservedRenderStorageBytes += stored.artifact.byteSize;
           renders.push({
@@ -363,22 +492,45 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
     try {
       await store.assertUsageAvailable(projectId, "tts_characters", script.voiceoverText.length);
       await fs.mkdir(path.dirname(outputPath), { recursive: true });
-      const result = await provider.synthesizeSpeech({
-        text: script.voiceoverText,
-        instructions: "Speak in a clear product demo voice. Keep pacing natural and concise.",
-        outputPath
-      });
+      const ttsStartedAtMs = nowMs();
+      let result: Awaited<ReturnType<SpeechProvider["synthesizeSpeech"]>>;
+      try {
+        result = await provider.synthesizeSpeech({
+          text: script.voiceoverText,
+          instructions: "Speak in a clear product demo voice. Keep pacing natural and concise.",
+          outputPath
+        });
+        emitMetric({
+          name: "tts_provider_finished",
+          projectId,
+          scriptId: script.id,
+          durationMs: Math.max(0, nowMs() - ttsStartedAtMs),
+          characters: script.voiceoverText.length,
+          model: result.model
+        });
+      } catch (error) {
+        emitMetric({
+          name: "tts_provider_failed",
+          projectId,
+          scriptId: script.id,
+          durationMs: Math.max(0, nowMs() - ttsStartedAtMs),
+          safeError: safeProviderError(error)
+        });
+        throw error;
+      }
       const project = await store.getProject(projectId);
       const synthesized = await statFile(result.outputPath);
       await store.assertUsageAvailable(projectId, "storage_bytes", synthesized.size);
-      const stored = await createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
-        workspaceId: project.workspaceId,
-        projectId,
-        kind: "voiceover",
-        sourcePath: result.outputPath,
-        originalFileName: `${script.id}.wav`,
-        contentType: "audio/wav"
-      });
+      const stored = await storeArtifactWithMetrics(projectId, "voiceover", () =>
+        createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
+          workspaceId: project.workspaceId,
+          projectId,
+          kind: "voiceover",
+          sourcePath: result.outputPath,
+          originalFileName: `${script.id}.wav`,
+          contentType: "audio/wav"
+        })
+      );
       await store.appendArtifact(projectId, stored.artifact);
       await store.appendProviderRuns(projectId, [
         {
@@ -391,14 +543,14 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
           finishedAt: now()
         }
       ]);
-      await store.recordUsage(projectId, {
+      await recordUsageWithMetrics(projectId, {
         metric: "tts_characters",
         quantity: script.voiceoverText.length,
         unit: "character",
         source: "tts",
         idempotencyKey: `tts:${projectId}:${script.id}:${startedAt}`
       });
-      await store.recordUsage(projectId, {
+      await recordUsageWithMetrics(projectId, {
         metric: "storage_bytes",
         quantity: stored.artifact.byteSize,
         unit: "byte",
@@ -441,7 +593,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
     );
     if (completedTranscription && project.recording) {
       const quantity = minutesForDuration(project.recording.durationMs);
-      await store.recordUsage(projectId, {
+      await recordUsageWithMetrics(projectId, {
         metric: "transcription_minutes",
         quantity,
         unit: "minute",
@@ -454,7 +606,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
       (run) => run.kind === "analysis" && run.provider === "openai" && run.status === "completed"
     ).length;
     if (completedAnalysisRuns > 0) {
-      await store.recordUsage(projectId, {
+      await recordUsageWithMetrics(projectId, {
         metric: "llm_runs",
         quantity: completedAnalysisRuns,
         unit: "count",
@@ -465,7 +617,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
 
     const completedOcrFrames = project.frameEvidence.filter((frame) => frame.ocrProvider === "openai").length;
     if (completedOcrFrames > 0) {
-      await store.recordUsage(projectId, {
+      await recordUsageWithMetrics(projectId, {
         metric: "llm_runs",
         quantity: completedOcrFrames,
         unit: "count",
@@ -480,7 +632,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
       if (render.status !== "completed" || !render.validation) {
         continue;
       }
-      await store.recordUsage(projectId, {
+      await recordUsageWithMetrics(projectId, {
         metric: "render_minutes",
         quantity: minutesForDuration(render.validation.durationMs),
         unit: "minute",
@@ -488,7 +640,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
         idempotencyKey: `render:${projectId}:${render.id}`
       });
       if (render.artifactId && render.sizeBytes) {
-        await store.recordUsage(projectId, {
+        await recordUsageWithMetrics(projectId, {
           metric: "storage_bytes",
           quantity: render.sizeBytes,
           unit: "byte",
@@ -496,6 +648,48 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
           idempotencyKey: `render:${projectId}:${render.artifactId}:storage_bytes`
         });
       }
+    }
+  }
+
+  async function recordUsageWithMetrics(projectId: string, input: UsageRecordInput): Promise<Project> {
+    const project = await store.recordUsage(projectId, input);
+    emitMetric({
+      name: "usage_recorded",
+      projectId,
+      metric: input.metric,
+      source: input.source,
+      quantity: input.quantity,
+      unit: input.unit
+    });
+    return project;
+  }
+
+  async function storeArtifactWithMetrics(
+    projectId: string,
+    kind: "voiceover" | "render",
+    put: () => ReturnType<PrivateObjectStorage["putFile"]>
+  ): ReturnType<PrivateObjectStorage["putFile"]> {
+    const storageStartedAtMs = nowMs();
+    try {
+      const stored = await put();
+      emitMetric({
+        name: "artifact_storage_finished",
+        projectId,
+        kind,
+        durationMs: Math.max(0, nowMs() - storageStartedAtMs),
+        artifactId: stored.artifact.id,
+        byteSize: stored.artifact.byteSize
+      });
+      return stored;
+    } catch (error) {
+      emitMetric({
+        name: "artifact_storage_failed",
+        projectId,
+        kind,
+        durationMs: Math.max(0, nowMs() - storageStartedAtMs),
+        safeError: safeProviderError(error)
+      });
+      throw error;
     }
   }
 

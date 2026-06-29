@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createJob } from "../shared/jobState";
-import { createGideonJobExecutor, minutesForDuration, type GideonJobExecutorStore } from "./jobExecutor";
+import {
+  createGideonJobExecutor,
+  minutesForDuration,
+  type GideonJobExecutorMetricEvent,
+  type GideonJobExecutorStore
+} from "./jobExecutor";
 import type {
   ArtifactRecord,
   DetectedMoment,
@@ -19,10 +24,15 @@ import type {
 describe("Gideon job executor", () => {
   it("runs analysis jobs through injected analysis pipeline and records job events", async () => {
     const store = new FakeExecutorStore(projectFixture());
+    const metrics: GideonJobExecutorMetricEvent[] = [];
     store.project.jobs = [createJob({ id: "job-1", projectId: store.project.id, kind: "analysis", now: "2026-06-25T12:00:00.000Z" })];
     const executor = createGideonJobExecutor({
       store,
       now: clock(),
+      nowMs: numberSequence([0, 25]),
+      onMetric(event) {
+        metrics.push(event);
+      },
       runAnalysisPipeline: async (_project, moments) => ({
         moments,
         transcript: transcriptFixture(),
@@ -65,6 +75,18 @@ describe("Gideon job executor", () => {
         expect.objectContaining({ metric: "llm_runs", quantity: 1, source: "ocr" })
       ])
     );
+    expect(metrics).toEqual([
+      expect.objectContaining({
+        name: "analysis_pipeline_finished",
+        projectId: "project-1",
+        jobId: "job-1",
+        durationMs: 25,
+        providerRuns: 1,
+        transcript: true
+      }),
+      expect.objectContaining({ name: "usage_recorded", metric: "llm_runs", source: "analysis", quantity: 1 }),
+      expect.objectContaining({ name: "usage_recorded", metric: "llm_runs", source: "ocr", quantity: 1 })
+    ]);
   });
 
   it("runs render jobs through injected renderer and private storage", async () => {
@@ -88,10 +110,15 @@ describe("Gideon job executor", () => {
       scripts: [scriptFixture()]
     });
     const store = new FakeExecutorStore(project);
+    const metrics: GideonJobExecutorMetricEvent[] = [];
     store.project.jobs = [createJob({ id: "job-1", projectId: store.project.id, kind: "render", now: "2026-06-25T12:00:00.000Z" })];
     const executor = createGideonJobExecutor({
       store,
       now: clock(),
+      nowMs: numberSequence([0, 12, 20, 35]),
+      onMetric(event) {
+        metrics.push(event);
+      },
       makeId: idSequence(["render-1"]),
       loadProviderConfig: () => providerConfig(false),
       statFile: async () => ({ size: 4096 }),
@@ -135,6 +162,27 @@ describe("Gideon job executor", () => {
         expect.objectContaining({ metric: "storage_bytes", quantity: 4096, source: "render" })
       ])
     );
+    expect(metrics).toEqual([
+      expect.objectContaining({
+        name: "render_draft_finished",
+        projectId: "project-1",
+        jobId: "job-1",
+        scriptId: "script-1",
+        renderId: "render-1",
+        durationMs: 12,
+        outputDurationMs: 30_000
+      }),
+      expect.objectContaining({
+        name: "artifact_storage_finished",
+        projectId: "project-1",
+        kind: "render",
+        artifactId: "artifact-render-1",
+        byteSize: 4096,
+        durationMs: 15
+      }),
+      expect.objectContaining({ name: "usage_recorded", metric: "render_minutes", source: "render", quantity: 1 }),
+      expect.objectContaining({ name: "usage_recorded", metric: "storage_bytes", source: "render", quantity: 4096 })
+    ]);
   });
 
   it("rounds media durations up to billable minutes", () => {
@@ -381,4 +429,9 @@ function clock(): () => string {
 function idSequence(ids: string[]): () => string {
   let index = 0;
   return () => ids[index++] ?? `id-${index}`;
+}
+
+function numberSequence(values: number[]): () => number {
+  let index = 0;
+  return () => values[Math.min(index++, values.length - 1)] ?? values[values.length - 1] ?? Date.now();
 }

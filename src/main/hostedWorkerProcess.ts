@@ -5,7 +5,7 @@ import {
   type HostedWorkerMetricEvent,
   type HostedWorkerRuntimeConfig
 } from "./hostedWorker";
-import { createGideonJobExecutor, type GideonJobExecutor } from "./jobExecutor";
+import { createGideonJobExecutor, type GideonJobExecutor, type GideonJobExecutorMetricEvent } from "./jobExecutor";
 import { GideonStore, type GideonStoreOptions } from "./store";
 
 export interface HostedWorkerProcessLogger {
@@ -21,8 +21,10 @@ export interface HostedWorkerProcessOptions {
   config?: Partial<HostedWorkerRuntimeConfig>;
   nowMs?: () => number;
   logger?: HostedWorkerProcessLogger;
-  onMetric?: (event: HostedWorkerMetricEvent) => void;
+  onMetric?: (event: HostedWorkerProcessMetricEvent) => void;
 }
+
+export type HostedWorkerProcessMetricEvent = HostedWorkerMetricEvent | GideonJobExecutorMetricEvent;
 
 export interface HostedWorkerProcessHandle {
   workerId: string;
@@ -37,7 +39,20 @@ export function createHostedWorkerProcess(input: HostedWorkerProcessOptions = {}
   const logger = input.logger ?? jsonConsoleLogger;
   const store = input.store ?? new GideonStore(storeOptionsFromEnv(env));
   const broker = input.broker ?? createHostedWorkerBrokerFromEnv(env);
-  const gideonExecutor = input.executor ?? createGideonJobExecutor({ store });
+  const emitMetric = (event: HostedWorkerProcessMetricEvent): void => {
+    input.onMetric?.(event);
+    logger.info({
+      level: "info",
+      event: event.name,
+      ...event
+    });
+  };
+  const gideonExecutor =
+    input.executor ??
+    createGideonJobExecutor({
+      store,
+      onMetric: emitMetric
+    });
   const bootstrap = createHostedWorkerRuntimeBootstrap({
     broker,
     store,
@@ -62,12 +77,7 @@ export function createHostedWorkerProcess(input: HostedWorkerProcessOptions = {}
       });
     },
     onMetric(event) {
-      input.onMetric?.(event);
-      logger.info({
-        level: "info",
-        event: event.name,
-        ...event
-      });
+      emitMetric(event);
     }
   });
   return {
