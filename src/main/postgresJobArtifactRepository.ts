@@ -1,5 +1,6 @@
 import type { ArtifactRecord, ArtifactKind, JobRecord } from "../shared/types";
 import type { PostgresQuery } from "./persistence";
+import { Pool } from "pg";
 
 export interface PersistJobInput {
   workspaceId: string;
@@ -29,7 +30,10 @@ interface JsonRecordRow<T> {
 }
 
 export class PostgresJobArtifactRepository {
-  constructor(private readonly query: PostgresQuery) {}
+  constructor(
+    private readonly query: PostgresQuery,
+    private readonly closeClient?: () => Promise<void> | void
+  ) {}
 
   async upsertJob(input: PersistJobInput): Promise<JobRecord> {
     const job = input.job;
@@ -192,6 +196,10 @@ export class PostgresJobArtifactRepository {
     );
     return result.rows.map((row) => parseRecordJson(row.record_json, "artifact"));
   }
+
+  async close(): Promise<void> {
+    await this.closeClient?.();
+  }
 }
 
 function parseRecordJson<T>(value: T | string | undefined, label: string): T {
@@ -206,4 +214,32 @@ function clampLimit(limit: number | undefined): number {
     return 50;
   }
   return Math.max(1, Math.min(200, Math.trunc(limit)));
+}
+
+export function createPostgresJobArtifactRepositoryFromEnv(
+  env: NodeJS.ProcessEnv = process.env
+): PostgresJobArtifactRepository {
+  const connectionString = trimEnv(env.GIDEON_DATABASE_URL ?? env.DATABASE_URL);
+  if (!connectionString) {
+    throw new Error("PostgreSQL jobs/artifacts repository requires GIDEON_DATABASE_URL or DATABASE_URL.");
+  }
+  const pool = new Pool({
+    connectionString,
+    max: 5,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000
+  });
+  return new PostgresJobArtifactRepository(
+    async <Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) => {
+      const result = await pool.query(text, values ? [...values] : undefined);
+      return { rows: result.rows as Row[] };
+    },
+    async () => {
+      await pool.end();
+    }
+  );
+}
+
+function trimEnv(value: string | undefined): string | undefined {
+  return value?.trim() || undefined;
 }

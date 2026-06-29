@@ -78,6 +78,7 @@ import {
   type WorkspaceAction
 } from "../shared/rbac";
 import { FileAppStatePersistence, type AppStatePersistence } from "./persistence";
+import type { PersistJobInput } from "./postgresJobArtifactRepository";
 
 const STORE_FILE = "gideon-store.json";
 const MAX_AUDIT_EVENTS = 500;
@@ -107,6 +108,14 @@ export interface GideonStoreOptions {
   projectsDir?: string;
   storageRoot?: string;
   persistence?: AppStatePersistence;
+  relationalMirror?: GideonRelationalMirror;
+  relationalQueueName?: string;
+}
+
+export interface GideonRelationalMirror {
+  upsertJob(input: PersistJobInput): Promise<JobRecord> | JobRecord;
+  upsertArtifact(artifact: ArtifactRecord): Promise<ArtifactRecord> | ArtifactRecord;
+  close?(): Promise<void> | void;
 }
 
 export interface JobObservabilitySnapshot {
@@ -2158,6 +2167,7 @@ export class GideonStore {
 
   async close(): Promise<void> {
     await this.persistence?.close?.();
+    await this.options.relationalMirror?.close?.();
   }
 
   private async updateProject(projectId: string, updater: (project: Project) => void, options: UpdateProjectOptions = {}): Promise<Project> {
@@ -2233,6 +2243,7 @@ export class GideonStore {
       return;
     }
     await this.appStatePersistence().save(this.state);
+    await this.mirrorRelationalState(this.state);
   }
 
   private appStatePersistence(): AppStatePersistence {
@@ -2240,6 +2251,27 @@ export class GideonStore {
       this.persistence = this.options.persistence ?? new FileAppStatePersistence(this.storePath());
     }
     return this.persistence;
+  }
+
+  private async mirrorRelationalState(state: AppState): Promise<void> {
+    if (!this.options.relationalMirror) {
+      return;
+    }
+    for (const project of state.projects) {
+      for (const job of project.jobs ?? []) {
+        await this.options.relationalMirror.upsertJob({
+          workspaceId: project.workspaceId,
+          job,
+          queueName: this.options.relationalQueueName ?? "gideon-hosted-worker-jobs",
+          stage: latestJobStage(project, job),
+          idempotencyKey: job.id,
+          inputJson: { projectId: project.id, jobId: job.id, kind: job.kind }
+        });
+      }
+      for (const artifact of project.artifacts ?? []) {
+        await this.options.relationalMirror.upsertArtifact(artifact);
+      }
+    }
   }
 
   private storePath(): string {
@@ -2326,6 +2358,10 @@ function countJobKinds(jobs: JobRecord[]): Partial<Record<JobKind, number>> {
     counts[job.kind] = (counts[job.kind] ?? 0) + 1;
     return counts;
   }, {});
+}
+
+function latestJobStage(project: Project, job: JobRecord): string {
+  return [...(project.jobEvents ?? [])].reverse().find((event) => event.jobId === job.id)?.stage ?? job.status;
 }
 
 function oldestAgeMs(jobs: JobRecord[], nowMs: number, timestamp: (job: JobRecord) => string | undefined): number | null {

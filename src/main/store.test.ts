@@ -14,14 +14,16 @@ vi.mock("electron", () => ({
 
 import { GideonStore } from "./store";
 import type {
+  AppState,
   ArtifactRecord,
   ProductProfile,
+  Project,
   RecordingMetadata,
   RecordingUploadSessionRecord,
   RenderedVideo,
   ScriptDraft
 } from "../shared/types";
-import { DEFAULT_LOCAL_USER_ID, DEFAULT_LOCAL_WORKSPACE_ID } from "../shared/usage";
+import { createLocalUserWorkspace, DEFAULT_LOCAL_USER_ID, DEFAULT_LOCAL_WORKSPACE_ID } from "../shared/usage";
 
 describe("GideonStore billing reconciliation", () => {
   beforeEach(async () => {
@@ -662,6 +664,79 @@ describe("GideonStore billing reconciliation", () => {
   });
 });
 
+describe("GideonStore relational mirror", () => {
+  beforeEach(async () => {
+    electronMock.userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-store-test-"));
+  });
+
+  it("mirrors live job and artifact state after successful saves", async () => {
+    const job = createJob({
+      id: "job-1",
+      projectId: "project-1",
+      kind: "analysis",
+      now: "2026-06-29T12:00:00.000Z",
+      userMessage: "Waiting to analyze recording."
+    });
+    const artifact: ArtifactRecord = {
+      id: "artifact-1",
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: "project-1",
+      kind: "render",
+      provider: "s3",
+      storageKey: "private/local/project-1/render.mp4",
+      contentType: "video/mp4",
+      byteSize: 1234,
+      sha256: "b".repeat(64),
+      originalFileName: "render.mp4",
+      createdAt: "2026-06-29T12:01:00.000Z"
+    };
+    const state = createMirrorState({ job, artifact });
+    const mirroredJobs: Array<{ queueName: string; stage?: string; jobId: string }> = [];
+    const mirroredArtifacts: string[] = [];
+    const store = new GideonStore({
+      userDataDir: electronMock.userDataDir,
+      persistence: {
+        metadata: { provider: "file", location: "memory" },
+        async load() {
+          return state;
+        },
+        async save(nextState) {
+          state.projects = nextState.projects;
+        }
+      },
+      relationalQueueName: "gideon-test-workers",
+      relationalMirror: {
+        upsertJob(input) {
+          mirroredJobs.push({
+            queueName: input.queueName,
+            stage: input.stage,
+            jobId: input.job.id
+          });
+          return input.job;
+        },
+        upsertArtifact(input) {
+          mirroredArtifacts.push(input.id);
+          return input;
+        }
+      }
+    });
+
+    await store.appendJobEvent("project-1", {
+      jobId: "job-1",
+      kind: "stage",
+      stage: "semantic_analysis",
+      message: "Analyzing recording."
+    });
+
+    expect(mirroredJobs.at(-1)).toEqual({
+      queueName: "gideon-test-workers",
+      stage: "semantic_analysis",
+      jobId: "job-1"
+    });
+    expect(mirroredArtifacts).toContain("artifact-1");
+  });
+});
+
 function profileFixture(overrides: Partial<ProductProfile> = {}): ProductProfile {
   return {
     productName: "Gideon",
@@ -672,6 +747,37 @@ function profileFixture(overrides: Partial<ProductProfile> = {}): ProductProfile
     platforms: ["tiktok", "youtube_shorts"],
     walkthroughNotes: "Focus on the upload-to-export workflow.",
     ...overrides
+  };
+}
+
+function createMirrorState(input: { job: AppState["projects"][number]["jobs"][number]; artifact: ArtifactRecord }): AppState {
+  const local = createLocalUserWorkspace();
+  const project: Project = {
+    id: "project-1",
+    workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+    name: "Mirror project",
+    status: "recording_ready",
+    profile: profileFixture(),
+    recording: recordingFixture(),
+    frameEvidence: [],
+    moments: [],
+    concepts: [],
+    scripts: [],
+    renders: [],
+    artifacts: [input.artifact],
+    uploadSessions: [],
+    providerRuns: [],
+    jobs: [input.job],
+    jobEvents: [],
+    createdAt: "2026-06-29T12:00:00.000Z",
+    updatedAt: "2026-06-29T12:00:00.000Z"
+  };
+  return {
+    ...local,
+    usageEvents: [],
+    auditEvents: [],
+    activeProjectId: project.id,
+    projects: [project]
   };
 }
 

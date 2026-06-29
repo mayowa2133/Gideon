@@ -33,6 +33,20 @@ describe("hosted worker process", () => {
       provider: "postgres_snapshot",
       location: '"gideon_app_state_snapshots":hosted-prod'
     });
+    expect(options.relationalMirror).toBeDefined();
+    await options.persistence?.close?.();
+    await options.relationalMirror?.close?.();
+  });
+
+  it("can disable the PostgreSQL relational mirror during controlled migrations", async () => {
+    const options = storeOptionsFromEnv({
+      GIDEON_STORE_PROVIDER: "postgres_snapshot",
+      GIDEON_RELATIONAL_MIRROR: "false",
+      GIDEON_DATABASE_URL: "postgres://gideon:secret@db.example.test:5432/gideon?sslmode=require"
+    });
+
+    expect(options.persistence?.metadata.provider).toBe("postgres_snapshot");
+    expect(options.relationalMirror).toBeUndefined();
     await options.persistence?.close?.();
   });
 

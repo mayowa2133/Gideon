@@ -46,6 +46,8 @@ GIDEON_DATABASE_URL=postgres://...?...sslmode=require pnpm db:migrate
 
 The first migration creates relational `gideon_jobs` and `gideon_artifacts` projections used by `src/main/postgresJobArtifactRepository.ts`.
 
+When `GIDEON_STORE_PROVIDER=postgres_snapshot`, the hosted worker also mirrors current jobs and artifacts into those relational tables after successful store saves. Set `GIDEON_RELATIONAL_MIRROR=false` only during controlled migration windows where the relational projections are intentionally unavailable.
+
 ## Preflight
 
 Run the preflight before starting a deployed worker:
