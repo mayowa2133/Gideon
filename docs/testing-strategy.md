@@ -165,6 +165,7 @@ Test:
 - Stale job lock recovery.
 - Idempotent reprocessing.
 - Duplicate job prevention.
+- Optional BullMQ/Redis smoke using `GIDEON_REDIS_URL=redis://... pnpm test:redis` to prove the hosted broker can enqueue, process, and drain analysis/render jobs through a real Redis backend.
 
 Expected result:
 

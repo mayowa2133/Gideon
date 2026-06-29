@@ -644,7 +644,7 @@ Detailed rules live in [security-rules.md](./security-rules.md). Baseline:
 
 ### Environments
 
-- Local: Docker Compose for PostgreSQL/Redis/object-store emulator; web and workers with safe sample media.
+- Local: Docker Compose for PostgreSQL/Redis/object-store emulator; web and workers with safe sample media. When Redis is available, `pnpm test:redis` runs the hosted BullMQ broker smoke against `GIDEON_REDIS_URL` or `REDIS_URL`.
 - Preview: isolated database/bucket/Redis namespace; no production media copied; provider test keys/limits.
 - Staging: production-like network/isolation, synthetic golden media, deployment smoke and render test.
 - Production: private data services, separate worker identities, secret manager, backups, monitoring.

@@ -68,6 +68,7 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm lint
 - pnpm typecheck
 - pnpm test
+- pnpm test:redis
 - pnpm test:e2e
 - pnpm build
 - pnpm db:migrate

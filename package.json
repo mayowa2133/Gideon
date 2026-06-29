@@ -18,6 +18,7 @@
     "worker:hosted": "pnpm build:main && node dist/main/main/hostedWorkerProcess.js",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.mcp.json",
     "test": "vitest run",
+    "test:redis": "vitest run src/main/jobQueue.redis.test.ts",
     "test:watch": "vitest",
     "package:mac": "pnpm build && electron-builder --mac dmg zip --config.mac.identity=null --publish=never",
     "dist:mac": "pnpm package:mac"

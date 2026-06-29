@@ -192,8 +192,7 @@ These remain out of the core productionization path until the evidence-to-render
 
 The next implementation slice is Milestone 5:
 
-1. Add a Redis-backed integration smoke test path for the hosted broker when Redis is available.
-2. Add deployment configuration for a separately scaled hosted worker process using `pnpm worker:hosted`.
-3. Add dashboard/alert definitions for oldest queue age, terminal failures, provider latency, and storage failures.
-4. Preserve the shared `createGideonJobExecutor` path for desktop, hosted worker, and MCP-enqueued analysis/render jobs.
-5. Add tests and push to `main`.
+1. Add deployment configuration for a separately scaled hosted worker process using `pnpm worker:hosted`.
+2. Add dashboard/alert definitions for oldest queue age, terminal failures, provider latency, and storage failures.
+3. Preserve the shared `createGideonJobExecutor` path for desktop, hosted worker, and MCP-enqueued analysis/render jobs.
+4. Add tests and push to `main`.
