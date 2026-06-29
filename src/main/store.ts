@@ -98,8 +98,17 @@ interface UpdateProjectOptions {
 
 type JobEventInput = Omit<JobEvent, "id" | "createdAt" | "projectId"> & { createdAt?: string };
 
+export interface GideonStoreOptions {
+  userDataDir?: string;
+  storePath?: string;
+  projectsDir?: string;
+  storageRoot?: string;
+}
+
 export class GideonStore {
   private state: AppState | null = null;
+
+  constructor(private readonly options: GideonStoreOptions = {}) {}
 
   async load(): Promise<AppState> {
     if (this.state) {
@@ -2073,11 +2082,11 @@ export class GideonStore {
   }
 
   projectDir(projectId: string): string {
-    return path.join(app.getPath("userData"), "projects", projectId);
+    return path.join(this.options.projectsDir ?? path.join(this.userDataDir(), "projects"), projectId);
   }
 
   storageRoot(): string {
-    return path.join(app.getPath("userData"), "private-storage");
+    return this.options.storageRoot ?? path.join(this.userDataDir(), "private-storage");
   }
 
   private async updateProject(projectId: string, updater: (project: Project) => void, options: UpdateProjectOptions = {}): Promise<Project> {
@@ -2160,7 +2169,21 @@ export class GideonStore {
   }
 
   private storePath(): string {
-    return path.join(app.getPath("userData"), STORE_FILE);
+    return this.options.storePath ?? process.env.GIDEON_STORE_PATH ?? path.join(this.userDataDir(), STORE_FILE);
+  }
+
+  private userDataDir(): string {
+    const configured = this.options.userDataDir ?? process.env.GIDEON_USER_DATA_DIR;
+    if (configured?.trim()) {
+      return configured.trim();
+    }
+    if (process.env.GIDEON_STORE_PATH?.trim()) {
+      return path.dirname(process.env.GIDEON_STORE_PATH.trim());
+    }
+    if (app && typeof app.getPath === "function") {
+      return app.getPath("userData");
+    }
+    throw new Error("GideonStore requires GIDEON_USER_DATA_DIR, GIDEON_STORE_PATH, or an Electron app context.");
   }
 }
 

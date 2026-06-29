@@ -1,0 +1,162 @@
+import { BullMqHostedWorkerJobBroker, InMemoryHostedWorkerJobBroker, loadHostedJobQueueConfig, redisConnectionFromUrl, type HostedWorkerJobBroker } from "./jobQueue";
+import {
+  createHostedWorkerRuntimeBootstrap,
+  type HostedWorkerBootstrapHandle,
+  type HostedWorkerMetricEvent,
+  type HostedWorkerRuntimeConfig
+} from "./hostedWorker";
+import { createGideonJobExecutor, type GideonJobExecutor } from "./jobExecutor";
+import { GideonStore, type GideonStoreOptions } from "./store";
+
+export interface HostedWorkerProcessLogger {
+  info(input: unknown): void;
+  error(input: unknown): void;
+}
+
+export interface HostedWorkerProcessOptions {
+  env?: NodeJS.ProcessEnv;
+  store?: GideonStore;
+  broker?: HostedWorkerJobBroker;
+  executor?: GideonJobExecutor;
+  config?: Partial<HostedWorkerRuntimeConfig>;
+  nowMs?: () => number;
+  logger?: HostedWorkerProcessLogger;
+  onMetric?: (event: HostedWorkerMetricEvent) => void;
+}
+
+export interface HostedWorkerProcessHandle {
+  workerId: string;
+  bootstrap: HostedWorkerBootstrapHandle;
+  broker: HostedWorkerJobBroker;
+  store: GideonStore;
+  stop(): Promise<void>;
+}
+
+export function createHostedWorkerProcess(input: HostedWorkerProcessOptions = {}): HostedWorkerProcessHandle {
+  const env = input.env ?? process.env;
+  const logger = input.logger ?? jsonConsoleLogger;
+  const store = input.store ?? new GideonStore(storeOptionsFromEnv(env));
+  const broker = input.broker ?? createHostedWorkerBrokerFromEnv(env);
+  const gideonExecutor = input.executor ?? createGideonJobExecutor({ store });
+  const bootstrap = createHostedWorkerRuntimeBootstrap({
+    broker,
+    store,
+    executor: {
+      async runAnalysisJob(job) {
+        await gideonExecutor.runAnalysisJob(job.projectId, job.jobId);
+      },
+      async runRenderJob(job) {
+        await gideonExecutor.runRenderJob(job.projectId, job.jobId);
+      }
+    },
+    config: input.config,
+    env,
+    nowMs: input.nowMs,
+    onError(error, job) {
+      logger.error({
+        level: "error",
+        event: "hosted_worker_job_error",
+        workerId: bootstrapSafeWorkerId(input.config, env),
+        job,
+        message: sanitizeHostedWorkerLogMessage(error instanceof Error ? error.message : "Hosted worker job failed.")
+      });
+    },
+    onMetric(event) {
+      input.onMetric?.(event);
+      logger.info({
+        level: "info",
+        event: event.name,
+        ...event
+      });
+    }
+  });
+  return {
+    workerId: bootstrap.workerId,
+    bootstrap,
+    broker,
+    store,
+    async stop() {
+      bootstrap.stop();
+      const closeable = broker as HostedWorkerJobBroker & { close?: () => Promise<void> | void };
+      await Promise.resolve(closeable.close?.());
+    }
+  };
+}
+
+export function createHostedWorkerBrokerFromEnv(env: NodeJS.ProcessEnv = process.env): HostedWorkerJobBroker {
+  const config = loadHostedJobQueueConfig(env);
+  if (config.provider === "bullmq" && config.redisUrl) {
+    return new BullMqHostedWorkerJobBroker({
+      connection: redisConnectionFromUrl(config.redisUrl),
+      queueName: config.bullMqQueueName,
+      prefix: config.bullMqPrefix ?? undefined
+    });
+  }
+  if (config.provider === "memory") {
+    return new InMemoryHostedWorkerJobBroker();
+  }
+  throw new Error(
+    "Hosted worker process requires GIDEON_HOSTED_QUEUE_PROVIDER=bullmq with GIDEON_REDIS_URL/REDIS_URL, or GIDEON_HOSTED_QUEUE_PROVIDER=memory for local testing."
+  );
+}
+
+export function storeOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): GideonStoreOptions {
+  return {
+    userDataDir: trimEnv(env.GIDEON_USER_DATA_DIR),
+    storePath: trimEnv(env.GIDEON_STORE_PATH),
+    projectsDir: trimEnv(env.GIDEON_PROJECTS_DIR),
+    storageRoot: trimEnv(env.GIDEON_STORAGE_ROOT)
+  };
+}
+
+async function runHostedWorkerCli(): Promise<void> {
+  const handle = createHostedWorkerProcess();
+  const stop = async (signal: NodeJS.Signals) => {
+    jsonConsoleLogger.info({
+      level: "info",
+      event: "hosted_worker_signal",
+      workerId: handle.workerId,
+      signal
+    });
+    await handle.stop();
+    process.exit(0);
+  };
+  process.once("SIGINT", () => {
+    void stop("SIGINT");
+  });
+  process.once("SIGTERM", () => {
+    void stop("SIGTERM");
+  });
+}
+
+function bootstrapSafeWorkerId(config: Partial<HostedWorkerRuntimeConfig> | undefined, env: NodeJS.ProcessEnv): string {
+  return config?.workerId ?? env.GIDEON_WORKER_ID?.trim() ?? `hosted-worker-${process.pid}`;
+}
+
+function trimEnv(value: string | undefined): string | undefined {
+  return value?.trim() || undefined;
+}
+
+function sanitizeHostedWorkerLogMessage(value: string): string {
+  return value.replace(/(sk|whsec|secret|token|key)_[a-zA-Z0-9_-]+/g, "[redacted]").slice(0, 300) || "Hosted worker error.";
+}
+
+const jsonConsoleLogger: HostedWorkerProcessLogger = {
+  info(input) {
+    console.log(JSON.stringify(input));
+  },
+  error(input) {
+    console.error(JSON.stringify(input));
+  }
+};
+
+if (require.main === module) {
+  runHostedWorkerCli().catch((error: unknown) => {
+    jsonConsoleLogger.error({
+      level: "error",
+      event: "hosted_worker_fatal",
+      message: sanitizeHostedWorkerLogMessage(error instanceof Error ? error.message : "Hosted worker failed to start.")
+    });
+    process.exit(1);
+  });
+}

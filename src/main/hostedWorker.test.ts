@@ -101,6 +101,43 @@ describe("hosted worker bootstrap", () => {
     ]);
     expect(errors).toEqual(["job-1:worker secret_token_123 failed"]);
   });
+
+  it("emits worker lifecycle and job metrics with safe failure messages", async () => {
+    const broker = new InMemoryHostedWorkerJobBroker();
+    const metrics: string[] = [];
+    const handle = createHostedWorkerRuntimeBootstrap({
+      broker,
+      store: leaseStoreFixture([]),
+      executor: {
+        runAnalysisJob() {
+          throw new Error("provider token_abc123 failed");
+        },
+        runRenderJob() {
+          metrics.push("render");
+        }
+      },
+      config: {
+        workerId: "worker-metrics",
+        leaseSeconds: 60,
+        heartbeatIntervalMs: 0
+      },
+      nowMs: sequenceClock([1_777_000_000_000, 1_777_000_000_010, 1_777_000_000_100, 1_777_000_000_110]),
+      onMetric(event) {
+        metrics.push(`${event.name}:${event.workerId}:${"job" in event ? event.job.jobId : "none"}:${"safeError" in event ? event.safeError : "ok"}`);
+      }
+    });
+
+    await createBrokeredHostedJobQueueService(broker).enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" });
+    await flushQueue();
+    handle.stop();
+
+    expect(metrics).toEqual([
+      "hosted_worker_started:worker-metrics:none:ok",
+      "hosted_worker_job_started:worker-metrics:job-1:ok",
+      "hosted_worker_job_failed:worker-metrics:job-1:provider [redacted] failed",
+      "hosted_worker_stopped:worker-metrics:none:ok"
+    ]);
+  });
 });
 
 function leaseStoreFixture(calls: string[]) {
@@ -139,4 +176,9 @@ async function flushQueue(): Promise<void> {
   await new Promise<void>((resolve) => {
     setTimeout(resolve, 0);
   });
+}
+
+function sequenceClock(values: number[]): () => number {
+  let index = 0;
+  return () => values[Math.min(index++, values.length - 1)] ?? values[values.length - 1] ?? Date.now();
 }

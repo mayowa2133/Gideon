@@ -15,6 +15,7 @@
     "build:mcp": "tsc -p tsconfig.mcp.json",
     "build": "pnpm build:main && pnpm build:renderer && pnpm build:mcp",
     "mcp:server": "node dist/mcp/server.js",
+    "worker:hosted": "pnpm build:main && node dist/main/main/hostedWorkerProcess.js",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.mcp.json",
     "test": "vitest run",
     "test:watch": "vitest",

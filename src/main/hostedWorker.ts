@@ -14,6 +14,50 @@ export interface HostedWorkerRuntimeConfig {
   heartbeatIntervalMs: number;
 }
 
+export type HostedWorkerMetricEvent =
+  | {
+      name: "hosted_worker_started";
+      workerId: string;
+      stats: QueueRuntimeStats;
+      at: string;
+    }
+  | {
+      name: "hosted_worker_stopped";
+      workerId: string;
+      stats: QueueRuntimeStats;
+      at: string;
+    }
+  | {
+      name: "hosted_worker_job_started";
+      workerId: string;
+      job: HostedWorkerQueueJob;
+      stats: QueueRuntimeStats;
+      at: string;
+    }
+  | {
+      name: "hosted_worker_job_succeeded";
+      workerId: string;
+      job: HostedWorkerQueueJob;
+      durationMs: number;
+      stats: QueueRuntimeStats;
+      at: string;
+    }
+  | {
+      name: "hosted_worker_job_failed";
+      workerId: string;
+      job: HostedWorkerQueueJob;
+      durationMs: number;
+      safeError: string;
+      stats: QueueRuntimeStats;
+      at: string;
+    };
+
+type HostedWorkerMetricInput = HostedWorkerMetricEvent extends infer Event
+  ? Event extends HostedWorkerMetricEvent
+    ? Omit<Event, "workerId" | "at" | "stats"> & { stats?: QueueRuntimeStats }
+    : never
+  : never;
+
 export interface HostedWorkerBootstrapInput {
   broker: HostedWorkerJobBroker;
   store: StoreBackedWorkerLeaseStore;
@@ -22,6 +66,7 @@ export interface HostedWorkerBootstrapInput {
   env?: NodeJS.ProcessEnv;
   nowMs?: () => number;
   onError?: (error: unknown, job: HostedWorkerQueueJob) => void;
+  onMetric?: (event: HostedWorkerMetricEvent) => void;
 }
 
 export interface HostedWorkerBootstrapHandle {
@@ -46,23 +91,46 @@ export function createHostedWorkerRuntimeBootstrap(input: HostedWorkerBootstrapI
     ...loaded,
     ...input.config
   };
+  const nowMs = input.nowMs ?? Date.now;
   const runtime = new HostedWorkerRuntime({
     workerId: config.workerId,
     leaseSeconds: config.leaseSeconds,
     heartbeatIntervalMs: config.heartbeatIntervalMs,
-    nowMs: input.nowMs,
+    nowMs,
     leaseCoordinator: createStoreBackedWorkerLeaseCoordinator(input.store),
     executor: input.executor,
     onError: input.onError
   });
+  const emitMetric = (event: HostedWorkerMetricInput): void => {
+    input.onMetric?.({
+      ...event,
+      workerId: config.workerId,
+      stats: event.stats ?? input.broker.stats(),
+      at: new Date(nowMs()).toISOString()
+    } as HostedWorkerMetricEvent);
+  };
   const unsubscribe = input.broker.subscribe(async (job) => {
+    const startedAtMs = nowMs();
+    emitMetric({ name: "hosted_worker_job_started", job });
     try {
       await runtime.runBrokeredJob(job);
+      emitMetric({
+        name: "hosted_worker_job_succeeded",
+        job,
+        durationMs: Math.max(0, nowMs() - startedAtMs)
+      });
     } catch (error) {
       input.onError?.(error, job);
+      emitMetric({
+        name: "hosted_worker_job_failed",
+        job,
+        durationMs: Math.max(0, nowMs() - startedAtMs),
+        safeError: sanitizeWorkerMetricError(error instanceof Error ? error.message : "Hosted worker job failed.")
+      });
       throw error;
     }
   });
+  emitMetric({ name: "hosted_worker_started" });
   return {
     workerId: config.workerId,
     runtime,
@@ -71,6 +139,7 @@ export function createHostedWorkerRuntimeBootstrap(input: HostedWorkerBootstrapI
     },
     stop() {
       unsubscribe();
+      emitMetric({ name: "hosted_worker_stopped" });
     }
   };
 }
@@ -78,4 +147,8 @@ export function createHostedWorkerRuntimeBootstrap(input: HostedWorkerBootstrapI
 function positiveInteger(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function sanitizeWorkerMetricError(value: string): string {
+  return value.replace(/(sk|whsec|secret|token|key)_[a-zA-Z0-9_-]+/g, "[redacted]").slice(0, 300) || "Hosted worker error.";
 }
