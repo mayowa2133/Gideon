@@ -25,7 +25,9 @@ import type {
   CreateWorkspaceInput,
   DetectedMoment,
   JobEvent,
+  JobKind,
   JobRecord,
+  JobStatus,
   FrameEvidence,
   ProviderRun,
   ProductProfile,
@@ -103,6 +105,27 @@ export interface GideonStoreOptions {
   storePath?: string;
   projectsDir?: string;
   storageRoot?: string;
+}
+
+export interface JobObservabilitySnapshot {
+  generatedAt: string;
+  windowMs: number;
+  totalJobs: number;
+  activeJobs: number;
+  queuedJobs: number;
+  runningJobs: number;
+  cancelingJobs: number;
+  terminalJobs: number;
+  failedJobs: number;
+  retryableFailedJobs: number;
+  terminalFailuresInWindow: number;
+  recoveredLeaseFailuresInWindow: number;
+  expiredRunningLeases: number;
+  oldestQueuedAgeMs: number | null;
+  oldestRunningAgeMs: number | null;
+  terminalFailureRatePerHour: number;
+  byStatus: Partial<Record<JobStatus, number>>;
+  byKind: Partial<Record<JobKind, number>>;
 }
 
 export class GideonStore {
@@ -1789,6 +1812,51 @@ export class GideonStore {
     return recoveredJobs;
   }
 
+  async getJobObservabilitySnapshot(input: { now?: string; windowMs?: number } = {}): Promise<JobObservabilitySnapshot> {
+    const state = await this.load();
+    const now = input.now ?? new Date().toISOString();
+    const nowMs = Date.parse(now);
+    const windowMs = Math.max(1, input.windowMs ?? 60 * 60 * 1000);
+    const windowStartMs = nowMs - windowMs;
+    const jobs = state.projects.flatMap((project) => project.jobs ?? []);
+    const jobEvents = state.projects.flatMap((project) => project.jobEvents ?? []);
+    const queuedJobs = jobs.filter((job) => job.status === "queued");
+    const runningJobs = jobs.filter((job) => job.status === "running");
+    const cancelingJobs = jobs.filter((job) => job.status === "canceling");
+    const terminalJobs = jobs.filter((job) => job.status === "succeeded" || job.status === "failed" || job.status === "canceled");
+    const failedJobs = jobs.filter((job) => job.status === "failed");
+    const terminalFailuresInWindow = failedJobs.filter((job) =>
+      timestampInWindow(job.finishedAt ?? job.updatedAt, windowStartMs, nowMs)
+    ).length;
+    const recoveredLeaseFailuresInWindow = jobEvents.filter(
+      (event) =>
+        event.kind === "failed" &&
+        timestampInWindow(event.createdAt, windowStartMs, nowMs) &&
+        typeof event.metadata?.recoveredFromWorkerId === "string"
+    ).length;
+    const expiredRunningLeases = runningJobs.filter((job) => job.leaseExpiresAt && Date.parse(job.leaseExpiresAt) <= nowMs).length;
+    return {
+      generatedAt: now,
+      windowMs,
+      totalJobs: jobs.length,
+      activeJobs: queuedJobs.length + runningJobs.length + cancelingJobs.length,
+      queuedJobs: queuedJobs.length,
+      runningJobs: runningJobs.length,
+      cancelingJobs: cancelingJobs.length,
+      terminalJobs: terminalJobs.length,
+      failedJobs: failedJobs.length,
+      retryableFailedJobs: failedJobs.filter((job) => job.retryable).length,
+      terminalFailuresInWindow,
+      recoveredLeaseFailuresInWindow,
+      expiredRunningLeases,
+      oldestQueuedAgeMs: oldestAgeMs(queuedJobs, nowMs, (job) => job.createdAt),
+      oldestRunningAgeMs: oldestAgeMs(runningJobs, nowMs, (job) => job.startedAt ?? job.updatedAt),
+      terminalFailureRatePerHour: terminalFailuresInWindow / (windowMs / (60 * 60 * 1000)),
+      byStatus: countJobStatuses(jobs),
+      byKind: countJobKinds(jobs)
+    };
+  }
+
   async getJobForSession(input: {
     userId: string;
     workspaceId: string;
@@ -2238,6 +2306,37 @@ function createInitialAppState(): AppState {
     projects: [],
     activeProjectId: null
   };
+}
+
+function countJobStatuses(jobs: JobRecord[]): Partial<Record<JobStatus, number>> {
+  return jobs.reduce<Partial<Record<JobStatus, number>>>((counts, job) => {
+    counts[job.status] = (counts[job.status] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+function countJobKinds(jobs: JobRecord[]): Partial<Record<JobKind, number>> {
+  return jobs.reduce<Partial<Record<JobKind, number>>>((counts, job) => {
+    counts[job.kind] = (counts[job.kind] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+function oldestAgeMs(jobs: JobRecord[], nowMs: number, timestamp: (job: JobRecord) => string | undefined): number | null {
+  const ages = jobs
+    .map((job) => timestamp(job))
+    .filter((value): value is string => Boolean(value))
+    .map((value) => Math.max(0, nowMs - Date.parse(value)))
+    .filter((value) => Number.isFinite(value));
+  return ages.length ? Math.max(...ages) : null;
+}
+
+function timestampInWindow(value: string | undefined, windowStartMs: number, nowMs: number): boolean {
+  if (!value) {
+    return false;
+  }
+  const timestampMs = Date.parse(value);
+  return Number.isFinite(timestampMs) && timestampMs >= windowStartMs && timestampMs <= nowMs;
 }
 
 function requireWorkspace(state: AppState, workspaceId: string) {

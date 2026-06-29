@@ -586,7 +586,7 @@ Log event names and bounded metadata. Redact/never log:
 - Render QA failure category.
 - Product funnel events from context to export without content payloads.
 
-The hosted worker process emits bounded JSON metric events for worker lifecycle, job lifecycle/duration, analysis pipeline duration, provider TTS latency/failure, render duration/failure, private artifact storage latency/bytes/failure, and usage records. Metrics include IDs, counts, durations, units, and safe error summaries only; they must not include transcript text, OCR text, scripts, prompts, object keys, signed URLs, or provider payloads.
+The hosted worker process emits bounded JSON metric events for worker lifecycle, job lifecycle/duration, analysis pipeline duration, provider TTS latency/failure, render duration/failure, private artifact storage latency/bytes/failure, usage records, and persisted job observability snapshots. Snapshot metrics include active/queued/running/canceling/terminal counts, oldest queued/running age, expired running leases, recovered lease failures, retryable failed jobs, and terminal failure rate. Metrics include IDs, counts, durations, units, and safe error summaries only; they must not include transcript text, OCR text, scripts, prompts, object keys, signed URLs, or provider payloads.
 
 ### Tracing and alerts
 

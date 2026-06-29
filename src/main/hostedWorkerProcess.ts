@@ -6,7 +6,7 @@ import {
   type HostedWorkerRuntimeConfig
 } from "./hostedWorker";
 import { createGideonJobExecutor, type GideonJobExecutor, type GideonJobExecutorMetricEvent } from "./jobExecutor";
-import { GideonStore, type GideonStoreOptions } from "./store";
+import { GideonStore, type GideonStoreOptions, type JobObservabilitySnapshot } from "./store";
 
 export interface HostedWorkerProcessLogger {
   info(input: unknown): void;
@@ -24,7 +24,16 @@ export interface HostedWorkerProcessOptions {
   onMetric?: (event: HostedWorkerProcessMetricEvent) => void;
 }
 
-export type HostedWorkerProcessMetricEvent = HostedWorkerMetricEvent | GideonJobExecutorMetricEvent;
+export type HostedWorkerJobObservabilityMetricEvent = {
+  name: "job_observability_snapshot";
+  trigger: string;
+  snapshot: JobObservabilitySnapshot;
+};
+
+export type HostedWorkerProcessMetricEvent =
+  | HostedWorkerMetricEvent
+  | GideonJobExecutorMetricEvent
+  | HostedWorkerJobObservabilityMetricEvent;
 
 export interface HostedWorkerProcessHandle {
   workerId: string;
@@ -47,11 +56,32 @@ export function createHostedWorkerProcess(input: HostedWorkerProcessOptions = {}
       ...event
     });
   };
+  const emitJobObservabilitySnapshot = async (trigger: string): Promise<void> => {
+    try {
+      emitMetric({
+        name: "job_observability_snapshot",
+        trigger,
+        snapshot: await store.getJobObservabilitySnapshot()
+      });
+    } catch (error) {
+      logger.error({
+        level: "error",
+        event: "job_observability_snapshot_error",
+        message: sanitizeHostedWorkerLogMessage(error instanceof Error ? error.message : "Could not read job observability snapshot.")
+      });
+    }
+  };
+  const emitMetricWithSnapshot = (event: HostedWorkerProcessMetricEvent): void => {
+    emitMetric(event);
+    if (event.name !== "job_observability_snapshot") {
+      void emitJobObservabilitySnapshot(event.name);
+    }
+  };
   const gideonExecutor =
     input.executor ??
     createGideonJobExecutor({
       store,
-      onMetric: emitMetric
+      onMetric: emitMetricWithSnapshot
     });
   const bootstrap = createHostedWorkerRuntimeBootstrap({
     broker,
@@ -77,7 +107,7 @@ export function createHostedWorkerProcess(input: HostedWorkerProcessOptions = {}
       });
     },
     onMetric(event) {
-      emitMetric(event);
+      emitMetricWithSnapshot(event);
     }
   });
   return {

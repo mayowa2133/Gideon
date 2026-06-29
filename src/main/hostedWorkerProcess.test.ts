@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createBrokeredHostedJobQueueService, InMemoryHostedWorkerJobBroker } from "./jobQueue";
 import { createHostedWorkerBrokerFromEnv, createHostedWorkerProcess, storeOptionsFromEnv } from "./hostedWorkerProcess";
-import { GideonStore } from "./store";
+import { GideonStore, type JobObservabilitySnapshot } from "./store";
 
 describe("hosted worker process", () => {
   it("loads store path options from environment", () => {
@@ -74,6 +74,7 @@ describe("hosted worker process", () => {
     await createBrokeredHostedJobQueueService(broker).enqueueRenderJob({ projectId: "project-1", jobId: "job-2" });
     await flushQueue();
     await handle.stop();
+    await flushQueue();
 
     expect(handle.workerId).toBe("worker-process");
     expect(calls).toEqual([
@@ -87,7 +88,7 @@ describe("hosted worker process", () => {
       "heartbeat:job-2:worker-process",
       "fail:job-2:render [redacted] failed"
     ]);
-    expect(metrics).toEqual([
+    expect(metrics.filter((name) => name !== "job_observability_snapshot")).toEqual([
       "hosted_worker_started",
       "hosted_worker_job_started",
       "hosted_worker_job_succeeded",
@@ -95,7 +96,16 @@ describe("hosted worker process", () => {
       "hosted_worker_job_failed",
       "hosted_worker_stopped"
     ]);
+    expect(metrics.filter((name) => name === "job_observability_snapshot").length).toBeGreaterThanOrEqual(1);
     expect(logs).toEqual(expect.arrayContaining([expect.objectContaining({ event: "hosted_worker_started" })]));
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: "job_observability_snapshot",
+          snapshot: expect.objectContaining({ totalJobs: 2, activeJobs: 1 })
+        })
+      ])
+    );
     expect(errors).toEqual([
       expect.objectContaining({
         event: "hosted_worker_job_error",
@@ -134,6 +144,29 @@ class FakeProcessStore extends GideonStore {
   override recoverExpiredWorkerJobLeases(now?: string): [] {
     this.calls.push(`recover:${now}`);
     return [];
+  }
+
+  override async getJobObservabilitySnapshot(): Promise<JobObservabilitySnapshot> {
+    return {
+      generatedAt: "2026-04-24T03:06:40.000Z",
+      windowMs: 3_600_000,
+      totalJobs: 2,
+      activeJobs: 1,
+      queuedJobs: 1,
+      runningJobs: 0,
+      cancelingJobs: 0,
+      terminalJobs: 1,
+      failedJobs: 1,
+      retryableFailedJobs: 1,
+      terminalFailuresInWindow: 1,
+      recoveredLeaseFailuresInWindow: 1,
+      expiredRunningLeases: 0,
+      oldestQueuedAgeMs: 1_000,
+      oldestRunningAgeMs: null,
+      terminalFailureRatePerHour: 1,
+      byStatus: { queued: 1, failed: 1 },
+      byKind: { analysis: 1, render: 1 }
+    };
   }
 }
 

@@ -341,6 +341,38 @@ describe("GideonStore billing reconciliation", () => {
         })
       ])
     );
+
+    await store.appendJob(
+      project.id,
+      createJob({
+        id: "job-queued",
+        projectId: project.id,
+        kind: "render",
+        now: "2026-06-25T12:01:00.000Z"
+      })
+    );
+    const snapshot = await store.getJobObservabilitySnapshot({
+      now: "2026-06-25T12:06:00.000Z",
+      windowMs: 10 * 60 * 1000
+    });
+
+    expect(snapshot).toMatchObject({
+      totalJobs: 2,
+      activeJobs: 1,
+      queuedJobs: 1,
+      runningJobs: 0,
+      terminalJobs: 1,
+      failedJobs: 1,
+      retryableFailedJobs: 1,
+      terminalFailuresInWindow: 1,
+      recoveredLeaseFailuresInWindow: 1,
+      expiredRunningLeases: 0,
+      oldestQueuedAgeMs: 5 * 60 * 1000,
+      oldestRunningAgeMs: null,
+      terminalFailureRatePerHour: 6,
+      byStatus: { failed: 1, queued: 1 },
+      byKind: { analysis: 1, render: 1 }
+    });
   });
 
   it("creates recording upload sessions with explicit hosted session scope", async () => {
