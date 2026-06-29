@@ -6,6 +6,7 @@ import {
   type HostedWorkerRuntimeConfig
 } from "./hostedWorker";
 import { createGideonJobExecutor, type GideonJobExecutor, type GideonJobExecutorMetricEvent } from "./jobExecutor";
+import { createHostedWorkerExecutorAdapter } from "./jobExecutorAdapter";
 import { GideonStore, type GideonStoreOptions, type JobObservabilitySnapshot } from "./store";
 
 export interface HostedWorkerProcessLogger {
@@ -86,14 +87,7 @@ export function createHostedWorkerProcess(input: HostedWorkerProcessOptions = {}
   const bootstrap = createHostedWorkerRuntimeBootstrap({
     broker,
     store,
-    executor: {
-      async runAnalysisJob(job) {
-        await gideonExecutor.runAnalysisJob(job.projectId, job.jobId);
-      },
-      async runRenderJob(job) {
-        await gideonExecutor.runRenderJob(job.projectId, job.jobId);
-      }
-    },
+    executor: createHostedWorkerExecutorAdapter(gideonExecutor),
     config: input.config,
     env,
     nowMs: input.nowMs,

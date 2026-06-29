@@ -192,5 +192,5 @@ These remain out of the core productionization path until the evidence-to-render
 
 The next implementation slice is Milestone 5:
 
-1. Preserve the shared `createGideonJobExecutor` path for desktop, hosted worker, and MCP-enqueued analysis/render jobs.
+1. Add deployment hardening for production-hosted persistence and Redis/BullMQ operations.
 2. Add tests and push to `main`.

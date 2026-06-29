@@ -19,6 +19,7 @@ import {
 import { isWorkerQueueCanceledError, loadLocalWorkerQueueOptions, LocalWorkerQueue } from "./jobQueue";
 import { startGideonControlServer } from "./controlServer";
 import { createGideonJobExecutor } from "./jobExecutor";
+import { createExecutorWorkerQueueTask } from "./jobExecutorAdapter";
 import type {
   AddWorkspaceMemberInput,
   AppState,
@@ -533,12 +534,7 @@ async function recoverInterruptedJobsAtStartup(): Promise<void> {
 
 function enqueueAnalysisJob(projectId: string, jobId: string): void {
   void workerQueue
-    .enqueue({
-      id: jobId,
-      projectId,
-      kind: "analysis",
-      run: () => jobExecutor.runAnalysisJob(projectId, jobId)
-    })
+    .enqueue(createExecutorWorkerQueueTask(jobExecutor, { kind: "analysis", projectId, jobId }))
     .catch((error) => {
       if (isWorkerQueueCanceledError(error)) {
         return;
@@ -549,12 +545,7 @@ function enqueueAnalysisJob(projectId: string, jobId: string): void {
 
 function enqueueRenderJob(projectId: string, jobId: string): void {
   void workerQueue
-    .enqueue({
-      id: jobId,
-      projectId,
-      kind: "render",
-      run: () => jobExecutor.runRenderJob(projectId, jobId)
-    })
+    .enqueue(createExecutorWorkerQueueTask(jobExecutor, { kind: "render", projectId, jobId }))
     .catch((error) => {
       if (isWorkerQueueCanceledError(error)) {
         return;
