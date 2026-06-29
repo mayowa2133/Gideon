@@ -4,9 +4,9 @@ Gideon is a macOS desktop app that turns a product walkthrough recording into ed
 
 ## Implementation progress
 
-Current engineering estimate: **92% complete** toward the full original product vision.
+Current engineering estimate: **93% complete** toward the full original product vision.
 
-This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, hosted analysis/render/export/download/billing-session primitives, Stripe REST session wiring, signed hosted worker-queue enqueue/intake HTTP dispatch boundaries, hosted worker lease/heartbeat/recovery coordination through the store layer, a reusable hosted worker runtime adapter for detached execution, hosted dependency auto-wiring for signed HTTP queues, the in-memory broker-backed queue path, a BullMQ Redis-backed broker with an optional real-Redis smoke gate, separately deployable hosted-worker container configuration, production hardening checks for Redis/BullMQ and worker persistence, a hosted worker process entrypoint with structured lifecycle/job metrics, persisted job observability snapshots, executable dashboard/alert definitions, and a shared real analysis/render job executor adapter used by desktop, hosted worker, and MCP-enqueued analysis/render jobs with analysis, TTS, render, storage, and usage metrics. Remaining work is mainly production-hosted persistence, deployed Redis/BullMQ operations, release hardening, and later non-MVP expansion items.
+This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, hosted analysis/render/export/download/billing-session primitives, Stripe REST session wiring, signed hosted worker-queue enqueue/intake HTTP dispatch boundaries, hosted worker lease/heartbeat/recovery coordination through the store layer, a reusable hosted worker runtime adapter for detached execution, hosted dependency auto-wiring for signed HTTP queues, the in-memory broker-backed queue path, a BullMQ Redis-backed broker with an optional real-Redis smoke gate, separately deployable hosted-worker container configuration, production hardening checks for Redis/BullMQ and worker persistence, macOS release provenance/signing preflight checks, a hosted worker process entrypoint with structured lifecycle/job metrics, persisted job observability snapshots, executable dashboard/alert definitions, and a shared real analysis/render job executor adapter used by desktop, hosted worker, and MCP-enqueued analysis/render jobs with analysis, TTS, render, storage, and usage metrics. Remaining work is mainly production-hosted persistence, deployed Redis/BullMQ operations, final release operations, and later non-MVP expansion items.
 
 ## Local development
 
@@ -48,6 +48,7 @@ Set `GIDEON_DEPLOYMENT_ENV=production` before `pnpm worker:hosted:check` to enab
 
 ```bash
 pnpm package:mac
+pnpm release:mac:check
 ```
 
 The packaged `.dmg` and `.zip` artifacts are written to `release/`:
@@ -55,11 +56,11 @@ The packaged `.dmg` and `.zip` artifacts are written to `release/`:
 - `release/Gideon-0.1.0-arm64.dmg`
 - `release/Gideon-0.1.0-arm64-mac.zip`
 
-Local builds are unsigned unless Apple Developer ID signing credentials are configured. For local testing on a Mac, open the DMG and drag Gideon to Applications. A public internet download should be signed and notarized before release.
+Local builds are unsigned unless Apple Developer ID signing credentials are configured. For local testing on a Mac, open the DMG and drag Gideon to Applications. A public internet download should be signed and notarized before release. Use `pnpm package:mac:signed` plus `GIDEON_RELEASE_CHANNEL=production pnpm release:mac:check` for production release candidates; see `docs/release-hardening.md`.
 
 ## GitHub packaging artifact
 
-The `Build macOS app` workflow builds the app on macOS and uploads the DMG/ZIP as workflow artifacts. After pushing to `main`, open the latest workflow run in GitHub Actions and download the Gideon macOS artifact.
+The `Build macOS app` workflow builds the app on macOS and uploads the DMG/ZIP/blockmap/provenance files as workflow artifacts. After pushing to `main`, open the latest workflow run in GitHub Actions and download the Gideon macOS artifact.
 
 ## Runtime requirements
 

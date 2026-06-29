@@ -43,6 +43,9 @@ jobs:
       - name: Package macOS app
         run: pnpm package:mac
 
+      - name: Check macOS release artifacts
+        run: pnpm release:mac:check
+
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -52,5 +55,5 @@ jobs:
             release/*.zip
             release/*.blockmap
             release/latest-mac.yml
+            release/provenance.json
           if-no-files-found: error
-

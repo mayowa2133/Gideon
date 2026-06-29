@@ -192,5 +192,5 @@ These remain out of the core productionization path until the evidence-to-render
 
 The next implementation slice is Milestone 5:
 
-1. Add release hardening checks for macOS signing/notarization and production artifact provenance.
+1. Add final production-readiness audit docs that map completed capabilities to the original product gaps and remaining hosted persistence/operations work.
 2. Add tests and push to `main`.

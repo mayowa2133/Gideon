@@ -23,6 +23,8 @@
     "test:redis": "vitest run src/main/jobQueue.redis.test.ts",
     "test:watch": "vitest",
     "package:mac": "pnpm build && electron-builder --mac dmg zip --config.mac.identity=null --publish=never",
+    "package:mac:signed": "pnpm build && electron-builder --mac dmg zip --publish=never",
+    "release:mac:check": "node scripts/check-macos-release.mjs",
     "dist:mac": "pnpm package:mac"
   },
   "build": {
