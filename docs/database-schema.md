@@ -4,7 +4,7 @@
 
 **ORM:** Prisma proposed for MVP
 
-**Last updated:** 2026-06-24
+**Last updated:** 2026-06-29
 
 ## Conventions
 
@@ -18,6 +18,16 @@
 - Money/cost is integer micros in a named currency or provider-reported precise decimal; never floating point.
 - Deletion access is revoked immediately with `deleted_at`; object purge runs asynchronously. Retention/legal exceptions are explicit.
 - Foreign-key actions are chosen deliberately. Most project-owned content cascades after purge authorization; billing/audit events restrict or retain pseudonymized references.
+
+## Implemented transition migrations
+
+The current desktop/hosted-worker implementation still preserves full app-state snapshots for compatibility, but hosted PostgreSQL mode also writes queryable relational projections after successful store saves:
+
+- `migrations/0001_hosted_jobs_artifacts.sql` creates `gideon_jobs` and `gideon_artifacts`.
+- `migrations/0002_usage_audit_events.sql` creates `gideon_usage_events` and `gideon_audit_events`.
+- `migrations/0003_core_identity_projects.sql` creates `gideon_users`, `gideon_workspaces`, `gideon_workspace_members`, `gideon_projects`, and `gideon_recording_upload_sessions`.
+
+These transition tables intentionally keep `record_json jsonb not null` beside normalized ownership, status, billing, object, and list-query columns. The normalized columns make hosted operations queryable while preserving full record compatibility until the future hosted web/API surface reads and writes through fully relational service repositories.
 
 ## Entity relationship overview
 

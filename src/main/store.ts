@@ -113,6 +113,13 @@ export interface GideonStoreOptions {
 }
 
 export interface GideonRelationalMirror {
+  upsertUser?(user: UserAccount): Promise<UserAccount> | UserAccount;
+  upsertWorkspace?(workspace: Workspace): Promise<Workspace> | Workspace;
+  upsertWorkspaceMember?(member: WorkspaceMember): Promise<WorkspaceMember> | WorkspaceMember;
+  upsertProject?(project: Project): Promise<Project> | Project;
+  upsertRecordingUploadSession?(
+    session: RecordingUploadSessionRecord
+  ): Promise<RecordingUploadSessionRecord> | RecordingUploadSessionRecord;
   upsertJob(input: PersistJobInput): Promise<JobRecord> | JobRecord;
   upsertArtifact(artifact: ArtifactRecord): Promise<ArtifactRecord> | ArtifactRecord;
   upsertUsageEvent?(event: UsageEvent): Promise<UsageEvent> | UsageEvent;
@@ -2259,7 +2266,20 @@ export class GideonStore {
     if (!this.options.relationalMirror) {
       return;
     }
+    for (const user of state.users) {
+      await this.options.relationalMirror.upsertUser?.(user);
+    }
+    for (const workspace of state.workspaces) {
+      await this.options.relationalMirror.upsertWorkspace?.(workspace);
+    }
+    for (const member of state.workspaceMembers) {
+      await this.options.relationalMirror.upsertWorkspaceMember?.(member);
+    }
     for (const project of state.projects) {
+      await this.options.relationalMirror.upsertProject?.(project);
+      for (const session of project.uploadSessions ?? []) {
+        await this.options.relationalMirror.upsertRecordingUploadSession?.(session);
+      }
       for (const job of project.jobs ?? []) {
         await this.options.relationalMirror.upsertJob({
           workspaceId: project.workspaceId,

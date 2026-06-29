@@ -34,6 +34,9 @@ describe("hosted worker process", () => {
       location: '"gideon_app_state_snapshots":hosted-prod'
     });
     expect(options.relationalMirror).toBeDefined();
+    expect(options.relationalMirror?.upsertUser).toBeDefined();
+    expect(options.relationalMirror?.upsertWorkspace).toBeDefined();
+    expect(options.relationalMirror?.upsertProject).toBeDefined();
     expect(options.relationalMirror?.upsertUsageEvent).toBeDefined();
     expect(options.relationalMirror?.upsertAuditEvent).toBeDefined();
     await options.persistence?.close?.();

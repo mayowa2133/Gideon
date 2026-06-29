@@ -192,6 +192,6 @@ These remain out of the core productionization path until the evidence-to-render
 
 The next implementation slice is Milestone 5 production operations:
 
-1. Run the provider canary against staging credentials and small ASR/OCR fixtures, or add project/billing relational expansion.
+1. Run the provider canary against staging credentials and small ASR/OCR fixtures, or add staging smoke/release-operation hardening.
 2. Keep the existing provider/store interfaces intact so desktop, hosted worker, and MCP paths continue sharing the same execution boundaries.
 3. Add tests and push to `main`.

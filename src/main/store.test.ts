@@ -23,7 +23,12 @@ import type {
   RenderedVideo,
   ScriptDraft
 } from "../shared/types";
-import { createLocalUserWorkspace, DEFAULT_LOCAL_USER_ID, DEFAULT_LOCAL_WORKSPACE_ID } from "../shared/usage";
+import {
+  createLocalUserWorkspace,
+  DEFAULT_LOCAL_MEMBER_ID,
+  DEFAULT_LOCAL_USER_ID,
+  DEFAULT_LOCAL_WORKSPACE_ID
+} from "../shared/usage";
 
 describe("GideonStore billing reconciliation", () => {
   beforeEach(async () => {
@@ -691,6 +696,16 @@ describe("GideonStore relational mirror", () => {
       createdAt: "2026-06-29T12:01:00.000Z"
     };
     const state = createMirrorState({ job, artifact });
+    state.projects[0]?.uploadSessions.push({
+      ...uploadSessionFixture({ artifactId: "artifact-1", status: "completed" }),
+      createdAt: "2026-06-29T12:01:00.000Z",
+      updatedAt: "2026-06-29T12:02:00.000Z"
+    });
+    const mirroredUsers: string[] = [];
+    const mirroredWorkspaces: string[] = [];
+    const mirroredMembers: string[] = [];
+    const mirroredProjects: string[] = [];
+    const mirroredUploadSessions: string[] = [];
     const mirroredJobs: Array<{ queueName: string; stage?: string; jobId: string }> = [];
     const mirroredArtifacts: string[] = [];
     const mirroredUsage: string[] = [];
@@ -708,6 +723,26 @@ describe("GideonStore relational mirror", () => {
       },
       relationalQueueName: "gideon-test-workers",
       relationalMirror: {
+        upsertUser(input) {
+          mirroredUsers.push(input.id);
+          return input;
+        },
+        upsertWorkspace(input) {
+          mirroredWorkspaces.push(input.id);
+          return input;
+        },
+        upsertWorkspaceMember(input) {
+          mirroredMembers.push(input.id);
+          return input;
+        },
+        upsertProject(input) {
+          mirroredProjects.push(input.id);
+          return input;
+        },
+        upsertRecordingUploadSession(input) {
+          mirroredUploadSessions.push(input.id);
+          return input;
+        },
         upsertJob(input) {
           mirroredJobs.push({
             queueName: input.queueName,
@@ -743,6 +778,11 @@ describe("GideonStore relational mirror", () => {
       stage: "semantic_analysis",
       jobId: "job-1"
     });
+    expect(mirroredUsers).toContain(DEFAULT_LOCAL_USER_ID);
+    expect(mirroredWorkspaces).toContain(DEFAULT_LOCAL_WORKSPACE_ID);
+    expect(mirroredMembers).toContain(DEFAULT_LOCAL_MEMBER_ID);
+    expect(mirroredProjects).toContain("project-1");
+    expect(mirroredUploadSessions).toContain("upload-1");
     expect(mirroredArtifacts).toContain("artifact-1");
     expect(mirroredUsage).toContain("usage-1");
     expect(mirroredAudit).toContain("audit-1");

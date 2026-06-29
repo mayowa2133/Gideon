@@ -44,9 +44,9 @@ Run migrations before starting a worker against a new database:
 GIDEON_DATABASE_URL=postgres://...?...sslmode=require pnpm db:migrate
 ```
 
-The migrations create relational `gideon_jobs`, `gideon_artifacts`, `gideon_usage_events`, and `gideon_audit_events` projections used by `src/main/postgresJobArtifactRepository.ts` and `src/main/postgresUsageAuditRepository.ts`.
+The migrations create relational `gideon_users`, `gideon_workspaces`, `gideon_workspace_members`, `gideon_projects`, `gideon_recording_upload_sessions`, `gideon_jobs`, `gideon_artifacts`, `gideon_usage_events`, and `gideon_audit_events` projections used by `src/main/postgresCoreRepository.ts`, `src/main/postgresJobArtifactRepository.ts`, and `src/main/postgresUsageAuditRepository.ts`.
 
-When `GIDEON_STORE_PROVIDER=postgres_snapshot`, the hosted worker also mirrors current jobs, artifacts, usage events, and audit events into those relational tables after successful store saves. Set `GIDEON_RELATIONAL_MIRROR=false` only during controlled migration windows where the relational projections are intentionally unavailable.
+When `GIDEON_STORE_PROVIDER=postgres_snapshot`, the hosted worker also mirrors current users, workspaces, workspace members, projects, recording upload sessions, jobs, artifacts, usage events, and audit events into those relational tables after successful store saves. Set `GIDEON_RELATIONAL_MIRROR=false` only during controlled migration windows where the relational projections are intentionally unavailable.
 
 ## Preflight
 

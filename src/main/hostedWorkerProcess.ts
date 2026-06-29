@@ -8,6 +8,7 @@ import {
 import { createGideonJobExecutor, type GideonJobExecutor, type GideonJobExecutorMetricEvent } from "./jobExecutor";
 import { createHostedWorkerExecutorAdapter } from "./jobExecutorAdapter";
 import { createPostgresSnapshotPoolPersistenceFromEnv } from "./persistence";
+import { createPostgresCoreRepositoryFromEnv } from "./postgresCoreRepository";
 import { createPostgresJobArtifactRepositoryFromEnv } from "./postgresJobArtifactRepository";
 import { createPostgresUsageAuditRepositoryFromEnv } from "./postgresUsageAuditRepository";
 import { GideonStore, type GideonRelationalMirror, type GideonStoreOptions, type JobObservabilitySnapshot } from "./store";
@@ -161,14 +162,21 @@ export function createHostedWorkerStoreFromEnv(env: NodeJS.ProcessEnv = process.
 }
 
 export function createHostedPostgresRelationalMirrorFromEnv(env: NodeJS.ProcessEnv = process.env): GideonRelationalMirror {
+  const core = createPostgresCoreRepositoryFromEnv(env);
   const jobsArtifacts = createPostgresJobArtifactRepositoryFromEnv(env);
   const usageAudit = createPostgresUsageAuditRepositoryFromEnv(env);
   return {
+    upsertUser: (user) => core.upsertUser(user),
+    upsertWorkspace: (workspace) => core.upsertWorkspace(workspace),
+    upsertWorkspaceMember: (member) => core.upsertWorkspaceMember(member),
+    upsertProject: (project) => core.upsertProject(project),
+    upsertRecordingUploadSession: (session) => core.upsertRecordingUploadSession(session),
     upsertJob: (input) => jobsArtifacts.upsertJob(input),
     upsertArtifact: (artifact) => jobsArtifacts.upsertArtifact(artifact),
     upsertUsageEvent: (event) => usageAudit.upsertUsageEvent(event),
     upsertAuditEvent: (event) => usageAudit.upsertAuditEvent(event),
     async close() {
+      await core.close();
       await jobsArtifacts.close();
       await usageAudit.close();
     }
