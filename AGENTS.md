@@ -71,6 +71,7 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm test:redis
 - pnpm test:e2e
 - pnpm build
+- pnpm worker:hosted:check
 - pnpm db:migrate
 - pnpm db:seed
 - pnpm dev

@@ -652,7 +652,7 @@ Detailed rules live in [security-rules.md](./security-rules.md). Baseline:
 ### Deployable units
 
 1. `web`: Next.js production build behind managed edge/reverse proxy.
-2. `worker-media`: TypeScript BullMQ worker with FFmpeg, Node, Chromium/Remotion; no public ingress.
+2. `worker-media`: TypeScript BullMQ worker with FFmpeg and Node; no public ingress. The current deployable target is `Dockerfile.hosted-worker`, run with `pnpm worker:hosted:run` after `pnpm worker:hosted:check`.
 3. `worker-transcribe`: Python worker with faster-whisper; optional GPU pool, no public ingress.
 4. Managed PostgreSQL, Redis, object storage, secret manager, observability.
 

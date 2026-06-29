@@ -1,0 +1,41 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - gideon-redis-data:/data
+
+  hosted-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.hosted-worker
+    depends_on:
+      - redis
+    environment:
+      GIDEON_HOSTED_QUEUE_PROVIDER: bullmq
+      GIDEON_REDIS_URL: redis://redis:6379/0
+      GIDEON_BULLMQ_QUEUE_NAME: gideon-hosted-worker-jobs
+      GIDEON_BULLMQ_PREFIX: gideon
+      GIDEON_WORKER_ID: hosted-worker-local-1
+      GIDEON_WORKER_LEASE_SECONDS: "300"
+      GIDEON_WORKER_HEARTBEAT_INTERVAL_MS: "30000"
+      GIDEON_USER_DATA_DIR: /data
+      GIDEON_STORE_PATH: /data/store.json
+      GIDEON_PROJECTS_DIR: /data/projects
+      GIDEON_STORAGE_ROOT: /data/storage
+      # Optional provider-backed AI/media settings:
+      # GIDEON_OPENAI_API_KEY: ${GIDEON_OPENAI_API_KEY}
+      # GIDEON_STORAGE_PROVIDER: s3
+      # GIDEON_STORAGE_BUCKET: ${GIDEON_STORAGE_BUCKET}
+      # GIDEON_STORAGE_REGION: ${GIDEON_STORAGE_REGION}
+      # GIDEON_STORAGE_ACCESS_KEY_ID: ${GIDEON_STORAGE_ACCESS_KEY_ID}
+      # GIDEON_STORAGE_SECRET_ACCESS_KEY: ${GIDEON_STORAGE_SECRET_ACCESS_KEY}
+    volumes:
+      - gideon-worker-data:/data
+    restart: unless-stopped
+
+volumes:
+  gideon-redis-data:
+  gideon-worker-data:

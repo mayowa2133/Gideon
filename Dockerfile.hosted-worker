@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1
+
+FROM node:22-bookworm-slim AS build
+WORKDIR /app
+ENV CI=true
+
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY tsconfig.base.json tsconfig.main.json ./
+COPY src ./src
+RUN pnpm build:main
+
+FROM node:22-bookworm-slim AS runtime
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    GIDEON_HOSTED_QUEUE_PROVIDER=bullmq \
+    GIDEON_USER_DATA_DIR=/data \
+    GIDEON_STORE_PATH=/data/store.json \
+    GIDEON_PROJECTS_DIR=/data/projects \
+    GIDEON_STORAGE_ROOT=/data/storage
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && corepack enable \
+    && mkdir -p /data \
+    && chown -R node:node /app /data
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --prod --frozen-lockfile
+
+COPY --from=build /app/dist ./dist
+
+USER node
+VOLUME ["/data"]
+
+CMD ["node", "dist/main/main/hostedWorkerProcess.js"]
