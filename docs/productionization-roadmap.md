@@ -192,5 +192,5 @@ These remain out of the core productionization path until the evidence-to-render
 
 The next implementation slice is Milestone 5:
 
-1. Add deployment hardening for production-hosted persistence and Redis/BullMQ operations.
+1. Add release hardening checks for macOS signing/notarization and production artifact provenance.
 2. Add tests and push to `main`.

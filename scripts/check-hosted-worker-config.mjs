@@ -3,6 +3,8 @@
 const env = process.env;
 const errors = [];
 const warnings = [];
+const deploymentEnv = normalize(env.GIDEON_DEPLOYMENT_ENV ?? env.NODE_ENV);
+const productionMode = deploymentEnv === "production";
 
 const queueProvider = normalize(env.GIDEON_HOSTED_QUEUE_PROVIDER ?? env.GIDEON_WORKER_QUEUE_PROVIDER);
 if (queueProvider !== "bullmq") {
@@ -16,19 +18,32 @@ if (!redisUrl) {
   validateRedisUrl(redisUrl);
 }
 
+const bullMqQueueName = normalize(env.GIDEON_BULLMQ_QUEUE_NAME ?? env.GIDEON_WORKER_QUEUE_NAME);
+const bullMqPrefix = normalize(env.GIDEON_BULLMQ_PREFIX);
+if (productionMode) {
+  requireNonEmpty("GIDEON_BULLMQ_QUEUE_NAME", "Set GIDEON_BULLMQ_QUEUE_NAME in production to isolate the worker queue.");
+  requireNonEmpty("GIDEON_BULLMQ_PREFIX", "Set GIDEON_BULLMQ_PREFIX in production to isolate Redis keys by environment.");
+}
+
 requireNonEmpty("GIDEON_WORKER_ID", "Set a stable worker identity for logs, leases, and metrics.");
 requirePositiveInteger("GIDEON_WORKER_LEASE_SECONDS", "Set a positive worker lease duration in seconds.");
 requirePositiveInteger("GIDEON_WORKER_HEARTBEAT_INTERVAL_MS", "Set a positive heartbeat interval in milliseconds.");
+validateLeaseHeartbeatRatio();
 
-if (!normalize(env.GIDEON_USER_DATA_DIR) && !normalize(env.GIDEON_STORE_PATH)) {
+const userDataDir = normalize(env.GIDEON_USER_DATA_DIR);
+const storePath = normalize(env.GIDEON_STORE_PATH);
+const projectsDir = normalize(env.GIDEON_PROJECTS_DIR);
+const storageRoot = normalize(env.GIDEON_STORAGE_ROOT);
+
+if (!userDataDir && !storePath) {
   errors.push("Set GIDEON_USER_DATA_DIR or GIDEON_STORE_PATH so the worker has durable store state.");
 }
 
-if (!normalize(env.GIDEON_PROJECTS_DIR)) {
+if (!projectsDir) {
   warnings.push("GIDEON_PROJECTS_DIR is not set; local project media paths will default to app data.");
 }
 
-if (!normalize(env.GIDEON_STORAGE_ROOT)) {
+if (!storageRoot) {
   warnings.push("GIDEON_STORAGE_ROOT is not set; local artifact storage will default to app data.");
 }
 
@@ -41,6 +56,19 @@ if (storageProvider && storageProvider !== "local") {
 
 if (!normalize(env.OPENAI_API_KEY) && !normalize(env.GIDEON_OPENAI_API_KEY)) {
   warnings.push("No OpenAI API key is configured; analysis, ASR, and TTS will use local fallback behavior where available.");
+}
+
+if (productionMode) {
+  validateProductionHardening({
+    redisUrl,
+    bullMqQueueName,
+    bullMqPrefix,
+    storageProvider,
+    userDataDir,
+    storePath,
+    projectsDir,
+    storageRoot
+  });
 }
 
 if (!normalize(env.GIDEON_SESSION_SECRET)) {
@@ -96,4 +124,45 @@ function validateRedisUrl(value) {
   } catch {
     errors.push("Redis URL is not a valid URL.");
   }
+}
+
+function validateLeaseHeartbeatRatio() {
+  const leaseSeconds = Number(normalize(env.GIDEON_WORKER_LEASE_SECONDS));
+  const heartbeatMs = Number(normalize(env.GIDEON_WORKER_HEARTBEAT_INTERVAL_MS));
+  if (!Number.isFinite(leaseSeconds) || !Number.isFinite(heartbeatMs) || leaseSeconds < 1 || heartbeatMs < 1) {
+    return;
+  }
+  const leaseMs = leaseSeconds * 1000;
+  if (heartbeatMs >= leaseMs) {
+    errors.push("GIDEON_WORKER_HEARTBEAT_INTERVAL_MS must be lower than GIDEON_WORKER_LEASE_SECONDS so leases renew before expiry.");
+    return;
+  }
+  if (heartbeatMs > leaseMs / 2) {
+    warnings.push("Heartbeat interval is more than half the lease duration; use a shorter interval to reduce false lease recovery.");
+  }
+}
+
+function validateProductionHardening(input) {
+  if (input.redisUrl.startsWith("redis://") && normalize(env.GIDEON_ALLOW_INSECURE_REDIS) !== "true") {
+    errors.push("Production hosted workers must use rediss:// Redis unless GIDEON_ALLOW_INSECURE_REDIS=true is explicitly set.");
+  }
+  if (input.bullMqQueueName === "gideon-hosted-worker-jobs") {
+    warnings.push("Production GIDEON_BULLMQ_QUEUE_NAME is using the default name; include an environment suffix to avoid cross-environment queue collisions.");
+  }
+  if (input.bullMqPrefix === "gideon") {
+    warnings.push("Production GIDEON_BULLMQ_PREFIX is using the local default; include an environment suffix to avoid Redis key collisions.");
+  }
+  const localStorageAllowed = normalize(env.GIDEON_ALLOW_LOCAL_PRODUCTION_STORAGE) === "true";
+  if ((!input.storageProvider || input.storageProvider === "local") && !localStorageAllowed) {
+    errors.push("Production workers should use private object storage; set GIDEON_STORAGE_PROVIDER=s3/r2 or GIDEON_ALLOW_LOCAL_PRODUCTION_STORAGE=true.");
+  }
+  const noProviderAllowed = normalize(env.GIDEON_ALLOW_NO_PROVIDER_KEYS) === "true";
+  if (!normalize(env.OPENAI_API_KEY) && !normalize(env.GIDEON_OPENAI_API_KEY) && !noProviderAllowed) {
+    errors.push("Production workers need provider credentials for real ASR/LLM/TTS, or set GIDEON_ALLOW_NO_PROVIDER_KEYS=true for a controlled fallback deployment.");
+  }
+  [input.userDataDir, input.storePath, input.projectsDir, input.storageRoot].filter(Boolean).forEach((value) => {
+    if (value.startsWith("/tmp/") || value.startsWith("/private/tmp/")) {
+      errors.push(`Production worker path ${value} is under tmp; use durable storage or private object storage.`);
+    }
+  });
 }

@@ -656,7 +656,7 @@ Detailed rules live in [security-rules.md](./security-rules.md). Baseline:
 3. `worker-transcribe`: Python worker with faster-whisper; optional GPU pool, no public ingress.
 4. Managed PostgreSQL, Redis, object storage, secret manager, observability.
 
-Web and media worker should not share runtime identity or filesystem. Worker egress is default-deny with explicit provider/storage/DB/Redis endpoints as required; decode subprocess receives no network access.
+Web and media worker should not share runtime identity or filesystem. Worker egress is default-deny with explicit provider/storage/DB/Redis endpoints as required; decode subprocess receives no network access. Hosted worker production preflight requires BullMQ, environment-specific queue names/prefixes, valid lease/heartbeat cadence, durable non-tmp paths, provider credentials, and private object storage unless an explicit controlled-deployment override is set.
 
 ### Release flow
 
