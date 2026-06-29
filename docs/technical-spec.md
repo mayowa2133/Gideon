@@ -668,6 +668,8 @@ Web and media worker should not share runtime identity or filesystem. Worker egr
 6. Run smoke: auth, signed upload, sample analysis (stubbed/provider canary), preview render, signed download, deletion.
 7. Monitor; rollback app images. Database rollback uses forward fix unless a reversible migration was explicitly tested.
 
+The current implementation evidence, remaining go-live blockers, and original-gap mapping are maintained in [production-readiness-audit.md](./production-readiness-audit.md). Update that audit whenever a production-readiness slice changes the completion estimate or closes a launch blocker.
+
 ## Scalability considerations
 
 ### First bottlenecks

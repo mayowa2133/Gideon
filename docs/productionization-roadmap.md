@@ -190,7 +190,8 @@ These remain out of the core productionization path until the evidence-to-render
 
 ## Current next slice
 
-The next implementation slice is Milestone 5:
+The next implementation slice is Milestone 4/5 persistence hardening:
 
-1. Add final production-readiness audit docs that map completed capabilities to the original product gaps and remaining hosted persistence/operations work.
-2. Add tests and push to `main`.
+1. Add the production-hosted persistence adapter or migration path for project, job, artifact, usage, and audit state.
+2. Keep the existing store interface intact so desktop, hosted worker, and MCP paths continue sharing the same execution boundaries.
+3. Add tests and push to `main`.
