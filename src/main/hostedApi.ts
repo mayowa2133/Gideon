@@ -17,10 +17,12 @@ import {
   type BillingConfig
 } from "./billing";
 import {
+  BullMqHostedWorkerJobBroker,
   createBrokeredHostedJobQueueService,
   createHttpHostedJobQueueService,
   InMemoryHostedWorkerJobBroker,
   loadHostedJobQueueConfig,
+  redisConnectionFromUrl,
   type HostedJobQueueConfig,
   type HostedWorkerJobBroker
 } from "./jobQueue";
@@ -403,6 +405,13 @@ function createHostedJobQueueBroker(config: HostedJobQueueConfig): HostedWorkerJ
   if (config.provider === "memory") {
     return new InMemoryHostedWorkerJobBroker();
   }
+  if (config.provider === "bullmq" && config.redisUrl) {
+    return new BullMqHostedWorkerJobBroker({
+      connection: redisConnectionFromUrl(config.redisUrl),
+      queueName: config.bullMqQueueName,
+      prefix: config.bullMqPrefix ?? undefined
+    });
+  }
   return undefined;
 }
 
@@ -414,6 +423,9 @@ function createHostedJobQueueService(
     return createHttpHostedJobQueueService(config);
   }
   if (config.provider === "memory" && broker) {
+    return createBrokeredHostedJobQueueService(broker);
+  }
+  if (config.provider === "bullmq" && broker) {
     return createBrokeredHostedJobQueueService(broker);
   }
   return undefined;

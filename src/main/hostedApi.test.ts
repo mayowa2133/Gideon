@@ -121,7 +121,10 @@ describe("hosted API foundation", () => {
     expect(dependencies.config.jobQueue).toEqual({
       provider: "http",
       httpEndpointUrl: "https://workers.example.test/enqueue",
-      signingSecret: "queue-secret"
+      signingSecret: "queue-secret",
+      redisUrl: null,
+      bullMqQueueName: "gideon-hosted-worker-jobs",
+      bullMqPrefix: null
     });
     expect(dependencies.jobQueueService).toBeDefined();
   });
@@ -138,7 +141,10 @@ describe("hosted API foundation", () => {
     expect(dependencies.config.jobQueue).toEqual({
       provider: "memory",
       httpEndpointUrl: null,
-      signingSecret: null
+      signingSecret: null,
+      redisUrl: null,
+      bullMqQueueName: "gideon-hosted-worker-jobs",
+      bullMqPrefix: null
     });
     expect(dependencies.jobQueueService).toBeDefined();
     expect(dependencies.jobQueueBroker).toBeDefined();
@@ -1484,7 +1490,10 @@ function testApi(
       jobQueue: {
         provider: "none" as const,
         httpEndpointUrl: null,
-        signingSecret: null
+        signingSecret: null,
+        redisUrl: null,
+        bullMqQueueName: "gideon-hosted-worker-jobs",
+        bullMqPrefix: null
       },
       internalAuthCallbackSecret: "internal-secret"
     },

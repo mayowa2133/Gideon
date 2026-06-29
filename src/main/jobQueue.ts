@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { Queue, Worker, type ConnectionOptions, type JobsOptions } from "bullmq";
 import type { HostedJobQueueService } from "./hostedApi";
 import type { JobKind, QueueRuntimeStats } from "../shared/types";
 
@@ -21,9 +22,12 @@ export interface WorkerQueueOptions {
 }
 
 export interface HostedJobQueueConfig {
-  provider: "none" | "http" | "memory";
+  provider: "none" | "http" | "memory" | "bullmq";
   httpEndpointUrl: string | null;
   signingSecret: string | null;
+  redisUrl: string | null;
+  bullMqQueueName: string;
+  bullMqPrefix: string | null;
 }
 
 export interface HostedWorkerQueueJob {
@@ -70,7 +74,7 @@ export interface HostedWorkerJobExecutor {
 export interface HostedWorkerJobBroker {
   enqueue(job: HostedWorkerQueueJob): Promise<void> | void;
   subscribe(processor: HostedWorkerJobProcessor): () => void;
-  cancel?(jobId: string): boolean;
+  cancel?(jobId: string): boolean | Promise<boolean>;
   stats(): QueueRuntimeStats;
 }
 
@@ -160,6 +164,46 @@ interface ActiveTask {
   projectId: string;
   kind: JobKind;
   startedAt: string;
+}
+
+interface BullMqJobLike {
+  id?: string;
+  name?: string;
+  data?: unknown;
+  getState?(): Promise<string> | string;
+  remove?(): Promise<void> | void;
+}
+
+interface BullMqQueueLike {
+  add(name: string, data: HostedWorkerQueueJob, options: JobsOptions): Promise<BullMqJobLike>;
+  getJob(jobId: string): Promise<BullMqJobLike | null>;
+  getJobs(types: string[], start?: number, end?: number): Promise<BullMqJobLike[]>;
+  getJobCounts(...types: string[]): Promise<Record<string, number>>;
+  close?(): Promise<void> | void;
+}
+
+interface BullMqWorkerLike {
+  on(event: "completed" | "failed" | "error", listener: (...args: unknown[]) => void): BullMqWorkerLike;
+  close?(): Promise<void> | void;
+}
+
+interface BullMqModuleLike {
+  Queue: new (name: string, options: Record<string, unknown>) => BullMqQueueLike;
+  Worker: new (
+    name: string,
+    processor: (job: BullMqJobLike) => Promise<void>,
+    options: Record<string, unknown>
+  ) => BullMqWorkerLike;
+}
+
+export interface BullMqHostedWorkerJobBrokerOptions {
+  connection: ConnectionOptions;
+  queueName?: string;
+  prefix?: string;
+  concurrency?: number;
+  defaultJobOptions?: JobsOptions;
+  bullmq?: BullMqModuleLike;
+  onError?: (error: unknown, job: HostedWorkerQueueJob) => void;
 }
 
 export class WorkerQueueCanceledError extends Error {
@@ -298,10 +342,26 @@ export function loadHostedJobQueueConfig(env: NodeJS.ProcessEnv = process.env): 
   const endpoint = normalizeHttpUrl(env.GIDEON_HOSTED_QUEUE_URL ?? env.GIDEON_WORKER_QUEUE_URL);
   const signingSecret = nonEmpty(env.GIDEON_HOSTED_QUEUE_SECRET ?? env.GIDEON_WORKER_QUEUE_SECRET);
   const requestedProvider = nonEmpty(env.GIDEON_HOSTED_QUEUE_PROVIDER ?? env.GIDEON_WORKER_QUEUE_PROVIDER)?.toLowerCase();
+  const redisUrl = normalizeRedisUrl(env.GIDEON_REDIS_URL ?? env.REDIS_URL);
+  const bullMqQueueName = nonEmpty(env.GIDEON_BULLMQ_QUEUE_NAME ?? env.GIDEON_WORKER_QUEUE_NAME) ?? "gideon-hosted-worker-jobs";
+  const bullMqPrefix = nonEmpty(env.GIDEON_BULLMQ_PREFIX);
+  const provider =
+    requestedProvider === "memory" || requestedProvider === "in_memory"
+      ? "memory"
+      : requestedProvider === "bullmq" || requestedProvider === "redis"
+        ? redisUrl
+          ? "bullmq"
+          : "none"
+        : endpoint && signingSecret
+          ? "http"
+          : "none";
   return {
-    provider: requestedProvider === "memory" || requestedProvider === "in_memory" ? "memory" : endpoint && signingSecret ? "http" : "none",
+    provider,
     httpEndpointUrl: endpoint,
-    signingSecret
+    signingSecret,
+    redisUrl,
+    bullMqQueueName,
+    bullMqPrefix
   };
 }
 
@@ -440,6 +500,197 @@ export class InMemoryHostedWorkerJobBroker implements HostedWorkerJobBroker {
         }
       );
     }
+  }
+}
+
+export class BullMqHostedWorkerJobBroker implements HostedWorkerJobBroker {
+  private readonly queue: BullMqQueueLike;
+  private readonly workerOptions: Record<string, unknown>;
+  private readonly defaultJobOptions: JobsOptions;
+  private readonly onError?: (error: unknown, job: HostedWorkerQueueJob) => void;
+  private readonly bullmq: BullMqModuleLike;
+  private readonly pendingJobs = new Map<string, HostedWorkerQueueJob>();
+  private readonly activeJobs = new Map<string, HostedWorkerQueueJob>();
+  private readonly queueName: string;
+  private processor: HostedWorkerJobProcessor | null = null;
+  private worker: BullMqWorkerLike | null = null;
+  private cachedStats: QueueRuntimeStats;
+
+  constructor(options: BullMqHostedWorkerJobBrokerOptions) {
+    this.queueName = options.queueName?.trim() || "gideon-hosted-worker-jobs";
+    this.bullmq = options.bullmq ?? {
+      Queue: Queue as unknown as BullMqModuleLike["Queue"],
+      Worker: Worker as unknown as BullMqModuleLike["Worker"]
+    };
+    const concurrency = Math.max(1, options.concurrency ?? 1);
+    const sharedOptions = compactObject({
+      connection: options.connection,
+      prefix: options.prefix
+    });
+    this.queue = new this.bullmq.Queue(this.queueName, {
+      ...sharedOptions,
+      defaultJobOptions: {
+        attempts: 1,
+        removeOnComplete: { count: 1_000 },
+        removeOnFail: { count: 5_000 },
+        ...options.defaultJobOptions
+      }
+    });
+    this.workerOptions = {
+      ...sharedOptions,
+      concurrency
+    };
+    this.defaultJobOptions = {
+      attempts: 1,
+      removeOnComplete: { count: 1_000 },
+      removeOnFail: { count: 5_000 },
+      ...options.defaultJobOptions
+    };
+    this.onError = options.onError;
+    this.cachedStats = emptyQueueStats(concurrency);
+  }
+
+  async enqueue(job: HostedWorkerQueueJob): Promise<void> {
+    const existing = await this.queue.getJob(job.jobId);
+    if (existing) {
+      const state = await bullMqJobState(existing);
+      if (isActiveBullMqState(state)) {
+        throw new Error(`Hosted worker job ${job.jobId} is already queued or running.`);
+      }
+      await existing.remove?.();
+    }
+    await this.queue.add(job.kind, job, {
+      ...this.defaultJobOptions,
+      jobId: job.jobId
+    });
+    this.pendingJobs.set(job.jobId, job);
+    this.updateCachedLocalStats();
+  }
+
+  subscribe(processor: HostedWorkerJobProcessor): () => void {
+    if (this.processor || this.worker) {
+      throw new Error("Hosted worker broker already has a processor.");
+    }
+    this.processor = processor;
+    this.worker = new this.bullmq.Worker(
+      this.queueName,
+      async (bullJob) => {
+        const job = hostedWorkerQueueJobFromBullMqJob(bullJob);
+        this.pendingJobs.delete(job.jobId);
+        this.activeJobs.set(job.jobId, job);
+        this.updateCachedLocalStats();
+        try {
+          await processor(job);
+        } finally {
+          this.activeJobs.delete(job.jobId);
+          this.updateCachedLocalStats();
+        }
+      },
+      this.workerOptions
+    );
+    this.worker
+      .on("completed", (bullJob) => {
+        const job = maybeHostedWorkerQueueJobFromBullMqJob(bullJob);
+        if (job) {
+          this.pendingJobs.delete(job.jobId);
+          this.activeJobs.delete(job.jobId);
+          this.updateCachedLocalStats();
+        }
+      })
+      .on("failed", (bullJob, error) => {
+        const job = maybeHostedWorkerQueueJobFromBullMqJob(bullJob);
+        if (job) {
+          this.pendingJobs.delete(job.jobId);
+          this.activeJobs.delete(job.jobId);
+          this.onError?.(error, job);
+          this.updateCachedLocalStats();
+        }
+      })
+      .on("error", (error) => {
+        this.onError?.(error, {
+          kind: "analysis",
+          projectId: "unknown",
+          jobId: "unknown"
+        });
+      });
+    return () => {
+      this.processor = null;
+      const worker = this.worker;
+      this.worker = null;
+      void Promise.resolve(worker?.close?.());
+    };
+  }
+
+  async cancel(jobId: string): Promise<boolean> {
+    const existing = await this.queue.getJob(jobId);
+    if (!existing) {
+      this.pendingJobs.delete(jobId);
+      this.updateCachedLocalStats();
+      return false;
+    }
+    const state = await bullMqJobState(existing);
+    if (!state || state === "active") {
+      return false;
+    }
+    await existing.remove?.();
+    this.pendingJobs.delete(jobId);
+    this.updateCachedLocalStats();
+    return true;
+  }
+
+  stats(): QueueRuntimeStats {
+    return this.cachedStats;
+  }
+
+  async refreshStats(limit = 1_000): Promise<QueueRuntimeStats> {
+    const counts = await this.queue.getJobCounts("active", "waiting", "delayed", "prioritized", "paused", "waiting-children");
+    const jobs = await this.queue.getJobs(["active", "waiting", "delayed", "prioritized", "paused", "waiting-children"], 0, Math.max(0, limit - 1));
+    const activeJobs: HostedWorkerQueueJob[] = [];
+    const pendingJobs: HostedWorkerQueueJob[] = [];
+    for (const bullJob of jobs) {
+      const job = maybeHostedWorkerQueueJobFromBullMqJob(bullJob);
+      if (!job) {
+        continue;
+      }
+      const state = await bullMqJobState(bullJob);
+      if (state === "active") {
+        activeJobs.push(job);
+      } else {
+        pendingJobs.push(job);
+      }
+    }
+    this.cachedStats = {
+      active: counts.active ?? activeJobs.length,
+      pending:
+        (counts.waiting ?? 0) +
+        (counts.delayed ?? 0) +
+        (counts.prioritized ?? 0) +
+        (counts.paused ?? 0) +
+        (counts["waiting-children"] ?? 0),
+      concurrency: Number(this.workerOptions.concurrency ?? 1),
+      activeByKind: countKinds(activeJobs),
+      pendingByKind: countKinds(pendingJobs),
+      concurrencyByKind: {}
+    };
+    return this.cachedStats;
+  }
+
+  async close(): Promise<void> {
+    await Promise.resolve(this.worker?.close?.());
+    await Promise.resolve(this.queue.close?.());
+  }
+
+  private updateCachedLocalStats(): void {
+    const active = [...this.activeJobs.values()];
+    const pending = [...this.pendingJobs.values()];
+    this.cachedStats = {
+      active: active.length,
+      pending: pending.length,
+      concurrency: Number(this.workerOptions.concurrency ?? 1),
+      activeByKind: countKinds(active),
+      pendingByKind: countKinds(pending),
+      concurrencyByKind: {}
+    };
   }
 }
 
@@ -914,6 +1165,22 @@ function parsePositiveInteger(value: string | undefined): number | undefined {
   return parsed;
 }
 
+export function redisConnectionFromUrl(value: string): ConnectionOptions {
+  const url = new URL(value);
+  if (url.protocol !== "redis:" && url.protocol !== "rediss:") {
+    throw new Error("Redis URL must use redis:// or rediss://.");
+  }
+  const database = url.pathname.replace("/", "");
+  return compactObject({
+    host: url.hostname,
+    port: url.port ? Number(url.port) : undefined,
+    username: decodeURIComponent(url.username || "") || undefined,
+    password: decodeURIComponent(url.password || "") || undefined,
+    db: database ? Number(database) : undefined,
+    tls: url.protocol === "rediss:" ? {} : undefined
+  }) as ConnectionOptions;
+}
+
 function normalizeHttpUrl(value: string | undefined): string | null {
   const trimmed = nonEmpty(value);
   if (!trimmed) {
@@ -935,8 +1202,69 @@ function nonEmpty(value: string | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
+function normalizeRedisUrl(value: string | undefined): string | null {
+  const trimmed = nonEmpty(value);
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    redisConnectionFromUrl(trimmed);
+    return trimmed;
+  } catch {
+    return null;
+  }
+}
+
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function emptyQueueStats(concurrency: number): QueueRuntimeStats {
+  return {
+    active: 0,
+    pending: 0,
+    concurrency,
+    activeByKind: {},
+    pendingByKind: {},
+    concurrencyByKind: {}
+  };
+}
+
+function compactObject(input: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined && value !== null));
+}
+
+async function bullMqJobState(job: BullMqJobLike): Promise<string | undefined> {
+  return typeof job.getState === "function" ? await job.getState() : undefined;
+}
+
+function isActiveBullMqState(state: string | undefined): boolean {
+  return !state || ["active", "waiting", "delayed", "prioritized", "paused", "waiting-children"].includes(state);
+}
+
+function hostedWorkerQueueJobFromBullMqJob(job: BullMqJobLike): HostedWorkerQueueJob {
+  const parsed = maybeHostedWorkerQueueJobFromBullMqJob(job);
+  if (!parsed) {
+    throw new Error("BullMQ hosted worker job payload is invalid.");
+  }
+  return parsed;
+}
+
+function maybeHostedWorkerQueueJobFromBullMqJob(job: BullMqJobLike | unknown): HostedWorkerQueueJob | null {
+  if (typeof job !== "object" || job === null) {
+    return null;
+  }
+  const data = (job as BullMqJobLike).data;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return null;
+  }
+  const record = data as Record<string, unknown>;
+  const kind = stringValue(record.kind);
+  const projectId = stringValue(record.projectId);
+  const jobId = stringValue(record.jobId);
+  return (kind === "analysis" || kind === "render") && projectId && jobId
+    ? { kind, projectId, jobId }
+    : null;
 }
 
 function sanitizeQueueError(value: string): string {

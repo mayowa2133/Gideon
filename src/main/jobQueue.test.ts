@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  BullMqHostedWorkerJobBroker,
   connectHostedWorkerRuntimeToBroker,
   createBrokeredHostedJobQueueService,
   createHostedWorkerIntakeService,
@@ -13,6 +14,7 @@ import {
   loadHostedJobQueueConfig,
   loadLocalWorkerQueueOptions,
   LocalWorkerQueue,
+  redisConnectionFromUrl,
   verifyHostedWorkerQueueRequest
 } from "./jobQueue";
 
@@ -299,7 +301,10 @@ describe("local worker queue", () => {
     ).toEqual({
       provider: "http",
       httpEndpointUrl: "https://workers.example.test/enqueue",
-      signingSecret: "queue-secret"
+      signingSecret: "queue-secret",
+      redisUrl: null,
+      bullMqQueueName: "gideon-hosted-worker-jobs",
+      bullMqPrefix: null
     });
     expect(
       loadHostedJobQueueConfig({
@@ -308,7 +313,10 @@ describe("local worker queue", () => {
     ).toEqual({
       provider: "none",
       httpEndpointUrl: "https://workers.example.test/enqueue",
-      signingSecret: null
+      signingSecret: null,
+      redisUrl: null,
+      bullMqQueueName: "gideon-hosted-worker-jobs",
+      bullMqPrefix: null
     });
     expect(
       loadHostedJobQueueConfig({
@@ -318,7 +326,10 @@ describe("local worker queue", () => {
     ).toEqual({
       provider: "none",
       httpEndpointUrl: null,
-      signingSecret: "queue-secret"
+      signingSecret: "queue-secret",
+      redisUrl: null,
+      bullMqQueueName: "gideon-hosted-worker-jobs",
+      bullMqPrefix: null
     });
     expect(
       loadHostedJobQueueConfig({
@@ -327,7 +338,25 @@ describe("local worker queue", () => {
     ).toEqual({
       provider: "memory",
       httpEndpointUrl: null,
-      signingSecret: null
+      signingSecret: null,
+      redisUrl: null,
+      bullMqQueueName: "gideon-hosted-worker-jobs",
+      bullMqPrefix: null
+    });
+    expect(
+      loadHostedJobQueueConfig({
+        GIDEON_HOSTED_QUEUE_PROVIDER: "bullmq",
+        GIDEON_REDIS_URL: "rediss://default:secret@redis.example.test:6380/2",
+        GIDEON_BULLMQ_QUEUE_NAME: "gideon-prod-workers",
+        GIDEON_BULLMQ_PREFIX: "gideon-prod"
+      })
+    ).toEqual({
+      provider: "bullmq",
+      httpEndpointUrl: null,
+      signingSecret: null,
+      redisUrl: "rediss://default:secret@redis.example.test:6380/2",
+      bullMqQueueName: "gideon-prod-workers",
+      bullMqPrefix: "gideon-prod"
     });
   });
 
@@ -410,6 +439,58 @@ describe("local worker queue", () => {
     expect(broker.stats()).toMatchObject({ active: 0, pending: 0 });
     expect(() => service.enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" })).not.toThrow();
     expect(() => service.enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" })).toThrow("already queued or running");
+  });
+
+  it("parses Redis URLs for BullMQ broker connections", () => {
+    expect(redisConnectionFromUrl("redis://default:secret@localhost:6379/3")).toMatchObject({
+      host: "localhost",
+      port: 6379,
+      username: "default",
+      password: "secret",
+      db: 3
+    });
+    expect(redisConnectionFromUrl("rediss://redis.example.test")).toMatchObject({
+      host: "redis.example.test",
+      tls: {}
+    });
+    expect(() => redisConnectionFromUrl("https://redis.example.test")).toThrow("redis:// or rediss://");
+  });
+
+  it("enqueues, processes, cancels, and reports hosted jobs through a BullMQ broker", async () => {
+    const bullmq = createFakeBullMqModule();
+    const broker = new BullMqHostedWorkerJobBroker({
+      connection: redisConnectionFromUrl("redis://localhost:6379/0"),
+      queueName: "gideon-test-workers",
+      bullmq,
+      concurrency: 2
+    });
+    const service = createBrokeredHostedJobQueueService(broker);
+    const processed: string[] = [];
+
+    await service.enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" });
+    await service.enqueueRenderJob({ projectId: "project-2", jobId: "job-2" });
+
+    expect(broker.stats()).toMatchObject({ active: 0, pending: 2, concurrency: 2 });
+    expect(broker.stats().pendingByKind).toEqual({ analysis: 1, render: 1 });
+    await expect(service.enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" })).rejects.toThrow(
+      "already queued or running"
+    );
+
+    await expect(broker.cancel("job-2")).resolves.toBe(true);
+    expect(broker.stats()).toMatchObject({ active: 0, pending: 1 });
+    const unsubscribe = broker.subscribe((job) => {
+      processed.push(`${job.kind}:${job.projectId}:${job.jobId}`);
+    });
+    await flushQueue();
+
+    expect(processed).toEqual(["analysis:project-1:job-1"]);
+    expect(broker.stats()).toMatchObject({ active: 0, pending: 0 });
+    await expect(service.enqueueAnalysisJob({ projectId: "project-1", jobId: "job-1" })).resolves.toBeUndefined();
+    await flushQueue();
+
+    expect(processed).toEqual(["analysis:project-1:job-1", "analysis:project-1:job-1"]);
+    unsubscribe();
+    await broker.close();
   });
 
   it("connects brokered hosted jobs to the worker runtime", async () => {
@@ -948,4 +1029,128 @@ async function flushQueue(): Promise<void> {
   await new Promise<void>((resolve) => {
     setTimeout(resolve, 0);
   });
+}
+
+function createFakeBullMqModule() {
+  const queues = new Map<string, FakeBullMqQueue>();
+  return {
+    Queue: class extends FakeBullMqQueue {
+      constructor(name: string) {
+        super(name, queues);
+      }
+    },
+    Worker: class extends FakeBullMqWorker {
+      constructor(name: string, processor: (job: FakeBullMqJob) => Promise<void>) {
+        const queue = queues.get(name) ?? new FakeBullMqQueue(name, queues);
+        super(queue, processor);
+      }
+    }
+  };
+}
+
+class FakeBullMqJob {
+  state = "waiting";
+
+  constructor(
+    readonly id: string,
+    readonly name: string,
+    readonly data: unknown,
+    private readonly queue: FakeBullMqQueue
+  ) {}
+
+  async getState(): Promise<string> {
+    return this.state;
+  }
+
+  async remove(): Promise<void> {
+    this.state = "removed";
+    this.queue.remove(this.id);
+  }
+}
+
+class FakeBullMqQueue {
+  readonly jobs = new Map<string, FakeBullMqJob>();
+  readonly workers = new Set<FakeBullMqWorker>();
+
+  constructor(
+    readonly name: string,
+    queues: Map<string, FakeBullMqQueue>
+  ) {
+    queues.set(name, this);
+  }
+
+  async add(name: string, data: { jobId: string }, options: { jobId?: string }): Promise<FakeBullMqJob> {
+    const job = new FakeBullMqJob(options.jobId ?? data.jobId, name, data, this);
+    this.jobs.set(job.id, job);
+    this.drain();
+    return job;
+  }
+
+  async getJob(jobId: string): Promise<FakeBullMqJob | null> {
+    return this.jobs.get(jobId) ?? null;
+  }
+
+  async getJobs(types: string[]): Promise<FakeBullMqJob[]> {
+    return [...this.jobs.values()].filter((job) => types.includes(job.state));
+  }
+
+  async getJobCounts(...types: string[]): Promise<Record<string, number>> {
+    const counts: Record<string, number> = {};
+    for (const type of types) {
+      counts[type] = [...this.jobs.values()].filter((job) => job.state === type).length;
+    }
+    return counts;
+  }
+
+  remove(jobId: string): void {
+    this.jobs.delete(jobId);
+  }
+
+  drain(): void {
+    const waiting = [...this.jobs.values()].find((job) => job.state === "waiting");
+    const worker = [...this.workers][0];
+    if (!waiting || !worker) {
+      return;
+    }
+    void worker.process(waiting).finally(() => this.drain());
+  }
+}
+
+class FakeBullMqWorker {
+  private readonly listeners = new Map<string, Array<(...args: unknown[]) => void>>();
+
+  constructor(
+    private readonly queue: FakeBullMqQueue,
+    private readonly processor: (job: FakeBullMqJob) => Promise<void>
+  ) {
+    this.queue.workers.add(this);
+    this.queue.drain();
+  }
+
+  on(event: "completed" | "failed" | "error", listener: (...args: unknown[]) => void): this {
+    this.listeners.set(event, [...(this.listeners.get(event) ?? []), listener]);
+    return this;
+  }
+
+  async process(job: FakeBullMqJob): Promise<void> {
+    job.state = "active";
+    try {
+      await this.processor(job);
+      job.state = "completed";
+      this.emit("completed", job);
+    } catch (error) {
+      job.state = "failed";
+      this.emit("failed", job, error);
+    }
+  }
+
+  async close(): Promise<void> {
+    this.queue.workers.delete(this);
+  }
+
+  private emit(event: string, ...args: unknown[]): void {
+    for (const listener of this.listeners.get(event) ?? []) {
+      listener(...args);
+    }
+  }
 }
