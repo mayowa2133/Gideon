@@ -12,6 +12,8 @@ describe("hosted worker deployment config preflight", () => {
       GIDEON_DEPLOYMENT_ENV: "production",
       GIDEON_HOSTED_QUEUE_PROVIDER: "bullmq",
       GIDEON_REDIS_URL: "rediss://default:secret@redis.example.test:6380/0",
+      GIDEON_STORE_PROVIDER: "postgres_snapshot",
+      GIDEON_DATABASE_URL: "postgres://gideon:secret@db.example.test:5432/gideon?sslmode=require",
       GIDEON_BULLMQ_QUEUE_NAME: "gideon-prod-workers",
       GIDEON_BULLMQ_PREFIX: "gideon-prod",
       GIDEON_WORKER_ID: "worker-prod-1",
@@ -37,6 +39,7 @@ describe("hosted worker deployment config preflight", () => {
         GIDEON_DEPLOYMENT_ENV: "production",
         GIDEON_HOSTED_QUEUE_PROVIDER: "bullmq",
         GIDEON_REDIS_URL: "redis://localhost:6379/0",
+        GIDEON_STORE_PROVIDER: "file",
         GIDEON_WORKER_ID: "worker-prod-1",
         GIDEON_WORKER_LEASE_SECONDS: "60",
         GIDEON_WORKER_HEARTBEAT_INTERVAL_MS: "60000",
@@ -57,6 +60,7 @@ describe("hosted worker deployment config preflight", () => {
       GIDEON_REDIS_URL: "redis://redis.internal:6379/0",
       GIDEON_ALLOW_INSECURE_REDIS: "true",
       GIDEON_ALLOW_LOCAL_PRODUCTION_STORAGE: "true",
+      GIDEON_ALLOW_LOCAL_PRODUCTION_STORE: "true",
       GIDEON_ALLOW_NO_PROVIDER_KEYS: "true",
       GIDEON_BULLMQ_QUEUE_NAME: "gideon-private-workers",
       GIDEON_BULLMQ_PREFIX: "gideon-private",
@@ -70,6 +74,22 @@ describe("hosted worker deployment config preflight", () => {
     });
 
     expect(result.stdout).toContain("Hosted worker deployment configuration looks usable.");
+  });
+
+  it("requires database settings for PostgreSQL snapshot persistence", async () => {
+    await expect(
+      runPreflight({
+        GIDEON_HOSTED_QUEUE_PROVIDER: "bullmq",
+        GIDEON_REDIS_URL: "redis://localhost:6379/0",
+        GIDEON_STORE_PROVIDER: "postgres_snapshot",
+        GIDEON_POSTGRES_SNAPSHOT_TABLE: "bad;table",
+        GIDEON_WORKER_ID: "worker-dev-1",
+        GIDEON_WORKER_LEASE_SECONDS: "300",
+        GIDEON_WORKER_HEARTBEAT_INTERVAL_MS: "30000"
+      })
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining("Set GIDEON_DATABASE_URL or DATABASE_URL")
+    });
   });
 });
 

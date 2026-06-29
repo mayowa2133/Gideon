@@ -77,6 +77,7 @@ import {
   countWorkspaceOwners,
   type WorkspaceAction
 } from "../shared/rbac";
+import { FileAppStatePersistence, type AppStatePersistence } from "./persistence";
 
 const STORE_FILE = "gideon-store.json";
 const MAX_AUDIT_EVENTS = 500;
@@ -105,6 +106,7 @@ export interface GideonStoreOptions {
   storePath?: string;
   projectsDir?: string;
   storageRoot?: string;
+  persistence?: AppStatePersistence;
 }
 
 export interface JobObservabilitySnapshot {
@@ -130,6 +132,7 @@ export interface JobObservabilitySnapshot {
 
 export class GideonStore {
   private state: AppState | null = null;
+  private persistence: AppStatePersistence | null = null;
 
   constructor(private readonly options: GideonStoreOptions = {}) {}
 
@@ -138,14 +141,10 @@ export class GideonStore {
       return this.state;
     }
 
-    const filePath = this.storePath();
-    try {
-      const raw = await fs.readFile(filePath, "utf8");
-      this.state = normalizeAppState(JSON.parse(raw) as AppState);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw error;
-      }
+    const storedState = await this.appStatePersistence().load();
+    if (storedState) {
+      this.state = normalizeAppState(storedState);
+    } else {
       this.state = createInitialAppState();
       await this.save();
     }
@@ -2229,11 +2228,14 @@ export class GideonStore {
     if (!this.state) {
       return;
     }
-    const filePath = this.storePath();
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    const temporaryPath = `${filePath}.tmp`;
-    await fs.writeFile(temporaryPath, JSON.stringify(this.state, null, 2));
-    await fs.rename(temporaryPath, filePath);
+    await this.appStatePersistence().save(this.state);
+  }
+
+  private appStatePersistence(): AppStatePersistence {
+    if (!this.persistence) {
+      this.persistence = this.options.persistence ?? new FileAppStatePersistence(this.storePath());
+    }
+    return this.persistence;
   }
 
   private storePath(): string {

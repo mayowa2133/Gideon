@@ -32,10 +32,28 @@ validateLeaseHeartbeatRatio();
 
 const userDataDir = normalize(env.GIDEON_USER_DATA_DIR);
 const storePath = normalize(env.GIDEON_STORE_PATH);
+const storeProvider = normalize(env.GIDEON_STORE_PROVIDER) || "file";
+const databaseUrl = normalize(env.GIDEON_DATABASE_URL ?? env.DATABASE_URL);
 const projectsDir = normalize(env.GIDEON_PROJECTS_DIR);
 const storageRoot = normalize(env.GIDEON_STORAGE_ROOT);
 
-if (!userDataDir && !storePath) {
+if (storeProvider !== "file" && storeProvider !== "postgres_snapshot") {
+  errors.push("GIDEON_STORE_PROVIDER must be file or postgres_snapshot.");
+}
+
+if (storeProvider === "postgres_snapshot") {
+  if (!databaseUrl) {
+    errors.push("Set GIDEON_DATABASE_URL or DATABASE_URL when GIDEON_STORE_PROVIDER=postgres_snapshot.");
+  } else {
+    validatePostgresUrl(databaseUrl);
+  }
+  validateSimpleIdentifier(
+    normalize(env.GIDEON_POSTGRES_SNAPSHOT_TABLE) || "gideon_app_state_snapshots",
+    "GIDEON_POSTGRES_SNAPSHOT_TABLE"
+  );
+}
+
+if (storeProvider === "file" && !userDataDir && !storePath) {
   errors.push("Set GIDEON_USER_DATA_DIR or GIDEON_STORE_PATH so the worker has durable store state.");
 }
 
@@ -64,6 +82,8 @@ if (productionMode) {
     bullMqQueueName,
     bullMqPrefix,
     storageProvider,
+    storeProvider,
+    databaseUrl,
     userDataDir,
     storePath,
     projectsDir,
@@ -126,6 +146,23 @@ function validateRedisUrl(value) {
   }
 }
 
+function validatePostgresUrl(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") {
+      errors.push("Database URL must use postgres:// or postgresql://.");
+    }
+  } catch {
+    errors.push("Database URL is not a valid URL.");
+  }
+}
+
+function validateSimpleIdentifier(value, name) {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) {
+    errors.push(`${name} must be a simple PostgreSQL identifier.`);
+  }
+}
+
 function validateLeaseHeartbeatRatio() {
   const leaseSeconds = Number(normalize(env.GIDEON_WORKER_LEASE_SECONDS));
   const heartbeatMs = Number(normalize(env.GIDEON_WORKER_HEARTBEAT_INTERVAL_MS));
@@ -155,6 +192,19 @@ function validateProductionHardening(input) {
   const localStorageAllowed = normalize(env.GIDEON_ALLOW_LOCAL_PRODUCTION_STORAGE) === "true";
   if ((!input.storageProvider || input.storageProvider === "local") && !localStorageAllowed) {
     errors.push("Production workers should use private object storage; set GIDEON_STORAGE_PROVIDER=s3/r2 or GIDEON_ALLOW_LOCAL_PRODUCTION_STORAGE=true.");
+  }
+  const localStoreAllowed = normalize(env.GIDEON_ALLOW_LOCAL_PRODUCTION_STORE) === "true";
+  if (input.storeProvider === "file" && !localStoreAllowed) {
+    errors.push("Production workers should use GIDEON_STORE_PROVIDER=postgres_snapshot with GIDEON_DATABASE_URL, or set GIDEON_ALLOW_LOCAL_PRODUCTION_STORE=true for a controlled local-store deployment.");
+  }
+  const insecureDatabaseAllowed = normalize(env.GIDEON_ALLOW_INSECURE_DATABASE) === "true";
+  if (
+    input.storeProvider === "postgres_snapshot" &&
+    input.databaseUrl &&
+    !input.databaseUrl.includes("sslmode=require") &&
+    !insecureDatabaseAllowed
+  ) {
+    errors.push("Production database URLs should require TLS with sslmode=require unless GIDEON_ALLOW_INSECURE_DATABASE=true is explicitly set.");
   }
   const noProviderAllowed = normalize(env.GIDEON_ALLOW_NO_PROVIDER_KEYS) === "true";
   if (!normalize(env.OPENAI_API_KEY) && !normalize(env.GIDEON_OPENAI_API_KEY) && !noProviderAllowed) {

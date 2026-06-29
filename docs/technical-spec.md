@@ -503,7 +503,7 @@ Keys are server-generated and never derived from original filenames. Bucket acce
 
 ## Database
 
-PostgreSQL is the source of truth for users/workspaces/projects, versions, job state, object metadata, usage, and audit events. Object storage is the source of truth for large binary/JSON artifacts; database rows store checksum, size, media type, and private key.
+PostgreSQL is the source of truth for users/workspaces/projects, versions, job state, object metadata, usage, and audit events. Object storage is the source of truth for large binary/JSON artifacts; database rows store checksum, size, media type, and private key. The current transition path is the `AppStatePersistence` boundary in `src/main/persistence.ts`: local desktop still uses file persistence, while hosted deployments can use a PostgreSQL snapshot adapter until the full relational repositories and migrations are wired.
 
 Key rules:
 

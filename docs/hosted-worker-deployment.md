@@ -23,8 +23,9 @@ GIDEON_BULLMQ_PREFIX=gideon-prod
 GIDEON_WORKER_ID=worker-media-1
 GIDEON_WORKER_LEASE_SECONDS=300
 GIDEON_WORKER_HEARTBEAT_INTERVAL_MS=30000
-GIDEON_USER_DATA_DIR=/data
-GIDEON_STORE_PATH=/data/store.json
+GIDEON_STORE_PROVIDER=postgres_snapshot
+GIDEON_DATABASE_URL=postgres://...?...sslmode=require
+GIDEON_POSTGRES_SNAPSHOT_TABLE=gideon_app_state_snapshots
 GIDEON_PROJECTS_DIR=/data/projects
 GIDEON_STORAGE_ROOT=/data/storage
 GIDEON_STORAGE_PROVIDER=s3
@@ -34,7 +35,7 @@ GIDEON_STORAGE_SECRET_ACCESS_KEY=...
 GIDEON_OPENAI_API_KEY=...
 ```
 
-Use `GIDEON_BULLMQ_QUEUE_NAME` and `GIDEON_BULLMQ_PREFIX` to isolate preview, staging, and production queues. Use private object storage variables from the README for production media/artifacts instead of relying on container-local storage.
+Use `GIDEON_BULLMQ_QUEUE_NAME` and `GIDEON_BULLMQ_PREFIX` to isolate preview, staging, and production queues. Use `GIDEON_STORE_PROVIDER=postgres_snapshot` plus a TLS-enabled PostgreSQL URL for hosted app state, and use private object storage variables from the README for production media/artifacts instead of relying on container-local storage.
 
 ## Preflight
 
@@ -48,6 +49,9 @@ The check fails on missing BullMQ/Redis/lease identity configuration and warns w
 
 - non-`rediss://` Redis unless `GIDEON_ALLOW_INSECURE_REDIS=true` is explicitly set;
 - missing `GIDEON_BULLMQ_QUEUE_NAME` or `GIDEON_BULLMQ_PREFIX`;
+- missing PostgreSQL database settings when `GIDEON_STORE_PROVIDER=postgres_snapshot`;
+- local file-backed app state unless `GIDEON_ALLOW_LOCAL_PRODUCTION_STORE=true` is explicitly set;
+- PostgreSQL database URLs without `sslmode=require` unless `GIDEON_ALLOW_INSECURE_DATABASE=true` is explicitly set;
 - heartbeat intervals greater than or equal to the lease duration;
 - local-only artifact storage unless `GIDEON_ALLOW_LOCAL_PRODUCTION_STORAGE=true` is explicitly set;
 - missing provider credentials unless `GIDEON_ALLOW_NO_PROVIDER_KEYS=true` is explicitly set;
@@ -71,5 +75,5 @@ This starts Redis and one hosted worker using the same BullMQ provider path as p
 - Prefer managed Redis with TLS (`rediss://`) and persistence enabled.
 - Keep worker instances off public ingress.
 - Use separate runtime identities from any web/API service.
-- Restrict egress to Redis, private storage, provider APIs, and any future database service.
+- Restrict egress to Redis, PostgreSQL, private storage, provider APIs, and any future database service.
 - Export JSON logs to the observability backend; alert on oldest queued age, expired leases, recovered lease failures, terminal failure rate, provider failures, and storage failures. See [observability-alerts.md](./observability-alerts.md).
