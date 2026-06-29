@@ -590,7 +590,7 @@ The hosted worker process emits bounded JSON metric events for worker lifecycle,
 
 ### Tracing and alerts
 
-Trace API→outbox→queue→worker→provider/storage/DB. Sample successful traces; retain errors longer. Alert on oldest queue age SLO, terminal failure spike, provider error/cost spike, render QA failures, storage/auth errors, and deletion backlog.
+Trace API→outbox→queue→worker→provider/storage/DB. Sample successful traces; retain errors longer. Alert on oldest queue age SLO, terminal failure spike, provider error/cost spike, render QA failures, storage/auth errors, and deletion backlog. The default hosted-worker dashboard panels and alert rules are defined in `src/main/observability.ts` and documented in [observability-alerts.md](./observability-alerts.md).
 
 ## Error handling
 

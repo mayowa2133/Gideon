@@ -53,4 +53,4 @@ This starts Redis and one hosted worker using the same BullMQ provider path as p
 - Keep worker instances off public ingress.
 - Use separate runtime identities from any web/API service.
 - Restrict egress to Redis, private storage, provider APIs, and any future database service.
-- Export JSON logs to the observability backend; alert on oldest queued age, expired leases, recovered lease failures, terminal failure rate, provider failures, and storage failures.
+- Export JSON logs to the observability backend; alert on oldest queued age, expired leases, recovered lease failures, terminal failure rate, provider failures, and storage failures. See [observability-alerts.md](./observability-alerts.md).
