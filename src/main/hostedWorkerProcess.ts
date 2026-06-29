@@ -9,7 +9,8 @@ import { createGideonJobExecutor, type GideonJobExecutor, type GideonJobExecutor
 import { createHostedWorkerExecutorAdapter } from "./jobExecutorAdapter";
 import { createPostgresSnapshotPoolPersistenceFromEnv } from "./persistence";
 import { createPostgresJobArtifactRepositoryFromEnv } from "./postgresJobArtifactRepository";
-import { GideonStore, type GideonStoreOptions, type JobObservabilitySnapshot } from "./store";
+import { createPostgresUsageAuditRepositoryFromEnv } from "./postgresUsageAuditRepository";
+import { GideonStore, type GideonRelationalMirror, type GideonStoreOptions, type JobObservabilitySnapshot } from "./store";
 
 export interface HostedWorkerProcessLogger {
   info(input: unknown): void;
@@ -149,7 +150,7 @@ export function storeOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): Gideo
       storeProvider === "postgres_snapshot" ? createPostgresSnapshotPoolPersistenceFromEnv(env) : undefined,
     relationalMirror:
       storeProvider === "postgres_snapshot" && relationalMirrorEnabled
-        ? createPostgresJobArtifactRepositoryFromEnv(env)
+        ? createHostedPostgresRelationalMirrorFromEnv(env)
         : undefined,
     relationalQueueName: trimEnv(env.GIDEON_BULLMQ_QUEUE_NAME ?? env.GIDEON_WORKER_QUEUE_NAME)
   };
@@ -157,6 +158,21 @@ export function storeOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): Gideo
 
 export function createHostedWorkerStoreFromEnv(env: NodeJS.ProcessEnv = process.env): GideonStore {
   return new GideonStore(storeOptionsFromEnv(env));
+}
+
+export function createHostedPostgresRelationalMirrorFromEnv(env: NodeJS.ProcessEnv = process.env): GideonRelationalMirror {
+  const jobsArtifacts = createPostgresJobArtifactRepositoryFromEnv(env);
+  const usageAudit = createPostgresUsageAuditRepositoryFromEnv(env);
+  return {
+    upsertJob: (input) => jobsArtifacts.upsertJob(input),
+    upsertArtifact: (artifact) => jobsArtifacts.upsertArtifact(artifact),
+    upsertUsageEvent: (event) => usageAudit.upsertUsageEvent(event),
+    upsertAuditEvent: (event) => usageAudit.upsertAuditEvent(event),
+    async close() {
+      await jobsArtifacts.close();
+      await usageAudit.close();
+    }
+  };
 }
 
 async function runHostedWorkerCli(): Promise<void> {

@@ -693,6 +693,8 @@ describe("GideonStore relational mirror", () => {
     const state = createMirrorState({ job, artifact });
     const mirroredJobs: Array<{ queueName: string; stage?: string; jobId: string }> = [];
     const mirroredArtifacts: string[] = [];
+    const mirroredUsage: string[] = [];
+    const mirroredAudit: string[] = [];
     const store = new GideonStore({
       userDataDir: electronMock.userDataDir,
       persistence: {
@@ -717,6 +719,14 @@ describe("GideonStore relational mirror", () => {
         upsertArtifact(input) {
           mirroredArtifacts.push(input.id);
           return input;
+        },
+        upsertUsageEvent(input) {
+          mirroredUsage.push(input.id);
+          return input;
+        },
+        upsertAuditEvent(input) {
+          mirroredAudit.push(input.id);
+          return input;
         }
       }
     });
@@ -734,6 +744,8 @@ describe("GideonStore relational mirror", () => {
       jobId: "job-1"
     });
     expect(mirroredArtifacts).toContain("artifact-1");
+    expect(mirroredUsage).toContain("usage-1");
+    expect(mirroredAudit).toContain("audit-1");
   });
 });
 
@@ -774,8 +786,34 @@ function createMirrorState(input: { job: AppState["projects"][number]["jobs"][nu
   };
   return {
     ...local,
-    usageEvents: [],
-    auditEvents: [],
+    usageEvents: [
+      {
+        id: "usage-1",
+        workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+        projectId: project.id,
+        metric: "llm_runs",
+        quantity: 1,
+        unit: "count",
+        source: "analysis",
+        idempotencyKey: "analysis:project-1:job-1",
+        createdAt: "2026-06-29T12:02:00.000Z"
+      }
+    ],
+    auditEvents: [
+      {
+        id: "audit-1",
+        workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+        projectId: project.id,
+        actorUserId: DEFAULT_LOCAL_USER_ID,
+        actorType: "local_user",
+        action: "usage.record",
+        targetType: "usage",
+        targetId: "usage-1",
+        summary: "Recorded analysis usage.",
+        metadata: { metric: "llm_runs", quantity: 1 },
+        createdAt: "2026-06-29T12:02:00.000Z"
+      }
+    ],
     activeProjectId: project.id,
     projects: [project]
   };

@@ -115,6 +115,8 @@ export interface GideonStoreOptions {
 export interface GideonRelationalMirror {
   upsertJob(input: PersistJobInput): Promise<JobRecord> | JobRecord;
   upsertArtifact(artifact: ArtifactRecord): Promise<ArtifactRecord> | ArtifactRecord;
+  upsertUsageEvent?(event: UsageEvent): Promise<UsageEvent> | UsageEvent;
+  upsertAuditEvent?(event: AuditEvent): Promise<AuditEvent> | AuditEvent;
   close?(): Promise<void> | void;
 }
 
@@ -2271,6 +2273,12 @@ export class GideonStore {
       for (const artifact of project.artifacts ?? []) {
         await this.options.relationalMirror.upsertArtifact(artifact);
       }
+    }
+    for (const event of state.usageEvents ?? []) {
+      await this.options.relationalMirror.upsertUsageEvent?.(event);
+    }
+    for (const event of state.auditEvents ?? []) {
+      await this.options.relationalMirror.upsertAuditEvent?.(event);
     }
   }
 

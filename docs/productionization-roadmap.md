@@ -192,6 +192,6 @@ These remain out of the core productionization path until the evidence-to-render
 
 The next implementation slice is Milestone 4/5 persistence hardening:
 
-1. Add the next relational repository for usage/audit state, or add provider canary smoke tests for ASR/OCR/TTS/analysis.
+1. Add provider canary smoke tests for ASR/OCR/TTS/analysis, or add project/billing relational expansion.
 2. Keep the existing store interface intact so desktop, hosted worker, and MCP paths continue sharing the same execution boundaries.
 3. Add tests and push to `main`.
