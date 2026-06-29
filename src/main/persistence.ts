@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Pool, type PoolConfig } from "pg";
 import type { AppState } from "../shared/types";
 
 export interface AppStatePersistenceMetadata {
@@ -11,6 +12,7 @@ export interface AppStatePersistence {
   readonly metadata: AppStatePersistenceMetadata;
   load(): Promise<AppState | null>;
   save(state: AppState): Promise<void>;
+  close?(): Promise<void> | void;
 }
 
 export class FileAppStatePersistence implements AppStatePersistence {
@@ -57,6 +59,7 @@ export interface PostgresSnapshotPersistenceOptions {
   snapshotId?: string;
   tableName?: string;
   autoMigrate?: boolean;
+  close?: () => Promise<void> | void;
 }
 
 interface AppStateSnapshotRow {
@@ -69,6 +72,7 @@ export class PostgresSnapshotAppStatePersistence implements AppStatePersistence 
   private readonly snapshotId: string;
   private readonly tableName: string;
   private readonly autoMigrate: boolean;
+  private readonly closeClient?: () => Promise<void> | void;
   private schemaReady = false;
 
   constructor(options: PostgresSnapshotPersistenceOptions) {
@@ -76,6 +80,7 @@ export class PostgresSnapshotAppStatePersistence implements AppStatePersistence 
     this.snapshotId = options.snapshotId?.trim() || "default";
     this.tableName = quotePostgresIdentifier(options.tableName?.trim() || "gideon_app_state_snapshots");
     this.autoMigrate = options.autoMigrate ?? true;
+    this.closeClient = options.close;
     this.metadata = {
       provider: "postgres_snapshot",
       location: `${this.tableName}:${this.snapshotId}`
@@ -117,6 +122,10 @@ export class PostgresSnapshotAppStatePersistence implements AppStatePersistence 
     );
     this.schemaReady = true;
   }
+
+  async close(): Promise<void> {
+    await this.closeClient?.();
+  }
 }
 
 export function quotePostgresIdentifier(identifier: string): string {
@@ -124,4 +133,55 @@ export function quotePostgresIdentifier(identifier: string): string {
     throw new Error("Postgres snapshot table name must be a simple identifier.");
   }
   return `"${identifier.replace(/"/g, "\"\"")}"`;
+}
+
+export interface PostgresSnapshotPoolPersistenceOptions {
+  connectionString: string;
+  snapshotId?: string;
+  tableName?: string;
+  autoMigrate?: boolean;
+  pool?: Omit<PoolConfig, "connectionString">;
+}
+
+export function createPostgresSnapshotPoolPersistence(
+  options: PostgresSnapshotPoolPersistenceOptions
+): PostgresSnapshotAppStatePersistence {
+  const pool = new Pool({
+    connectionString: options.connectionString,
+    max: 5,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+    ...options.pool
+  });
+  return new PostgresSnapshotAppStatePersistence({
+    snapshotId: options.snapshotId,
+    tableName: options.tableName,
+    autoMigrate: options.autoMigrate,
+    query: async <Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) => {
+      const result = await pool.query(text, values ? [...values] : undefined);
+      return { rows: result.rows as Row[] };
+    },
+    close: async () => {
+      await pool.end();
+    }
+  });
+}
+
+export function createPostgresSnapshotPoolPersistenceFromEnv(
+  env: NodeJS.ProcessEnv = process.env
+): PostgresSnapshotAppStatePersistence {
+  const connectionString = trimEnv(env.GIDEON_DATABASE_URL ?? env.DATABASE_URL);
+  if (!connectionString) {
+    throw new Error("GIDEON_STORE_PROVIDER=postgres_snapshot requires GIDEON_DATABASE_URL or DATABASE_URL.");
+  }
+  return createPostgresSnapshotPoolPersistence({
+    connectionString,
+    snapshotId: trimEnv(env.GIDEON_POSTGRES_SNAPSHOT_ID),
+    tableName: trimEnv(env.GIDEON_POSTGRES_SNAPSHOT_TABLE),
+    autoMigrate: trimEnv(env.GIDEON_POSTGRES_AUTO_MIGRATE) !== "false"
+  });
+}
+
+function trimEnv(value: string | undefined): string | undefined {
+  return value?.trim() || undefined;
 }

@@ -16,8 +16,30 @@ describe("hosted worker process", () => {
       userDataDir: "/tmp/gideon-user-data",
       storePath: "/tmp/gideon-store.json",
       projectsDir: "/tmp/gideon-projects",
-      storageRoot: "/tmp/gideon-storage"
+      storageRoot: "/tmp/gideon-storage",
+      persistence: undefined
     });
+  });
+
+  it("loads PostgreSQL snapshot persistence from environment", async () => {
+    const options = storeOptionsFromEnv({
+      GIDEON_STORE_PROVIDER: "postgres_snapshot",
+      GIDEON_DATABASE_URL: "postgres://gideon:secret@db.example.test:5432/gideon?sslmode=require",
+      GIDEON_POSTGRES_SNAPSHOT_ID: "hosted-prod",
+      GIDEON_POSTGRES_SNAPSHOT_TABLE: "gideon_app_state_snapshots"
+    });
+
+    expect(options.persistence?.metadata).toEqual({
+      provider: "postgres_snapshot",
+      location: '"gideon_app_state_snapshots":hosted-prod'
+    });
+    await options.persistence?.close?.();
+  });
+
+  it("rejects PostgreSQL snapshot persistence without a database URL", () => {
+    expect(() => storeOptionsFromEnv({ GIDEON_STORE_PROVIDER: "postgres_snapshot" })).toThrow(
+      "GIDEON_STORE_PROVIDER=postgres_snapshot requires GIDEON_DATABASE_URL or DATABASE_URL."
+    );
   });
 
   it("creates a configured local-test broker from environment", () => {

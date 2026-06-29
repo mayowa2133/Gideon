@@ -61,12 +61,14 @@
   },
   "dependencies": {
     "bullmq": "^5.79.2",
+    "pg": "^8.22.0",
     "pureimage": "^0.4.18",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",

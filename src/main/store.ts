@@ -2156,6 +2156,10 @@ export class GideonStore {
     return this.options.storageRoot ?? path.join(this.userDataDir(), "private-storage");
   }
 
+  async close(): Promise<void> {
+    await this.persistence?.close?.();
+  }
+
   private async updateProject(projectId: string, updater: (project: Project) => void, options: UpdateProjectOptions = {}): Promise<Project> {
     const state = await this.load();
     const project = state.projects.find((candidate) => candidate.id === projectId);

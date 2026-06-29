@@ -26,6 +26,7 @@ GIDEON_WORKER_HEARTBEAT_INTERVAL_MS=30000
 GIDEON_STORE_PROVIDER=postgres_snapshot
 GIDEON_DATABASE_URL=postgres://...?...sslmode=require
 GIDEON_POSTGRES_SNAPSHOT_TABLE=gideon_app_state_snapshots
+GIDEON_POSTGRES_SNAPSHOT_ID=production
 GIDEON_PROJECTS_DIR=/data/projects
 GIDEON_STORAGE_ROOT=/data/storage
 GIDEON_STORAGE_PROVIDER=s3
@@ -35,7 +36,7 @@ GIDEON_STORAGE_SECRET_ACCESS_KEY=...
 GIDEON_OPENAI_API_KEY=...
 ```
 
-Use `GIDEON_BULLMQ_QUEUE_NAME` and `GIDEON_BULLMQ_PREFIX` to isolate preview, staging, and production queues. Use `GIDEON_STORE_PROVIDER=postgres_snapshot` plus a TLS-enabled PostgreSQL URL for hosted app state, and use private object storage variables from the README for production media/artifacts instead of relying on container-local storage.
+Use `GIDEON_BULLMQ_QUEUE_NAME` and `GIDEON_BULLMQ_PREFIX` to isolate preview, staging, and production queues. Use `GIDEON_STORE_PROVIDER=postgres_snapshot` plus a TLS-enabled PostgreSQL URL for hosted app state; the hosted worker creates a `pg` connection pool, persists app-state snapshots, and closes the pool on worker shutdown. Use private object storage variables from the README for production media/artifacts instead of relying on container-local storage.
 
 ## Preflight
 

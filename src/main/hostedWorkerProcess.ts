@@ -7,6 +7,7 @@ import {
 } from "./hostedWorker";
 import { createGideonJobExecutor, type GideonJobExecutor, type GideonJobExecutorMetricEvent } from "./jobExecutor";
 import { createHostedWorkerExecutorAdapter } from "./jobExecutorAdapter";
+import { createPostgresSnapshotPoolPersistenceFromEnv } from "./persistence";
 import { GideonStore, type GideonStoreOptions, type JobObservabilitySnapshot } from "./store";
 
 export interface HostedWorkerProcessLogger {
@@ -47,7 +48,7 @@ export interface HostedWorkerProcessHandle {
 export function createHostedWorkerProcess(input: HostedWorkerProcessOptions = {}): HostedWorkerProcessHandle {
   const env = input.env ?? process.env;
   const logger = input.logger ?? jsonConsoleLogger;
-  const store = input.store ?? new GideonStore(storeOptionsFromEnv(env));
+  const store = input.store ?? createHostedWorkerStoreFromEnv(env);
   const broker = input.broker ?? createHostedWorkerBrokerFromEnv(env);
   const emitMetric = (event: HostedWorkerProcessMetricEvent): void => {
     input.onMetric?.(event);
@@ -113,6 +114,7 @@ export function createHostedWorkerProcess(input: HostedWorkerProcessOptions = {}
       bootstrap.stop();
       const closeable = broker as HostedWorkerJobBroker & { close?: () => Promise<void> | void };
       await Promise.resolve(closeable.close?.());
+      await store.close();
     }
   };
 }
@@ -135,12 +137,19 @@ export function createHostedWorkerBrokerFromEnv(env: NodeJS.ProcessEnv = process
 }
 
 export function storeOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): GideonStoreOptions {
+  const storeProvider = trimEnv(env.GIDEON_STORE_PROVIDER);
   return {
     userDataDir: trimEnv(env.GIDEON_USER_DATA_DIR),
     storePath: trimEnv(env.GIDEON_STORE_PATH),
     projectsDir: trimEnv(env.GIDEON_PROJECTS_DIR),
-    storageRoot: trimEnv(env.GIDEON_STORAGE_ROOT)
+    storageRoot: trimEnv(env.GIDEON_STORAGE_ROOT),
+    persistence:
+      storeProvider === "postgres_snapshot" ? createPostgresSnapshotPoolPersistenceFromEnv(env) : undefined
   };
+}
+
+export function createHostedWorkerStoreFromEnv(env: NodeJS.ProcessEnv = process.env): GideonStore {
+  return new GideonStore(storeOptionsFromEnv(env));
 }
 
 async function runHostedWorkerCli(): Promise<void> {
