@@ -38,6 +38,14 @@ GIDEON_OPENAI_API_KEY=...
 
 Use `GIDEON_BULLMQ_QUEUE_NAME` and `GIDEON_BULLMQ_PREFIX` to isolate preview, staging, and production queues. Use `GIDEON_STORE_PROVIDER=postgres_snapshot` plus a TLS-enabled PostgreSQL URL for hosted app state; the hosted worker creates a `pg` connection pool, persists app-state snapshots, and closes the pool on worker shutdown. Use private object storage variables from the README for production media/artifacts instead of relying on container-local storage.
 
+Run migrations before starting a worker against a new database:
+
+```bash
+GIDEON_DATABASE_URL=postgres://...?...sslmode=require pnpm db:migrate
+```
+
+The first migration creates relational `gideon_jobs` and `gideon_artifacts` projections used by `src/main/postgresJobArtifactRepository.ts`.
+
 ## Preflight
 
 Run the preflight before starting a deployed worker:

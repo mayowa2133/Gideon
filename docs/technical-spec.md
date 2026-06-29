@@ -503,7 +503,7 @@ Keys are server-generated and never derived from original filenames. Bucket acce
 
 ## Database
 
-PostgreSQL is the source of truth for users/workspaces/projects, versions, job state, object metadata, usage, and audit events. Object storage is the source of truth for large binary/JSON artifacts; database rows store checksum, size, media type, and private key. The current transition path is the `AppStatePersistence` boundary in `src/main/persistence.ts`: local desktop still uses file persistence, while hosted workers can select a `pg`-backed PostgreSQL snapshot adapter via `GIDEON_STORE_PROVIDER=postgres_snapshot` until the full relational repositories and migrations are wired.
+PostgreSQL is the source of truth for users/workspaces/projects, versions, job state, object metadata, usage, and audit events. Object storage is the source of truth for large binary/JSON artifacts; database rows store checksum, size, media type, and private key. The current transition path is the `AppStatePersistence` boundary in `src/main/persistence.ts`: local desktop still uses file persistence, while hosted workers can select a `pg`-backed PostgreSQL snapshot adapter via `GIDEON_STORE_PROVIDER=postgres_snapshot` until the full relational repositories are wired. The first relational migration, `migrations/0001_hosted_jobs_artifacts.sql`, creates `gideon_jobs` and `gideon_artifacts`; `src/main/postgresJobArtifactRepository.ts` writes queryable projections plus full JSONB records for compatibility during the transition.
 
 Key rules:
 
@@ -513,6 +513,7 @@ Key rules:
 - JSONB is for versioned provider/manifest data, not core relational identity/state.
 - UTC timestamptz everywhere.
 - Soft-delete only where recovery/audit requires it; media access checks `deleted_at IS NULL`.
+- Run `pnpm db:migrate` against PostgreSQL deployments after `pnpm worker:hosted:check` passes.
 - Database schema details and draft are in [database-schema.md](./database-schema.md).
 
 ## Authentication and authorization

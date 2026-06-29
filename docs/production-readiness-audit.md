@@ -10,7 +10,7 @@ Gideon is no longer only a local deterministic desktop prototype. The repository
 
 The remaining production gap is narrower and mostly operational: replace local JSON-backed hosted state with production database-backed persistence, run Redis/BullMQ and object storage as managed production services, complete deployment/release operations, and execute a final end-to-end production smoke with real infrastructure. Social posting, scheduling, avatar generation, and voice cloning remain explicit post-MVP items.
 
-Current engineering estimate: **96% complete** toward the full original product vision.
+Current engineering estimate: **97% complete** toward the full original product vision.
 
 ## Capability audit
 
@@ -20,9 +20,9 @@ Current engineering estimate: **96% complete** toward the full original product 
 | Real AI/LLM semantic analysis | Implemented behind provider boundary | `src/main/providers/openai.ts`, `src/main/analysisPipeline.ts`, `src/main/jobExecutor.ts`, and tests in `src/main/providers/openai.test.ts` / `src/main/analysisPipeline.test.ts` validate structured provider parsing, fallback behavior, and executor handoff. | Production canary with real provider credentials, model/cost limits, and prompt/version rollout controls. |
 | Transcription / ASR from recordings | Partially implemented as an adapter boundary | The architecture and roadmap require provider-neutral ASR. Provider config and job boundaries exist, but production ASR is not yet a fully independent hosted worker lane. | Add the production ASR provider implementation, media extraction fixture tests, and worker lane separation for ASR-heavy jobs. |
 | OCR / UI understanding | Partially implemented as evidence model and prompt boundary | `docs/productionization-roadmap.md`, `docs/technical-spec.md`, and analysis pipeline tests document transcript/frame/OCR evidence handling and prompt-injection treatment. | Add production OCR provider or local OCR integration, persist frame-level OCR evidence, and add noisy/prompt-injection OCR fixtures. |
-| Cloud auth, workspaces, teams, RBAC, billing, quotas | Implemented as foundations | `src/main/auth.ts`, `src/shared/rbac.ts`, `src/main/billing.ts`, `src/shared/usage.ts`, `src/main/hostedApi.ts`, and related tests cover roles, hosted API boundaries, billing-session wiring, usage records, and quota foundations. `src/main/persistence.ts` adds a pluggable app-state persistence boundary plus a `pg`-backed PostgreSQL snapshot adapter, and `src/main/hostedWorkerProcess.ts` wires it from `GIDEON_STORE_PROVIDER=postgres_snapshot`. | Complete relational migrations/repositories and billing webhook reconciliation before public paid launch. |
+| Cloud auth, workspaces, teams, RBAC, billing, quotas | Implemented as foundations | `src/main/auth.ts`, `src/shared/rbac.ts`, `src/main/billing.ts`, `src/shared/usage.ts`, `src/main/hostedApi.ts`, and related tests cover roles, hosted API boundaries, billing-session wiring, usage records, and quota foundations. `src/main/persistence.ts` adds a pluggable app-state persistence boundary plus a `pg`-backed PostgreSQL snapshot adapter, `src/main/hostedWorkerProcess.ts` wires it from `GIDEON_STORE_PROVIDER=postgres_snapshot`, and `migrations/0001_hosted_jobs_artifacts.sql` starts the relational hosted schema. | Complete relational repositories for projects, usage, audit, and billing webhook reconciliation before public paid launch. |
 | Direct-to-cloud uploads and private object storage | Implemented as primitives | `src/main/storage.ts`, `src/main/store.ts`, `src/main/hostedApi.ts`, `src/main/storage.test.ts`, and API docs cover direct upload sessions, private artifact records, signed downloads, and non-public storage behavior. | Replace local storage paths with production S3-compatible storage in hosted deployments and complete deletion/lifecycle policies. |
-| Async queues and hosted workers | Implemented through local, memory, HTTP, and BullMQ paths | `src/main/jobQueue.ts`, `src/main/hostedWorker.ts`, `src/main/hostedWorkerProcess.ts`, `src/main/jobExecutorAdapter.ts`, `Dockerfile.hosted-worker`, `docker-compose.hosted-worker.yml`, `scripts/check-hosted-worker-config.mjs`, and `src/main/jobQueue.redis.test.ts` prove the queue, signed intake, leases, heartbeat, recovery, worker process, Redis smoke path, hosted persistence preflight, and PostgreSQL store selection. | Operate managed Redis/BullMQ and PostgreSQL in staging/production, tune concurrency/retention, and add infrastructure-level dashboards. |
+| Async queues and hosted workers | Implemented through local, memory, HTTP, and BullMQ paths | `src/main/jobQueue.ts`, `src/main/hostedWorker.ts`, `src/main/hostedWorkerProcess.ts`, `src/main/jobExecutorAdapter.ts`, `src/main/postgresJobArtifactRepository.ts`, `Dockerfile.hosted-worker`, `docker-compose.hosted-worker.yml`, `scripts/check-hosted-worker-config.mjs`, and `src/main/jobQueue.redis.test.ts` prove the queue, signed intake, leases, heartbeat, recovery, worker process, Redis smoke path, hosted persistence preflight, PostgreSQL store selection, and the first relational jobs/artifacts projections. | Wire the relational jobs/artifacts repository into the live job execution path, operate managed Redis/BullMQ and PostgreSQL in staging/production, tune concurrency/retention, and add infrastructure-level dashboards. |
 | Provider-backed TTS | Implemented behind provider boundary | `src/main/jobExecutor.ts` creates the speech provider through the same provider config as analysis; worker metrics include provider TTS latency/failure. | Production voice selection, provider quota controls, and audio artifact retention policy. |
 | Stage-level retry/cancel jobs | Implemented for the current job model | `src/main/jobQueue.ts`, `src/main/store.ts`, and `src/main/jobQueue.test.ts` cover job states, retryability, canceling, leases, heartbeats, expired lease recovery, and safe failure mapping. | Extend stage-specific worker lanes as ASR/OCR become fully hosted services. |
 | Observability and safe operations | Implemented for hosted workers | `src/main/observability.ts`, `docs/observability-alerts.md`, `docs/hosted-worker-deployment.md`, and worker process tests cover metrics, alert rules, safe summaries, and deployment checks. | Connect emitted metrics to production observability backend and define paging thresholds after staging load tests. |
@@ -68,6 +68,7 @@ GIDEON_STORAGE_SECRET_ACCESS_KEY=storage-secret \
 GIDEON_OPENAI_API_KEY=provider-key \
 pnpm worker:hosted:check
 docker compose -f docker-compose.hosted-worker.yml config
+pnpm db:migrate -- --dry-run
 pnpm package:mac
 pnpm release:mac:check
 hdiutil verify release/Gideon-0.1.0-arm64.dmg
@@ -78,7 +79,7 @@ git diff --check
 
 ## Go-live blockers
 
-1. Production database-backed hosted persistence is partly closed by the pluggable persistence boundary and hosted-worker PostgreSQL snapshot wiring; remaining work is relational migrations/repositories for projects, jobs, usage, audit events, and artifact metadata.
+1. Production database-backed hosted persistence is partly closed by the pluggable persistence boundary, hosted-worker PostgreSQL snapshot wiring, and first jobs/artifacts relational repository; remaining work is wiring that repository into execution plus relational migrations/repositories for projects, usage, audit events, and billing metadata.
 2. Managed Redis/BullMQ operations with production retention, concurrency, retry, and dead-letter policies.
 3. Production object storage credentials, lifecycle/deletion policies, and signed-download smoke tests.
 4. Real provider canary runs for analysis, ASR/OCR where configured, and TTS with cost ceilings.
@@ -87,4 +88,4 @@ git diff --check
 
 ## Next engineering slice
 
-The next slice should add the first relational migration-backed repository for jobs/artifacts while keeping the current store interface and tests intact.
+The next slice should wire the relational jobs/artifacts repository into the live hosted job execution path or add the next relational repository for usage/audit state while keeping desktop and MCP compatibility intact.
