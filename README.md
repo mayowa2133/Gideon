@@ -4,9 +4,9 @@ Gideon is a macOS desktop app that turns a product walkthrough recording into ed
 
 ## Implementation progress
 
-Current engineering estimate: **99% complete** toward the full original product vision.
+Current engineering estimate: **99.5% complete** toward the full original product vision.
 
-This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, hosted analysis/render/export/download/billing-session primitives, Stripe REST session wiring, signed hosted worker-queue enqueue/intake HTTP dispatch boundaries, hosted worker lease/heartbeat/recovery coordination through the store layer, a reusable hosted worker runtime adapter for detached execution, hosted dependency auto-wiring for signed HTTP queues, the in-memory broker-backed queue path, a BullMQ Redis-backed broker with an optional real-Redis smoke gate, separately deployable hosted-worker container configuration, production hardening checks for Redis/BullMQ and worker persistence, macOS release provenance/signing preflight checks, a hosted worker process entrypoint with structured lifecycle/job metrics, persisted job observability snapshots, executable dashboard/alert definitions, a shared real analysis/render job executor adapter used by desktop, hosted worker, and MCP-enqueued analysis/render jobs with analysis, TTS, render, storage, and usage metrics, a pluggable app-state persistence boundary with a `pg`-backed PostgreSQL snapshot adapter selectable in hosted worker runtime configuration, migration-backed PostgreSQL jobs/artifacts and usage/audit repositories plus `pnpm db:migrate`, live relational mirroring of jobs/artifacts/usage/audit from store saves in hosted PostgreSQL mode, and a production-readiness audit that maps original product gaps to current evidence and go-live blockers. Remaining work is mainly deployed Redis/BullMQ/PostgreSQL operations, provider canaries, final release operations, and later non-MVP expansion items.
+This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, hosted analysis/render/export/download/billing-session primitives, Stripe REST session wiring, signed hosted worker-queue enqueue/intake HTTP dispatch boundaries, hosted worker lease/heartbeat/recovery coordination through the store layer, a reusable hosted worker runtime adapter for detached execution, hosted dependency auto-wiring for signed HTTP queues, the in-memory broker-backed queue path, a BullMQ Redis-backed broker with an optional real-Redis smoke gate, separately deployable hosted-worker container configuration, production hardening checks for Redis/BullMQ and worker persistence, macOS release provenance/signing preflight checks, a hosted worker process entrypoint with structured lifecycle/job metrics, persisted job observability snapshots, executable dashboard/alert definitions, a shared real analysis/render job executor adapter used by desktop, hosted worker, and MCP-enqueued analysis/render jobs with analysis, TTS, render, storage, and usage metrics, a pluggable app-state persistence boundary with a `pg`-backed PostgreSQL snapshot adapter selectable in hosted worker runtime configuration, migration-backed PostgreSQL jobs/artifacts and usage/audit repositories plus `pnpm db:migrate`, live relational mirroring of jobs/artifacts/usage/audit from store saves in hosted PostgreSQL mode, a safe provider canary runner for analysis, ASR, OCR, and TTS, and a production-readiness audit that maps original product gaps to current evidence and go-live blockers. Remaining work is mainly deployed Redis/BullMQ/PostgreSQL operations, live provider canary execution with production credentials/media, final release operations, and later non-MVP expansion items.
 
 ## Local development
 
@@ -18,6 +18,7 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm db:migrate -- --dry-run
+pnpm provider:canary -- --dry-run
 pnpm start
 ```
 
@@ -93,6 +94,22 @@ Supported provider variables:
 - `GIDEON_OPENAI_TRANSCRIPTION_MODEL`, default `gpt-4o-transcribe`
 - `GIDEON_OPENAI_TTS_MODEL`, default `gpt-4o-mini-tts`
 - `GIDEON_OPENAI_TTS_VOICE`, default `coral`
+
+Check provider readiness safely without making live calls:
+
+```bash
+pnpm provider:canary -- --dry-run
+```
+
+To run live provider smoke checks, explicitly opt in and provide credentials. ASR and OCR live checks require small staging fixtures:
+
+```bash
+GIDEON_PROVIDER_CANARY_LIVE=true \
+GIDEON_OPENAI_API_KEY=sk-... \
+GIDEON_PROVIDER_CANARY_AUDIO_PATH=/path/to/small.wav \
+GIDEON_PROVIDER_CANARY_IMAGE_PATH=/path/to/screenshot.png \
+pnpm provider:canary -- --live
+```
 
 Provider outputs are treated as untrusted until parsed and validated. If a provider call fails, Gideon records a safe provider-run error and falls back to the local path where possible. Successful provider TTS output is stored as a private `voiceover` artifact before rendering. Completed render MP4s are imported into private storage as `render` artifacts. User exports create private `export` artifacts before copying to the selected destination, so rendered and exported media stay attached to the project and counted against storage quota.
 
