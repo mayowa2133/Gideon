@@ -163,6 +163,7 @@ Create reliable analysis inputs from the source recording: transcript segments, 
    - Use BullMQ or equivalent with explicit job records.
    - Keep hosted enqueue and worker runtime code behind the broker interface so the current in-memory broker can be replaced by Redis/BullMQ without changing API handlers.
    - Run workers through the hosted worker bootstrap so broker subscription, store-backed lease coordination, executor hooks, stop handling, and worker identity settings are centralized.
+   - Reuse the shared `createGideonJobExecutor` analysis/render path from both the desktop queue and hosted worker bootstrap hooks, including jobs enqueued by Codex/Claude Code through MCP.
    - Support retries, cancellation, stale lock recovery, and progress updates.
    - Persist job events for UI and debugging.
 

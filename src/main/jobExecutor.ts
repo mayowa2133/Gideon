@@ -1,0 +1,510 @@
+import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { renderDraft as defaultRenderDraft } from "./media";
+import { runAnalysisPipeline as defaultRunAnalysisPipeline, safeProviderError } from "./analysisPipeline";
+import { createPrivateObjectStorage as defaultCreatePrivateObjectStorage, type PrivateObjectStorage } from "./storage";
+import { loadProviderConfig as defaultLoadProviderConfig, type ProviderConfig } from "./providers/config";
+import { OpenAiProvider } from "./providers/openai";
+import { failJob, startJob, succeedJob, updateJobStage } from "../shared/jobState";
+import type {
+  ArtifactRecord,
+  DetectedMoment,
+  FrameEvidence,
+  JobEvent,
+  JobRecord,
+  JobStage,
+  Project,
+  ProviderRun,
+  RenderedVideo,
+  ScriptDraft,
+  TranscriptArtifact,
+  UsageEvent,
+  UsageMetric
+} from "../shared/types";
+
+type JobEventInput = Omit<JobEvent, "id" | "createdAt" | "projectId"> & { createdAt?: string };
+
+interface AnalysisPipelineResult {
+  moments: DetectedMoment[];
+  transcript?: TranscriptArtifact;
+  analysisSummary?: string;
+  frameEvidence: FrameEvidence[];
+  providerRuns: ProviderRun[];
+}
+
+interface RenderDraftResult {
+  outputPath: string;
+  validation: RenderedVideo["validation"];
+}
+
+interface SpeechProvider {
+  isConfigured(): boolean;
+  synthesizeSpeech(input: { text: string; instructions: string; outputPath: string }): Promise<{
+    outputPath: string;
+    provider: "openai";
+    model: string;
+  }>;
+}
+
+export interface GideonJobExecutorStore {
+  getProject(projectId: string): Promise<Project>;
+  getJob(projectId: string, jobId: string): Promise<JobRecord>;
+  updateJob(projectId: string, job: JobRecord): Promise<Project>;
+  appendJobEvent(projectId: string, input: JobEventInput): Promise<Project>;
+  runAnalysis(
+    projectId: string,
+    enrich: (project: Project, moments: DetectedMoment[]) => Promise<{
+      moments: DetectedMoment[];
+      transcript?: TranscriptArtifact;
+      analysisSummary?: string;
+      frameEvidence?: FrameEvidence[];
+      providerRuns?: ProviderRun[];
+    }>
+  ): Promise<Project>;
+  assertUsageAvailable(projectId: string, metric: UsageMetric, additionalQuantity: number): Promise<void>;
+  recordUsage(projectId: string, input: Omit<UsageEvent, "id" | "workspaceId" | "projectId" | "createdAt"> & { createdAt?: string }): Promise<Project>;
+  finishJobCancel(projectId: string, jobId: string): Promise<Project>;
+  replaceRenders(projectId: string, renders: RenderedVideo[]): Promise<Project>;
+  appendArtifact(projectId: string, artifact: ArtifactRecord): Promise<Project>;
+  appendProviderRuns(projectId: string, providerRuns: ProviderRun[]): Promise<Project>;
+  projectDir(projectId: string): string;
+  storageRoot(): string;
+}
+
+export interface GideonJobExecutor {
+  runAnalysisJob(projectId: string, jobId: string): Promise<Project>;
+  runRenderJob(projectId: string, jobId: string): Promise<Project>;
+}
+
+export interface GideonJobExecutorOptions {
+  store: GideonJobExecutorStore;
+  runAnalysisPipeline?: (project: Project, baseMoments: DetectedMoment[], projectDir: string) => Promise<AnalysisPipelineResult>;
+  renderDraft?: (input: Parameters<typeof defaultRenderDraft>[0]) => Promise<RenderDraftResult>;
+  createPrivateObjectStorage?: (input: { localRootDir: string }) => PrivateObjectStorage;
+  loadProviderConfig?: () => ProviderConfig;
+  createSpeechProvider?: (config: ProviderConfig) => SpeechProvider;
+  statFile?: (filePath: string) => Promise<{ size: number }>;
+  makeId?: () => string;
+  now?: () => string;
+}
+
+export function createGideonJobExecutor(options: GideonJobExecutorOptions): GideonJobExecutor {
+  const store = options.store;
+  const runAnalysisPipeline = options.runAnalysisPipeline ?? defaultRunAnalysisPipeline;
+  const renderDraft = options.renderDraft ?? defaultRenderDraft;
+  const createPrivateObjectStorage = options.createPrivateObjectStorage ?? defaultCreatePrivateObjectStorage;
+  const loadProviderConfig = options.loadProviderConfig ?? defaultLoadProviderConfig;
+  const createSpeechProvider =
+    options.createSpeechProvider ?? ((config: ProviderConfig) => new OpenAiProvider({ config: config.openai }));
+  const statFile = options.statFile ?? ((filePath: string) => fs.stat(filePath));
+  const makeId = options.makeId ?? randomUUID;
+  const now = options.now ?? (() => new Date().toISOString());
+
+  async function runAnalysisJob(projectId: string, jobId: string): Promise<Project> {
+    const project = await store.getProject(projectId);
+    if (!project.recording) {
+      throw new Error("Choose a recording before analysis.");
+    }
+    const providerRunStartCount = project.providerRuns.length;
+    let job = await store.getJob(projectId, jobId);
+    if (job.status === "canceled") {
+      return project;
+    }
+    job = startJob(job, now(), "Analyzing recording evidence.");
+    await store.updateJob(projectId, job);
+    await store.appendJobEvent(projectId, {
+      jobId,
+      kind: "started",
+      stage: "queued",
+      message: "Analysis job started.",
+      progress: job.progress
+    });
+    try {
+      job = await advanceJobStage(projectId, jobId, "quota", 1, 5, "Checking workspace AI and media quotas.");
+      await assertAnalysisQuota(project);
+      if (await finishIfCancelRequested(projectId, jobId)) {
+        return store.getProject(projectId);
+      }
+      job = await advanceJobStage(projectId, jobId, "frame_extraction", 2, 5, "Extracting representative frames.");
+      job = await advanceJobStage(projectId, jobId, "transcription", 3, 5, "Transcribing source audio when configured.");
+      job = await advanceJobStage(projectId, jobId, "ocr", 4, 5, "Reading UI text from extracted frames when configured.");
+      job = await advanceJobStage(projectId, jobId, "semantic_analysis", 5, 5, "Analyzing product flow and moments.");
+      const analyzed = await store.runAnalysis(projectId, (analysisProject, moments) =>
+        runAnalysisPipeline(analysisProject, moments, store.projectDir(projectId))
+      );
+      await store.appendJobEvent(projectId, {
+        jobId,
+        kind: "stage",
+        stage: "usage",
+        message: "Recording provider usage for analysis.",
+        progress: job.progress,
+        metadata: { providerRuns: analyzed.providerRuns.length }
+      });
+      await recordAnalysisUsage(projectId, analyzed, analyzed.providerRuns.slice(providerRunStartCount));
+      if (await finishIfCancelRequested(projectId, jobId)) {
+        return store.getProject(projectId);
+      }
+      job = await store.getJob(projectId, jobId);
+      job = succeedJob(job, now(), "Analysis completed.");
+      await store.appendJobEvent(projectId, {
+        jobId,
+        kind: "succeeded",
+        stage: "finalize",
+        message: "Analysis completed.",
+        progress: job.progress,
+        metadata: { moments: analyzed.moments.length, frameEvidence: analyzed.frameEvidence.length }
+      });
+      return store.updateJob(projectId, job);
+    } catch (error) {
+      return failOrCancelJob(projectId, jobId, error);
+    }
+  }
+
+  async function runRenderJob(projectId: string, jobId: string): Promise<Project> {
+    const project = await store.getProject(projectId);
+    if (!project.recording) {
+      throw new Error("Choose a recording before rendering.");
+    }
+    const selectedConcepts = project.concepts.filter((concept) => concept.selected);
+    const scripts = project.scripts.filter((script) =>
+      selectedConcepts.some((concept) => concept.id === script.conceptId)
+    );
+    if (scripts.length === 0) {
+      throw new Error("Generate scripts before rendering.");
+    }
+    let job = await store.getJob(projectId, jobId);
+    if (job.status === "canceled") {
+      return project;
+    }
+    job = startJob(job, now(), "Rendering selected drafts.");
+    await store.updateJob(projectId, job);
+    await store.appendJobEvent(projectId, {
+      jobId,
+      kind: "started",
+      stage: "queued",
+      message: "Render job started.",
+      progress: job.progress
+    });
+    const renders: RenderedVideo[] = [];
+    let reservedRenderStorageBytes = 0;
+    try {
+      job = await advanceJobStage(projectId, jobId, "quota", 1, scripts.length + 3, "Checking render quota.");
+      await store.assertUsageAvailable(projectId, "render_minutes", scripts.length);
+      const scriptsToRender = scripts.slice(0, 3);
+      for (const [index, script] of scriptsToRender.entries()) {
+        if (await finishIfCancelRequested(projectId, jobId)) {
+          return store.getProject(projectId);
+        }
+        const concept = project.concepts.find((candidate) => candidate.id === script.conceptId);
+        const moment = concept?.proofMomentIds
+          .map((momentId) => project.moments.find((candidate) => candidate.id === momentId))
+          .find(Boolean);
+        const createdAt = now();
+        job = await advanceJobStage(
+          projectId,
+          jobId,
+          "tts",
+          index + 2,
+          scriptsToRender.length + 3,
+          `Generating voiceover for draft ${index + 1}/${scriptsToRender.length}.`
+        );
+        const voiceoverPath = await createProviderVoiceover(projectId, script);
+        if (await finishIfCancelRequested(projectId, jobId)) {
+          return store.getProject(projectId);
+        }
+        try {
+          job = await advanceJobStage(
+            projectId,
+            jobId,
+            "render",
+            index + 3,
+            scriptsToRender.length + 3,
+            `Rendering draft ${index + 1}/${scriptsToRender.length}.`
+          );
+          const renderId = makeId();
+          const rendered = await renderDraft({
+            projectId,
+            projectDir: store.projectDir(projectId),
+            profile: project.profile,
+            recording: project.recording,
+            script,
+            moment,
+            title: concept?.title ?? script.hook,
+            voiceoverPath: voiceoverPath ?? undefined
+          });
+          const output = await statFile(rendered.outputPath);
+          await store.assertUsageAvailable(projectId, "storage_bytes", reservedRenderStorageBytes + output.size);
+          const stored = await createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
+            workspaceId: project.workspaceId,
+            projectId,
+            kind: "render",
+            sourcePath: rendered.outputPath,
+            originalFileName: `${renderId}.mp4`,
+            contentType: "video/mp4"
+          });
+          await store.appendArtifact(projectId, stored.artifact);
+          reservedRenderStorageBytes += stored.artifact.byteSize;
+          renders.push({
+            id: renderId,
+            scriptId: script.id,
+            title: concept?.title ?? script.hook,
+            status: "completed",
+            outputPath: stored.filePath,
+            outputUrl: stored.fileUrl,
+            artifactId: stored.artifact.id,
+            storageKey: stored.artifact.storageKey,
+            sha256: stored.artifact.sha256,
+            sizeBytes: stored.artifact.byteSize,
+            validation: rendered.validation,
+            createdAt
+          });
+        } catch (error) {
+          renders.push({
+            id: makeId(),
+            scriptId: script.id,
+            title: concept?.title ?? script.hook,
+            status: "failed",
+            error: error instanceof Error ? error.message : "Render failed.",
+            createdAt
+          });
+        }
+      }
+      if (await finishIfCancelRequested(projectId, jobId)) {
+        return store.getProject(projectId);
+      }
+      job = await advanceJobStage(projectId, jobId, "finalize", scriptsToRender.length + 2, scriptsToRender.length + 3, "Saving render outputs.");
+      await store.replaceRenders(projectId, renders);
+      await store.appendJobEvent(projectId, {
+        jobId,
+        kind: "stage",
+        stage: "usage",
+        message: "Recording render usage.",
+        progress: job.progress,
+        metadata: { renders: renders.length }
+      });
+      await recordRenderUsage(projectId, renders);
+      job = await store.getJob(projectId, jobId);
+      job = renders.some((render) => render.status === "failed")
+        ? failJob(job, now(), "One or more render drafts failed.")
+        : succeedJob(job, now(), "Rendering completed.");
+      await store.appendJobEvent(projectId, {
+        jobId,
+        kind: job.status === "failed" ? "failed" : "succeeded",
+        stage: "finalize",
+        message: job.userMessage,
+        progress: job.progress,
+        metadata: {
+          completed: renders.filter((render) => render.status === "completed").length,
+          failed: renders.filter((render) => render.status === "failed").length
+        }
+      });
+      return store.updateJob(projectId, job);
+    } catch (error) {
+      return failOrCancelJob(projectId, jobId, error);
+    }
+  }
+
+  async function advanceJobStage(
+    projectId: string,
+    jobId: string,
+    stage: JobStage,
+    current: number,
+    total: number,
+    message: string
+  ): Promise<JobRecord> {
+    let job = await store.getJob(projectId, jobId);
+    job = updateJobStage(job, stage, { current, total, unit: "stage" }, now(), message);
+    await store.updateJob(projectId, job);
+    await store.appendJobEvent(projectId, {
+      jobId,
+      kind: "stage",
+      stage,
+      message,
+      progress: job.progress
+    });
+    return job;
+  }
+
+  async function finishIfCancelRequested(projectId: string, jobId: string): Promise<boolean> {
+    const job = await store.getJob(projectId, jobId);
+    if (job.status !== "canceling") {
+      return false;
+    }
+    await store.finishJobCancel(projectId, jobId);
+    return true;
+  }
+
+  async function failOrCancelJob(projectId: string, jobId: string, error: unknown): Promise<Project> {
+    const latest = await store.getJob(projectId, jobId);
+    if (latest.status === "canceling") {
+      return store.finishJobCancel(projectId, jobId);
+    }
+    const failed = failJob(latest, now(), safeProviderError(error));
+    await store.appendJobEvent(projectId, {
+      jobId,
+      kind: "failed",
+      stage: "finalize",
+      message: failed.safeError ?? "Job failed.",
+      progress: failed.progress,
+      metadata: { retryable: failed.retryable }
+    });
+    return store.updateJob(projectId, failed);
+  }
+
+  async function createProviderVoiceover(projectId: string, script: ScriptDraft): Promise<string | null> {
+    const config = loadProviderConfig();
+    const provider = createSpeechProvider(config);
+    if (!provider.isConfigured()) {
+      return null;
+    }
+    const startedAt = now();
+    const outputPath = path.join(store.projectDir(projectId), "voiceovers", `${script.id}.wav`);
+    try {
+      await store.assertUsageAvailable(projectId, "tts_characters", script.voiceoverText.length);
+      await fs.mkdir(path.dirname(outputPath), { recursive: true });
+      const result = await provider.synthesizeSpeech({
+        text: script.voiceoverText,
+        instructions: "Speak in a clear product demo voice. Keep pacing natural and concise.",
+        outputPath
+      });
+      const project = await store.getProject(projectId);
+      const synthesized = await statFile(result.outputPath);
+      await store.assertUsageAvailable(projectId, "storage_bytes", synthesized.size);
+      const stored = await createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
+        workspaceId: project.workspaceId,
+        projectId,
+        kind: "voiceover",
+        sourcePath: result.outputPath,
+        originalFileName: `${script.id}.wav`,
+        contentType: "audio/wav"
+      });
+      await store.appendArtifact(projectId, stored.artifact);
+      await store.appendProviderRuns(projectId, [
+        {
+          id: makeId(),
+          kind: "tts",
+          provider: "openai",
+          model: result.model,
+          status: "completed",
+          startedAt,
+          finishedAt: now()
+        }
+      ]);
+      await store.recordUsage(projectId, {
+        metric: "tts_characters",
+        quantity: script.voiceoverText.length,
+        unit: "character",
+        source: "tts",
+        idempotencyKey: `tts:${projectId}:${script.id}:${startedAt}`
+      });
+      await store.recordUsage(projectId, {
+        metric: "storage_bytes",
+        quantity: stored.artifact.byteSize,
+        unit: "byte",
+        source: "tts",
+        idempotencyKey: `tts:${projectId}:${stored.artifact.id}:storage_bytes`
+      });
+      return stored.filePath;
+    } catch (error) {
+      await store.appendProviderRuns(projectId, [
+        {
+          id: makeId(),
+          kind: "tts",
+          provider: "openai",
+          model: config.openai.ttsModel,
+          status: "failed",
+          startedAt,
+          finishedAt: now(),
+          error: safeProviderError(error)
+        }
+      ]);
+      return null;
+    }
+  }
+
+  async function assertAnalysisQuota(project: Project): Promise<void> {
+    const config = loadProviderConfig();
+    if (!config.openai.apiKey || !project.recording) {
+      return;
+    }
+    const estimatedLlmRuns = 1 + 4;
+    await store.assertUsageAvailable(project.id, "llm_runs", estimatedLlmRuns);
+    if (project.recording.hasAudio) {
+      await store.assertUsageAvailable(project.id, "transcription_minutes", minutesForDuration(project.recording.durationMs));
+    }
+  }
+
+  async function recordAnalysisUsage(projectId: string, project: Project, providerRuns: ProviderRun[]): Promise<void> {
+    const completedTranscription = providerRuns.some(
+      (run) => run.kind === "transcription" && run.provider === "openai" && run.status === "completed"
+    );
+    if (completedTranscription && project.recording) {
+      const quantity = minutesForDuration(project.recording.durationMs);
+      await store.recordUsage(projectId, {
+        metric: "transcription_minutes",
+        quantity,
+        unit: "minute",
+        source: "transcription",
+        idempotencyKey: `transcription:${projectId}:${project.transcript?.id ?? providerRuns[0]?.id}`
+      });
+    }
+
+    const completedAnalysisRuns = providerRuns.filter(
+      (run) => run.kind === "analysis" && run.provider === "openai" && run.status === "completed"
+    ).length;
+    if (completedAnalysisRuns > 0) {
+      await store.recordUsage(projectId, {
+        metric: "llm_runs",
+        quantity: completedAnalysisRuns,
+        unit: "count",
+        source: "analysis",
+        idempotencyKey: `analysis:${projectId}:${providerRuns.find((run) => run.kind === "analysis")?.id ?? makeId()}`
+      });
+    }
+
+    const completedOcrFrames = project.frameEvidence.filter((frame) => frame.ocrProvider === "openai").length;
+    if (completedOcrFrames > 0) {
+      await store.recordUsage(projectId, {
+        metric: "llm_runs",
+        quantity: completedOcrFrames,
+        unit: "count",
+        source: "ocr",
+        idempotencyKey: `ocr:${projectId}:${providerRuns.find((run) => run.kind === "ocr")?.id ?? makeId()}`
+      });
+    }
+  }
+
+  async function recordRenderUsage(projectId: string, renders: RenderedVideo[]): Promise<void> {
+    for (const render of renders) {
+      if (render.status !== "completed" || !render.validation) {
+        continue;
+      }
+      await store.recordUsage(projectId, {
+        metric: "render_minutes",
+        quantity: minutesForDuration(render.validation.durationMs),
+        unit: "minute",
+        source: "render",
+        idempotencyKey: `render:${projectId}:${render.id}`
+      });
+      if (render.artifactId && render.sizeBytes) {
+        await store.recordUsage(projectId, {
+          metric: "storage_bytes",
+          quantity: render.sizeBytes,
+          unit: "byte",
+          source: "render",
+          idempotencyKey: `render:${projectId}:${render.artifactId}:storage_bytes`
+        });
+      }
+    }
+  }
+
+  return {
+    runAnalysisJob,
+    runRenderJob
+  };
+}
+
+export function minutesForDuration(durationMs: number): number {
+  return Math.max(1, Math.ceil(durationMs / 60_000));
+}

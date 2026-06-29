@@ -1,6 +1,6 @@
 # Gideon productionization roadmap
 
-Last updated: 2026-06-25
+Last updated: 2026-06-29
 
 This roadmap turns the current downloadable macOS MVP into the fuller Gideon product described by the PRD. The current app already packages and downloads on macOS, accepts local walkthrough videos, generates deterministic moments/concepts/scripts, and renders captioned vertical MP4 drafts. The remaining work is to replace deterministic/local-only pieces with real provider-backed analysis, transcription, storage, jobs, auth, workspaces, operational controls, and an MCP control plane that lets tools like Codex or Claude Code inspect and edit Gideon projects without requiring Gideon to hold LLM API keys.
 
@@ -135,7 +135,7 @@ Implement in vertical slices that keep the app usable after each commit:
 ### Scope
 
 - Move heavy media, ASR, AI, TTS, and render work to worker processes.
-- Extend the signed hosted HTTP queue handoff, intake HTTP handler, dispatcher, hosted runtime adapter, worker bootstrap, broker interface, and store-backed lease/heartbeat coordinator into a durable Redis/BullMQ or equivalent backend.
+- Extend the signed hosted HTTP queue handoff, intake HTTP handler, dispatcher, hosted runtime adapter, worker bootstrap, broker interface, shared analysis/render job executor, and store-backed lease/heartbeat coordinator into a durable Redis/BullMQ or equivalent backend.
 - Add idempotency keys, concurrency limits, job leases, and stale-lock recovery.
 - Add structured logs, metrics, and safe error reporting.
 
@@ -190,10 +190,10 @@ These remain out of the core productionization path until the evidence-to-render
 
 ## Current next slice
 
-The next implementation slice is Milestone 1:
+The next implementation slice is Milestone 5:
 
-1. Add provider interfaces and configuration.
-2. Add OpenAI-compatible adapters using current official API shapes.
-3. Persist transcript/provider metadata.
-4. Use provider TTS when available.
+1. Replace the in-memory broker with a Redis/BullMQ-compatible broker implementation.
+2. Connect hosted worker bootstrap configuration to the durable broker.
+3. Preserve the shared `createGideonJobExecutor` path for desktop, hosted worker, and MCP-enqueued analysis/render jobs.
+4. Add observability hooks for queue depth, lease recovery, and terminal job failures.
 5. Add tests and push to `main`.
