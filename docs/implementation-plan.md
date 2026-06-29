@@ -162,6 +162,7 @@ Create reliable analysis inputs from the source recording: transcript segments, 
 1. Add media processing queue.
    - Use BullMQ or equivalent with explicit job records.
    - Keep hosted enqueue and worker runtime code behind the broker interface so the current in-memory broker can be replaced by Redis/BullMQ without changing API handlers.
+   - Run workers through the hosted worker bootstrap so broker subscription, store-backed lease coordination, executor hooks, stop handling, and worker identity settings are centralized.
    - Support retries, cancellation, stale lock recovery, and progress updates.
    - Persist job events for UI and debugging.
 
