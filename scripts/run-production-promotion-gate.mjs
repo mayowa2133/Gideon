@@ -10,6 +10,9 @@ const dryRun = args.has("--dry-run") || !live;
 const skipPackage = args.has("--skip-package");
 const pnpm = process.env.GIDEON_PNPM_BIN?.trim() || "pnpm";
 const releaseDmg = path.join("release", "Gideon-0.1.0-arm64.dmg");
+const evidencePath =
+  process.env.GIDEON_PRODUCTION_PROMOTION_EVIDENCE_PATH?.trim() ||
+  path.join("tmp", "production-promotion-evidence.json");
 
 const steps = [
   step("local production readiness gate", [pnpm, "production:check"]),
@@ -36,6 +39,7 @@ if (dryRun) {
     const envPrefix = Object.keys(item.env ?? {}).length > 0 ? `${formatEnv(item.env)} ` : "";
     console.log(`${index + 1}. ${item.name}: ${envPrefix}${item.command.join(" ")}`);
   });
+  console.log(`Live evidence report path: ${evidencePath}`);
   console.log("Set GIDEON_PRODUCTION_PROMOTION_LIVE=true or pass --live to execute against staging/release infrastructure.");
   process.exit(0);
 }
@@ -45,8 +49,29 @@ if (!live) {
   process.exit(1);
 }
 
+const evidence = createEvidenceSkeleton();
+
 for (const item of steps) {
+  const startedAt = new Date();
+  const evidenceStep = {
+    name: item.name,
+    command: item.command,
+    env: safeEnv(item.env),
+    startedAt: startedAt.toISOString(),
+    finishedAt: null,
+    durationMs: null,
+    status: "running",
+    exitCode: null,
+    error: null
+  };
+  evidence.steps.push(evidenceStep);
+
   if (item.requireFile && !fs.existsSync(item.requireFile)) {
+    finishEvidenceStep(evidenceStep, startedAt, "failed", 1, `Missing required file: ${item.requireFile}`);
+    evidence.status = "failed";
+    evidence.failedStep = item.name;
+    evidence.finishedAt = new Date().toISOString();
+    writeEvidence(evidence);
     console.error(`Production promotion gate failed at step: ${item.name}`);
     console.error(`Missing required file: ${item.requireFile}`);
     process.exit(1);
@@ -59,12 +84,22 @@ for (const item of steps) {
     stdio: "inherit"
   });
   if (result.status !== 0) {
+    finishEvidenceStep(evidenceStep, startedAt, "failed", result.status ?? 1, "Command exited with non-zero status.");
+    evidence.status = "failed";
+    evidence.failedStep = item.name;
+    evidence.finishedAt = new Date().toISOString();
+    writeEvidence(evidence);
     console.error(`Production promotion gate failed at step: ${item.name}`);
     process.exit(result.status ?? 1);
   }
+  finishEvidenceStep(evidenceStep, startedAt, "succeeded", 0, null);
 }
 
+evidence.status = "succeeded";
+evidence.finishedAt = new Date().toISOString();
+writeEvidence(evidence);
 console.log("Production promotion gate passed.");
+console.log(`Production promotion evidence written to ${evidencePath}.`);
 
 function step(name, command, env, options = {}) {
   return {
@@ -79,4 +114,50 @@ function formatEnv(env) {
   return Object.entries(env)
     .map(([key, value]) => `${key}=${value}`)
     .join(" ");
+}
+
+function createEvidenceSkeleton() {
+  return {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    finishedAt: null,
+    status: "running",
+    failedStep: null,
+    mode: "live",
+    skipPackage,
+    gitCommit: currentGitCommit(),
+    steps: [],
+    safety: {
+      secretPolicy:
+        "Commands, step names, exit codes, safe env overrides, and timings are recorded. Process environment, cookies, API keys, signed URLs, provider payloads, transcripts, prompts, and media paths are not recorded."
+    }
+  };
+}
+
+function finishEvidenceStep(evidenceStep, startedAt, status, exitCode, error) {
+  const finishedAt = new Date();
+  evidenceStep.finishedAt = finishedAt.toISOString();
+  evidenceStep.durationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime());
+  evidenceStep.status = status;
+  evidenceStep.exitCode = exitCode;
+  evidenceStep.error = error;
+}
+
+function safeEnv(env) {
+  return Object.fromEntries(
+    Object.entries(env ?? {}).filter(([key]) => key === "GIDEON_RELEASE_CHANNEL")
+  );
+}
+
+function currentGitCommit() {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
+function writeEvidence(evidence) {
+  fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
+  fs.writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
 }

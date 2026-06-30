@@ -194,4 +194,4 @@ The next implementation slice is Milestone 5 production operations:
 
 1. Run `pnpm production:check`, then run `pnpm production:promote:check -- --live` against staging credentials, small ASR/OCR fixtures, and Apple signing credentials.
 2. Keep the existing provider/store interfaces intact so desktop, hosted worker, and MCP paths continue sharing the same execution boundaries.
-3. Run the live production promotion gate with staging upload-to-export, hosted MCP smoke, deployed metric export, and signed/notarized release credentials before removing snapshot reads entirely.
+3. Run the live production promotion gate with staging upload-to-export, hosted MCP smoke, deployed metric export, signed/notarized release credentials, and archived promotion evidence before removing snapshot reads entirely.
