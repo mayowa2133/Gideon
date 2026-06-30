@@ -109,6 +109,7 @@ export interface GideonStoreOptions {
   storageRoot?: string;
   persistence?: AppStatePersistence;
   relationalMirror?: GideonRelationalMirror;
+  relationalReads?: GideonRelationalReads;
   relationalQueueName?: string;
 }
 
@@ -124,6 +125,14 @@ export interface GideonRelationalMirror {
   upsertArtifact(artifact: ArtifactRecord): Promise<ArtifactRecord> | ArtifactRecord;
   upsertUsageEvent?(event: UsageEvent): Promise<UsageEvent> | UsageEvent;
   upsertAuditEvent?(event: AuditEvent): Promise<AuditEvent> | AuditEvent;
+  close?(): Promise<void> | void;
+}
+
+export interface GideonRelationalReads {
+  listWorkspaceProjects?(input: { workspaceId: string; limit?: number }): Promise<Project[]> | Project[];
+  getProject?(input: { workspaceId: string; projectId: string }): Promise<Project | null> | Project | null;
+  getJob?(input: { workspaceId: string; jobId: string }): Promise<JobRecord | null> | JobRecord | null;
+  getArtifact?(input: { workspaceId: string; artifactId: string }): Promise<ArtifactRecord | null> | ArtifactRecord | null;
   close?(): Promise<void> | void;
 }
 
@@ -570,6 +579,9 @@ export class GideonStore {
       userId: input.userId,
       action: "project:read"
     });
+    if (this.options.relationalReads?.listWorkspaceProjects) {
+      return await this.options.relationalReads.listWorkspaceProjects({ workspaceId: input.workspaceId });
+    }
     return state.projects.filter((project) => project.workspaceId === input.workspaceId);
   }
 
@@ -582,6 +594,16 @@ export class GideonStore {
       userId: input.userId,
       action: "project:read"
     });
+    if (this.options.relationalReads?.getProject) {
+      const project = await this.options.relationalReads.getProject({
+        workspaceId: input.workspaceId,
+        projectId: input.projectId
+      });
+      if (!project) {
+        throw new Error("Project not found.");
+      }
+      return project;
+    }
     const project = state.projects.find(
       (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
     );
@@ -1364,6 +1386,23 @@ export class GideonStore {
       userId: input.userId,
       action: "project:read"
     });
+    if (this.options.relationalReads?.getArtifact && this.options.relationalReads.getProject) {
+      const project = await this.options.relationalReads.getProject({
+        workspaceId: input.workspaceId,
+        projectId: input.projectId
+      });
+      if (!project) {
+        throw new Error("Project not found.");
+      }
+      const artifact = await this.options.relationalReads.getArtifact({
+        workspaceId: input.workspaceId,
+        artifactId: input.exportId
+      });
+      if (!artifact || artifact.projectId !== input.projectId || artifact.kind !== "export") {
+        throw new Error("Export artifact not found.");
+      }
+      return artifact;
+    }
     const project = state.projects.find(
       (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
     );
@@ -1887,6 +1926,20 @@ export class GideonStore {
       userId: input.userId,
       action: "project:read"
     });
+    if (this.options.relationalReads?.getJob && this.options.relationalReads.getProject) {
+      const job = await this.options.relationalReads.getJob({ workspaceId: input.workspaceId, jobId: input.jobId });
+      if (!job) {
+        throw new Error("Job not found.");
+      }
+      const project = await this.options.relationalReads.getProject({
+        workspaceId: input.workspaceId,
+        projectId: job.projectId
+      });
+      if (!project) {
+        throw new Error("Project not found.");
+      }
+      return { project, job };
+    }
     return this.findJobInWorkspace(state, input.workspaceId, input.jobId);
   }
 
@@ -2177,6 +2230,9 @@ export class GideonStore {
   async close(): Promise<void> {
     await this.persistence?.close?.();
     await this.options.relationalMirror?.close?.();
+    if (this.options.relationalReads && this.options.relationalReads !== this.options.relationalMirror) {
+      await this.options.relationalReads.close?.();
+    }
   }
 
   private async updateProject(projectId: string, updater: (project: Project) => void, options: UpdateProjectOptions = {}): Promise<Project> {

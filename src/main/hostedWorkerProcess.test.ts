@@ -39,6 +39,11 @@ describe("hosted worker process", () => {
     expect(options.relationalMirror?.upsertProject).toBeDefined();
     expect(options.relationalMirror?.upsertUsageEvent).toBeDefined();
     expect(options.relationalMirror?.upsertAuditEvent).toBeDefined();
+    expect(options.relationalReads).toBeDefined();
+    expect(options.relationalReads?.listWorkspaceProjects).toBeDefined();
+    expect(options.relationalReads?.getProject).toBeDefined();
+    expect(options.relationalReads?.getJob).toBeDefined();
+    expect(options.relationalReads?.getArtifact).toBeDefined();
     await options.persistence?.close?.();
     await options.relationalMirror?.close?.();
   });
@@ -52,6 +57,7 @@ describe("hosted worker process", () => {
 
     expect(options.persistence?.metadata.provider).toBe("postgres_snapshot");
     expect(options.relationalMirror).toBeUndefined();
+    expect(options.relationalReads).toBeUndefined();
     await options.persistence?.close?.();
   });
 

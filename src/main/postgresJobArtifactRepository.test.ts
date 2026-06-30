@@ -49,6 +49,18 @@ describe("PostgresJobArtifactRepository", () => {
     expect(calls[0]?.values).toEqual(["workspace-1", "project-1", 200]);
   });
 
+  it("reads jobs by workspace scope", async () => {
+    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const job = createJob();
+    const repository = new PostgresJobArtifactRepository(createQuery(calls, job));
+
+    const fetched = await repository.getJob({ workspaceId: "workspace-1", jobId: "job-1" });
+
+    expect(fetched).toEqual(job);
+    expect(calls[0]?.text).toContain("where workspace_id = $1 and id = $2");
+    expect(calls[0]?.values).toEqual(["workspace-1", "job-1"]);
+  });
+
   it("upserts artifacts into queryable object-storage columns", async () => {
     const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
     const artifact = createArtifact();
@@ -67,6 +79,18 @@ describe("PostgresJobArtifactRepository", () => {
       "private/workspace-1/project-1/render.mp4",
       "video/mp4"
     ]);
+  });
+
+  it("reads artifacts by workspace scope", async () => {
+    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const artifact = createArtifact({ id: "export-1", kind: "export" });
+    const repository = new PostgresJobArtifactRepository(createQuery(calls, artifact));
+
+    const fetched = await repository.getArtifact({ workspaceId: "workspace-1", artifactId: "export-1" });
+
+    expect(fetched).toEqual(artifact);
+    expect(calls[0]?.text).toContain("where workspace_id = $1 and id = $2");
+    expect(calls[0]?.values).toEqual(["workspace-1", "export-1"]);
   });
 
   it("keeps the migration focused on jobs and artifacts", async () => {
@@ -116,7 +140,7 @@ function createJob(): JobRecord {
   };
 }
 
-function createArtifact(): ArtifactRecord {
+function createArtifact(overrides: Partial<ArtifactRecord> = {}): ArtifactRecord {
   return {
     id: "artifact-1",
     workspaceId: "workspace-1",
@@ -128,6 +152,7 @@ function createArtifact(): ArtifactRecord {
     byteSize: 1024,
     sha256: "a".repeat(64),
     originalFileName: "render.mp4",
-    createdAt: "2026-06-29T12:02:00.000Z"
+    createdAt: "2026-06-29T12:02:00.000Z",
+    ...overrides
   };
 }

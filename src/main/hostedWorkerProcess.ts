@@ -11,7 +11,13 @@ import { createPostgresSnapshotPoolPersistenceFromEnv } from "./persistence";
 import { createPostgresCoreRepositoryFromEnv } from "./postgresCoreRepository";
 import { createPostgresJobArtifactRepositoryFromEnv } from "./postgresJobArtifactRepository";
 import { createPostgresUsageAuditRepositoryFromEnv } from "./postgresUsageAuditRepository";
-import { GideonStore, type GideonRelationalMirror, type GideonStoreOptions, type JobObservabilitySnapshot } from "./store";
+import {
+  GideonStore,
+  type GideonRelationalMirror,
+  type GideonRelationalReads,
+  type GideonStoreOptions,
+  type JobObservabilitySnapshot
+} from "./store";
 
 export interface HostedWorkerProcessLogger {
   info(input: unknown): void;
@@ -142,17 +148,20 @@ export function createHostedWorkerBrokerFromEnv(env: NodeJS.ProcessEnv = process
 export function storeOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): GideonStoreOptions {
   const storeProvider = trimEnv(env.GIDEON_STORE_PROVIDER);
   const relationalMirrorEnabled = trimEnv(env.GIDEON_RELATIONAL_MIRROR) !== "false";
+  const persistence =
+    storeProvider === "postgres_snapshot" ? createPostgresSnapshotPoolPersistenceFromEnv(env) : undefined;
+  const relationalStore =
+    storeProvider === "postgres_snapshot" && relationalMirrorEnabled
+      ? createHostedPostgresRelationalStoreFromEnv(env)
+      : undefined;
   return {
     userDataDir: trimEnv(env.GIDEON_USER_DATA_DIR),
     storePath: trimEnv(env.GIDEON_STORE_PATH),
     projectsDir: trimEnv(env.GIDEON_PROJECTS_DIR),
     storageRoot: trimEnv(env.GIDEON_STORAGE_ROOT),
-    persistence:
-      storeProvider === "postgres_snapshot" ? createPostgresSnapshotPoolPersistenceFromEnv(env) : undefined,
-    relationalMirror:
-      storeProvider === "postgres_snapshot" && relationalMirrorEnabled
-        ? createHostedPostgresRelationalMirrorFromEnv(env)
-        : undefined,
+    persistence,
+    relationalMirror: relationalStore,
+    relationalReads: relationalStore,
     relationalQueueName: trimEnv(env.GIDEON_BULLMQ_QUEUE_NAME ?? env.GIDEON_WORKER_QUEUE_NAME)
   };
 }
@@ -162,10 +171,20 @@ export function createHostedWorkerStoreFromEnv(env: NodeJS.ProcessEnv = process.
 }
 
 export function createHostedPostgresRelationalMirrorFromEnv(env: NodeJS.ProcessEnv = process.env): GideonRelationalMirror {
+  return createHostedPostgresRelationalStoreFromEnv(env);
+}
+
+export function createHostedPostgresRelationalStoreFromEnv(
+  env: NodeJS.ProcessEnv = process.env
+): GideonRelationalMirror & GideonRelationalReads {
   const core = createPostgresCoreRepositoryFromEnv(env);
   const jobsArtifacts = createPostgresJobArtifactRepositoryFromEnv(env);
   const usageAudit = createPostgresUsageAuditRepositoryFromEnv(env);
   return {
+    listWorkspaceProjects: (input) => core.listWorkspaceProjects(input),
+    getProject: (input) => core.getProject(input),
+    getJob: (input) => jobsArtifacts.getJob(input),
+    getArtifact: (input) => jobsArtifacts.getArtifact(input),
     upsertUser: (user) => core.upsertUser(user),
     upsertWorkspace: (workspace) => core.upsertWorkspace(workspace),
     upsertWorkspaceMember: (member) => core.upsertWorkspaceMember(member),

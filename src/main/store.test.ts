@@ -669,6 +669,118 @@ describe("GideonStore billing reconciliation", () => {
   });
 });
 
+describe("GideonStore relational read paths", () => {
+  beforeEach(async () => {
+    electronMock.userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-store-test-"));
+  });
+
+  it("uses relational project reads after hosted session authorization", async () => {
+    const state = { ...createLocalUserWorkspace(), usageEvents: [], auditEvents: [], projects: [], activeProjectId: null };
+    const relationalProject = createRelationalProject();
+    const store = new GideonStore({
+      persistence: memoryPersistence(state),
+      relationalReads: {
+        listWorkspaceProjects(input) {
+          expect(input).toEqual({ workspaceId: DEFAULT_LOCAL_WORKSPACE_ID });
+          return [relationalProject];
+        },
+        getProject(input) {
+          expect(input).toEqual({ workspaceId: DEFAULT_LOCAL_WORKSPACE_ID, projectId: "project-relational-1" });
+          return relationalProject;
+        }
+      }
+    });
+
+    const projects = await store.listProjectsForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID
+    });
+    const project = await store.getProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: "project-relational-1"
+    });
+
+    expect(projects).toEqual([relationalProject]);
+    expect(project.id).toBe("project-relational-1");
+  });
+
+  it("uses relational job and export artifact reads for hosted API lookups", async () => {
+    const state = { ...createLocalUserWorkspace(), usageEvents: [], auditEvents: [], projects: [], activeProjectId: null };
+    const relationalProject = createRelationalProject();
+    const relationalJob = createJob({
+      id: "job-relational-1",
+      projectId: relationalProject.id,
+      kind: "analysis",
+      now: "2026-06-29T12:00:00.000Z"
+    });
+    const exportArtifact = exportArtifactFixture({
+      id: "export-relational-1",
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: relationalProject.id
+    });
+    const store = new GideonStore({
+      persistence: memoryPersistence(state),
+      relationalReads: {
+        getProject(input) {
+          expect(input.workspaceId).toBe(DEFAULT_LOCAL_WORKSPACE_ID);
+          expect(input.projectId).toBe(relationalProject.id);
+          return relationalProject;
+        },
+        getJob(input) {
+          expect(input).toEqual({ workspaceId: DEFAULT_LOCAL_WORKSPACE_ID, jobId: "job-relational-1" });
+          return relationalJob;
+        },
+        getArtifact(input) {
+          expect(input).toEqual({ workspaceId: DEFAULT_LOCAL_WORKSPACE_ID, artifactId: "export-relational-1" });
+          return exportArtifact;
+        }
+      }
+    });
+
+    const fetchedJob = await store.getJobForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      jobId: "job-relational-1"
+    });
+    const fetchedExport = await store.getExportArtifactForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: relationalProject.id,
+      exportId: "export-relational-1"
+    });
+
+    expect(fetchedJob).toEqual({ project: relationalProject, job: relationalJob });
+    expect(fetchedExport).toBe(exportArtifact);
+  });
+
+  it("rejects relational export artifacts that do not belong to the requested project", async () => {
+    const state = { ...createLocalUserWorkspace(), usageEvents: [], auditEvents: [], projects: [], activeProjectId: null };
+    const relationalProject = createRelationalProject();
+    const store = new GideonStore({
+      persistence: memoryPersistence(state),
+      relationalReads: {
+        getProject: () => relationalProject,
+        getArtifact: () =>
+          exportArtifactFixture({
+            id: "export-other-project",
+            workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+            projectId: "other-project"
+          })
+      }
+    });
+
+    await expect(
+      store.getExportArtifactForSession({
+        userId: DEFAULT_LOCAL_USER_ID,
+        workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+        projectId: relationalProject.id,
+        exportId: "export-other-project"
+      })
+    ).rejects.toThrow("Export artifact not found.");
+  });
+});
+
 describe("GideonStore relational mirror", () => {
   beforeEach(async () => {
     electronMock.userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-store-test-"));
@@ -798,6 +910,42 @@ function profileFixture(overrides: Partial<ProductProfile> = {}): ProductProfile
     toneGuidance: "specific and direct",
     platforms: ["tiktok", "youtube_shorts"],
     walkthroughNotes: "Focus on the upload-to-export workflow.",
+    ...overrides
+  };
+}
+
+function memoryPersistence(state: AppState) {
+  return {
+    metadata: { provider: "file" as const, location: "memory" },
+    async load() {
+      return state;
+    },
+    async save(nextState: AppState) {
+      Object.assign(state, nextState);
+    }
+  };
+}
+
+function createRelationalProject(overrides: Partial<Project> = {}): Project {
+  return {
+    id: "project-relational-1",
+    workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+    name: "Relational hosted project",
+    status: "ready",
+    profile: profileFixture(),
+    recording: recordingFixture(),
+    frameEvidence: [],
+    moments: [],
+    concepts: [],
+    scripts: [scriptFixture()],
+    renders: [renderFixture({ id: "render-relational-1" })],
+    artifacts: [],
+    uploadSessions: [],
+    providerRuns: [],
+    jobs: [],
+    jobEvents: [],
+    createdAt: "2026-06-29T12:00:00.000Z",
+    updatedAt: "2026-06-29T12:05:00.000Z",
     ...overrides
   };
 }

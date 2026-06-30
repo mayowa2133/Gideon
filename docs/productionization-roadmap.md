@@ -194,4 +194,4 @@ The next implementation slice is Milestone 5 production operations:
 
 1. Run `pnpm production:check`, then run `pnpm production:promote:check -- --live` against staging credentials, small ASR/OCR fixtures, and Apple signing credentials.
 2. Keep the existing provider/store interfaces intact so desktop, hosted worker, and MCP paths continue sharing the same execution boundaries.
-3. Use the scoped PostgreSQL service-query reads for any hosted web/API surface split before removing snapshot reads.
+3. Use the scoped PostgreSQL service-query reads for hosted web/API project, job, export, and MCP surfaces before removing snapshot reads entirely.
