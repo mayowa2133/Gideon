@@ -72,6 +72,7 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm test:e2e
 - pnpm build
 - pnpm provider:canary
+- pnpm staging:check
 - pnpm worker:hosted:check
 - pnpm release:mac:check
 - pnpm db:migrate

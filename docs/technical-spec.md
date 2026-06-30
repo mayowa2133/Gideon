@@ -666,7 +666,7 @@ Web and media worker should not share runtime identity or filesystem. Worker egr
 3. Golden extraction/transcription stub/render test in pinned container.
 4. Build immutable images and generate SBOM/provenance. macOS desktop release candidates run `pnpm release:mac:check`, validate DMG/ZIP metadata, and write `release/provenance.json`; production release mode requires Apple signing/notarization credentials.
 5. Deploy backward-compatible code before additive migration consumers.
-6. Run smoke: auth, signed upload, sample analysis (stubbed/provider canary), preview render, signed download, deletion.
+6. Run smoke: `pnpm staging:check -- --strict`, auth, signed upload, sample analysis (stubbed/provider canary), preview render, signed download, deletion.
 7. Monitor; rollback app images. Database rollback uses forward fix unless a reversible migration was explicitly tested.
 
 The current implementation evidence, remaining go-live blockers, and original-gap mapping are maintained in [production-readiness-audit.md](./production-readiness-audit.md). Update that audit whenever a production-readiness slice changes the completion estimate or closes a launch blocker.

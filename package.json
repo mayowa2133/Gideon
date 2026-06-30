@@ -19,6 +19,7 @@
     "worker:hosted:run": "node dist/main/main/hostedWorkerProcess.js",
     "worker:hosted:check": "node scripts/check-hosted-worker-config.mjs",
     "provider:canary": "pnpm build:main && node dist/main/main/providerCanaryCli.js",
+    "staging:check": "node scripts/check-staging-readiness.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.mcp.json",
     "test": "vitest run",

@@ -1,0 +1,75 @@
+import { execFile } from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
+import { describe, expect, it } from "vitest";
+
+const execFileAsync = promisify(execFile);
+
+describe("staging readiness check", () => {
+  it("passes in dry-run mode while warning that strict staging validation is still required", async () => {
+    const result = await execFileAsync(process.execPath, ["scripts/check-staging-readiness.mjs"], {
+      cwd: process.cwd(),
+      env: { PATH: process.env.PATH ?? "" }
+    });
+
+    expect(result.stdout).toContain("Staging readiness dry-run check passed.");
+    expect(result.stdout).toContain("Strict staging environment validation is disabled.");
+  });
+
+  it("fails strict mode when production-shaped environment is missing", async () => {
+    await expect(
+      execFileAsync(process.execPath, ["scripts/check-staging-readiness.mjs", "--strict"], {
+        cwd: process.cwd(),
+        env: { PATH: process.env.PATH ?? "" }
+      })
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining("Staging readiness check failed:")
+    });
+  });
+
+  it("passes strict mode with production-shaped staging configuration and canary fixtures", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-staging-check-"));
+    const audioPath = path.join(tempDir, "audio.wav");
+    const imagePath = path.join(tempDir, "frame.png");
+    await fs.writeFile(audioPath, "audio");
+    await fs.writeFile(imagePath, "image");
+
+    const result = await execFileAsync(process.execPath, ["scripts/check-staging-readiness.mjs", "--strict"], {
+      cwd: process.cwd(),
+      env: {
+        PATH: process.env.PATH ?? "",
+        GIDEON_DEPLOYMENT_ENV: "production",
+        GIDEON_HOSTED_QUEUE_PROVIDER: "bullmq",
+        GIDEON_REDIS_URL: "rediss://default:secret@redis.example.test:6380/0",
+        GIDEON_BULLMQ_QUEUE_NAME: "gideon-staging-workers",
+        GIDEON_BULLMQ_PREFIX: "gideon-staging",
+        GIDEON_WORKER_ID: "staging-worker-1",
+        GIDEON_WORKER_LEASE_SECONDS: "300",
+        GIDEON_WORKER_HEARTBEAT_INTERVAL_MS: "30000",
+        GIDEON_STORE_PROVIDER: "postgres_snapshot",
+        GIDEON_DATABASE_URL: "postgres://gideon:secret@db.example.test:5432/gideon?sslmode=require",
+        GIDEON_SESSION_SECRET: "session-secret",
+        GIDEON_USER_DATA_DIR: "/var/lib/gideon-worker",
+        GIDEON_PROJECTS_DIR: "/var/lib/gideon-worker/projects",
+        GIDEON_STORAGE_ROOT: "/var/lib/gideon-worker/cache",
+        GIDEON_STORAGE_PROVIDER: "s3",
+        GIDEON_STORAGE_BUCKET: "gideon-private-staging",
+        GIDEON_STORAGE_ACCESS_KEY_ID: "storage-key",
+        GIDEON_STORAGE_SECRET_ACCESS_KEY: "storage-secret",
+        GIDEON_OPENAI_API_KEY: "sk-test",
+        GIDEON_PROVIDER_CANARY_LIVE: "true",
+        GIDEON_PROVIDER_CANARY_AUDIO_PATH: audioPath,
+        GIDEON_PROVIDER_CANARY_IMAGE_PATH: imagePath,
+        GIDEON_RELEASE_CHANNEL: "production",
+        APPLE_TEAM_ID: "TEAM123",
+        APPLE_ID: "release@example.com",
+        APPLE_APP_SPECIFIC_PASSWORD: "app-password",
+        CSC_NAME: "Developer ID Application: Example"
+      }
+    });
+
+    expect(result.stdout).toContain("Staging readiness strict check passed.");
+  });
+});
