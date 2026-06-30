@@ -10,7 +10,7 @@ Gideon is no longer only a local deterministic desktop prototype. The repository
 
 The remaining production gap is narrower and mostly operational: replace local JSON-backed hosted state with production database-backed persistence, run Redis/BullMQ and object storage as managed production services, complete deployment/release operations, and execute a final end-to-end production smoke with real infrastructure. Social posting, scheduling, avatar generation, and voice cloning remain explicit post-MVP items.
 
-Current engineering estimate: **99.9% complete** toward the full original product vision.
+Current engineering estimate: **99.95% complete** toward the full original product vision.
 
 ## Capability audit
 
@@ -25,7 +25,7 @@ Current engineering estimate: **99.9% complete** toward the full original produc
 | Async queues and hosted workers | Implemented through local, memory, HTTP, and BullMQ paths | `src/main/jobQueue.ts`, `src/main/hostedWorker.ts`, `src/main/hostedWorkerProcess.ts`, `src/main/jobExecutorAdapter.ts`, `src/main/postgresCoreRepository.ts`, `src/main/postgresJobArtifactRepository.ts`, `src/main/postgresUsageAuditRepository.ts`, `Dockerfile.hosted-worker`, `docker-compose.hosted-worker.yml`, `scripts/check-hosted-worker-config.mjs`, `scripts/check-staging-readiness.mjs`, and `src/main/jobQueue.redis.test.ts` prove the queue, signed intake, leases, heartbeat, recovery, worker process, Redis smoke path, hosted persistence preflight, PostgreSQL store selection, live relational mirroring, aggregate staging-readiness preflight, and relational core/jobs/artifacts/usage/audit projections. | Operate managed Redis/BullMQ and PostgreSQL in staging/production, tune concurrency/retention, and add infrastructure-level dashboards. |
 | Provider-backed TTS | Implemented behind provider boundary | `src/main/jobExecutor.ts` creates the speech provider through the same provider config as analysis; worker metrics include provider TTS latency/failure. | Production voice selection, provider quota controls, and audio artifact retention policy. |
 | Stage-level retry/cancel jobs | Implemented for the current job model | `src/main/jobQueue.ts`, `src/main/store.ts`, and `src/main/jobQueue.test.ts` cover job states, retryability, canceling, leases, heartbeats, expired lease recovery, and safe failure mapping. | Extend stage-specific worker lanes as ASR/OCR become fully hosted services. |
-| Observability and safe operations | Implemented for hosted workers | `src/main/observability.ts`, `scripts/lint-repository.mjs`, `docs/observability-alerts.md`, `docs/hosted-worker-deployment.md`, and worker process/lint tests cover metrics, alert rules, safe summaries, deployment checks, conflict-marker detection, generated/private artifact checks, secret-like material checks, and README/audit progress consistency. | Connect emitted metrics to production observability backend and define paging thresholds after staging load tests. |
+| Observability and safe operations | Implemented for hosted workers | `src/main/observability.ts`, `scripts/lint-repository.mjs`, `scripts/run-production-readiness-gate.mjs`, `docs/observability-alerts.md`, `docs/hosted-worker-deployment.md`, and worker process/lint/gate tests cover metrics, alert rules, safe summaries, deployment checks, conflict-marker detection, generated/private artifact checks, secret-like material checks, README/audit progress consistency, and a single-command local production-readiness gate. | Connect emitted metrics to production observability backend and define paging thresholds after staging load tests. |
 | macOS packaging and release provenance | Implemented for unsigned local builds and preflighted production candidates | `package.json`, `scripts/check-macos-release.mjs`, `src/main/macosReleaseCheck.test.ts`, `docs/release-hardening.md`, and the release workflow validate DMG/ZIP metadata, checksums, provenance, signing/notarization env, and production release preflight. | Run Apple Developer ID signing/notarization with production credentials and publish the first release artifact. |
 | Codex/Claude Code MCP control without Gideon API keys | Implemented as a first-class path | `src/mcp/server.ts`, `src/mcp/server.test.ts`, `docs/mcp-agent-control.md`, `docs/implementation-plan.md`, and README document Palmier-style MCP tools for project inspection, bounded script/moment edits, audit events, and analysis/render enqueueing. The agent supplies model reasoning; Gideon does not require LLM provider API keys for this control path. | Harden hosted MCP mode through the authoritative hosted service layer before exposing remote/enterprise MCP access. |
 | Human approval gates | Preserved | Product docs and UI flow keep users in control of reviewing moments, scripts, and generated outputs before export. MCP mutations are bounded and audited. | Add stronger hosted revision/conflict handling during collaborative review. |
@@ -76,6 +76,7 @@ pnpm package:mac
 pnpm release:mac:check
 hdiutil verify release/Gideon-0.1.0-arm64.dmg
 git diff --check
+pnpm production:check
 ```
 
 ## Go-live blockers
@@ -85,7 +86,7 @@ git diff --check
 3. Production object storage credentials, lifecycle/deletion policies, and signed-download smoke tests.
 4. Live provider canary execution for analysis, ASR/OCR where configured, and TTS with production credentials, staging fixtures, and cost ceilings.
 5. Signed and notarized macOS release artifact, plus production release provenance.
-6. End-to-end staging smoke from upload to private export package using production-shaped infrastructure; `pnpm staging:check -- --strict` now guards the required staging configuration before that live smoke.
+6. End-to-end staging smoke from upload to private export package using production-shaped infrastructure; `pnpm staging:check -- --strict` guards the required staging configuration before that live smoke, and `pnpm production:check` now runs the local non-credential promotion gate.
 
 ## Next engineering slice
 

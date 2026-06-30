@@ -4,9 +4,9 @@ Gideon is a macOS desktop app that turns a product walkthrough recording into ed
 
 ## Implementation progress
 
-Current engineering estimate: **99.9% complete** toward the full original product vision.
+Current engineering estimate: **99.95% complete** toward the full original product vision.
 
-This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, hosted analysis/render/export/download/billing-session primitives, Stripe REST session wiring, signed hosted worker-queue enqueue/intake HTTP dispatch boundaries, hosted worker lease/heartbeat/recovery coordination through the store layer, a reusable hosted worker runtime adapter for detached execution, hosted dependency auto-wiring for signed HTTP queues, the in-memory broker-backed queue path, a BullMQ Redis-backed broker with an optional real-Redis smoke gate, separately deployable hosted-worker container configuration, production hardening checks for Redis/BullMQ and worker persistence, macOS release provenance/signing preflight checks, a hosted worker process entrypoint with structured lifecycle/job metrics, persisted job observability snapshots, executable dashboard/alert definitions, a shared real analysis/render job executor adapter used by desktop, hosted worker, and MCP-enqueued analysis/render jobs with analysis, TTS, render, storage, and usage metrics, a pluggable app-state persistence boundary with a `pg`-backed PostgreSQL snapshot adapter selectable in hosted worker runtime configuration, migration-backed PostgreSQL repositories for core identity/project state, jobs/artifacts, and usage/audit events plus `pnpm db:migrate`, live relational mirroring of users/workspaces/members/projects/upload sessions/jobs/artifacts/usage/audit from store saves in hosted PostgreSQL mode, scoped PostgreSQL read paths for hosted auth/RBAC/billing/project queries, a safe provider canary runner for analysis, ASR, OCR, and TTS, an executable staging-readiness gate for production-shaped Redis/PostgreSQL/object-storage/provider/release configuration, a dependency-free repository lint gate for conflict markers, generated/private artifacts, secret-like material, and progress drift, and a production-readiness audit that maps original product gaps to current evidence and go-live blockers. Remaining work is mainly running that staging gate against deployed infrastructure, live provider canary execution with production credentials/media, final release operations, and later non-MVP expansion items.
+This estimate is intentionally conservative. Gideon has the local upload-to-export loop, provider-neutral AI/media adapters, private artifact storage, local queue controls, MCP control for Codex/Claude Code without Gideon API keys, workspace/team/billing foundations, hosted direct-upload completion, hosted analysis/render/export/download/billing-session primitives, Stripe REST session wiring, signed hosted worker-queue enqueue/intake HTTP dispatch boundaries, hosted worker lease/heartbeat/recovery coordination through the store layer, a reusable hosted worker runtime adapter for detached execution, hosted dependency auto-wiring for signed HTTP queues, the in-memory broker-backed queue path, a BullMQ Redis-backed broker with an optional real-Redis smoke gate, separately deployable hosted-worker container configuration, production hardening checks for Redis/BullMQ and worker persistence, macOS release provenance/signing preflight checks, a hosted worker process entrypoint with structured lifecycle/job metrics, persisted job observability snapshots, executable dashboard/alert definitions, a shared real analysis/render job executor adapter used by desktop, hosted worker, and MCP-enqueued analysis/render jobs with analysis, TTS, render, storage, and usage metrics, a pluggable app-state persistence boundary with a `pg`-backed PostgreSQL snapshot adapter selectable in hosted worker runtime configuration, migration-backed PostgreSQL repositories for core identity/project state, jobs/artifacts, and usage/audit events plus `pnpm db:migrate`, live relational mirroring of users/workspaces/members/projects/upload sessions/jobs/artifacts/usage/audit from store saves in hosted PostgreSQL mode, scoped PostgreSQL read paths for hosted auth/RBAC/billing/project queries, a safe provider canary runner for analysis, ASR, OCR, and TTS, an executable staging-readiness gate for production-shaped Redis/PostgreSQL/object-storage/provider/release configuration, a dependency-free repository lint gate for conflict markers, generated/private artifacts, secret-like material, and progress drift, a single-command local production-readiness gate, and a production-readiness audit that maps original product gaps to current evidence and go-live blockers. Remaining work is mainly running the strict staging/live gates against deployed infrastructure, live provider canary execution with production credentials/media, final signed/notarized release operations, and later non-MVP expansion items.
 
 ## Local development
 
@@ -21,6 +21,7 @@ pnpm build
 pnpm db:migrate -- --dry-run
 pnpm provider:canary -- --dry-run
 pnpm staging:check
+pnpm production:check -- --dry-run
 pnpm start
 ```
 
@@ -54,6 +55,14 @@ Before staging promotion, run the aggregate staging gate. Dry-run mode checks th
 pnpm staging:check
 pnpm staging:check -- --strict
 ```
+
+To run every local non-credential promotion check as one command, use:
+
+```bash
+pnpm production:check
+```
+
+Use `pnpm production:check -- --dry-run` to print the exact gate plan without executing it.
 
 Hosted state persistence is pluggable. The default remains the local private app-data JSON file for desktop and local worker runs. Production deployments can use the `pg`-backed PostgreSQL snapshot adapter by setting `GIDEON_STORE_PROVIDER=postgres_snapshot`, `GIDEON_DATABASE_URL`, and optionally `GIDEON_POSTGRES_SNAPSHOT_TABLE` / `GIDEON_POSTGRES_SNAPSHOT_ID`; `pnpm worker:hosted:check` validates this configuration before deploy. In PostgreSQL snapshot mode, store saves also mirror current users, workspaces, workspace members, projects, recording upload sessions, jobs, artifacts, usage events, and audit events into relational projections unless `GIDEON_RELATIONAL_MIRROR=false` is set during a controlled migration.
 

@@ -198,7 +198,16 @@ function checkPackageContract() {
     return;
   }
   const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
-  for (const scriptName of ["lint", "typecheck", "test", "build", "db:migrate", "provider:canary", "staging:check"]) {
+  for (const scriptName of [
+    "lint",
+    "typecheck",
+    "test",
+    "build",
+    "db:migrate",
+    "provider:canary",
+    "staging:check",
+    "production:check"
+  ]) {
     if (typeof packageJson.scripts?.[scriptName] !== "string") {
       errors.push(`package.json must define ${scriptName}.`);
     }
