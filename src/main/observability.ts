@@ -1,4 +1,5 @@
 import type { GideonJobExecutorMetricEvent } from "./jobExecutor";
+import type { HostedApiMetricEvent } from "./hostedApi";
 import type { JobObservabilitySnapshot } from "./store";
 
 export type ObservabilityAlertSeverity = "warning" | "critical";
@@ -11,7 +12,9 @@ export type ObservabilityAlertMetric =
   | "provider_tts_latency_ms"
   | "provider_tts_failures"
   | "storage_latency_ms"
-  | "storage_failures";
+  | "storage_failures"
+  | "hosted_review_revision_conflicts"
+  | "hosted_review_precondition_failures";
 
 export interface ObservabilityAlertRule {
   id: string;
@@ -27,7 +30,7 @@ export interface ObservabilityAlertRule {
 
 export interface ObservabilityMetricRecord {
   receivedAt: string;
-  event: GideonJobExecutorMetricEvent;
+  event: GideonJobExecutorMetricEvent | HostedApiMetricEvent;
 }
 
 export interface ObservabilityAlertEvaluation {
@@ -148,6 +151,28 @@ export const DEFAULT_OBSERVABILITY_ALERT_RULES: ObservabilityAlertRule[] = [
     summary: "Private artifact storage failures occurred recently.",
     dashboardPanel: "Storage health",
     runbook: "Page the operator, verify private bucket credentials/policy, and pause exports/renders if artifact writes are failing."
+  },
+  {
+    id: "hosted-review-revision-conflicts-warning",
+    metric: "hosted_review_revision_conflicts",
+    severity: "warning",
+    threshold: 5,
+    comparison: "gte",
+    windowMs: 15 * 60 * 1000,
+    summary: "Hosted review edit revision conflicts are elevated.",
+    dashboardPanel: "Hosted review health",
+    runbook: "Inspect collaborative editing sessions, stale MCP clients, retry loops, and whether clients refresh mcp-context before edits."
+  },
+  {
+    id: "hosted-review-precondition-failures-warning",
+    metric: "hosted_review_precondition_failures",
+    severity: "warning",
+    threshold: 1,
+    comparison: "gte",
+    windowMs: 15 * 60 * 1000,
+    summary: "Hosted review edits are missing revision preconditions.",
+    dashboardPanel: "Hosted review health",
+    runbook: "Check client versions and MCP configuration. Edits must include If-Match or body revision from hosted MCP context."
   }
 ];
 
@@ -222,6 +247,16 @@ function valueForRule(
         return null;
       }
       return matchingEvents.filter((record) => record.event.name === "artifact_storage_failed").length;
+    case "hosted_review_revision_conflicts":
+      if (!matchingEvents.length) {
+        return null;
+      }
+      return matchingEvents.filter(isHostedReviewRevisionConflictRecord).length;
+    case "hosted_review_precondition_failures":
+      if (!matchingEvents.length) {
+        return null;
+      }
+      return matchingEvents.filter(isHostedReviewPreconditionFailureRecord).length;
     default:
       return null;
   }
@@ -255,6 +290,18 @@ function isArtifactStorageFinishedRecord(
   record: ObservabilityMetricRecord
 ): record is ObservabilityMetricRecord & { event: Extract<GideonJobExecutorMetricEvent, { name: "artifact_storage_finished" }> } {
   return record.event.name === "artifact_storage_finished";
+}
+
+function isHostedReviewRevisionConflictRecord(
+  record: ObservabilityMetricRecord
+): record is ObservabilityMetricRecord & { event: Extract<HostedApiMetricEvent, { name: "hosted_review_edit_failed" }> } {
+  return record.event.name === "hosted_review_edit_failed" && record.event.code === "revision_conflict";
+}
+
+function isHostedReviewPreconditionFailureRecord(
+  record: ObservabilityMetricRecord
+): record is ObservabilityMetricRecord & { event: Extract<HostedApiMetricEvent, { name: "hosted_review_edit_failed" }> } {
+  return record.event.name === "hosted_review_edit_failed" && record.event.code === "precondition_required";
 }
 
 function timestampInWindow(value: string, nowMs: number, windowMs: number): boolean {

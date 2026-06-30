@@ -88,6 +88,45 @@ describe("observability alert evaluation", () => {
     });
   });
 
+  it("fires hosted review alerts from API review metrics", () => {
+    const now = "2026-06-29T12:00:00.000Z";
+    const events: ObservabilityMetricRecord[] = [
+      ...Array.from({ length: 5 }, (_, index) => ({
+        receivedAt: "2026-06-29T11:59:00.000Z",
+        event: {
+          name: "hosted_review_edit_failed" as const,
+          workspaceId: "workspace-1",
+          projectId: `project-${index}`,
+          resourceKind: "script" as const,
+          status: 409,
+          code: "revision_conflict"
+        }
+      })),
+      {
+        receivedAt: "2026-06-29T11:59:30.000Z",
+        event: {
+          name: "hosted_review_edit_failed",
+          workspaceId: "workspace-1",
+          projectId: "project-1",
+          resourceKind: "moment",
+          status: 428,
+          code: "precondition_required"
+        }
+      }
+    ];
+
+    const evaluations = evaluateObservabilityAlerts({
+      now,
+      snapshots: [snapshot({ generatedAt: now })],
+      events
+    });
+
+    expect(statusById(evaluations)).toMatchObject({
+      "hosted-review-revision-conflicts-warning": "firing",
+      "hosted-review-precondition-failures-warning": "firing"
+    });
+  });
+
   it("marks missing metric windows as no data without firing", () => {
     const evaluations = evaluateObservabilityAlerts({
       now: "2026-06-29T12:00:00.000Z",

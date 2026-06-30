@@ -587,11 +587,11 @@ Log event names and bounded metadata. Redact/never log:
 - Render QA failure category.
 - Product funnel events from context to export without content payloads.
 
-The hosted worker process emits bounded JSON metric events for worker lifecycle, job lifecycle/duration, analysis pipeline duration, provider TTS latency/failure, render duration/failure, private artifact storage latency/bytes/failure, usage records, and persisted job observability snapshots. Snapshot metrics include active/queued/running/canceling/terminal counts, oldest queued/running age, expired running leases, recovered lease failures, retryable failed jobs, and terminal failure rate. Metrics include IDs, counts, durations, units, and safe error summaries only; they must not include transcript text, OCR text, scripts, prompts, object keys, signed URLs, or provider payloads.
+The hosted worker process emits bounded JSON metric events for worker lifecycle, job lifecycle/duration, analysis pipeline duration, provider TTS latency/failure, render duration/failure, private artifact storage latency/bytes/failure, usage records, and persisted job observability snapshots. Hosted API sessions emit bounded MCP context and hosted review edit success/failure metrics for Codex/Claude Code control paths, including safe IDs, counts, resource kind, changed-field names, status, and error code. Snapshot metrics include active/queued/running/canceling/terminal counts, oldest queued/running age, expired running leases, recovered lease failures, retryable failed jobs, and terminal failure rate. Metrics include IDs, counts, durations, units, and safe error summaries only; they must not include transcript text, OCR text, scripts, prompts, object keys, signed URLs, or provider payloads.
 
 ### Tracing and alerts
 
-Trace API→outbox→queue→worker→provider/storage/DB. Sample successful traces; retain errors longer. Alert on oldest queue age SLO, terminal failure spike, provider error/cost spike, render QA failures, storage/auth errors, and deletion backlog. The default hosted-worker dashboard panels and alert rules are defined in `src/main/observability.ts` and documented in [observability-alerts.md](./observability-alerts.md).
+Trace API→outbox→queue→worker→provider/storage/DB. Sample successful traces; retain errors longer. Alert on oldest queue age SLO, terminal failure spike, provider error/cost spike, render QA failures, storage/auth errors, hosted review revision conflicts/missing preconditions, and deletion backlog. The default hosted-worker and hosted-review dashboard panels and alert rules are defined in `src/main/observability.ts` and documented in [observability-alerts.md](./observability-alerts.md).
 
 ## Error handling
 

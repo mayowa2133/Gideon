@@ -6,6 +6,7 @@ import {
   handleHostedApiRequest,
   type HostedBillingService,
   type HostedApiStore,
+  type HostedApiMetricEvent,
   type HostedExportService,
   type HostedJobQueueService,
   type HostedRecordingUploadService
@@ -401,7 +402,8 @@ describe("hosted API foundation", () => {
   });
 
   it("serves hosted MCP context and applies CSRF-protected script and moment edits", async () => {
-    const api = testApi();
+    const metrics: HostedApiMetricEvent[] = [];
+    const api = testApi({ onMetric: (event) => metrics.push(event) });
     api.store.state.projects = [
       projectFixture({
         id: "project-1",
@@ -520,6 +522,39 @@ describe("hosted API foundation", () => {
       enabled: false
     });
     expect(api.store.state.auditEvents.map((event) => event.actorType)).toContain("mcp_agent");
+    expect(metrics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "hosted_mcp_context_served",
+          workspaceId: "local-workspace",
+          projectId: "project-1",
+          scripts: 1,
+          moments: 1
+        }),
+        expect.objectContaining({
+          name: "hosted_review_edit_succeeded",
+          resourceKind: "script",
+          changedFields: ["cta", "hook"]
+        }),
+        expect.objectContaining({
+          name: "hosted_review_edit_failed",
+          resourceKind: "script",
+          status: 428,
+          code: "precondition_required"
+        }),
+        expect.objectContaining({
+          name: "hosted_review_edit_failed",
+          resourceKind: "script",
+          status: 409,
+          code: "revision_conflict"
+        }),
+        expect.objectContaining({
+          name: "hosted_review_edit_succeeded",
+          resourceKind: "moment",
+          changedFields: ["enabled", "label"]
+        })
+      ])
+    );
   });
 
   it("returns sanitized completed renders so hosted clients can create exports", async () => {
@@ -1647,6 +1682,7 @@ function testApi(
     jobQueueService?: HostedJobQueueService;
     exportService?: HostedExportService;
     billingService?: HostedBillingService;
+    onMetric?: (event: HostedApiMetricEvent) => void;
   } = {}
 ) {
   const store = new InMemoryHostedApiStore();
@@ -1681,7 +1717,8 @@ function testApi(
     uploadService: input.uploadService,
     jobQueueService: input.jobQueueService,
     exportService: input.exportService,
-    billingService: input.billingService
+    billingService: input.billingService,
+    onMetric: input.onMetric
   };
 }
 

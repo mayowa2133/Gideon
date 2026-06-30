@@ -68,6 +68,32 @@ export interface HostedApiConfig {
   internalAuthCallbackSecret: string | null;
 }
 
+export type HostedApiMetricEvent =
+  | {
+      name: "hosted_mcp_context_served";
+      workspaceId: string;
+      projectId: string;
+      scripts: number;
+      moments: number;
+      frameEvidence: number;
+      auditEvents: number;
+    }
+  | {
+      name: "hosted_review_edit_succeeded";
+      workspaceId: string;
+      projectId: string;
+      resourceKind: "script" | "moment";
+      changedFields: string[];
+    }
+  | {
+      name: "hosted_review_edit_failed";
+      workspaceId: string;
+      projectId: string;
+      resourceKind: "script" | "moment";
+      status: number;
+      code: string;
+    };
+
 export interface HostedApiStore {
   load(): Promise<AppState>;
   syncAuthenticatedUser(input: SyncAuthenticatedUserInput): Promise<AppState>;
@@ -232,6 +258,7 @@ export interface HostedApiDependencies {
   jobQueueBroker?: HostedWorkerJobBroker;
   exportService?: HostedExportService;
   billingService?: HostedBillingService;
+  onMetric?: (event: HostedApiMetricEvent) => void;
 }
 
 class ApiError extends Error {
@@ -267,6 +294,7 @@ export function createHostedApiDependencies(input: {
   jobQueueBroker?: HostedWorkerJobBroker;
   exportService?: HostedExportService;
   billingService?: HostedBillingService;
+  onMetric?: (event: HostedApiMetricEvent) => void;
 }): HostedApiDependencies {
   const config = input.config ?? loadHostedApiConfig(input.env);
   const jobQueueBroker = input.jobQueueBroker ?? createHostedJobQueueBroker(config.jobQueue);
@@ -277,7 +305,8 @@ export function createHostedApiDependencies(input: {
     jobQueueService: input.jobQueueService ?? createHostedJobQueueService(config.jobQueue, jobQueueBroker),
     jobQueueBroker,
     exportService: input.exportService,
-    billingService: input.billingService ?? createHostedBillingService(config.billing)
+    billingService: input.billingService ?? createHostedBillingService(config.billing),
+    onMetric: input.onMetric
   };
 }
 
@@ -669,6 +698,15 @@ async function handleGetProjectMcpContext(
     })
   );
   const state = await dependencies.store.load();
+  emitHostedApiMetric(dependencies, {
+    name: "hosted_mcp_context_served",
+    workspaceId: claims.workspaceId,
+    projectId,
+    scripts: project.scripts.length,
+    moments: project.moments.length,
+    frameEvidence: project.frameEvidence.length,
+    auditEvents: state.auditEvents.filter((event) => event.projectId === project.id).length
+  });
   return jsonResponse(200, { project: mcpProjectContextResource(project, state) }, requestId);
 }
 
@@ -705,24 +743,36 @@ async function handleUpdateProjectScript(
 ): Promise<HostedApiResponse> {
   const claims = requiredSession(request, dependencies);
   try {
-    assertCsrfToken(claims, header(request, "x-csrf-token"));
-  } catch {
-    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
-  }
-  const body = objectBody(request);
-  const input = hostedScriptPatchInput(body);
-  const expectedRevision = requiredRevisionPrecondition(request, body);
-  const project = await storeCall(() =>
-    dependencies.store.updateScriptForSession({
-      userId: claims.userId,
+    try {
+      assertCsrfToken(claims, header(request, "x-csrf-token"));
+    } catch {
+      throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+    }
+    const body = objectBody(request);
+    const input = hostedScriptPatchInput(body);
+    const expectedRevision = requiredRevisionPrecondition(request, body);
+    const project = await storeCall(() =>
+      dependencies.store.updateScriptForSession({
+        userId: claims.userId,
+        workspaceId: claims.workspaceId,
+        projectId,
+        scriptId,
+        expectedRevision,
+        ...input
+      })
+    );
+    emitHostedApiMetric(dependencies, {
+      name: "hosted_review_edit_succeeded",
       workspaceId: claims.workspaceId,
       projectId,
-      scriptId,
-      expectedRevision,
-      ...input
-    })
-  );
-  return jsonResponse(200, { project: projectResource(project) }, requestId);
+      resourceKind: "script",
+      changedFields: changedReviewFields(input)
+    });
+    return jsonResponse(200, { project: projectResource(project) }, requestId);
+  } catch (error) {
+    emitHostedReviewFailureMetric(dependencies, claims.workspaceId, projectId, "script", error);
+    throw error;
+  }
 }
 
 async function handleUpdateProjectMoment(
@@ -734,24 +784,36 @@ async function handleUpdateProjectMoment(
 ): Promise<HostedApiResponse> {
   const claims = requiredSession(request, dependencies);
   try {
-    assertCsrfToken(claims, header(request, "x-csrf-token"));
-  } catch {
-    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
-  }
-  const body = objectBody(request);
-  const input = hostedMomentPatchInput(body);
-  const expectedRevision = requiredRevisionPrecondition(request, body);
-  const project = await storeCall(() =>
-    dependencies.store.updateMomentForSession({
-      userId: claims.userId,
+    try {
+      assertCsrfToken(claims, header(request, "x-csrf-token"));
+    } catch {
+      throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+    }
+    const body = objectBody(request);
+    const input = hostedMomentPatchInput(body);
+    const expectedRevision = requiredRevisionPrecondition(request, body);
+    const project = await storeCall(() =>
+      dependencies.store.updateMomentForSession({
+        userId: claims.userId,
+        workspaceId: claims.workspaceId,
+        projectId,
+        momentId,
+        expectedRevision,
+        ...input
+      })
+    );
+    emitHostedApiMetric(dependencies, {
+      name: "hosted_review_edit_succeeded",
       workspaceId: claims.workspaceId,
       projectId,
-      momentId,
-      expectedRevision,
-      ...input
-    })
-  );
-  return jsonResponse(200, { project: projectResource(project) }, requestId);
+      resourceKind: "moment",
+      changedFields: changedReviewFields(input)
+    });
+    return jsonResponse(200, { project: projectResource(project) }, requestId);
+  } catch (error) {
+    emitHostedReviewFailureMetric(dependencies, claims.workspaceId, projectId, "moment", error);
+    throw error;
+  }
 }
 
 async function handleGetJob(
@@ -1644,6 +1706,39 @@ function hostedMomentPatchInput(body: Record<string, unknown>): {
     throw new ApiError(422, "validation_failed", "At least one moment field is required.");
   }
   return input;
+}
+
+function changedReviewFields(input: Record<string, unknown>): string[] {
+  return Object.entries(input)
+    .filter(([, value]) => typeof value !== "undefined")
+    .map(([field]) => field)
+    .sort();
+}
+
+function emitHostedReviewFailureMetric(
+  dependencies: HostedApiDependencies,
+  workspaceId: string,
+  projectId: string,
+  resourceKind: "script" | "moment",
+  error: unknown
+): void {
+  const apiError = error instanceof ApiError ? error : apiErrorFromStoreError(error);
+  emitHostedApiMetric(dependencies, {
+    name: "hosted_review_edit_failed",
+    workspaceId,
+    projectId,
+    resourceKind,
+    status: apiError.status,
+    code: apiError.code
+  });
+}
+
+function emitHostedApiMetric(dependencies: HostedApiDependencies, event: HostedApiMetricEvent): void {
+  try {
+    dependencies.onMetric?.(event);
+  } catch {
+    // Metrics must not change API behavior.
+  }
 }
 
 function optionalIdentityProvider(value: unknown): IdentityProvider | undefined {

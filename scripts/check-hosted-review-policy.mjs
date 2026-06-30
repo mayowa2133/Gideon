@@ -7,6 +7,8 @@ const errors = [];
 const packageJson = read("package.json");
 const hostedApi = read("src/main/hostedApi.ts");
 const hostedApiTests = read("src/main/hostedApi.test.ts");
+const observability = read("src/main/observability.ts");
+const observabilityTests = read("src/main/observability.test.ts");
 const mcpServer = read("src/mcp/server.ts");
 const mcpTests = read("src/mcp/server.test.ts");
 const apiContract = read("docs/api-contract.md");
@@ -19,9 +21,19 @@ requireContains(hostedApi, '"precondition_required"', "Hosted edit API must retu
 requireContains(hostedApi, '"revision_conflict"', "Hosted edit API must return a typed revision-conflict error.");
 requireContains(hostedApi, "revision: script.updatedAt", "Hosted MCP context must expose script revisions.");
 requireContains(hostedApi, "revision: project.updatedAt", "Hosted MCP context must expose project/moment revisions.");
+requireContains(hostedApi, "HostedApiMetricEvent", "Hosted API must define safe hosted review metric events.");
+requireContains(hostedApi, "hosted_mcp_context_served", "Hosted API must emit MCP context metrics.");
+requireContains(hostedApi, "hosted_review_edit_succeeded", "Hosted API must emit successful hosted review edit metrics.");
+requireContains(hostedApi, "hosted_review_edit_failed", "Hosted API must emit failed hosted review edit metrics.");
 
 requireContains(hostedApiTests, "precondition_required", "Hosted API tests must cover missing edit preconditions.");
 requireContains(hostedApiTests, "revision_conflict", "Hosted API tests must cover stale edit conflicts.");
+requireContains(hostedApiTests, "HostedApiMetricEvent", "Hosted API tests must cover hosted review metric export.");
+
+requireContains(observability, "hosted_review_revision_conflicts", "Observability rules must include hosted review revision conflict metrics.");
+requireContains(observability, "hosted_review_precondition_failures", "Observability rules must include hosted review missing-precondition metrics.");
+requireContains(observability, "Hosted review health", "Observability rules must expose a hosted review dashboard panel.");
+requireContains(observabilityTests, "fires hosted review alerts from API review metrics", "Observability tests must cover hosted review metrics.");
 
 requireContains(mcpServer, "shouldRetryHostedResponse", "Hosted MCP client must centralize transient response retry policy.");
 requireContains(mcpServer, "status === 429", "Hosted MCP retry policy must retry rate-limit responses.");

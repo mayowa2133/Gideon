@@ -55,7 +55,7 @@ When these variables are present, MCP tools prefer the hosted API service layer:
 - `gideon_update_script` and `gideon_update_moment` call CSRF-protected hosted edit routes.
 - `gideon_enqueue_analysis` and `gideon_enqueue_render` call the hosted job routes.
 
-The MCP server can discover the CSRF token from `GET /api/v1/auth/session`, or you can provide `GIDEON_MCP_HOSTED_CSRF_TOKEN`. Hosted project context includes script and moment revisions. Edit tools send a revision precondition automatically unless the agent provides an explicit `revision` argument. Stale edits fail with `409 revision_conflict` instead of overwriting newer user or teammate changes. Hosted HTTP calls retry only transient network, rate-limit, and 5xx/408 failures; auth, validation, missing-precondition, and revision-conflict failures are not retried. This mode keeps workspace authorization, CSRF checks, bounded field updates, job queues, optimistic concurrency, and audit records inside Gideon's authoritative hosted service layer while Codex/Claude Code supplies the reasoning externally.
+The MCP server can discover the CSRF token from `GET /api/v1/auth/session`, or you can provide `GIDEON_MCP_HOSTED_CSRF_TOKEN`. Hosted project context includes script and moment revisions. Edit tools send a revision precondition automatically unless the agent provides an explicit `revision` argument. Stale edits fail with `409 revision_conflict` instead of overwriting newer user or teammate changes. Hosted HTTP calls retry only transient network, rate-limit, and 5xx/408 failures; auth, validation, missing-precondition, and revision-conflict failures are not retried. This mode keeps workspace authorization, CSRF checks, bounded field updates, job queues, optimistic concurrency, and audit records inside Gideon's authoritative hosted service layer while Codex/Claude Code supplies the reasoning externally. Hosted API sessions emit bounded MCP context and review-edit success/failure metrics so operators can track stale clients, missing revision preconditions, and review health without indexing transcripts, OCR text, scripts, prompts, signed URLs, or object keys.
 
 ## Safety rules
 
@@ -69,5 +69,5 @@ The MCP server can discover the CSRF token from `GET /api/v1/auth/session`, or y
 
 ## Next steps
 
-- Run hosted MCP through staging SSO/session policy and production observability export checks.
+- Run hosted MCP through staging SSO/session policy, deployed metric export, and production load testing.
 - Add project-scoped approval gates for destructive actions and future publishing.
