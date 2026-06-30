@@ -21,6 +21,7 @@
     "provider:canary": "pnpm build:main && node dist/main/main/providerCanaryCli.js",
     "staging:check": "node scripts/check-staging-readiness.mjs",
     "staging:smoke": "node scripts/run-staging-smoke.mjs",
+    "staging:mcp:smoke": "node scripts/run-staging-mcp-smoke.mjs",
     "production:check": "node scripts/run-production-readiness-gate.mjs",
     "production:promote:check": "node scripts/run-production-promotion-gate.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs",

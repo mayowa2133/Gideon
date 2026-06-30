@@ -16,6 +16,7 @@ const steps = [
   step("strict staging readiness gate", [pnpm, "staging:check", "--", "--strict"]),
   step("live provider canaries", [pnpm, "provider:canary", "--", "--live"]),
   step("live staging upload-to-export smoke", [pnpm, "staging:smoke", "--", "--live"]),
+  step("live staging hosted MCP smoke", [pnpm, "staging:mcp:smoke", "--", "--live", "--require-metric-export"]),
   ...(skipPackage
     ? []
     : [

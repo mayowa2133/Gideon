@@ -17,6 +17,7 @@ describe("production readiness gate", () => {
     expect(result.stdout).toContain("hosted review policy");
     expect(result.stdout).toContain("staging readiness dry-run");
     expect(result.stdout).toContain("staging upload-to-export smoke dry-run");
+    expect(result.stdout).toContain("staging hosted MCP smoke dry-run");
     expect(result.stdout).toContain("production promotion gate dry-run");
     expect(result.stdout).toContain("production-shaped hosted worker preflight");
     expect(result.stdout).toContain("macOS release metadata");

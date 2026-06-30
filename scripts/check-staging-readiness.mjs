@@ -53,6 +53,7 @@ function validateCommandContract() {
     "package:mac:signed",
     "release:mac:check",
     "staging:smoke",
+    "staging:mcp:smoke",
     "production:promote:check"
   ]) {
     if (typeof scripts[scriptName] !== "string") {
@@ -155,6 +156,7 @@ function validateOperationalEnvironment() {
   requireReadableFile("GIDEON_PROVIDER_CANARY_AUDIO_PATH", "Set GIDEON_PROVIDER_CANARY_AUDIO_PATH to a small staging audio fixture.");
   requireReadableFile("GIDEON_PROVIDER_CANARY_IMAGE_PATH", "Set GIDEON_PROVIDER_CANARY_IMAGE_PATH to a small staging screenshot fixture.");
   requireHostedSmokeEnvironment();
+  requireHostedMcpSmokeEnvironment();
 
   requireEquals("GIDEON_RELEASE_CHANNEL", "production", "Set GIDEON_RELEASE_CHANNEL=production for staging release promotion checks.");
   requireEnv("APPLE_TEAM_ID", "Set APPLE_TEAM_ID for production release notarization checks.");
@@ -190,6 +192,36 @@ function requireHostedSmokeEnvironment() {
     "GIDEON_STAGING_SMOKE_POLL_INTERVAL_MS",
     "Set GIDEON_STAGING_SMOKE_POLL_INTERVAL_MS to a positive interval for live job polling."
   );
+}
+
+function requireHostedMcpSmokeEnvironment() {
+  const stagingMcpApiBaseUrl = normalize(env.GIDEON_STAGING_MCP_API_BASE_URL);
+  if (!stagingMcpApiBaseUrl) {
+    errors.push("Set GIDEON_STAGING_MCP_API_BASE_URL before running the live hosted MCP staging smoke.");
+  } else {
+    validateUrl(stagingMcpApiBaseUrl, ["https:"], "GIDEON_STAGING_MCP_API_BASE_URL must be an absolute https:// URL.");
+  }
+  requireEnv(
+    "GIDEON_STAGING_MCP_SESSION_COOKIE",
+    "Set GIDEON_STAGING_MCP_SESSION_COOKIE to an active scratch-user hosted session before staging promotion."
+  );
+  requireEnv(
+    "GIDEON_STAGING_MCP_PROJECT_ID",
+    "Set GIDEON_STAGING_MCP_PROJECT_ID to a scratch project with at least one script and moment."
+  );
+  requireEquals(
+    "GIDEON_STAGING_MCP_SMOKE_LIVE",
+    "true",
+    "Set GIDEON_STAGING_MCP_SMOKE_LIVE=true before staging promotion."
+  );
+  if (normalize(env.GIDEON_STAGING_MCP_REQUIRE_METRIC_EXPORT) === "true") {
+    const metricProbeUrl = normalize(env.GIDEON_STAGING_MCP_METRIC_PROBE_URL);
+    if (!metricProbeUrl) {
+      errors.push("Set GIDEON_STAGING_MCP_METRIC_PROBE_URL when hosted MCP metric export is required.");
+    } else {
+      validateUrl(metricProbeUrl, ["https:"], "GIDEON_STAGING_MCP_METRIC_PROBE_URL must be an absolute https:// URL.");
+    }
+  }
 }
 
 function readJson(filePath) {

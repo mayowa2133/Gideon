@@ -8,8 +8,8 @@ describe("production readiness audit", () => {
   it("tracks the current README completion estimate", () => {
     const readme = readFileSync(path.join(process.cwd(), "README.md"), "utf8");
 
-    expect(readme).toContain("Current engineering estimate: **99.996% complete**");
-    expect(audit).toContain("Current engineering estimate: **99.996% complete**");
+    expect(readme).toContain("Current engineering estimate: **99.997% complete**");
+    expect(audit).toContain("Current engineering estimate: **99.997% complete**");
   });
 
   it("maps the original product gaps to evidence and remaining work", () => {
@@ -45,6 +45,7 @@ describe("production readiness audit", () => {
       "End-to-end staging smoke",
       "pnpm staging:check -- --strict",
       "pnpm staging:smoke -- --live",
+      "pnpm staging:mcp:smoke -- --live --require-metric-export",
       "pnpm production:promote:check -- --live",
       "pnpm production:check"
     ]) {

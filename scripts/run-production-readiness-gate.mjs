@@ -20,6 +20,7 @@ const steps = [
   step("hosted review policy", [pnpm, "hosted:review:check"]),
   step("staging readiness dry-run", [pnpm, "staging:check"]),
   step("staging upload-to-export smoke dry-run", [pnpm, "staging:smoke", "--", "--dry-run"]),
+  step("staging hosted MCP smoke dry-run", [pnpm, "staging:mcp:smoke", "--", "--dry-run"]),
   step("production promotion gate dry-run", [pnpm, "production:promote:check", "--", "--dry-run"]),
   step("local hosted worker preflight", [pnpm, "worker:hosted:check"], localWorkerEnv()),
   step("production-shaped hosted worker preflight", [pnpm, "worker:hosted:check"], productionWorkerEnv()),

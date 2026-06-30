@@ -69,5 +69,5 @@ The MCP server can discover the CSRF token from `GET /api/v1/auth/session`, or y
 
 ## Next steps
 
-- Run hosted MCP through staging SSO/session policy, deployed metric export, and production load testing.
+- Run `pnpm staging:mcp:smoke -- --live --require-metric-export` through staging SSO/session policy, deployed metric export, and production load testing.
 - Add project-scoped approval gates for destructive actions and future publishing.

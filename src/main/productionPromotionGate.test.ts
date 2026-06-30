@@ -16,6 +16,7 @@ describe("production promotion gate", () => {
     expect(result.stdout).toContain("strict staging readiness gate");
     expect(result.stdout).toContain("live provider canaries");
     expect(result.stdout).toContain("live staging upload-to-export smoke");
+    expect(result.stdout).toContain("live staging hosted MCP smoke");
     expect(result.stdout).toContain("signed macOS package");
     expect(result.stdout).toContain("GIDEON_RELEASE_CHANNEL=production");
     expect(result.stdout).toContain("GIDEON_PRODUCTION_PROMOTION_LIVE=true");
@@ -32,6 +33,7 @@ describe("production promotion gate", () => {
     );
 
     expect(result.stdout).toContain("live staging upload-to-export smoke");
+    expect(result.stdout).toContain("live staging hosted MCP smoke");
     expect(result.stdout).not.toContain("signed macOS package");
   });
 });

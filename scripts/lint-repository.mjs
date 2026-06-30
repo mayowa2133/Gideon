@@ -207,6 +207,7 @@ function checkPackageContract() {
     "provider:canary",
     "staging:check",
     "staging:smoke",
+    "staging:mcp:smoke",
     "production:check",
     "production:promote:check"
   ]) {
