@@ -32,6 +32,7 @@
     "package:mac": "pnpm build && electron-builder --mac dmg zip --config.mac.identity=null --publish=never",
     "package:mac:signed": "pnpm build && electron-builder --mac dmg zip --publish=never",
     "release:mac:check": "node scripts/check-macos-release.mjs",
+    "hosted:review:check": "node scripts/check-hosted-review-policy.mjs",
     "dist:mac": "pnpm package:mac"
   },
   "build": {

@@ -48,6 +48,7 @@ function validateCommandContract() {
     "db:migrate",
     "worker:hosted:check",
     "provider:canary",
+    "hosted:review:check",
     "package:mac",
     "package:mac:signed",
     "release:mac:check",

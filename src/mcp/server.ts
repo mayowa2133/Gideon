@@ -93,7 +93,9 @@ interface HostedMcpConfig {
 const hostedTransportSchema = {
   hostedApiBaseUrl: optionalString("Hosted Gideon API base URL. Defaults to GIDEON_MCP_HOSTED_API_BASE_URL."),
   hostedSessionCookie: optionalString("Raw hosted session Cookie header. Defaults to GIDEON_MCP_HOSTED_SESSION_COOKIE."),
-  hostedCsrfToken: optionalString("Hosted CSRF token for mutations. Defaults to GIDEON_MCP_HOSTED_CSRF_TOKEN or is discovered from /auth/session.")
+  hostedCsrfToken: optionalString("Hosted CSRF token for mutations. Defaults to GIDEON_MCP_HOSTED_CSRF_TOKEN or is discovered from /auth/session."),
+  hostedMaxRetries: optionalString("Hosted API transient retry count. Defaults to GIDEON_MCP_HOSTED_MAX_RETRIES or 2."),
+  hostedRetryDelayMs: optionalString("Hosted API retry base delay in milliseconds. Defaults to GIDEON_MCP_HOSTED_RETRY_DELAY_MS or 100.")
 };
 
 const tools = [
@@ -575,19 +577,37 @@ async function hostedApiRequest(
   if (requiresCsrf) {
     headers["X-CSRF-Token"] = config.csrfToken ?? (await hostedCsrfToken(config));
   }
-  const response = await fetch(new URL(apiPath, `${config.baseUrl}/`).toString(), {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined
-  });
-  const payload = (await response.json().catch(() => ({}))) as {
-    data?: Record<string, JsonValue>;
-    error?: { message?: string; code?: string };
-  };
-  if (!response.ok) {
-    throw new Error(payload.error?.message ?? payload.error?.code ?? `Hosted Gideon API request failed with ${response.status}.`);
+  const maxAttempts = hostedRetryAttempts(args);
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(new URL(apiPath, `${config.baseUrl}/`).toString(), {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: Record<string, JsonValue>;
+        error?: { message?: string; code?: string };
+      };
+      if (response.ok) {
+        return { mode: "hosted_api", ...(payload.data ?? {}) };
+      }
+      const message =
+        payload.error?.message ?? payload.error?.code ?? `Hosted Gideon API request failed with ${response.status}.`;
+      if (!shouldRetryHostedResponse(response.status) || attempt >= maxAttempts) {
+        throw new Error(message);
+      }
+      lastError = new Error(message);
+    } catch (error) {
+      lastError = error;
+      if (!shouldRetryHostedError(error) || attempt >= maxAttempts) {
+        throw error;
+      }
+    }
+    await delay(hostedRetryDelayMs(args, attempt));
   }
-  return { mode: "hosted_api", ...(payload.data ?? {}) };
+  throw lastError instanceof Error ? lastError : new Error("Hosted Gideon API request failed.");
 }
 
 async function hostedCsrfToken(config: HostedMcpConfig): Promise<string> {
@@ -606,6 +626,41 @@ async function hostedCsrfToken(config: HostedMcpConfig): Promise<string> {
     throw new Error(payload.error?.message ?? "Hosted MCP mode could not discover a CSRF token from the active session.");
   }
   return payload.data.csrfToken.trim();
+}
+
+function hostedRetryAttempts(args: Record<string, unknown>): number {
+  const raw =
+    optionalArgString(args.hostedMaxRetries) ?? optionalArgString(process.env.GIDEON_MCP_HOSTED_MAX_RETRIES);
+  const retries = raw ? Number(raw) : 2;
+  return Math.max(1, Math.min(5, Number.isFinite(retries) ? Math.floor(retries) + 1 : 3));
+}
+
+function hostedRetryDelayMs(args: Record<string, unknown>, attempt: number): number {
+  const raw =
+    optionalArgString(args.hostedRetryDelayMs) ?? optionalArgString(process.env.GIDEON_MCP_HOSTED_RETRY_DELAY_MS);
+  const baseDelay = raw ? Number(raw) : 100;
+  const normalized = Math.max(0, Math.min(5_000, Number.isFinite(baseDelay) ? Math.floor(baseDelay) : 100));
+  return normalized * attempt;
+}
+
+function shouldRetryHostedResponse(status: number): boolean {
+  return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function shouldRetryHostedError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return true;
+  }
+  return !/csrf|forbidden|unauthorized|revision|precondition|required|validation|not found/i.test(error.message);
+}
+
+async function delay(ms: number): Promise<void> {
+  if (ms <= 0) {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 async function hostedEditableRevision(

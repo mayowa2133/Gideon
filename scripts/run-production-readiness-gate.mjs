@@ -17,6 +17,7 @@ const steps = [
   step("optional Redis smoke", [pnpm, "test:redis"]),
   step("PostgreSQL migration dry-run", [pnpm, "db:migrate", "--", "--dry-run"]),
   step("provider canary dry-run", [pnpm, "provider:canary", "--", "--dry-run"]),
+  step("hosted review policy", [pnpm, "hosted:review:check"]),
   step("staging readiness dry-run", [pnpm, "staging:check"]),
   step("staging upload-to-export smoke dry-run", [pnpm, "staging:smoke", "--", "--dry-run"]),
   step("production promotion gate dry-run", [pnpm, "production:promote:check", "--", "--dry-run"]),

@@ -180,6 +180,46 @@ describe("Gideon MCP server tools", () => {
     }
   });
 
+  it("retries transient hosted API failures only", async () => {
+    const calls: Array<{ method: string; url: string; cookie?: string; csrf?: string; body?: unknown }> = [];
+    const hosted = await startFakeHostedApiServer(calls, { transientProjectListFailures: 1 });
+
+    try {
+      const listed = await callTool("gideon_list_projects", {
+        hostedApiBaseUrl: hosted.baseUrl,
+        hostedSessionCookie: "gideon_session=session-token",
+        hostedRetryDelayMs: "0"
+      });
+
+      expect(listed.content[0]?.text).toContain("Hosted project");
+      expect(calls.filter((call) => call.method === "GET" && call.url === "/api/v1/projects")).toHaveLength(2);
+    } finally {
+      await hosted.close();
+    }
+  });
+
+  it("does not retry hosted revision conflicts", async () => {
+    const calls: Array<{ method: string; url: string; cookie?: string; csrf?: string; body?: unknown }> = [];
+    const hosted = await startFakeHostedApiServer(calls, { scriptPatchStatus: 409, scriptPatchErrorCode: "revision_conflict" });
+
+    try {
+      await expect(
+        callTool("gideon_update_script", {
+          hostedApiBaseUrl: hosted.baseUrl,
+          hostedSessionCookie: "gideon_session=session-token",
+          hostedRetryDelayMs: "0",
+          projectId: "project-1",
+          scriptId: "script-1",
+          revision: "stale-revision",
+          hook: "Lost update"
+        })
+      ).rejects.toThrow("revision_conflict");
+      expect(calls.filter((call) => call.method === "PATCH" && call.url === "/api/v1/projects/project-1/scripts/script-1")).toHaveLength(1);
+    } finally {
+      await hosted.close();
+    }
+  });
+
   it("prefers the live app control bridge when available", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-mcp-bridge-"));
     const controlSocketPath = path.join(dir, "control.sock");
@@ -255,8 +295,14 @@ async function startFakeControlServer(
 }
 
 async function startFakeHostedApiServer(
-  calls: Array<{ method: string; url: string; cookie?: string; csrf?: string; body?: unknown }>
+  calls: Array<{ method: string; url: string; cookie?: string; csrf?: string; body?: unknown }>,
+  options: {
+    transientProjectListFailures?: number;
+    scriptPatchStatus?: number;
+    scriptPatchErrorCode?: string;
+  } = {}
 ): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  let remainingProjectListFailures = options.transientProjectListFailures ?? 0;
   const server = http.createServer((request, response) => {
     let rawBody = "";
     request.setEncoding("utf8");
@@ -278,6 +324,12 @@ async function startFakeHostedApiServer(
         return;
       }
       if (request.method === "GET" && request.url === "/api/v1/projects") {
+        if (remainingProjectListFailures > 0) {
+          remainingProjectListFailures -= 1;
+          response.statusCode = 503;
+          response.end(JSON.stringify({ error: { code: "temporarily_unavailable" }, meta: { requestId: "req_hosted" } }));
+          return;
+        }
         response.end(
           JSON.stringify({
             data: { projects: [{ id: "project-1", name: "Hosted project", status: "script_review" }] },
@@ -312,6 +364,16 @@ async function startFakeHostedApiServer(
         return;
       }
       if (request.method === "PATCH" && request.url === "/api/v1/projects/project-1/scripts/script-1") {
+        if (options.scriptPatchStatus) {
+          response.statusCode = options.scriptPatchStatus;
+          response.end(
+            JSON.stringify({
+              error: { code: options.scriptPatchErrorCode ?? "request_failed" },
+              meta: { requestId: "req_hosted" }
+            })
+          );
+          return;
+        }
         response.end(
           JSON.stringify({
             data: {
