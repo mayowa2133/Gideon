@@ -241,6 +241,15 @@ Return project summary, active artifacts, sanitized completed/queued render proj
 - **Errors:** 404.
 - **Rate limit:** 120/min.
 
+### GET `/projects/{projectId}/mcp-context`
+
+Return sanitized project context for Codex/Claude Code MCP agents using the user's hosted session.
+
+- **Auth:** Active member authorized for project workspace.
+- **Response 200:** Project summary plus product profile, recording metadata without private paths or object keys, transcript text/segments, detected moments without local thumbnail paths, frame OCR evidence without local image paths, scripts, jobs, sanitized renders, and recent project audit events.
+- **Errors:** 404.
+- **Rate limit:** 120/min.
+
 ### PATCH `/projects/{projectId}`
 
 Update project display name or archive state; product context uses separate endpoint.
@@ -498,7 +507,7 @@ Rename, adjust range, hide, or mark key proof; creates/revises reviewed moment.
 
 - **Auth:** `member+`.
 - **Headers:** CSRF, `If-Match` revision.
-- **Request:** Any of `label` (1–160), `startMs`, `endMs`, `isHidden`, `isKeyProof`; unknown fields rejected.
+- **Request:** Current hosted foundation supports allowlisted MCP fields `{ "label": string, "evidence": string, "enabled": boolean }`; future review revisions can also support `startMs`, `endMs`, `isHidden`, and `isKeyProof`.
 - **Validation:** end > start, within recording duration, minimum/maximum range policy.
 - **Response 200:** Updated moment/revision and stale impact if concepts already exist.
 - **Errors:** 404, 409 revision/impact, 422 range.
@@ -598,7 +607,7 @@ Edit user-controlled script fields.
 
 - **Auth:** `member+`.
 - **Headers:** CSRF, `If-Match`.
-- **Request:** allowlisted `hookText`, `voiceoverText`, `ctaText`, `captionCues`, `visualBeats`, `overlayCues`; no provider/model/status directly.
+- **Request:** Current hosted foundation supports allowlisted MCP fields `{ "hook": string, "voiceoverText": string, "cta": string }`; future script revisions can also support `hookText`, `ctaText`, `captionCues`, `visualBeats`, and `overlayCues`. No provider/model/status fields are accepted directly.
 - **Validation:** bounded text; caption ranges ordered/non-overlap policy; moment IDs owned; total duration <=60s; prohibited phrases return warnings or validation errors according to field; unsupported claim warning can require acknowledgment/context update.
 - **Response 200:** New/revised script, validation, revision, downstream artifacts marked stale.
 - **Errors:** 404, 409 revision/invalid state, 422.

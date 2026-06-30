@@ -16,6 +16,7 @@ import type {
   ApplyBillingSubscriptionInput,
   ArtifactRecord,
   CreateProjectInput,
+  DetectedMoment,
   JobRecord,
   ProductProfile,
   Project,
@@ -397,6 +398,93 @@ describe("hosted API foundation", () => {
 
     expect(hidden.status).toBe(404);
     expect(hidden.body).toMatchObject({ error: { code: "not_found" } });
+  });
+
+  it("serves hosted MCP context and applies CSRF-protected script and moment edits", async () => {
+    const api = testApi();
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        moments: [
+          {
+            id: "moment-1",
+            label: "Old proof",
+            startMs: 0,
+            endMs: 2_000,
+            evidence: "Old evidence",
+            confidence: 0.9,
+            enabled: true,
+            thumbnailPath: "/private/frame.png",
+            thumbnailUrl: "https://cdn.example.test/frame.png"
+          }
+        ],
+        scripts: [scriptFixture({ id: "script-1", hook: "Old hook", cta: "Old CTA" })]
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const context = await handleHostedApiRequest(
+      {
+        method: "GET",
+        path: "/api/v1/projects/project-1/mcp-context",
+        headers: { cookie: `gideon_session=${created.token}` },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(context.status).toBe(200);
+    expect(JSON.stringify(context.body)).toContain("Old hook");
+    expect(JSON.stringify(context.body)).toContain("https://cdn.example.test/frame.png");
+    expect(JSON.stringify(context.body)).not.toContain("/private/frame.png");
+
+    const scriptEdit = await handleHostedApiRequest(
+      {
+        method: "PATCH",
+        path: "/api/v1/projects/project-1/scripts/script-1",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1"
+        },
+        body: { hook: "New hosted hook", cta: "Try it now" },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+    expect(scriptEdit.status).toBe(200);
+    expect(api.store.state.projects[0]?.scripts[0]).toMatchObject({
+      hook: "New hosted hook",
+      cta: "Try it now"
+    });
+
+    const momentEdit = await handleHostedApiRequest(
+      {
+        method: "PATCH",
+        path: "/api/v1/projects/project-1/moments/moment-1",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1"
+        },
+        body: { label: "New hosted proof", enabled: false },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+    expect(momentEdit.status).toBe(200);
+    expect(api.store.state.projects[0]?.moments[0]).toMatchObject({
+      label: "New hosted proof",
+      enabled: false
+    });
+    expect(api.store.state.auditEvents.map((event) => event.actorType)).toContain("mcp_agent");
   });
 
   it("returns sanitized completed renders so hosted clients can create exports", async () => {
@@ -1686,6 +1774,109 @@ class InMemoryHostedApiStore implements HostedApiStore {
     return project;
   }
 
+  async updateScriptForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    scriptId: string;
+    hook?: string;
+    voiceoverText?: string;
+    cta?: string;
+  }): Promise<Project> {
+    this.assertMember(input);
+    const project = this.state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const script = project.scripts.find((candidate) => candidate.id === input.scriptId);
+    if (!script) {
+      throw new Error("Script not found.");
+    }
+    if (input.hook) {
+      script.hook = input.hook;
+    }
+    if (input.voiceoverText) {
+      script.voiceoverText = input.voiceoverText;
+    }
+    if (input.cta) {
+      script.cta = input.cta;
+    }
+    script.updatedAt = "2026-06-25T12:05:00.000Z";
+    project.renders = [];
+    project.status = "script_review";
+    this.state.auditEvents = [
+      ...this.state.auditEvents,
+      {
+        id: "audit-script-1",
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        actorUserId: input.userId,
+        actorType: "mcp_agent",
+        action: "scripts.update",
+        targetType: "script",
+        targetId: input.scriptId,
+        summary: `MCP updated script ${input.scriptId}.`,
+        metadata: { changedFields: "hook,cta" },
+        createdAt: "2026-06-25T12:05:00.000Z"
+      }
+    ];
+    return project;
+  }
+
+  async updateMomentForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    momentId: string;
+    label?: string;
+    evidence?: string;
+    enabled?: boolean;
+  }): Promise<Project> {
+    this.assertMember(input);
+    const project = this.state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const moment = project.moments.find((candidate) => candidate.id === input.momentId);
+    if (!moment) {
+      throw new Error("Moment not found.");
+    }
+    if (input.label) {
+      moment.label = input.label;
+    }
+    if (input.evidence) {
+      moment.evidence = input.evidence;
+    }
+    if (typeof input.enabled === "boolean") {
+      moment.enabled = input.enabled;
+    }
+    project.concepts = [];
+    project.scripts = [];
+    project.renders = [];
+    project.status = "analyzed";
+    this.state.auditEvents = [
+      ...this.state.auditEvents,
+      {
+        id: "audit-moment-1",
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        actorUserId: input.userId,
+        actorType: "mcp_agent",
+        action: "moments.update",
+        targetType: "moment",
+        targetId: input.momentId,
+        summary: `MCP updated moment ${input.momentId}.`,
+        metadata: { changedFields: "label,enabled" },
+        createdAt: "2026-06-25T12:05:00.000Z"
+      }
+    ];
+    return project;
+  }
+
   async getJobForSession(input: {
     userId: string;
     workspaceId: string;
@@ -1954,6 +2145,7 @@ function projectFixture(input: {
   uploadSessions?: RecordingUploadSessionRecord[];
   artifacts?: ArtifactRecord[];
   recording?: RecordingMetadata;
+  moments?: DetectedMoment[];
   scripts?: ScriptDraft[];
   renders?: RenderedVideo[];
   jobs?: JobRecord[];
@@ -1965,7 +2157,7 @@ function projectFixture(input: {
     status: input.recording ? "recording_ready" : "draft",
     profile: input.profile ?? profileFixture(),
     recording: input.recording,
-    moments: [],
+    moments: input.moments ?? [],
     frameEvidence: [],
     concepts: [],
     scripts: input.scripts ?? [],

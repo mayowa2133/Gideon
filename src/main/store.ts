@@ -1224,6 +1224,134 @@ export class GideonStore {
     );
   }
 
+  async updateScriptForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    scriptId: string;
+    hook?: string;
+    voiceoverText?: string;
+    cta?: string;
+  }): Promise<Project> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "mcp:write"
+    });
+    const project = state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const script = project.scripts.find((candidate) => candidate.id === input.scriptId);
+    if (!script) {
+      throw new Error("Script not found.");
+    }
+    const changedFields: string[] = [];
+    if (typeof input.hook === "string") {
+      script.hook = input.hook.trim();
+      changedFields.push("hook");
+    }
+    if (typeof input.voiceoverText === "string") {
+      script.voiceoverText = input.voiceoverText.trim();
+      changedFields.push("voiceoverText");
+    }
+    if (typeof input.cta === "string") {
+      script.cta = input.cta.trim();
+      changedFields.push("cta");
+    }
+    if (changedFields.length === 0) {
+      throw new Error("At least one script field is required.");
+    }
+    const now = new Date().toISOString();
+    script.updatedAt = now;
+    project.renders = [];
+    project.status = "script_review";
+    project.updatedAt = now;
+    this.appendAuditToState(state, {
+      workspaceId: project.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      actorType: "mcp_agent",
+      action: "scripts.update",
+      targetType: "script",
+      targetId: input.scriptId,
+      summary: `MCP updated script ${input.scriptId}.`,
+      metadata: { changedFields: changedFields.join(",") }
+    });
+    await this.save();
+    return project;
+  }
+
+  async updateMomentForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    momentId: string;
+    label?: string;
+    evidence?: string;
+    enabled?: boolean;
+  }): Promise<Project> {
+    const state = await this.load();
+    requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({
+      members: state.workspaceMembers,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      action: "mcp:write"
+    });
+    const project = state.projects.find(
+      (candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId
+    );
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+    const moment = project.moments.find((candidate) => candidate.id === input.momentId);
+    if (!moment) {
+      throw new Error("Moment not found.");
+    }
+    const changedFields: string[] = [];
+    if (typeof input.label === "string") {
+      moment.label = input.label.trim();
+      changedFields.push("label");
+    }
+    if (typeof input.evidence === "string") {
+      moment.evidence = input.evidence.trim();
+      changedFields.push("evidence");
+    }
+    if (typeof input.enabled === "boolean") {
+      moment.enabled = input.enabled;
+      changedFields.push("enabled");
+    }
+    if (changedFields.length === 0) {
+      throw new Error("At least one moment field is required.");
+    }
+    const now = new Date().toISOString();
+    project.analysisSummary = undefined;
+    project.concepts = [];
+    project.scripts = [];
+    project.renders = [];
+    project.status = "analyzed";
+    project.updatedAt = now;
+    this.appendAuditToState(state, {
+      workspaceId: project.workspaceId,
+      projectId: project.id,
+      actorUserId: input.userId,
+      actorType: "mcp_agent",
+      action: "moments.update",
+      targetType: "moment",
+      targetId: input.momentId,
+      summary: `MCP updated moment ${input.momentId}.`,
+      metadata: { changedFields: changedFields.join(",") }
+    });
+    await this.save();
+    return project;
+  }
+
   async replaceRenders(projectId: string, renders: RenderedVideo[]): Promise<Project> {
     return this.updateProject(
       projectId,

@@ -37,6 +37,26 @@ GIDEON_CONTROL_SOCKET="$HOME/Library/Application Support/Gideon/gideon-control.s
 
 The socket path defaults to the macOS Gideon app data folder. Direct JSON-store access remains a fallback for safe inspection and bounded copy edits when the app is not running, but the intended path is the live bridge so edits flow through Gideon’s in-memory store and durable worker queue.
 
+## Hosted MCP mode
+
+Hosted deployments can use the same MCP server without giving Gideon model-provider API keys. Set the hosted API base URL and the user's active Gideon session cookie:
+
+```bash
+GIDEON_MCP_HOSTED_API_BASE_URL="https://app.gideon.example" \
+GIDEON_MCP_HOSTED_SESSION_COOKIE="gideon_session=..." \
+pnpm mcp:server
+```
+
+When these variables are present, MCP tools prefer the hosted API service layer:
+
+- `gideon_list_projects` calls the authenticated project list route.
+- `gideon_get_project` calls the sanitized project MCP context route.
+- `gideon_get_audit_log` reads the project-scoped audit events from that context.
+- `gideon_update_script` and `gideon_update_moment` call CSRF-protected hosted edit routes.
+- `gideon_enqueue_analysis` and `gideon_enqueue_render` call the hosted job routes.
+
+The MCP server can discover the CSRF token from `GET /api/v1/auth/session`, or you can provide `GIDEON_MCP_HOSTED_CSRF_TOKEN`. This mode keeps workspace authorization, CSRF checks, bounded field updates, job queues, and audit records inside Gideon's authoritative hosted service layer while Codex/Claude Code supplies the reasoning externally.
+
 ## Safety rules
 
 - Tools must use explicit schemas and bounded fields.
@@ -45,9 +65,9 @@ The socket path defaults to the macOS Gideon app data folder. Direct JSON-store 
 - Render/analysis tools must enqueue Gideon durable jobs instead of bypassing job state.
 - Local MCP mutations are checked against the active user's workspace role. Viewers can inspect projects but cannot apply MCP edits.
 - Live MCP edits and direct JSON-store fallback edits write audit events with `actorType: "mcp_agent"` so Codex/Claude changes are visible in the app and inspectable through MCP.
-- Future hosted mode must enforce workspace membership through the authoritative service layer on every MCP call.
+- Hosted mode enforces workspace membership through the authoritative service layer on every MCP call and uses CSRF-protected routes for mutations.
 
 ## Next steps
 
-- Replace direct JSON fallback edits with a fully authoritative service API once hosted/workspace auth exists.
+- Add collaborative revision/conflict handling for hosted MCP and web review edits.
 - Add project-scoped approval gates for destructive actions and future publishing.

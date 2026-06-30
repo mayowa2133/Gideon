@@ -618,6 +618,69 @@ describe("GideonStore billing reconciliation", () => {
     ).toBe(true);
   });
 
+  it("applies hosted MCP script and moment edits through explicit session scope", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Hosted MCP project",
+      profile: profileFixture()
+    });
+    await store.updateMoments(project.id, [
+      {
+        id: "moment-1",
+        label: "Old proof",
+        startMs: 0,
+        endMs: 2_000,
+        evidence: "Old evidence",
+        confidence: 0.9,
+        enabled: true
+      }
+    ]);
+
+    const momentProject = await store.updateMomentForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      momentId: "moment-1",
+      label: "Hosted proof",
+      enabled: false
+    });
+    expect(momentProject.moments[0]).toMatchObject({ label: "Hosted proof", enabled: false });
+    expect(momentProject.status).toBe("analyzed");
+
+    await store.updateScripts(project.id, [scriptFixture({ id: "script-1", hook: "Old hook", cta: "Old CTA" })]);
+    const scriptProject = await store.updateScriptForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      scriptId: "script-1",
+      hook: "Hosted hook",
+      cta: "Hosted CTA"
+    });
+    expect(scriptProject.scripts[0]).toMatchObject({ hook: "Hosted hook", cta: "Hosted CTA" });
+    expect(scriptProject.status).toBe("script_review");
+
+    const state = await store.load();
+    expect(
+      state.auditEvents.some(
+        (event) =>
+          event.actorType === "mcp_agent" &&
+          event.action === "moments.update" &&
+          event.targetId === "moment-1"
+      )
+    ).toBe(true);
+    expect(
+      state.auditEvents.some(
+        (event) =>
+          event.actorType === "mcp_agent" &&
+          event.action === "scripts.update" &&
+          event.targetId === "script-1"
+      )
+    ).toBe(true);
+  });
+
   it("creates exports with explicit hosted session scope", async () => {
     const store = new GideonStore();
     await store.load();

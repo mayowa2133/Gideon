@@ -84,13 +84,26 @@ interface GideonMoment {
   [key: string]: unknown;
 }
 
+interface HostedMcpConfig {
+  baseUrl: string;
+  cookie: string;
+  csrfToken?: string;
+}
+
+const hostedTransportSchema = {
+  hostedApiBaseUrl: optionalString("Hosted Gideon API base URL. Defaults to GIDEON_MCP_HOSTED_API_BASE_URL."),
+  hostedSessionCookie: optionalString("Raw hosted session Cookie header. Defaults to GIDEON_MCP_HOSTED_SESSION_COOKIE."),
+  hostedCsrfToken: optionalString("Hosted CSRF token for mutations. Defaults to GIDEON_MCP_HOSTED_CSRF_TOKEN or is discovered from /auth/session.")
+};
+
 const tools = [
   {
     name: "gideon_status",
     description: "Check whether the local Gideon store is reachable. No provider API keys are required.",
     inputSchema: objectSchema({
       controlSocketPath: optionalString("Explicit Gideon app control socket path. Defaults to GIDEON_CONTROL_SOCKET or the macOS app data path."),
-      storePath: optionalString("Explicit path to gideon-store.json. Defaults to GIDEON_STORE_PATH or the macOS app data path.")
+      storePath: optionalString("Explicit path to gideon-store.json. Defaults to GIDEON_STORE_PATH or the macOS app data path."),
+      ...hostedTransportSchema
     })
   },
   {
@@ -98,7 +111,8 @@ const tools = [
     description: "List local Gideon projects with high-level status for agent review.",
     inputSchema: objectSchema({
       controlSocketPath: optionalString("Explicit Gideon app control socket path."),
-      storePath: optionalString("Explicit path to gideon-store.json.")
+      storePath: optionalString("Explicit path to gideon-store.json."),
+      ...hostedTransportSchema
     })
   },
   {
@@ -107,7 +121,8 @@ const tools = [
     inputSchema: objectSchema({
       projectId: { type: "string", description: "Gideon project ID." },
       controlSocketPath: optionalString("Explicit Gideon app control socket path."),
-      storePath: optionalString("Explicit path to gideon-store.json.")
+      storePath: optionalString("Explicit path to gideon-store.json."),
+      ...hostedTransportSchema
     }, ["projectId"])
   },
   {
@@ -117,7 +132,8 @@ const tools = [
       projectId: optionalString("Optional project ID to filter audit events."),
       limit: { type: "number", description: "Maximum number of events to return. Defaults to 25." },
       controlSocketPath: optionalString("Explicit Gideon app control socket path."),
-      storePath: optionalString("Explicit path to gideon-store.json.")
+      storePath: optionalString("Explicit path to gideon-store.json."),
+      ...hostedTransportSchema
     })
   },
   {
@@ -130,7 +146,8 @@ const tools = [
       voiceoverText: optionalString("Replacement voiceover text."),
       cta: optionalString("Replacement CTA text."),
       controlSocketPath: optionalString("Explicit Gideon app control socket path."),
-      storePath: optionalString("Explicit path to gideon-store.json.")
+      storePath: optionalString("Explicit path to gideon-store.json."),
+      ...hostedTransportSchema
     }, ["projectId", "scriptId"])
   },
   {
@@ -143,7 +160,8 @@ const tools = [
       evidence: optionalString("Replacement evidence text."),
       enabled: { type: "boolean", description: "Whether this moment should be used." },
       controlSocketPath: optionalString("Explicit Gideon app control socket path."),
-      storePath: optionalString("Explicit path to gideon-store.json.")
+      storePath: optionalString("Explicit path to gideon-store.json."),
+      ...hostedTransportSchema
     }, ["projectId", "momentId"])
   },
   {
@@ -151,7 +169,8 @@ const tools = [
     description: "Ask the running Gideon app to enqueue an analysis job through its local worker queue.",
     inputSchema: objectSchema({
       projectId: { type: "string" },
-      controlSocketPath: optionalString("Explicit Gideon app control socket path.")
+      controlSocketPath: optionalString("Explicit Gideon app control socket path."),
+      ...hostedTransportSchema
     }, ["projectId"])
   },
   {
@@ -159,7 +178,8 @@ const tools = [
     description: "Ask the running Gideon app to enqueue a render job through its local worker queue.",
     inputSchema: objectSchema({
       projectId: { type: "string" },
-      controlSocketPath: optionalString("Explicit Gideon app control socket path.")
+      controlSocketPath: optionalString("Explicit Gideon app control socket path."),
+      ...hostedTransportSchema
     }, ["projectId"])
   },
   {
@@ -169,7 +189,8 @@ const tools = [
       instruction: { type: "string", description: "User's desired edit or marketing outcome." },
       projectId: optionalString("Optional project ID to ground the plan."),
       controlSocketPath: optionalString("Explicit Gideon app control socket path."),
-      storePath: optionalString("Explicit path to gideon-store.json.")
+      storePath: optionalString("Explicit path to gideon-store.json."),
+      ...hostedTransportSchema
     }, ["instruction"])
   }
 ];
@@ -209,12 +230,22 @@ export async function callTool(name: string, args: Record<string, unknown> = {})
     case "gideon_update_moment":
       return textResult(await updateMoment(args));
     case "gideon_enqueue_analysis":
+      if (hostedConfigFromArgs(args)) {
+        return textResult(
+          await hostedApiRequest(args, "POST", `/api/v1/projects/${encodeURIComponent(requireString(args.projectId, "projectId"))}/analysis-runs`, {}, true)
+        );
+      }
       return textResult(
         await requireLiveControl(args, "enqueueAnalysis", {
           projectId: requireString(args.projectId, "projectId")
         })
       );
     case "gideon_enqueue_render":
+      if (hostedConfigFromArgs(args)) {
+        return textResult(
+          await hostedApiRequest(args, "POST", `/api/v1/projects/${encodeURIComponent(requireString(args.projectId, "projectId"))}/render-jobs`, {}, true)
+        );
+      }
       return textResult(
         await requireLiveControl(args, "enqueueRender", {
           projectId: requireString(args.projectId, "projectId")
@@ -248,6 +279,8 @@ export function createVideoEditPlan(instruction: string, project?: GideonProject
 async function status(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
   const storePath = pathFromArgs(args);
   const controlSocketPath = controlSocketPathFromArgs(args);
+  const hostedConfig = hostedConfigFromArgs(args);
+  const hostedSession = hostedConfig ? await maybeHostedApiRequest(args, "GET", "/api/v1/auth/session") : null;
   const live = await maybeControlRequest(args, "status", {});
   let exists = false;
   let projectCount = 0;
@@ -264,6 +297,9 @@ async function status(args: Record<string, unknown>): Promise<Record<string, Jso
     server: "gideon-mcp",
     liveAppConnected: Boolean(live),
     liveApp: live ? sanitizeRecord(live) : {},
+    hostedApiConfigured: Boolean(hostedConfig),
+    hostedApiConnected: Boolean(hostedSession),
+    hostedApi: hostedSession ? sanitizeRecord(hostedSession) : {},
     controlSocketPath,
     storePath,
     storeExists: exists,
@@ -273,6 +309,9 @@ async function status(args: Record<string, unknown>): Promise<Record<string, Jso
 }
 
 async function listProjectsTool(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  if (hostedConfigFromArgs(args)) {
+    return await hostedApiRequest(args, "GET", "/api/v1/projects");
+  }
   const live = await maybeControlRequest(args, "listProjects", {});
   if (live) {
     return { mode: "live_app", state: sanitizeRecord(live) };
@@ -282,6 +321,9 @@ async function listProjectsTool(args: Record<string, unknown>): Promise<Record<s
 
 async function getProjectTool(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
   const projectId = requireString(args.projectId, "projectId");
+  if (hostedConfigFromArgs(args)) {
+    return await hostedApiRequest(args, "GET", `/api/v1/projects/${encodeURIComponent(projectId)}/mcp-context`);
+  }
   const live = await maybeControlRequest(args, "getProject", { projectId });
   if (live) {
     return { mode: "live_app", project: sanitizeRecord(live) };
@@ -293,6 +335,14 @@ async function getProjectTool(args: Record<string, unknown>): Promise<Record<str
 }
 
 async function getAuditLogTool(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  if (hostedConfigFromArgs(args)) {
+    const projectId = requireString(args.projectId, "projectId");
+    const context = await hostedApiRequest(args, "GET", `/api/v1/projects/${encodeURIComponent(projectId)}/mcp-context`);
+    const project = context.project as Record<string, unknown> | undefined;
+    const auditEvents = Array.isArray(project?.auditEvents) ? project.auditEvents : [];
+    const limit = typeof args.limit === "number" && Number.isFinite(args.limit) ? Math.max(1, Math.min(100, Math.floor(args.limit))) : 25;
+    return { mode: "hosted_api", auditEvents: auditEvents.slice(-limit).reverse() as JsonValue[] };
+  }
   const live = await maybeControlRequest(args, "listProjects", {});
   const state = live ? (live as GideonState) : await readStateFromArgs(args);
   const projectId = typeof args.projectId === "string" && args.projectId.trim() ? args.projectId.trim() : null;
@@ -310,6 +360,21 @@ async function getAuditLogTool(args: Record<string, unknown>): Promise<Record<st
 }
 
 async function updateScript(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  if (hostedConfigFromArgs(args)) {
+    const projectId = requireString(args.projectId, "projectId");
+    const scriptId = requireString(args.scriptId, "scriptId");
+    return await hostedApiRequest(
+      args,
+      "PATCH",
+      `/api/v1/projects/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(scriptId)}`,
+      {
+        hook: optionalControlValue(args.hook),
+        voiceoverText: optionalControlValue(args.voiceoverText),
+        cta: optionalControlValue(args.cta)
+      },
+      true
+    );
+  }
   const live = await maybeControlRequest(args, "updateScript", {
     projectId: requireString(args.projectId, "projectId"),
     scriptId: requireString(args.scriptId, "scriptId"),
@@ -361,6 +426,21 @@ async function updateScript(args: Record<string, unknown>): Promise<Record<strin
 }
 
 async function updateMoment(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  if (hostedConfigFromArgs(args)) {
+    const projectId = requireString(args.projectId, "projectId");
+    const momentId = requireString(args.momentId, "momentId");
+    return await hostedApiRequest(
+      args,
+      "PATCH",
+      `/api/v1/projects/${encodeURIComponent(projectId)}/moments/${encodeURIComponent(momentId)}`,
+      {
+        label: optionalControlValue(args.label),
+        evidence: optionalControlValue(args.evidence),
+        enabled: typeof args.enabled === "boolean" ? args.enabled : undefined
+      },
+      true
+    );
+  }
   const live = await maybeControlRequest(args, "updateMoment", {
     projectId: requireString(args.projectId, "projectId"),
     momentId: requireString(args.momentId, "momentId"),
@@ -414,8 +494,13 @@ async function generateVideoEditPlan(args: Record<string, unknown>): Promise<Rec
   const instruction = requireString(args.instruction, "instruction");
   let project: GideonProject | undefined;
   if (typeof args.projectId === "string") {
-    const live = await maybeControlRequest(args, "getProject", { projectId: args.projectId });
-    project = live ? (live as GideonProject) : requireProject(await readStateFromArgs(args), args.projectId);
+    if (hostedConfigFromArgs(args)) {
+      const hosted = await hostedApiRequest(args, "GET", `/api/v1/projects/${encodeURIComponent(args.projectId)}/mcp-context`);
+      project = hosted.project as GideonProject | undefined;
+    } else {
+      const live = await maybeControlRequest(args, "getProject", { projectId: args.projectId });
+      project = live ? (live as GideonProject) : requireProject(await readStateFromArgs(args), args.projectId);
+    }
   }
   return createVideoEditPlan(instruction, project);
 }
@@ -448,6 +533,109 @@ async function maybeControlRequest(
     }
     return null;
   }
+}
+
+async function maybeHostedApiRequest(
+  args: Record<string, unknown>,
+  method: "GET" | "POST" | "PATCH",
+  apiPath: string,
+  body?: Record<string, unknown>,
+  requiresCsrf = false
+): Promise<Record<string, JsonValue> | null> {
+  try {
+    return await hostedApiRequest(args, method, apiPath, body, requiresCsrf);
+  } catch {
+    return null;
+  }
+}
+
+async function hostedApiRequest(
+  args: Record<string, unknown>,
+  method: "GET" | "POST" | "PATCH",
+  apiPath: string,
+  body?: Record<string, unknown>,
+  requiresCsrf = false
+): Promise<Record<string, JsonValue>> {
+  const config = requireHostedConfig(args);
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    Cookie: config.cookie
+  };
+  if (body) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (requiresCsrf) {
+    headers["X-CSRF-Token"] = config.csrfToken ?? (await hostedCsrfToken(config));
+  }
+  const response = await fetch(new URL(apiPath, `${config.baseUrl}/`).toString(), {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: Record<string, JsonValue>;
+    error?: { message?: string; code?: string };
+  };
+  if (!response.ok) {
+    throw new Error(payload.error?.message ?? payload.error?.code ?? `Hosted Gideon API request failed with ${response.status}.`);
+  }
+  return { mode: "hosted_api", ...(payload.data ?? {}) };
+}
+
+async function hostedCsrfToken(config: HostedMcpConfig): Promise<string> {
+  const response = await fetch(new URL("/api/v1/auth/session", `${config.baseUrl}/`).toString(), {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      Cookie: config.cookie
+    }
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: { csrfToken?: unknown };
+    error?: { message?: string };
+  };
+  if (!response.ok || typeof payload.data?.csrfToken !== "string" || !payload.data.csrfToken.trim()) {
+    throw new Error(payload.error?.message ?? "Hosted MCP mode could not discover a CSRF token from the active session.");
+  }
+  return payload.data.csrfToken.trim();
+}
+
+function hostedConfigFromArgs(args: Record<string, unknown>): HostedMcpConfig | null {
+  const baseUrl = optionalArgString(args.hostedApiBaseUrl) ?? optionalArgString(process.env.GIDEON_MCP_HOSTED_API_BASE_URL);
+  if (!baseUrl) {
+    return null;
+  }
+  const cookie =
+    optionalArgString(args.hostedSessionCookie) ??
+    optionalArgString(process.env.GIDEON_MCP_HOSTED_SESSION_COOKIE) ??
+    hostedCookieFromToken(
+      optionalArgString(args.hostedSessionToken) ?? optionalArgString(process.env.GIDEON_MCP_HOSTED_SESSION_TOKEN),
+      optionalArgString(process.env.GIDEON_SESSION_COOKIE_NAME) ?? "gideon_session"
+    );
+  if (!cookie) {
+    throw new Error("Hosted MCP mode requires hostedSessionCookie, GIDEON_MCP_HOSTED_SESSION_COOKIE, or GIDEON_MCP_HOSTED_SESSION_TOKEN.");
+  }
+  const parsed = new URL(baseUrl);
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Hosted MCP API base URL must use http or https.");
+  }
+  return {
+    baseUrl: parsed.toString().replace(/\/$/, ""),
+    cookie,
+    csrfToken: optionalArgString(args.hostedCsrfToken) ?? optionalArgString(process.env.GIDEON_MCP_HOSTED_CSRF_TOKEN)
+  };
+}
+
+function requireHostedConfig(args: Record<string, unknown>): HostedMcpConfig {
+  const config = hostedConfigFromArgs(args);
+  if (!config) {
+    throw new Error("Hosted MCP mode requires hostedApiBaseUrl or GIDEON_MCP_HOSTED_API_BASE_URL.");
+  }
+  return config;
+}
+
+function hostedCookieFromToken(token: string | undefined, cookieName: string): string | undefined {
+  return token ? `${cookieName}=${token}` : undefined;
 }
 
 async function requireLiveControl(
@@ -608,6 +796,10 @@ function controlSocketPathFromArgs(args: Record<string, unknown>): string {
 
 function optionalControlValue(value: unknown): string | undefined {
   return typeof value === "string" ? value.trim() : undefined;
+}
+
+function optionalArgString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function requireString(value: unknown, field: string): string {

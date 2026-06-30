@@ -81,6 +81,24 @@ export interface HostedApiStore {
     projectId: string;
     profile: ProductProfile;
   }): Promise<Project>;
+  updateScriptForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    scriptId: string;
+    hook?: string;
+    voiceoverText?: string;
+    cta?: string;
+  }): Promise<Project>;
+  updateMomentForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    momentId: string;
+    label?: string;
+    evidence?: string;
+    enabled?: boolean;
+  }): Promise<Project>;
   getJobForSession(input: { userId: string; workspaceId: string; jobId: string }): Promise<{ project: Project; job: JobRecord }>;
   requestJobCancelForSession(input: {
     userId: string;
@@ -288,9 +306,38 @@ export async function handleHostedApiRequest(
     if (method === "GET" && projectRoute) {
       return await handleGetProject(request, dependencies, requestId, decodeURIComponent(projectRoute[1] ?? ""));
     }
+    const projectMcpContextRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/mcp-context$/);
+    if (method === "GET" && projectMcpContextRoute) {
+      return await handleGetProjectMcpContext(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(projectMcpContextRoute[1] ?? "")
+      );
+    }
     const projectProfileRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/profile$/);
     if (method === "PATCH" && projectProfileRoute) {
       return await handleUpdateProjectProfile(request, dependencies, requestId, decodeURIComponent(projectProfileRoute[1] ?? ""));
+    }
+    const projectScriptRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/scripts\/([^/]+)$/);
+    if (method === "PATCH" && projectScriptRoute) {
+      return await handleUpdateProjectScript(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(projectScriptRoute[1] ?? ""),
+        decodeURIComponent(projectScriptRoute[2] ?? "")
+      );
+    }
+    const projectMomentRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/moments\/([^/]+)$/);
+    if (method === "PATCH" && projectMomentRoute) {
+      return await handleUpdateProjectMoment(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(projectMomentRoute[1] ?? ""),
+        decodeURIComponent(projectMomentRoute[2] ?? "")
+      );
     }
     const recordingUploadRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/recordings\/uploads$/);
     if (method === "POST" && recordingUploadRoute) {
@@ -605,6 +652,24 @@ async function handleGetProject(
   return jsonResponse(200, { project: projectResource(project) }, requestId);
 }
 
+async function handleGetProjectMcpContext(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string
+): Promise<HostedApiResponse> {
+  const claims = requiredSession(request, dependencies);
+  const project = await storeCall(() =>
+    dependencies.store.getProjectForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId
+    })
+  );
+  const state = await dependencies.store.load();
+  return jsonResponse(200, { project: mcpProjectContextResource(project, state) }, requestId);
+}
+
 async function handleUpdateProjectProfile(
   request: HostedApiRequest,
   dependencies: HostedApiDependencies,
@@ -624,6 +689,58 @@ async function handleUpdateProjectProfile(
       workspaceId: claims.workspaceId,
       projectId,
       profile
+    })
+  );
+  return jsonResponse(200, { project: projectResource(project) }, requestId);
+}
+
+async function handleUpdateProjectScript(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string,
+  scriptId: string
+): Promise<HostedApiResponse> {
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  const input = hostedScriptPatchInput(objectBody(request));
+  const project = await storeCall(() =>
+    dependencies.store.updateScriptForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId,
+      scriptId,
+      ...input
+    })
+  );
+  return jsonResponse(200, { project: projectResource(project) }, requestId);
+}
+
+async function handleUpdateProjectMoment(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string,
+  momentId: string
+): Promise<HostedApiResponse> {
+  const claims = requiredSession(request, dependencies);
+  try {
+    assertCsrfToken(claims, header(request, "x-csrf-token"));
+  } catch {
+    throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  const input = hostedMomentPatchInput(objectBody(request));
+  const project = await storeCall(() =>
+    dependencies.store.updateMomentForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId,
+      momentId,
+      ...input
     })
   );
   return jsonResponse(200, { project: projectResource(project) }, requestId);
@@ -1194,6 +1311,88 @@ function projectResource(project: Project) {
   };
 }
 
+function mcpProjectContextResource(project: Project, state: AppState) {
+  return {
+    ...projectResource(project),
+    recording: project.recording
+      ? {
+          fileName: project.recording.fileName,
+          durationMs: project.recording.durationMs,
+          width: project.recording.width,
+          height: project.recording.height,
+          fps: project.recording.fps,
+          videoCodec: project.recording.videoCodec,
+          audioCodec: project.recording.audioCodec,
+          hasAudio: project.recording.hasAudio,
+          sizeBytes: project.recording.sizeBytes,
+          validatedAt: project.recording.validatedAt,
+          artifactId: project.recording.artifactId,
+          sha256: project.recording.sha256
+        }
+      : null,
+    transcript: project.transcript
+      ? {
+          id: project.transcript.id,
+          status: project.transcript.status,
+          provider: project.transcript.provider,
+          model: project.transcript.model,
+          text: project.transcript.text,
+          segments: project.transcript.segments,
+          createdAt: project.transcript.createdAt,
+          error: project.transcript.error
+        }
+      : null,
+    moments: project.moments.map((moment) => ({
+      id: moment.id,
+      label: moment.label,
+      startMs: moment.startMs,
+      endMs: moment.endMs,
+      evidence: moment.evidence,
+      confidence: moment.confidence,
+      enabled: moment.enabled,
+      thumbnailUrl: moment.thumbnailUrl
+    })),
+    frameEvidence: project.frameEvidence.map((frame) => ({
+      id: frame.id,
+      momentId: frame.momentId,
+      timestampMs: frame.timestampMs,
+      imageUrl: frame.imageUrl,
+      ocrText: frame.ocrText,
+      ocrProvider: frame.ocrProvider,
+      confidence: frame.confidence,
+      createdAt: frame.createdAt
+    })),
+    scripts: project.scripts.map((script) => ({
+      id: script.id,
+      conceptId: script.conceptId,
+      hook: script.hook,
+      voiceoverText: script.voiceoverText,
+      captions: script.captions,
+      cta: script.cta,
+      visualBeats: script.visualBeats,
+      approved: script.approved,
+      updatedAt: script.updatedAt
+    })),
+    jobs: project.jobs.map((job) => jobResource(project, job)),
+    auditEvents: state.auditEvents
+      .filter((event) => event.projectId === project.id)
+      .slice(-25)
+      .map((event) => ({
+        id: event.id,
+        workspaceId: event.workspaceId,
+        projectId: event.projectId,
+        actorUserId: event.actorUserId,
+        actorType: event.actorType,
+        action: event.action,
+        targetType: event.targetType,
+        targetId: event.targetId,
+        summary: event.summary,
+        metadata: event.metadata,
+        createdAt: event.createdAt
+      }))
+  };
+}
+
 function jobResource(project: Project, job: JobRecord) {
   return {
     ...job,
@@ -1384,6 +1583,38 @@ function requiredString(value: unknown, field: string): string {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function hostedScriptPatchInput(body: Record<string, unknown>): {
+  hook?: string;
+  voiceoverText?: string;
+  cta?: string;
+} {
+  const input = {
+    hook: optionalString(body.hook),
+    voiceoverText: optionalString(body.voiceoverText),
+    cta: optionalString(body.cta)
+  };
+  if (!input.hook && !input.voiceoverText && !input.cta) {
+    throw new ApiError(422, "validation_failed", "At least one script field is required.");
+  }
+  return input;
+}
+
+function hostedMomentPatchInput(body: Record<string, unknown>): {
+  label?: string;
+  evidence?: string;
+  enabled?: boolean;
+} {
+  const input = {
+    label: optionalString(body.label),
+    evidence: optionalString(body.evidence),
+    enabled: typeof body.enabled === "boolean" ? body.enabled : undefined
+  };
+  if (!input.label && !input.evidence && typeof input.enabled !== "boolean") {
+    throw new ApiError(422, "validation_failed", "At least one moment field is required.");
+  }
+  return input;
 }
 
 function optionalIdentityProvider(value: unknown): IdentityProvider | undefined {

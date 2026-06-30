@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -128,6 +129,56 @@ describe("Gideon MCP server tools", () => {
     expect(project.content[0]?.text).toContain("Launch demo");
   });
 
+  it("uses hosted API mode for authenticated project inspection, edits, and job enqueueing", async () => {
+    const calls: Array<{ method: string; url: string; cookie?: string; csrf?: string; body?: unknown }> = [];
+    const hosted = await startFakeHostedApiServer(calls);
+
+    try {
+      const common = {
+        hostedApiBaseUrl: hosted.baseUrl,
+        hostedSessionCookie: "gideon_session=session-token"
+      };
+
+      const listed = await callTool("gideon_list_projects", common);
+      expect(listed.content[0]?.text).toContain("hosted_api");
+      expect(listed.content[0]?.text).toContain("Hosted project");
+
+      const project = await callTool("gideon_get_project", { ...common, projectId: "project-1" });
+      expect(project.content[0]?.text).toContain("Hosted hook");
+      expect(project.content[0]?.text).not.toContain("session-token");
+
+      const edited = await callTool("gideon_update_script", {
+        ...common,
+        projectId: "project-1",
+        scriptId: "script-1",
+        hook: "Hosted edit"
+      });
+      expect(edited.content[0]?.text).toContain("Hosted edit");
+
+      const enqueued = await callTool("gideon_enqueue_render", { ...common, projectId: "project-1" });
+      expect(enqueued.content[0]?.text).toContain("job-render-1");
+      expect(calls).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ method: "GET", url: "/api/v1/projects" }),
+          expect.objectContaining({ method: "GET", url: "/api/v1/projects/project-1/mcp-context" }),
+          expect.objectContaining({
+            method: "PATCH",
+            url: "/api/v1/projects/project-1/scripts/script-1",
+            cookie: "gideon_session=session-token",
+            csrf: "csrf-hosted"
+          }),
+          expect.objectContaining({
+            method: "POST",
+            url: "/api/v1/projects/project-1/render-jobs",
+            csrf: "csrf-hosted"
+          })
+        ])
+      );
+    } finally {
+      await hosted.close();
+    }
+  });
+
   it("prefers the live app control bridge when available", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-mcp-bridge-"));
     const controlSocketPath = path.join(dir, "control.sock");
@@ -200,4 +251,104 @@ async function startFakeControlServer(
     });
   });
   return server;
+}
+
+async function startFakeHostedApiServer(
+  calls: Array<{ method: string; url: string; cookie?: string; csrf?: string; body?: unknown }>
+): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  const server = http.createServer((request, response) => {
+    let rawBody = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => {
+      rawBody += chunk;
+    });
+    request.on("end", () => {
+      const body = rawBody ? JSON.parse(rawBody) : undefined;
+      calls.push({
+        method: request.method ?? "GET",
+        url: request.url ?? "/",
+        cookie: request.headers.cookie,
+        csrf: request.headers["x-csrf-token"] as string | undefined,
+        body
+      });
+      response.setHeader("Content-Type", "application/json");
+      if (request.url === "/api/v1/auth/session") {
+        response.end(JSON.stringify({ data: { csrfToken: "csrf-hosted" }, meta: { requestId: "req_hosted" } }));
+        return;
+      }
+      if (request.method === "GET" && request.url === "/api/v1/projects") {
+        response.end(
+          JSON.stringify({
+            data: { projects: [{ id: "project-1", name: "Hosted project", status: "script_review" }] },
+            meta: { requestId: "req_hosted" }
+          })
+        );
+        return;
+      }
+      if (request.method === "GET" && request.url === "/api/v1/projects/project-1/mcp-context") {
+        response.end(
+          JSON.stringify({
+            data: {
+              project: {
+                id: "project-1",
+                name: "Hosted project",
+                scripts: [{ id: "script-1", hook: "Hosted hook", voiceoverText: "Hosted VO", cta: "Hosted CTA" }],
+                moments: [{ id: "moment-1", label: "Hosted moment", enabled: true }],
+                auditEvents: []
+              }
+            },
+            meta: { requestId: "req_hosted" }
+          })
+        );
+        return;
+      }
+      if (request.method === "PATCH" && request.url === "/api/v1/projects/project-1/scripts/script-1") {
+        response.end(
+          JSON.stringify({
+            data: {
+              project: {
+                id: "project-1",
+                scripts: [{ id: "script-1", hook: body?.hook ?? "Hosted hook" }]
+              }
+            },
+            meta: { requestId: "req_hosted" }
+          })
+        );
+        return;
+      }
+      if (request.method === "POST" && request.url === "/api/v1/projects/project-1/render-jobs") {
+        response.statusCode = 202;
+        response.end(
+          JSON.stringify({
+            data: {
+              renderJob: { id: "job-render-1", projectId: "project-1", status: "queued" },
+              job: { id: "job-render-1", kind: "render", status: "queued" }
+            },
+            meta: { requestId: "req_hosted" }
+          })
+        );
+        return;
+      }
+      response.statusCode = 404;
+      response.end(JSON.stringify({ error: { message: "not found" }, meta: { requestId: "req_hosted" } }));
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Fake hosted API server did not bind to a TCP port.");
+  }
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      })
+  };
 }
