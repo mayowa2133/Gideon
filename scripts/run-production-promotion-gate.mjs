@@ -98,6 +98,7 @@ for (const item of steps) {
 evidence.status = "succeeded";
 evidence.finishedAt = new Date().toISOString();
 writeEvidence(evidence);
+verifyEvidence(evidencePath);
 console.log("Production promotion gate passed.");
 console.log(`Production promotion evidence written to ${evidencePath}.`);
 
@@ -160,4 +161,19 @@ function currentGitCommit() {
 function writeEvidence(evidence) {
   fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
   fs.writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+}
+
+function verifyEvidence(filePath) {
+  const args = ["scripts/check-production-promotion-evidence.mjs", "--path", filePath];
+  if (skipPackage) {
+    args.push("--allow-skip-package");
+  }
+  const result = spawnSync(process.execPath, args, {
+    cwd: process.cwd(),
+    stdio: "inherit"
+  });
+  if (result.status !== 0) {
+    console.error("Production promotion gate failed while verifying promotion evidence.");
+    process.exit(result.status ?? 1);
+  }
 }

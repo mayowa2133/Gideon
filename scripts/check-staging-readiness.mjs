@@ -54,7 +54,8 @@ function validateCommandContract() {
     "release:mac:check",
     "staging:smoke",
     "staging:mcp:smoke",
-    "production:promote:check"
+    "production:promote:check",
+    "production:evidence:check"
   ]) {
     if (typeof scripts[scriptName] !== "string") {
       errors.push(`package.json must define ${scriptName}.`);
