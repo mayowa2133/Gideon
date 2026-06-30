@@ -12,6 +12,16 @@ export interface ListWorkspaceProjectsInput {
   limit?: number;
 }
 
+export interface ListUserWorkspacesInput {
+  userId: string;
+  limit?: number;
+}
+
+export interface ListWorkspaceMembersInput {
+  workspaceId: string;
+  limit?: number;
+}
+
 export class PostgresCoreRepository {
   constructor(
     private readonly query: PostgresQuery,
@@ -47,6 +57,31 @@ export class PostgresCoreRepository {
       ]
     );
     return parseRecordJson(result.rows[0]?.record_json, "user");
+  }
+
+  async getUser(input: { userId: string }): Promise<UserAccount | null> {
+    const result = await this.query<JsonRecordRow<UserAccount>>(
+      "select record_json from gideon_users where id = $1 limit 1",
+      [input.userId]
+    );
+    return result.rows[0] ? parseRecordJson(result.rows[0].record_json, "user") : null;
+  }
+
+  async getUserByAuthSubject(input: { identityProvider?: string; authSubject: string }): Promise<UserAccount | null> {
+    const result = input.identityProvider
+      ? await this.query<JsonRecordRow<UserAccount>>(
+          `select record_json from gideon_users
+           where identity_provider = $1 and auth_subject = $2
+           limit 1`,
+          [input.identityProvider, input.authSubject]
+        )
+      : await this.query<JsonRecordRow<UserAccount>>(
+          `select record_json from gideon_users
+           where auth_subject = $1
+           limit 1`,
+          [input.authSubject]
+        );
+    return result.rows[0] ? parseRecordJson(result.rows[0].record_json, "user") : null;
   }
 
   async upsertWorkspace(workspace: Workspace): Promise<Workspace> {
@@ -98,6 +133,57 @@ export class PostgresCoreRepository {
     return parseRecordJson(result.rows[0]?.record_json, "workspace");
   }
 
+  async getWorkspace(input: { workspaceId: string }): Promise<Workspace | null> {
+    const result = await this.query<JsonRecordRow<Workspace>>(
+      "select record_json from gideon_workspaces where id = $1 limit 1",
+      [input.workspaceId]
+    );
+    return result.rows[0] ? parseRecordJson(result.rows[0].record_json, "workspace") : null;
+  }
+
+  async getWorkspaceBySlug(input: { slug: string }): Promise<Workspace | null> {
+    const result = await this.query<JsonRecordRow<Workspace>>(
+      "select record_json from gideon_workspaces where slug = $1 limit 1",
+      [input.slug]
+    );
+    return result.rows[0] ? parseRecordJson(result.rows[0].record_json, "workspace") : null;
+  }
+
+  async getWorkspaceByBillingCustomer(input: { provider: NonNullable<Workspace["billingProvider"]>; customerId: string }): Promise<Workspace | null> {
+    const result = await this.query<JsonRecordRow<Workspace>>(
+      `select record_json from gideon_workspaces
+       where billing_provider = $1 and billing_customer_id = $2
+       limit 1`,
+      [input.provider, input.customerId]
+    );
+    return result.rows[0] ? parseRecordJson(result.rows[0].record_json, "workspace") : null;
+  }
+
+  async getWorkspaceByBillingSubscription(input: {
+    provider: NonNullable<Workspace["billingProvider"]>;
+    subscriptionId: string;
+  }): Promise<Workspace | null> {
+    const result = await this.query<JsonRecordRow<Workspace>>(
+      `select record_json from gideon_workspaces
+       where billing_provider = $1 and billing_subscription_id = $2
+       limit 1`,
+      [input.provider, input.subscriptionId]
+    );
+    return result.rows[0] ? parseRecordJson(result.rows[0].record_json, "workspace") : null;
+  }
+
+  async listUserWorkspaces(input: ListUserWorkspacesInput): Promise<Workspace[]> {
+    const result = await this.query<JsonRecordRow<Workspace>>(
+      `select w.record_json from gideon_workspaces w
+       inner join gideon_workspace_members m on m.workspace_id = w.id
+       where m.user_id = $1
+       order by w.updated_at desc
+       limit $2`,
+      [input.userId, clampLimit(input.limit)]
+    );
+    return result.rows.map((row) => parseRecordJson(row.record_json, "workspace"));
+  }
+
   async upsertWorkspaceMember(member: WorkspaceMember): Promise<WorkspaceMember> {
     const result = await this.query<JsonRecordRow<WorkspaceMember>>(
       `insert into gideon_workspace_members (
@@ -123,6 +209,27 @@ export class PostgresCoreRepository {
       ]
     );
     return parseRecordJson(result.rows[0]?.record_json, "workspace member");
+  }
+
+  async getWorkspaceMember(input: { workspaceId: string; userId: string }): Promise<WorkspaceMember | null> {
+    const result = await this.query<JsonRecordRow<WorkspaceMember>>(
+      `select record_json from gideon_workspace_members
+       where workspace_id = $1 and user_id = $2
+       limit 1`,
+      [input.workspaceId, input.userId]
+    );
+    return result.rows[0] ? parseRecordJson(result.rows[0].record_json, "workspace member") : null;
+  }
+
+  async listWorkspaceMembers(input: ListWorkspaceMembersInput): Promise<WorkspaceMember[]> {
+    const result = await this.query<JsonRecordRow<WorkspaceMember>>(
+      `select record_json from gideon_workspace_members
+       where workspace_id = $1
+       order by created_at asc
+       limit $2`,
+      [input.workspaceId, clampLimit(input.limit)]
+    );
+    return result.rows.map((row) => parseRecordJson(row.record_json, "workspace member"));
   }
 
   async upsertProject(project: Project): Promise<Project> {

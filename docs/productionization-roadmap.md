@@ -194,4 +194,4 @@ The next implementation slice is Milestone 5 production operations:
 
 1. Run the strict staging-readiness gate and provider canary against staging credentials and small ASR/OCR fixtures.
 2. Keep the existing provider/store interfaces intact so desktop, hosted worker, and MCP paths continue sharing the same execution boundaries.
-3. Add tests and push to `main`.
+3. Use the scoped PostgreSQL service-query reads for any hosted web/API surface split before removing snapshot reads.

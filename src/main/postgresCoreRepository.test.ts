@@ -30,6 +30,26 @@ describe("PostgresCoreRepository", () => {
     ]);
   });
 
+  it("reads users by id and auth subject", async () => {
+    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const user = userFixture();
+    const repository = new PostgresCoreRepository(createQuery(calls, user));
+
+    await repository.getUser({ userId: "user-1" });
+    await repository.getUserByAuthSubject({
+      identityProvider: "google",
+      authSubject: "google-oauth2|founder"
+    });
+    await repository.getUserByAuthSubject({ authSubject: "local:local-user" });
+
+    expect(calls[0]?.text).toContain("from gideon_users where id = $1");
+    expect(calls[0]?.values).toEqual(["user-1"]);
+    expect(calls[1]?.text).toContain("where identity_provider = $1 and auth_subject = $2");
+    expect(calls[1]?.values).toEqual(["google", "google-oauth2|founder"]);
+    expect(calls[2]?.text).toContain("where auth_subject = $1");
+    expect(calls[2]?.values).toEqual(["local:local-user"]);
+  });
+
   it("upserts workspaces with billing columns and entitlements JSON", async () => {
     const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
     const workspace = workspaceFixture();
@@ -53,6 +73,39 @@ describe("PostgresCoreRepository", () => {
       "evt_123",
       JSON.stringify(workspace.entitlements)
     ]);
+  });
+
+  it("reads workspaces by id, slug, billing customer, and billing subscription", async () => {
+    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const workspace = workspaceFixture();
+    const repository = new PostgresCoreRepository(createQuery(calls, workspace));
+
+    await repository.getWorkspace({ workspaceId: "workspace-1" });
+    await repository.getWorkspaceBySlug({ slug: "acme" });
+    await repository.getWorkspaceByBillingCustomer({ provider: "stripe", customerId: "cus_123" });
+    await repository.getWorkspaceByBillingSubscription({ provider: "stripe", subscriptionId: "sub_123" });
+
+    expect(calls[0]?.text).toContain("from gideon_workspaces where id = $1");
+    expect(calls[0]?.values).toEqual(["workspace-1"]);
+    expect(calls[1]?.text).toContain("from gideon_workspaces where slug = $1");
+    expect(calls[1]?.values).toEqual(["acme"]);
+    expect(calls[2]?.text).toContain("where billing_provider = $1 and billing_customer_id = $2");
+    expect(calls[2]?.values).toEqual(["stripe", "cus_123"]);
+    expect(calls[3]?.text).toContain("where billing_provider = $1 and billing_subscription_id = $2");
+    expect(calls[3]?.values).toEqual(["stripe", "sub_123"]);
+  });
+
+  it("lists workspaces available to a user through workspace membership", async () => {
+    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const workspace = workspaceFixture();
+    const repository = new PostgresCoreRepository(createQuery(calls, workspace));
+
+    const workspaces = await repository.listUserWorkspaces({ userId: "user-1", limit: 500 });
+
+    expect(workspaces).toEqual([workspace]);
+    expect(calls[0]?.text).toContain("inner join gideon_workspace_members");
+    expect(calls[0]?.text).toContain("where m.user_id = $1");
+    expect(calls[0]?.values).toEqual(["user-1", 200]);
   });
 
   it("upserts workspace members, projects, and upload sessions", async () => {
@@ -91,6 +144,20 @@ describe("PostgresCoreRepository", () => {
       "private/workspace-1/project-1/source.mov",
       "completed"
     ]);
+  });
+
+  it("reads workspace membership by scoped user and lists workspace members", async () => {
+    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const member = memberFixture();
+    const repository = new PostgresCoreRepository(createQuery(calls, member));
+
+    await repository.getWorkspaceMember({ workspaceId: "workspace-1", userId: "user-1" });
+    await repository.listWorkspaceMembers({ workspaceId: "workspace-1", limit: 999 });
+
+    expect(calls[0]?.text).toContain("where workspace_id = $1 and user_id = $2");
+    expect(calls[0]?.values).toEqual(["workspace-1", "user-1"]);
+    expect(calls[1]?.text).toContain("from gideon_workspace_members");
+    expect(calls[1]?.values).toEqual(["workspace-1", 200]);
   });
 
   it("lists projects by workspace, optional status, and clamped limit", async () => {
