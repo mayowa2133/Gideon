@@ -651,16 +651,34 @@ describe("GideonStore billing reconciliation", () => {
     expect(momentProject.status).toBe("analyzed");
 
     await store.updateScripts(project.id, [scriptFixture({ id: "script-1", hook: "Old hook", cta: "Old CTA" })]);
+    const scriptRevision = (await store.getProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id
+    })).scripts[0]?.updatedAt;
+    expect(scriptRevision).toBeDefined();
     const scriptProject = await store.updateScriptForSession({
       userId: DEFAULT_LOCAL_USER_ID,
       workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
       projectId: project.id,
       scriptId: "script-1",
+      expectedRevision: scriptRevision,
       hook: "Hosted hook",
       cta: "Hosted CTA"
     });
     expect(scriptProject.scripts[0]).toMatchObject({ hook: "Hosted hook", cta: "Hosted CTA" });
     expect(scriptProject.status).toBe("script_review");
+
+    await expect(
+      store.updateScriptForSession({
+        userId: DEFAULT_LOCAL_USER_ID,
+        workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+        projectId: project.id,
+        scriptId: "script-1",
+        expectedRevision: "2026-06-25T12:00:00.000Z",
+        hook: "Stale hook"
+      })
+    ).rejects.toThrow("Revision conflict.");
 
     const state = await store.load();
     expect(

@@ -453,7 +453,8 @@ describe("hosted API foundation", () => {
         path: "/api/v1/projects/project-1/scripts/script-1",
         headers: {
           cookie: `gideon_session=${created.token}`,
-          "x-csrf-token": "csrf-1"
+          "x-csrf-token": "csrf-1",
+          "if-match": '"2026-06-25T12:00:00.000Z"'
         },
         body: { hook: "New hosted hook", cta: "Try it now" },
         nowMs: Date.parse("2026-06-25T12:01:00.000Z")
@@ -466,13 +467,47 @@ describe("hosted API foundation", () => {
       cta: "Try it now"
     });
 
+    const missingPrecondition = await handleHostedApiRequest(
+      {
+        method: "PATCH",
+        path: "/api/v1/projects/project-1/scripts/script-1",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1"
+        },
+        body: { hook: "Blind overwrite" },
+        nowMs: Date.parse("2026-06-25T12:02:00.000Z")
+      },
+      api
+    );
+    expect(missingPrecondition.status).toBe(428);
+    expect(missingPrecondition.body).toMatchObject({ error: { code: "precondition_required" } });
+
+    const stale = await handleHostedApiRequest(
+      {
+        method: "PATCH",
+        path: "/api/v1/projects/project-1/scripts/script-1",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1",
+          "if-match": '"stale-revision"'
+        },
+        body: { hook: "Lost update" },
+        nowMs: Date.parse("2026-06-25T12:02:00.000Z")
+      },
+      api
+    );
+    expect(stale.status).toBe(409);
+    expect(stale.body).toMatchObject({ error: { code: "revision_conflict" } });
+
     const momentEdit = await handleHostedApiRequest(
       {
         method: "PATCH",
         path: "/api/v1/projects/project-1/moments/moment-1",
         headers: {
           cookie: `gideon_session=${created.token}`,
-          "x-csrf-token": "csrf-1"
+          "x-csrf-token": "csrf-1",
+          "if-match": '"2026-06-25T12:00:00.000Z"'
         },
         body: { label: "New hosted proof", enabled: false },
         nowMs: Date.parse("2026-06-25T12:01:00.000Z")
@@ -1779,6 +1814,7 @@ class InMemoryHostedApiStore implements HostedApiStore {
     workspaceId: string;
     projectId: string;
     scriptId: string;
+    expectedRevision?: string;
     hook?: string;
     voiceoverText?: string;
     cta?: string;
@@ -1793,6 +1829,9 @@ class InMemoryHostedApiStore implements HostedApiStore {
     const script = project.scripts.find((candidate) => candidate.id === input.scriptId);
     if (!script) {
       throw new Error("Script not found.");
+    }
+    if (input.expectedRevision && input.expectedRevision !== script.updatedAt) {
+      throw new Error("Revision conflict.");
     }
     if (input.hook) {
       script.hook = input.hook;
@@ -1830,6 +1869,7 @@ class InMemoryHostedApiStore implements HostedApiStore {
     workspaceId: string;
     projectId: string;
     momentId: string;
+    expectedRevision?: string;
     label?: string;
     evidence?: string;
     enabled?: boolean;
@@ -1844,6 +1884,9 @@ class InMemoryHostedApiStore implements HostedApiStore {
     const moment = project.moments.find((candidate) => candidate.id === input.momentId);
     if (!moment) {
       throw new Error("Moment not found.");
+    }
+    if (input.expectedRevision && input.expectedRevision !== project.updatedAt) {
+      throw new Error("Revision conflict.");
     }
     if (input.label) {
       moment.label = input.label;

@@ -55,7 +55,7 @@ When these variables are present, MCP tools prefer the hosted API service layer:
 - `gideon_update_script` and `gideon_update_moment` call CSRF-protected hosted edit routes.
 - `gideon_enqueue_analysis` and `gideon_enqueue_render` call the hosted job routes.
 
-The MCP server can discover the CSRF token from `GET /api/v1/auth/session`, or you can provide `GIDEON_MCP_HOSTED_CSRF_TOKEN`. This mode keeps workspace authorization, CSRF checks, bounded field updates, job queues, and audit records inside Gideon's authoritative hosted service layer while Codex/Claude Code supplies the reasoning externally.
+The MCP server can discover the CSRF token from `GET /api/v1/auth/session`, or you can provide `GIDEON_MCP_HOSTED_CSRF_TOKEN`. Hosted project context includes script and moment revisions. Edit tools send a revision precondition automatically unless the agent provides an explicit `revision` argument. Stale edits fail with `409 revision_conflict` instead of overwriting newer user or teammate changes. This mode keeps workspace authorization, CSRF checks, bounded field updates, job queues, optimistic concurrency, and audit records inside Gideon's authoritative hosted service layer while Codex/Claude Code supplies the reasoning externally.
 
 ## Safety rules
 
@@ -65,9 +65,9 @@ The MCP server can discover the CSRF token from `GET /api/v1/auth/session`, or y
 - Render/analysis tools must enqueue Gideon durable jobs instead of bypassing job state.
 - Local MCP mutations are checked against the active user's workspace role. Viewers can inspect projects but cannot apply MCP edits.
 - Live MCP edits and direct JSON-store fallback edits write audit events with `actorType: "mcp_agent"` so Codex/Claude changes are visible in the app and inspectable through MCP.
-- Hosted mode enforces workspace membership through the authoritative service layer on every MCP call and uses CSRF-protected routes for mutations.
+- Hosted mode enforces workspace membership through the authoritative service layer on every MCP call, uses CSRF-protected routes for mutations, and requires revision preconditions for script/moment review edits.
 
 ## Next steps
 
-- Add collaborative revision/conflict handling for hosted MCP and web review edits.
+- Run hosted MCP through staging SSO/session policy and load tests.
 - Add project-scoped approval gates for destructive actions and future publishing.

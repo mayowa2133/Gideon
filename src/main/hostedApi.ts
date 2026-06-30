@@ -86,6 +86,7 @@ export interface HostedApiStore {
     workspaceId: string;
     projectId: string;
     scriptId: string;
+    expectedRevision?: string;
     hook?: string;
     voiceoverText?: string;
     cta?: string;
@@ -95,6 +96,7 @@ export interface HostedApiStore {
     workspaceId: string;
     projectId: string;
     momentId: string;
+    expectedRevision?: string;
     label?: string;
     evidence?: string;
     enabled?: boolean;
@@ -707,13 +709,16 @@ async function handleUpdateProjectScript(
   } catch {
     throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
   }
-  const input = hostedScriptPatchInput(objectBody(request));
+  const body = objectBody(request);
+  const input = hostedScriptPatchInput(body);
+  const expectedRevision = requiredRevisionPrecondition(request, body);
   const project = await storeCall(() =>
     dependencies.store.updateScriptForSession({
       userId: claims.userId,
       workspaceId: claims.workspaceId,
       projectId,
       scriptId,
+      expectedRevision,
       ...input
     })
   );
@@ -733,13 +738,16 @@ async function handleUpdateProjectMoment(
   } catch {
     throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
   }
-  const input = hostedMomentPatchInput(objectBody(request));
+  const body = objectBody(request);
+  const input = hostedMomentPatchInput(body);
+  const expectedRevision = requiredRevisionPrecondition(request, body);
   const project = await storeCall(() =>
     dependencies.store.updateMomentForSession({
       userId: claims.userId,
       workspaceId: claims.workspaceId,
       projectId,
       momentId,
+      expectedRevision,
       ...input
     })
   );
@@ -1314,6 +1322,7 @@ function projectResource(project: Project) {
 function mcpProjectContextResource(project: Project, state: AppState) {
   return {
     ...projectResource(project),
+    revision: project.updatedAt,
     recording: project.recording
       ? {
           fileName: project.recording.fileName,
@@ -1344,6 +1353,7 @@ function mcpProjectContextResource(project: Project, state: AppState) {
       : null,
     moments: project.moments.map((moment) => ({
       id: moment.id,
+      revision: project.updatedAt,
       label: moment.label,
       startMs: moment.startMs,
       endMs: moment.endMs,
@@ -1364,6 +1374,7 @@ function mcpProjectContextResource(project: Project, state: AppState) {
     })),
     scripts: project.scripts.map((script) => ({
       id: script.id,
+      revision: script.updatedAt,
       conceptId: script.conceptId,
       hook: script.hook,
       voiceoverText: script.voiceoverText,
@@ -1581,6 +1592,24 @@ function requiredString(value: unknown, field: string): string {
   return normalized;
 }
 
+function requiredRevisionPrecondition(request: HostedApiRequest, body: Record<string, unknown>): string {
+  const headerRevision = normalizeRevision(header(request, "if-match"));
+  const bodyRevision = normalizeRevision(body.revision);
+  const revision = headerRevision ?? bodyRevision;
+  if (!revision) {
+    throw new ApiError(428, "precondition_required", "If-Match or revision is required for collaborative edits.");
+  }
+  return revision;
+}
+
+function normalizeRevision(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.startsWith('"') && trimmed.endsWith('"') ? trimmed.slice(1, -1).trim() : trimmed;
+}
+
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
@@ -1724,6 +1753,9 @@ function apiErrorFromStoreError(error: unknown): ApiError {
   }
   if (/not found/i.test(message)) {
     return new ApiError(404, "not_found", "Resource not found.");
+  }
+  if (/revision conflict/i.test(message)) {
+    return new ApiError(409, "revision_conflict", "Resource revision has changed.");
   }
   if (/quota exceeded|limit exceeded/i.test(message)) {
     return new ApiError(402, "quota_exceeded", message);

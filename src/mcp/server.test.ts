@@ -165,7 +165,8 @@ describe("Gideon MCP server tools", () => {
             method: "PATCH",
             url: "/api/v1/projects/project-1/scripts/script-1",
             cookie: "gideon_session=session-token",
-            csrf: "csrf-hosted"
+            csrf: "csrf-hosted",
+            body: expect.objectContaining({ revision: "script-revision-1" })
           }),
           expect.objectContaining({
             method: "POST",
@@ -292,8 +293,16 @@ async function startFakeHostedApiServer(
               project: {
                 id: "project-1",
                 name: "Hosted project",
-                scripts: [{ id: "script-1", hook: "Hosted hook", voiceoverText: "Hosted VO", cta: "Hosted CTA" }],
-                moments: [{ id: "moment-1", label: "Hosted moment", enabled: true }],
+                scripts: [
+                  {
+                    id: "script-1",
+                    revision: "script-revision-1",
+                    hook: "Hosted hook",
+                    voiceoverText: "Hosted VO",
+                    cta: "Hosted CTA"
+                  }
+                ],
+                moments: [{ id: "moment-1", revision: "moment-revision-1", label: "Hosted moment", enabled: true }],
                 auditEvents: []
               }
             },

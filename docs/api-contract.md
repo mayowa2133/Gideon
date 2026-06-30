@@ -246,7 +246,7 @@ Return project summary, active artifacts, sanitized completed/queued render proj
 Return sanitized project context for Codex/Claude Code MCP agents using the user's hosted session.
 
 - **Auth:** Active member authorized for project workspace.
-- **Response 200:** Project summary plus product profile, recording metadata without private paths or object keys, transcript text/segments, detected moments without local thumbnail paths, frame OCR evidence without local image paths, scripts, jobs, sanitized renders, and recent project audit events.
+- **Response 200:** Project summary plus product profile, recording metadata without private paths or object keys, transcript text/segments, detected moments with revision values and without local thumbnail paths, frame OCR evidence without local image paths, scripts with revision values, jobs, sanitized renders, and recent project audit events.
 - **Errors:** 404.
 - **Rate limit:** 120/min.
 
@@ -507,10 +507,10 @@ Rename, adjust range, hide, or mark key proof; creates/revises reviewed moment.
 
 - **Auth:** `member+`.
 - **Headers:** CSRF, `If-Match` revision.
-- **Request:** Current hosted foundation supports allowlisted MCP fields `{ "label": string, "evidence": string, "enabled": boolean }`; future review revisions can also support `startMs`, `endMs`, `isHidden`, and `isKeyProof`.
+- **Request:** Current hosted foundation supports allowlisted MCP fields `{ "label": string, "evidence": string, "enabled": boolean }`; `If-Match` or body `revision` is required and stale writes return `409 revision_conflict`. Future review revisions can also support `startMs`, `endMs`, `isHidden`, and `isKeyProof`.
 - **Validation:** end > start, within recording duration, minimum/maximum range policy.
 - **Response 200:** Updated moment/revision and stale impact if concepts already exist.
-- **Errors:** 404, 409 revision/impact, 422 range.
+- **Errors:** 404, 409 revision/impact, 422 range, 428 missing precondition.
 - **Rate limit:** 60/min.
 
 ### POST `/projects/{projectId}/moments`
@@ -607,10 +607,10 @@ Edit user-controlled script fields.
 
 - **Auth:** `member+`.
 - **Headers:** CSRF, `If-Match`.
-- **Request:** Current hosted foundation supports allowlisted MCP fields `{ "hook": string, "voiceoverText": string, "cta": string }`; future script revisions can also support `hookText`, `ctaText`, `captionCues`, `visualBeats`, and `overlayCues`. No provider/model/status fields are accepted directly.
+- **Request:** Current hosted foundation supports allowlisted MCP fields `{ "hook": string, "voiceoverText": string, "cta": string }`; `If-Match` or body `revision` is required and stale writes return `409 revision_conflict`. Future script revisions can also support `hookText`, `ctaText`, `captionCues`, `visualBeats`, and `overlayCues`. No provider/model/status fields are accepted directly.
 - **Validation:** bounded text; caption ranges ordered/non-overlap policy; moment IDs owned; total duration <=60s; prohibited phrases return warnings or validation errors according to field; unsupported claim warning can require acknowledgment/context update.
 - **Response 200:** New/revised script, validation, revision, downstream artifacts marked stale.
-- **Errors:** 404, 409 revision/invalid state, 422.
+- **Errors:** 404, 409 revision/invalid state, 422, 428 missing precondition.
 - **Rate limit:** 60/min.
 
 ### POST `/projects/{projectId}/scripts/{scriptId}/approval`

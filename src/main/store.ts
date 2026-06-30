@@ -1229,6 +1229,7 @@ export class GideonStore {
     workspaceId: string;
     projectId: string;
     scriptId: string;
+    expectedRevision?: string;
     hook?: string;
     voiceoverText?: string;
     cta?: string;
@@ -1250,6 +1251,9 @@ export class GideonStore {
     const script = project.scripts.find((candidate) => candidate.id === input.scriptId);
     if (!script) {
       throw new Error("Script not found.");
+    }
+    if (input.expectedRevision && input.expectedRevision !== script.updatedAt) {
+      throw new Error("Revision conflict.");
     }
     const changedFields: string[] = [];
     if (typeof input.hook === "string") {
@@ -1292,6 +1296,7 @@ export class GideonStore {
     workspaceId: string;
     projectId: string;
     momentId: string;
+    expectedRevision?: string;
     label?: string;
     evidence?: string;
     enabled?: boolean;
@@ -1313,6 +1318,9 @@ export class GideonStore {
     const moment = project.moments.find((candidate) => candidate.id === input.momentId);
     if (!moment) {
       throw new Error("Moment not found.");
+    }
+    if (input.expectedRevision && input.expectedRevision !== project.updatedAt) {
+      throw new Error("Revision conflict.");
     }
     const changedFields: string[] = [];
     if (typeof input.label === "string") {

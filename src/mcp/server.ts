@@ -145,6 +145,7 @@ const tools = [
       hook: optionalString("Replacement hook text."),
       voiceoverText: optionalString("Replacement voiceover text."),
       cta: optionalString("Replacement CTA text."),
+      revision: optionalString("Expected script revision from hosted MCP context. Hosted mode auto-discovers the current revision when omitted."),
       controlSocketPath: optionalString("Explicit Gideon app control socket path."),
       storePath: optionalString("Explicit path to gideon-store.json."),
       ...hostedTransportSchema
@@ -159,6 +160,7 @@ const tools = [
       label: optionalString("Replacement moment label."),
       evidence: optionalString("Replacement evidence text."),
       enabled: { type: "boolean", description: "Whether this moment should be used." },
+      revision: optionalString("Expected moment revision from hosted MCP context. Hosted mode auto-discovers the current revision when omitted."),
       controlSocketPath: optionalString("Explicit Gideon app control socket path."),
       storePath: optionalString("Explicit path to gideon-store.json."),
       ...hostedTransportSchema
@@ -363,11 +365,14 @@ async function updateScript(args: Record<string, unknown>): Promise<Record<strin
   if (hostedConfigFromArgs(args)) {
     const projectId = requireString(args.projectId, "projectId");
     const scriptId = requireString(args.scriptId, "scriptId");
+    const revision =
+      optionalArgString(args.revision) ?? (await hostedEditableRevision(args, projectId, "scripts", scriptId));
     return await hostedApiRequest(
       args,
       "PATCH",
       `/api/v1/projects/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(scriptId)}`,
       {
+        revision,
         hook: optionalControlValue(args.hook),
         voiceoverText: optionalControlValue(args.voiceoverText),
         cta: optionalControlValue(args.cta)
@@ -429,11 +434,14 @@ async function updateMoment(args: Record<string, unknown>): Promise<Record<strin
   if (hostedConfigFromArgs(args)) {
     const projectId = requireString(args.projectId, "projectId");
     const momentId = requireString(args.momentId, "momentId");
+    const revision =
+      optionalArgString(args.revision) ?? (await hostedEditableRevision(args, projectId, "moments", momentId));
     return await hostedApiRequest(
       args,
       "PATCH",
       `/api/v1/projects/${encodeURIComponent(projectId)}/moments/${encodeURIComponent(momentId)}`,
       {
+        revision,
         label: optionalControlValue(args.label),
         evidence: optionalControlValue(args.evidence),
         enabled: typeof args.enabled === "boolean" ? args.enabled : undefined
@@ -598,6 +606,27 @@ async function hostedCsrfToken(config: HostedMcpConfig): Promise<string> {
     throw new Error(payload.error?.message ?? "Hosted MCP mode could not discover a CSRF token from the active session.");
   }
   return payload.data.csrfToken.trim();
+}
+
+async function hostedEditableRevision(
+  args: Record<string, unknown>,
+  projectId: string,
+  collection: "scripts" | "moments",
+  id: string
+): Promise<string> {
+  const context = await hostedApiRequest(args, "GET", `/api/v1/projects/${encodeURIComponent(projectId)}/mcp-context`);
+  const project = context.project as Record<string, unknown> | undefined;
+  const records = project?.[collection];
+  if (!Array.isArray(records)) {
+    throw new Error(`Hosted MCP context did not include ${collection}.`);
+  }
+  const record = records.find((candidate) => {
+    return Boolean(candidate && typeof candidate === "object" && (candidate as { id?: unknown }).id === id);
+  }) as { revision?: unknown } | undefined;
+  if (typeof record?.revision !== "string" || !record.revision.trim()) {
+    throw new Error(`Hosted MCP context did not include a revision for ${collection.slice(0, -1)} ${id}.`);
+  }
+  return record.revision.trim();
 }
 
 function hostedConfigFromArgs(args: Record<string, unknown>): HostedMcpConfig | null {
