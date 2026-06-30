@@ -18,6 +18,7 @@ const steps = [
   step("PostgreSQL migration dry-run", [pnpm, "db:migrate", "--", "--dry-run"]),
   step("provider canary dry-run", [pnpm, "provider:canary", "--", "--dry-run"]),
   step("staging readiness dry-run", [pnpm, "staging:check"]),
+  step("staging upload-to-export smoke dry-run", [pnpm, "staging:smoke", "--", "--dry-run"]),
   step("local hosted worker preflight", [pnpm, "worker:hosted:check"], localWorkerEnv()),
   step("production-shaped hosted worker preflight", [pnpm, "worker:hosted:check"], productionWorkerEnv()),
   step("build", [pnpm, "build"]),

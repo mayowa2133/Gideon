@@ -234,10 +234,10 @@ List workspace projects.
 
 ### GET `/projects/{projectId}`
 
-Return project summary, active artifacts, and allowed next actions.
+Return project summary, active artifacts, sanitized completed/queued render projections, and allowed next actions.
 
 - **Auth:** Active member authorized for project workspace.
-- **Response 200:** Project plus `allowedActions` such as `upload_recording`, `start_analysis`, `generate_concepts`.
+- **Response 200:** Project plus `allowedActions` such as `upload_recording`, `start_analysis`, `generate_concepts`. The current hosted foundation includes a sanitized `renders` list so clients can discover a completed `renderId` before creating an export. Render projections may include `id`, `scriptId`, `title`, `status`, `artifactId`, `sha256`, `sizeBytes`, `validation`, and `createdAt`; they must not include private object keys, local cache paths, local URLs, or signed URLs.
 - **Errors:** 404.
 - **Rate limit:** 120/min.
 

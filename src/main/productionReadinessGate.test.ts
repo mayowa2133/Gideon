@@ -15,6 +15,7 @@ describe("production readiness gate", () => {
     expect(result.stdout).toContain("repository lint");
     expect(result.stdout).toContain("provider canary dry-run");
     expect(result.stdout).toContain("staging readiness dry-run");
+    expect(result.stdout).toContain("staging upload-to-export smoke dry-run");
     expect(result.stdout).toContain("production-shaped hosted worker preflight");
     expect(result.stdout).toContain("macOS release metadata");
   });

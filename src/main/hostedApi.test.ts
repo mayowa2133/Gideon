@@ -378,6 +378,7 @@ describe("hosted API foundation", () => {
           momentsCount: 0,
           scriptsCount: 0,
           rendersCount: 0,
+          renders: [],
           artifactsCount: 0,
           hasRecording: false
         }
@@ -396,6 +397,63 @@ describe("hosted API foundation", () => {
 
     expect(hidden.status).toBe(404);
     expect(hidden.body).toMatchObject({ error: { code: "not_found" } });
+  });
+
+  it("returns sanitized completed renders so hosted clients can create exports", async () => {
+    const api = testApi();
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        renders: [renderFixture({ id: "render-1", projectId: "project-1" })]
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const response = await handleHostedApiRequest(
+      {
+        method: "GET",
+        path: "/api/v1/projects/project-1",
+        headers: { cookie: `gideon_session=${created.token}` },
+        nowMs: Date.parse("2026-06-25T12:01:00.000Z")
+      },
+      api
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      data: {
+        project: {
+          id: "project-1",
+          rendersCount: 1,
+          renders: [
+            {
+              id: "render-1",
+              scriptId: "script-1",
+              status: "completed",
+              artifactId: "render-artifact-1",
+              sizeBytes: 4096,
+              validation: {
+                width: 1080,
+                height: 1920
+              }
+            }
+          ]
+        }
+      }
+    });
+    const render = (response.body as { data: { project: { renders: Array<Record<string, unknown>> } } }).data.project.renders[0];
+    expect(render.outputPath).toBeUndefined();
+    expect(render.outputUrl).toBeUndefined();
+    expect(render.storageKey).toBeUndefined();
   });
 
   it("creates projects through authenticated CSRF-protected hosted API requests", async () => {

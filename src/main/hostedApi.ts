@@ -1188,6 +1188,7 @@ function projectResource(project: Project) {
     conceptsCount: project.concepts.length,
     scriptsCount: project.scripts.length,
     rendersCount: project.renders.length,
+    renders: project.renders.map(renderResource),
     artifactsCount: project.artifacts.length,
     jobsCount: project.jobs.length
   };
@@ -1198,6 +1199,20 @@ function jobResource(project: Project, job: JobRecord) {
     ...job,
     workspaceId: project.workspaceId,
     projectId: project.id
+  };
+}
+
+function renderResource(render: RenderedVideo) {
+  return {
+    id: render.id,
+    scriptId: render.scriptId,
+    title: render.title,
+    status: render.status,
+    artifactId: render.artifactId ?? null,
+    sha256: render.sha256 ?? null,
+    sizeBytes: render.sizeBytes ?? null,
+    validation: render.validation ?? null,
+    createdAt: render.createdAt
   };
 }
 

@@ -206,6 +206,7 @@ function checkPackageContract() {
     "db:migrate",
     "provider:canary",
     "staging:check",
+    "staging:smoke",
     "production:check"
   ]) {
     if (typeof packageJson.scripts?.[scriptName] !== "string") {
