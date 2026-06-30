@@ -33,8 +33,10 @@ describe("staging readiness check", () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-staging-check-"));
     const audioPath = path.join(tempDir, "audio.wav");
     const imagePath = path.join(tempDir, "frame.png");
+    const recordingPath = path.join(tempDir, "walkthrough.mp4");
     await fs.writeFile(audioPath, "audio");
     await fs.writeFile(imagePath, "image");
+    await fs.writeFile(recordingPath, "video");
 
     const result = await execFileAsync(process.execPath, ["scripts/check-staging-readiness.mjs", "--strict"], {
       cwd: process.cwd(),
@@ -62,6 +64,12 @@ describe("staging readiness check", () => {
         GIDEON_PROVIDER_CANARY_LIVE: "true",
         GIDEON_PROVIDER_CANARY_AUDIO_PATH: audioPath,
         GIDEON_PROVIDER_CANARY_IMAGE_PATH: imagePath,
+        GIDEON_STAGING_API_BASE_URL: "https://staging.gideon.example.test",
+        GIDEON_AUTH_CALLBACK_SECRET: "auth-callback-secret",
+        GIDEON_STAGING_SMOKE_LIVE: "true",
+        GIDEON_STAGING_SMOKE_RECORDING_PATH: recordingPath,
+        GIDEON_STAGING_SMOKE_POLL_TIMEOUT_MS: "600000",
+        GIDEON_STAGING_SMOKE_POLL_INTERVAL_MS: "5000",
         GIDEON_RELEASE_CHANNEL: "production",
         APPLE_TEAM_ID: "TEAM123",
         APPLE_ID: "release@example.com",
@@ -71,5 +79,51 @@ describe("staging readiness check", () => {
     });
 
     expect(result.stdout).toContain("Staging readiness strict check passed.");
+  });
+
+  it("requires live upload-to-export smoke configuration in strict mode", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-staging-check-"));
+    const audioPath = path.join(tempDir, "audio.wav");
+    const imagePath = path.join(tempDir, "frame.png");
+    await fs.writeFile(audioPath, "audio");
+    await fs.writeFile(imagePath, "image");
+
+    await expect(
+      execFileAsync(process.execPath, ["scripts/check-staging-readiness.mjs", "--strict"], {
+        cwd: process.cwd(),
+        env: {
+          PATH: process.env.PATH ?? "",
+          GIDEON_DEPLOYMENT_ENV: "production",
+          GIDEON_HOSTED_QUEUE_PROVIDER: "bullmq",
+          GIDEON_REDIS_URL: "rediss://default:secret@redis.example.test:6380/0",
+          GIDEON_BULLMQ_QUEUE_NAME: "gideon-staging-workers",
+          GIDEON_BULLMQ_PREFIX: "gideon-staging",
+          GIDEON_WORKER_ID: "staging-worker-1",
+          GIDEON_WORKER_LEASE_SECONDS: "300",
+          GIDEON_WORKER_HEARTBEAT_INTERVAL_MS: "30000",
+          GIDEON_STORE_PROVIDER: "postgres_snapshot",
+          GIDEON_DATABASE_URL: "postgres://gideon:secret@db.example.test:5432/gideon?sslmode=require",
+          GIDEON_SESSION_SECRET: "session-secret",
+          GIDEON_USER_DATA_DIR: "/var/lib/gideon-worker",
+          GIDEON_PROJECTS_DIR: "/var/lib/gideon-worker/projects",
+          GIDEON_STORAGE_ROOT: "/var/lib/gideon-worker/cache",
+          GIDEON_STORAGE_PROVIDER: "s3",
+          GIDEON_STORAGE_BUCKET: "gideon-private-staging",
+          GIDEON_STORAGE_ACCESS_KEY_ID: "storage-key",
+          GIDEON_STORAGE_SECRET_ACCESS_KEY: "storage-secret",
+          GIDEON_OPENAI_API_KEY: "sk-test",
+          GIDEON_PROVIDER_CANARY_LIVE: "true",
+          GIDEON_PROVIDER_CANARY_AUDIO_PATH: audioPath,
+          GIDEON_PROVIDER_CANARY_IMAGE_PATH: imagePath,
+          GIDEON_RELEASE_CHANNEL: "production",
+          APPLE_TEAM_ID: "TEAM123",
+          APPLE_ID: "release@example.com",
+          APPLE_APP_SPECIFIC_PASSWORD: "app-password",
+          CSC_NAME: "Developer ID Application: Example"
+        }
+      })
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining("Set GIDEON_STAGING_API_BASE_URL")
+    });
   });
 });

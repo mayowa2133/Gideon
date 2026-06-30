@@ -152,6 +152,7 @@ function validateOperationalEnvironment() {
   requireEquals("GIDEON_PROVIDER_CANARY_LIVE", "true", "Set GIDEON_PROVIDER_CANARY_LIVE=true before staging promotion.");
   requireReadableFile("GIDEON_PROVIDER_CANARY_AUDIO_PATH", "Set GIDEON_PROVIDER_CANARY_AUDIO_PATH to a small staging audio fixture.");
   requireReadableFile("GIDEON_PROVIDER_CANARY_IMAGE_PATH", "Set GIDEON_PROVIDER_CANARY_IMAGE_PATH to a small staging screenshot fixture.");
+  requireHostedSmokeEnvironment();
 
   requireEquals("GIDEON_RELEASE_CHANNEL", "production", "Set GIDEON_RELEASE_CHANNEL=production for staging release promotion checks.");
   requireEnv("APPLE_TEAM_ID", "Set APPLE_TEAM_ID for production release notarization checks.");
@@ -160,6 +161,33 @@ function validateOperationalEnvironment() {
   if (!normalize(env.CSC_LINK) && !normalize(env.CSC_NAME)) {
     errors.push("Set CSC_LINK or CSC_NAME so production release candidates can be signed.");
   }
+}
+
+function requireHostedSmokeEnvironment() {
+  const stagingApiBaseUrl = normalize(env.GIDEON_STAGING_API_BASE_URL);
+  if (!stagingApiBaseUrl) {
+    errors.push("Set GIDEON_STAGING_API_BASE_URL before running the live upload-to-export staging smoke.");
+  } else {
+    validateUrl(stagingApiBaseUrl, ["https:"], "GIDEON_STAGING_API_BASE_URL must be an absolute https:// URL.");
+  }
+  requireEnv("GIDEON_AUTH_CALLBACK_SECRET", "Set GIDEON_AUTH_CALLBACK_SECRET so staging smoke can create a hosted session.");
+  requireEquals(
+    "GIDEON_STAGING_SMOKE_LIVE",
+    "true",
+    "Set GIDEON_STAGING_SMOKE_LIVE=true before staging promotion."
+  );
+  requireReadableFile(
+    "GIDEON_STAGING_SMOKE_RECORDING_PATH",
+    "Set GIDEON_STAGING_SMOKE_RECORDING_PATH to a small staging recording fixture."
+  );
+  requirePositiveInteger(
+    "GIDEON_STAGING_SMOKE_POLL_TIMEOUT_MS",
+    "Set GIDEON_STAGING_SMOKE_POLL_TIMEOUT_MS to a positive timeout for live job polling."
+  );
+  requirePositiveInteger(
+    "GIDEON_STAGING_SMOKE_POLL_INTERVAL_MS",
+    "Set GIDEON_STAGING_SMOKE_POLL_INTERVAL_MS to a positive interval for live job polling."
+  );
 }
 
 function readJson(filePath) {
