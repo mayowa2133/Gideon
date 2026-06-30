@@ -25,6 +25,7 @@ Run these on every pull request once the implementation exists:
 - Install dependencies from lockfile.
 - Lint.
 - Repository safety lint for conflict markers, generated/private artifacts, obvious committed secret patterns, and README/audit progress drift.
+- Production-readiness and production-promotion gate dry-runs.
 - Typecheck.
 - Unit tests.
 - Integration tests that do not require heavy media processing.

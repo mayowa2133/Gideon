@@ -22,7 +22,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
           cache: pnpm
 
       - name: Install FFmpeg
@@ -30,6 +30,14 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Lint repository
+        run: pnpm lint
+
+      - name: Check production gate plans
+        run: |
+          pnpm production:check -- --dry-run
+          pnpm production:promote:check -- --dry-run
 
       - name: Run unit and media tests
         run: pnpm test
