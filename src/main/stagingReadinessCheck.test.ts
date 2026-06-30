@@ -34,9 +34,11 @@ describe("staging readiness check", () => {
     const audioPath = path.join(tempDir, "audio.wav");
     const imagePath = path.join(tempDir, "frame.png");
     const recordingPath = path.join(tempDir, "walkthrough.mp4");
+    const releaseDir = path.join(tempDir, "release");
     await fs.writeFile(audioPath, "audio");
     await fs.writeFile(imagePath, "image");
     await fs.writeFile(recordingPath, "video");
+    await writeReleaseFixtures(releaseDir);
 
     const result = await execFileAsync(process.execPath, ["scripts/check-staging-readiness.mjs", "--strict"], {
       cwd: process.cwd(),
@@ -70,6 +72,7 @@ describe("staging readiness check", () => {
         GIDEON_STAGING_SMOKE_RECORDING_PATH: recordingPath,
         GIDEON_STAGING_SMOKE_POLL_TIMEOUT_MS: "600000",
         GIDEON_STAGING_SMOKE_POLL_INTERVAL_MS: "5000",
+        GIDEON_RELEASE_DIR: releaseDir,
         GIDEON_RELEASE_CHANNEL: "production",
         APPLE_TEAM_ID: "TEAM123",
         APPLE_ID: "release@example.com",
@@ -85,8 +88,10 @@ describe("staging readiness check", () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-staging-check-"));
     const audioPath = path.join(tempDir, "audio.wav");
     const imagePath = path.join(tempDir, "frame.png");
+    const releaseDir = path.join(tempDir, "release");
     await fs.writeFile(audioPath, "audio");
     await fs.writeFile(imagePath, "image");
+    await writeReleaseFixtures(releaseDir);
 
     await expect(
       execFileAsync(process.execPath, ["scripts/check-staging-readiness.mjs", "--strict"], {
@@ -115,6 +120,7 @@ describe("staging readiness check", () => {
           GIDEON_PROVIDER_CANARY_LIVE: "true",
           GIDEON_PROVIDER_CANARY_AUDIO_PATH: audioPath,
           GIDEON_PROVIDER_CANARY_IMAGE_PATH: imagePath,
+          GIDEON_RELEASE_DIR: releaseDir,
           GIDEON_RELEASE_CHANNEL: "production",
           APPLE_TEAM_ID: "TEAM123",
           APPLE_ID: "release@example.com",
@@ -127,3 +133,17 @@ describe("staging readiness check", () => {
     });
   });
 });
+
+async function writeReleaseFixtures(releaseDir: string): Promise<void> {
+  await fs.mkdir(releaseDir, { recursive: true });
+  for (const fileName of [
+    "Gideon-0.1.0-arm64.dmg",
+    "Gideon-0.1.0-arm64-mac.zip",
+    "Gideon-0.1.0-arm64.dmg.blockmap",
+    "Gideon-0.1.0-arm64-mac.zip.blockmap",
+    "latest-mac.yml",
+    "provenance.json"
+  ]) {
+    await fs.writeFile(path.join(releaseDir, fileName), "fixture");
+  }
+}

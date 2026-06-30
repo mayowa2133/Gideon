@@ -447,7 +447,7 @@ Before a beta release:
 - Generate and approve voiceover.
 - Render and download MP4.
 - Upload the MP4 manually to at least one target platform draft flow if possible.
-- Run `pnpm lint`, `pnpm production:check`, `pnpm package:mac`, `pnpm release:mac:check`, `hdiutil verify release/Gideon-0.1.0-arm64.dmg`, `pnpm staging:check`, and `pnpm staging:smoke -- --dry-run`; production-shaped staging candidates must also pass `pnpm staging:check -- --strict`, `pnpm staging:smoke -- --live`, `pnpm package:mac:signed`, and `GIDEON_RELEASE_CHANNEL=production pnpm release:mac:check`.
+- Run `pnpm lint`, `pnpm production:check`, `pnpm production:promote:check -- --dry-run`, `pnpm package:mac`, `pnpm release:mac:check`, `hdiutil verify release/Gideon-0.1.0-arm64.dmg`, `pnpm staging:check`, and `pnpm staging:smoke -- --dry-run`; production-shaped staging candidates must also pass `pnpm production:promote:check -- --live`, `pnpm staging:check -- --strict`, `pnpm staging:smoke -- --live`, `pnpm package:mac:signed`, and `GIDEON_RELEASE_CHANNEL=production pnpm release:mac:check`.
 - Delete a project and verify source/export access is removed or scheduled for deletion.
 - Review logs for accidental sensitive data.
 - Verify support/admin views show job status without exposing private media.

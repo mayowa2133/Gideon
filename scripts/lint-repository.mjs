@@ -207,7 +207,8 @@ function checkPackageContract() {
     "provider:canary",
     "staging:check",
     "staging:smoke",
-    "production:check"
+    "production:check",
+    "production:promote:check"
   ]) {
     if (typeof packageJson.scripts?.[scriptName] !== "string") {
       errors.push(`package.json must define ${scriptName}.`);

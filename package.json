@@ -22,6 +22,7 @@
     "staging:check": "node scripts/check-staging-readiness.mjs",
     "staging:smoke": "node scripts/run-staging-smoke.mjs",
     "production:check": "node scripts/run-production-readiness-gate.mjs",
+    "production:promote:check": "node scripts/run-production-promotion-gate.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs",
     "lint": "node scripts/lint-repository.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.mcp.json",
