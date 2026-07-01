@@ -28,6 +28,7 @@ describe("macOS CI workflow", () => {
     expect(workflow).toContain("run_live_promotion:");
     expect(workflow).toContain("if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_live_promotion }}");
     expect(workflow).toContain("GIDEON_PRODUCTION_PROMOTION_EVIDENCE_PATH: tmp/production-promotion-evidence.json");
+    expect(workflow).toContain("pnpm production:fixtures:materialize");
     expect(workflow).toContain("pnpm production:promote:check -- --live");
     expect(workflow).toContain("pnpm production:evidence:check -- --path tmp/production-promotion-evidence.json");
     expect(workflow).toContain("Gideon-production-promotion-evidence");

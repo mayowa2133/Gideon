@@ -210,7 +210,8 @@ function checkPackageContract() {
     "staging:mcp:smoke",
     "production:check",
     "production:promote:check",
-    "production:evidence:check"
+    "production:evidence:check",
+    "production:fixtures:materialize"
   ]) {
     if (typeof packageJson.scripts?.[scriptName] !== "string") {
       errors.push(`package.json must define ${scriptName}.`);

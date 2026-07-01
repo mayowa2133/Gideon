@@ -108,10 +108,7 @@ jobs:
           GIDEON_PROVIDER_CANARY_IMAGE_BASE64: ${{ secrets.GIDEON_PROVIDER_CANARY_IMAGE_BASE64 }}
           GIDEON_STAGING_SMOKE_RECORDING_BASE64: ${{ secrets.GIDEON_STAGING_SMOKE_RECORDING_BASE64 }}
         run: |
-          mkdir -p tmp/live-fixtures
-          node -e 'require("node:fs").writeFileSync("tmp/live-fixtures/provider-audio.wav", Buffer.from(process.env.GIDEON_PROVIDER_CANARY_AUDIO_BASE64 || "", "base64"))'
-          node -e 'require("node:fs").writeFileSync("tmp/live-fixtures/provider-image.png", Buffer.from(process.env.GIDEON_PROVIDER_CANARY_IMAGE_BASE64 || "", "base64"))'
-          node -e 'require("node:fs").writeFileSync("tmp/live-fixtures/staging-recording.mp4", Buffer.from(process.env.GIDEON_STAGING_SMOKE_RECORDING_BASE64 || "", "base64"))'
+          pnpm production:fixtures:materialize
 
       - name: Run live production promotion gate
         env:

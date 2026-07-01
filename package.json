@@ -25,6 +25,7 @@
     "production:check": "node scripts/run-production-readiness-gate.mjs",
     "production:promote:check": "node scripts/run-production-promotion-gate.mjs",
     "production:evidence:check": "node scripts/check-production-promotion-evidence.mjs",
+    "production:fixtures:materialize": "node scripts/materialize-live-promotion-fixtures.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs",
     "lint": "node scripts/lint-repository.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.mcp.json",
