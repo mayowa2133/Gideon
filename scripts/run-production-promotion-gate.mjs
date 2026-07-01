@@ -17,6 +17,7 @@ const evidencePath =
 const steps = [
   step("local production readiness gate", [pnpm, "production:check"]),
   step("strict staging readiness gate", [pnpm, "staging:check", "--", "--strict"]),
+  step("production billing reconciliation", [pnpm, "production:billing:check", "--", "--live"]),
   step("live provider canaries", [pnpm, "provider:canary", "--", "--live"]),
   step("live staging upload-to-export smoke", [pnpm, "staging:smoke", "--", "--live"]),
   step("live staging hosted MCP smoke", [pnpm, "staging:mcp:smoke", "--", "--live", "--require-metric-export"]),

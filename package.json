@@ -33,6 +33,7 @@
     "production:github-promote:run": "node scripts/run-github-live-promotion.mjs",
     "production:live-env:check": "node scripts/check-live-promotion-env.mjs",
     "production:fixtures:materialize": "node scripts/materialize-live-promotion-fixtures.mjs",
+    "production:billing:check": "node scripts/check-billing-reconciliation.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs",
     "lint": "node scripts/lint-repository.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.mcp.json",

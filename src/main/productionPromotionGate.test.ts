@@ -17,6 +17,7 @@ describe("production promotion gate", () => {
     expect(result.stdout).toContain("Production promotion gate dry-run:");
     expect(result.stdout).toContain("local production readiness gate");
     expect(result.stdout).toContain("strict staging readiness gate");
+    expect(result.stdout).toContain("production billing reconciliation");
     expect(result.stdout).toContain("live provider canaries");
     expect(result.stdout).toContain("live staging upload-to-export smoke");
     expect(result.stdout).toContain("live staging hosted MCP smoke");
@@ -75,10 +76,11 @@ describe("production promotion gate", () => {
       skipPackage: true,
       failedStep: null
     });
-    expect(evidence.steps).toHaveLength(5);
+    expect(evidence.steps).toHaveLength(6);
     expect(evidence.steps.every((step: { status: string }) => step.status === "succeeded")).toBe(true);
     expect(JSON.stringify(evidence)).not.toContain("gideon_session");
     expect(JSON.stringify(evidence)).not.toContain("OPENAI_API_KEY");
+    expect(invocations).toContain("production:billing:check -- --live");
     expect(invocations).toContain("staging:mcp:smoke -- --live --require-metric-export");
   });
 });

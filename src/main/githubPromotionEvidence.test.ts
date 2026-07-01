@@ -96,7 +96,7 @@ describe("GitHub promotion evidence artifact check", () => {
     expect(receipt.repository).toBe("example/Gideon");
     expect(receipt.runId).toBe("12345");
     expect(receipt.evidence.gitCommit).toBe("0123456789abcdef0123456789abcdef01234567");
-    expect(receipt.evidence.stepCount).toBe(8);
+    expect(receipt.evidence.stepCount).toBe(9);
     expect(receipt.githubRun.headSha).toBe("0123456789abcdef0123456789abcdef01234567");
     expect(receipt.githubRun.event).toBe("workflow_dispatch");
     expect(receipt.checks.runMetadata).toBe("passed");
@@ -161,6 +161,7 @@ function createEvidence() {
   const stepNames = [
     "local production readiness gate",
     "strict staging readiness gate",
+    "production billing reconciliation",
     "live provider canaries",
     "live staging upload-to-export smoke",
     "live staging hosted MCP smoke",

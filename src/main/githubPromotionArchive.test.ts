@@ -29,7 +29,7 @@ describe("GitHub promotion archive bundle check", () => {
   });
 
   it("rejects receipt summaries that drift from the archived evidence", async () => {
-    const archiveDir = await writeArchiveFixture({ receiptStepCount: 9 });
+    const archiveDir = await writeArchiveFixture({ receiptStepCount: 10 });
 
     await expect(runArchiveCheck(archiveDir)).rejects.toMatchObject({
       stderr: expect.stringContaining("Receipt evidence.stepCount must match archived promotion evidence")
@@ -75,6 +75,7 @@ function createEvidence() {
   const stepNames = [
     "local production readiness gate",
     "strict staging readiness gate",
+    "production billing reconciliation",
     "live provider canaries",
     "live staging upload-to-export smoke",
     "live staging hosted MCP smoke",

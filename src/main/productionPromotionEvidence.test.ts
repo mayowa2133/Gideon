@@ -75,6 +75,7 @@ async function writeEvidenceFixture(
   const baseSteps = [
     "local production readiness gate",
     "strict staging readiness gate",
+    "production billing reconciliation",
     "live provider canaries",
     "live staging upload-to-export smoke",
     "live staging hosted MCP smoke"

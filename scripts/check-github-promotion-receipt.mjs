@@ -115,7 +115,7 @@ function validateEvidenceSummary(evidence) {
   if (typeof evidence.skipPackage !== "boolean") {
     errors.push("Receipt evidence.skipPackage must be boolean.");
   }
-  if (!Number.isInteger(evidence.stepCount) || evidence.stepCount < 5) {
+  if (!Number.isInteger(evidence.stepCount) || evidence.stepCount < 6) {
     errors.push("Receipt evidence.stepCount must include at least the required live promotion steps.");
   }
 }

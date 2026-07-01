@@ -26,6 +26,7 @@ describe("production readiness gate", () => {
     expect(result.stdout).toContain("live promotion GitHub workflow runner dry-run");
     expect(result.stdout).toContain("live promotion environment dry-run");
     expect(result.stdout).toContain("live promotion fixture materialization dry-run");
+    expect(result.stdout).toContain("production billing reconciliation dry-run");
     expect(result.stdout).toContain("production promotion gate dry-run");
     expect(result.stdout).toContain("production-shaped hosted worker preflight");
     expect(result.stdout).toContain("macOS release metadata");

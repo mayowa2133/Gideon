@@ -63,7 +63,8 @@ function validateCommandContract() {
     "production:github-archive:check",
     "production:github-promote:run",
     "production:live-env:check",
-    "production:fixtures:materialize"
+    "production:fixtures:materialize",
+    "production:billing:check"
   ]) {
     if (typeof scripts[scriptName] !== "string") {
       errors.push(`package.json must define ${scriptName}.`);
