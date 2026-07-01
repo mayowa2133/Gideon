@@ -14,6 +14,7 @@ const REQUIRED_BASE_STEPS = [
   "local production readiness gate",
   "strict staging readiness gate",
   "production billing reconciliation",
+  "production storage lifecycle policy",
   "live provider canaries",
   "live staging upload-to-export smoke",
   "live staging hosted MCP smoke"

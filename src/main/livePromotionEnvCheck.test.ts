@@ -15,6 +15,7 @@ describe("live promotion environment check", () => {
     expect(result.stdout).toContain("Live promotion environment check dry-run:");
     expect(result.stdout).toContain("GIDEON_STAGING_MCP_SESSION_COOKIE");
     expect(result.stdout).toContain("GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD");
+    expect(result.stdout).toContain("GIDEON_STORAGE_TEMP_RETENTION_DAYS");
     expect(result.stdout).toContain("Require Apple signing/notarization env");
   });
 
@@ -88,6 +89,13 @@ function liveEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     GIDEON_STORAGE_BUCKET: "gideon-private-staging",
     GIDEON_STORAGE_ACCESS_KEY_ID: "storage-key",
     GIDEON_STORAGE_SECRET_ACCESS_KEY: "storage-secret",
+    GIDEON_STORAGE_ENDPOINT: "https://storage.example.test",
+    GIDEON_STORAGE_TEMP_RETENTION_DAYS: "3",
+    GIDEON_STORAGE_FAILED_RETENTION_DAYS: "14",
+    GIDEON_STORAGE_SOURCE_RETENTION_DAYS: "365",
+    GIDEON_STORAGE_EXPORT_RETENTION_DAYS: "365",
+    GIDEON_STORAGE_DELETION_SLA_HOURS: "24",
+    GIDEON_SIGNED_URL_MAX_SECONDS: "900",
     GIDEON_OPENAI_API_KEY: "sk-test",
     GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD: "0.05",
     GIDEON_PROVIDER_CANARY_ANALYSIS_ESTIMATED_COST_USD: "0.01",

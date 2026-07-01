@@ -64,7 +64,8 @@ function validateCommandContract() {
     "production:github-promote:run",
     "production:live-env:check",
     "production:fixtures:materialize",
-    "production:billing:check"
+    "production:billing:check",
+    "production:storage:check"
   ]) {
     if (typeof scripts[scriptName] !== "string") {
       errors.push(`package.json must define ${scriptName}.`);
@@ -158,6 +159,7 @@ function validateOperationalEnvironment() {
   requireEnv("GIDEON_STORAGE_BUCKET", "Set GIDEON_STORAGE_BUCKET for staging private object storage.");
   requireEnv("GIDEON_STORAGE_ACCESS_KEY_ID", "Set GIDEON_STORAGE_ACCESS_KEY_ID for staging private object storage.");
   requireEnv("GIDEON_STORAGE_SECRET_ACCESS_KEY", "Set GIDEON_STORAGE_SECRET_ACCESS_KEY for staging private object storage.");
+  requireStorageLifecyclePolicy();
 
   if (!normalize(env.GIDEON_OPENAI_API_KEY ?? env.OPENAI_API_KEY)) {
     errors.push("Set GIDEON_OPENAI_API_KEY or OPENAI_API_KEY before running live provider canaries.");
@@ -175,6 +177,22 @@ function validateOperationalEnvironment() {
   requireEnv("APPLE_APP_SPECIFIC_PASSWORD", "Set APPLE_APP_SPECIFIC_PASSWORD for production release notarization checks.");
   if (!normalize(env.CSC_LINK) && !normalize(env.CSC_NAME)) {
     errors.push("Set CSC_LINK or CSC_NAME so production release candidates can be signed.");
+  }
+}
+
+function requireStorageLifecyclePolicy() {
+  for (const [name, min, max] of [
+    ["GIDEON_STORAGE_TEMP_RETENTION_DAYS", 1, 7],
+    ["GIDEON_STORAGE_FAILED_RETENTION_DAYS", 1, 30],
+    ["GIDEON_STORAGE_SOURCE_RETENTION_DAYS", 1, 3650],
+    ["GIDEON_STORAGE_EXPORT_RETENTION_DAYS", 1, 3650],
+    ["GIDEON_STORAGE_DELETION_SLA_HOURS", 1, 168],
+    ["GIDEON_SIGNED_URL_MAX_SECONDS", 60, 3600]
+  ]) {
+    requireIntegerRange(name, min, max, `Set ${name} to an integer between ${min} and ${max} for staging private storage policy.`);
+  }
+  if (normalize(env.GIDEON_STORAGE_PUBLIC_BASE_URL) && normalize(env.GIDEON_ALLOW_PUBLIC_STORAGE_BASE_URL) !== "true") {
+    errors.push("GIDEON_STORAGE_PUBLIC_BASE_URL must be unset for staging private artifacts unless GIDEON_ALLOW_PUBLIC_STORAGE_BASE_URL=true.");
   }
 }
 
@@ -283,6 +301,14 @@ function requireEquals(name, expected, message) {
 function requirePositiveInteger(name, message) {
   const value = normalize(env[name]);
   if (!value || !Number.isInteger(Number(value)) || Number(value) < 1) {
+    errors.push(message);
+  }
+}
+
+function requireIntegerRange(name, min, max, message) {
+  const value = normalize(env[name]);
+  const parsed = Number(value);
+  if (!value || !Number.isInteger(parsed) || parsed < min || parsed > max) {
     errors.push(message);
   }
 }

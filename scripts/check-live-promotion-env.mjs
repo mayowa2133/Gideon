@@ -19,9 +19,16 @@ const requiredEnv = [
   "GIDEON_DATABASE_URL",
   "GIDEON_SESSION_SECRET",
   "GIDEON_STORAGE_PROVIDER",
+  "GIDEON_STORAGE_ENDPOINT",
   "GIDEON_STORAGE_BUCKET",
   "GIDEON_STORAGE_ACCESS_KEY_ID",
   "GIDEON_STORAGE_SECRET_ACCESS_KEY",
+  "GIDEON_STORAGE_TEMP_RETENTION_DAYS",
+  "GIDEON_STORAGE_FAILED_RETENTION_DAYS",
+  "GIDEON_STORAGE_SOURCE_RETENTION_DAYS",
+  "GIDEON_STORAGE_EXPORT_RETENTION_DAYS",
+  "GIDEON_STORAGE_DELETION_SLA_HOURS",
+  "GIDEON_SIGNED_URL_MAX_SECONDS",
   "GIDEON_OPENAI_API_KEY",
   "GIDEON_STAGING_API_BASE_URL",
   "GIDEON_AUTH_CALLBACK_SECRET",
@@ -69,6 +76,7 @@ validateUrl("GIDEON_DATABASE_URL", ["postgres:", "postgresql:"], "GIDEON_DATABAS
 if (value("GIDEON_DATABASE_URL") && !value("GIDEON_DATABASE_URL").includes("sslmode=require")) {
   errors.push("GIDEON_DATABASE_URL must include sslmode=require for live promotion.");
 }
+validateUrl("GIDEON_STORAGE_ENDPOINT", ["https:"], "GIDEON_STORAGE_ENDPOINT must be an https:// URL.");
 validateUrl("GIDEON_STAGING_API_BASE_URL", ["https:"], "GIDEON_STAGING_API_BASE_URL must be an https:// URL.");
 validateUrl("GIDEON_STAGING_MCP_API_BASE_URL", ["https:"], "GIDEON_STAGING_MCP_API_BASE_URL must be an https:// URL.");
 validateUrl("GIDEON_STAGING_MCP_METRIC_PROBE_URL", ["https:"], "GIDEON_STAGING_MCP_METRIC_PROBE_URL must be an https:// URL.");
@@ -76,6 +84,15 @@ validateUrl("GIDEON_STAGING_MCP_METRIC_PROBE_URL", ["https:"], "GIDEON_STAGING_M
 const storageProvider = value("GIDEON_STORAGE_PROVIDER");
 if (storageProvider && storageProvider !== "s3" && storageProvider !== "r2") {
   errors.push("GIDEON_STORAGE_PROVIDER must be s3 or r2 for live promotion.");
+}
+validateRetentionWindow("GIDEON_STORAGE_TEMP_RETENTION_DAYS", 1, 7);
+validateRetentionWindow("GIDEON_STORAGE_FAILED_RETENTION_DAYS", 1, 30);
+validateRetentionWindow("GIDEON_STORAGE_SOURCE_RETENTION_DAYS", 1, 3650);
+validateRetentionWindow("GIDEON_STORAGE_EXPORT_RETENTION_DAYS", 1, 3650);
+validateRetentionWindow("GIDEON_STORAGE_DELETION_SLA_HOURS", 1, 168);
+validateRetentionWindow("GIDEON_SIGNED_URL_MAX_SECONDS", 60, 3600);
+if (value("GIDEON_STORAGE_PUBLIC_BASE_URL") && value("GIDEON_ALLOW_PUBLIC_STORAGE_BASE_URL") !== "true") {
+  errors.push("GIDEON_STORAGE_PUBLIC_BASE_URL must be unset for live private artifacts unless GIDEON_ALLOW_PUBLIC_STORAGE_BASE_URL=true.");
 }
 
 if (!skipPackage) {
@@ -128,6 +145,14 @@ function requirePositiveMoney(name) {
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed < 0) {
     errors.push(`${name} must be a non-negative USD amount.`);
+  }
+}
+
+function validateRetentionWindow(name, min, max) {
+  const raw = value(name);
+  const parsed = Number(raw);
+  if (!raw || !Number.isInteger(parsed) || parsed < min || parsed > max) {
+    errors.push(`${name} must be an integer between ${min} and ${max}.`);
   }
 }
 

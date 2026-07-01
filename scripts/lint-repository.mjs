@@ -219,7 +219,8 @@ function checkPackageContract() {
     "production:github-promote:run",
     "production:live-env:check",
     "production:fixtures:materialize",
-    "production:billing:check"
+    "production:billing:check",
+    "production:storage:check"
   ]) {
     if (typeof packageJson.scripts?.[scriptName] !== "string") {
       errors.push(`package.json must define ${scriptName}.`);

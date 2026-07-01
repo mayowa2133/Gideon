@@ -62,6 +62,8 @@ describe("staging readiness check", () => {
         GIDEON_STORAGE_BUCKET: "gideon-private-staging",
         GIDEON_STORAGE_ACCESS_KEY_ID: "storage-key",
         GIDEON_STORAGE_SECRET_ACCESS_KEY: "storage-secret",
+        GIDEON_STORAGE_ENDPOINT: "https://storage.example.test",
+        ...storagePolicyEnv(),
         GIDEON_OPENAI_API_KEY: "sk-test",
         GIDEON_PROVIDER_CANARY_LIVE: "true",
         GIDEON_PROVIDER_CANARY_AUDIO_PATH: audioPath,
@@ -123,6 +125,8 @@ describe("staging readiness check", () => {
           GIDEON_STORAGE_BUCKET: "gideon-private-staging",
           GIDEON_STORAGE_ACCESS_KEY_ID: "storage-key",
           GIDEON_STORAGE_SECRET_ACCESS_KEY: "storage-secret",
+          GIDEON_STORAGE_ENDPOINT: "https://storage.example.test",
+          ...storagePolicyEnv(),
           GIDEON_OPENAI_API_KEY: "sk-test",
           GIDEON_PROVIDER_CANARY_LIVE: "true",
           GIDEON_PROVIDER_CANARY_AUDIO_PATH: audioPath,
@@ -152,6 +156,17 @@ function providerCanaryCostEnv(): Record<string, string> {
     GIDEON_PROVIDER_CANARY_OCR_ESTIMATED_COST_USD: "0.01",
     GIDEON_PROVIDER_CANARY_TTS_MAX_COST_USD: "0.02",
     GIDEON_PROVIDER_CANARY_TTS_ESTIMATED_COST_USD: "0.005"
+  };
+}
+
+function storagePolicyEnv(): Record<string, string> {
+  return {
+    GIDEON_STORAGE_TEMP_RETENTION_DAYS: "3",
+    GIDEON_STORAGE_FAILED_RETENTION_DAYS: "14",
+    GIDEON_STORAGE_SOURCE_RETENTION_DAYS: "365",
+    GIDEON_STORAGE_EXPORT_RETENTION_DAYS: "365",
+    GIDEON_STORAGE_DELETION_SLA_HOURS: "24",
+    GIDEON_SIGNED_URL_MAX_SECONDS: "900"
   };
 }
 

@@ -30,6 +30,7 @@ const steps = [
   step("live promotion environment dry-run", [pnpm, "production:live-env:check", "--", "--dry-run"]),
   step("live promotion fixture materialization dry-run", [pnpm, "production:fixtures:materialize", "--", "--dry-run"]),
   step("production billing reconciliation dry-run", [pnpm, "production:billing:check", "--", "--dry-run"]),
+  step("production storage lifecycle dry-run", [pnpm, "production:storage:check", "--", "--dry-run"]),
   step("production promotion gate dry-run", [pnpm, "production:promote:check", "--", "--dry-run"]),
   step("local hosted worker preflight", [pnpm, "worker:hosted:check"], localWorkerEnv()),
   step("production-shaped hosted worker preflight", [pnpm, "worker:hosted:check"], productionWorkerEnv()),
