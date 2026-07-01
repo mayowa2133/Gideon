@@ -5,6 +5,17 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      run_live_promotion:
+        description: Run live production promotion gate against staging infrastructure
+        required: true
+        default: false
+        type: boolean
+      skip_package:
+        description: Skip signed package/release steps for infrastructure-only rehearsal
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   mac:
@@ -65,3 +76,109 @@ jobs:
             release/latest-mac.yml
             release/provenance.json
           if-no-files-found: error
+
+  live-promotion:
+    name: Live production promotion evidence
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_live_promotion }}
+    runs-on: macos-15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install FFmpeg
+        run: brew install ffmpeg
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Materialize private staging fixtures
+        env:
+          GIDEON_PROVIDER_CANARY_AUDIO_BASE64: ${{ secrets.GIDEON_PROVIDER_CANARY_AUDIO_BASE64 }}
+          GIDEON_PROVIDER_CANARY_IMAGE_BASE64: ${{ secrets.GIDEON_PROVIDER_CANARY_IMAGE_BASE64 }}
+          GIDEON_STAGING_SMOKE_RECORDING_BASE64: ${{ secrets.GIDEON_STAGING_SMOKE_RECORDING_BASE64 }}
+        run: |
+          mkdir -p tmp/live-fixtures
+          node -e 'require("node:fs").writeFileSync("tmp/live-fixtures/provider-audio.wav", Buffer.from(process.env.GIDEON_PROVIDER_CANARY_AUDIO_BASE64 || "", "base64"))'
+          node -e 'require("node:fs").writeFileSync("tmp/live-fixtures/provider-image.png", Buffer.from(process.env.GIDEON_PROVIDER_CANARY_IMAGE_BASE64 || "", "base64"))'
+          node -e 'require("node:fs").writeFileSync("tmp/live-fixtures/staging-recording.mp4", Buffer.from(process.env.GIDEON_STAGING_SMOKE_RECORDING_BASE64 || "", "base64"))'
+
+      - name: Run live production promotion gate
+        env:
+          GIDEON_PRODUCTION_PROMOTION_LIVE: "true"
+          GIDEON_PRODUCTION_PROMOTION_EVIDENCE_PATH: tmp/production-promotion-evidence.json
+          GIDEON_DEPLOYMENT_ENV: production
+          GIDEON_HOSTED_QUEUE_PROVIDER: bullmq
+          GIDEON_REDIS_URL: ${{ secrets.GIDEON_REDIS_URL }}
+          GIDEON_BULLMQ_QUEUE_NAME: ${{ vars.GIDEON_BULLMQ_QUEUE_NAME }}
+          GIDEON_BULLMQ_PREFIX: ${{ vars.GIDEON_BULLMQ_PREFIX }}
+          GIDEON_WORKER_ID: ${{ vars.GIDEON_WORKER_ID }}
+          GIDEON_WORKER_LEASE_SECONDS: "300"
+          GIDEON_WORKER_HEARTBEAT_INTERVAL_MS: "30000"
+          GIDEON_STORE_PROVIDER: postgres_snapshot
+          GIDEON_DATABASE_URL: ${{ secrets.GIDEON_DATABASE_URL }}
+          GIDEON_SESSION_SECRET: ${{ secrets.GIDEON_SESSION_SECRET }}
+          GIDEON_USER_DATA_DIR: /tmp/gideon-worker
+          GIDEON_PROJECTS_DIR: /tmp/gideon-worker/projects
+          GIDEON_STORAGE_ROOT: /tmp/gideon-worker/cache
+          GIDEON_STORAGE_PROVIDER: ${{ vars.GIDEON_STORAGE_PROVIDER }}
+          GIDEON_STORAGE_BUCKET: ${{ vars.GIDEON_STORAGE_BUCKET }}
+          GIDEON_STORAGE_ACCESS_KEY_ID: ${{ secrets.GIDEON_STORAGE_ACCESS_KEY_ID }}
+          GIDEON_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.GIDEON_STORAGE_SECRET_ACCESS_KEY }}
+          GIDEON_OPENAI_API_KEY: ${{ secrets.GIDEON_OPENAI_API_KEY }}
+          GIDEON_PROVIDER_CANARY_LIVE: "true"
+          GIDEON_PROVIDER_CANARY_AUDIO_PATH: tmp/live-fixtures/provider-audio.wav
+          GIDEON_PROVIDER_CANARY_IMAGE_PATH: tmp/live-fixtures/provider-image.png
+          GIDEON_STAGING_API_BASE_URL: ${{ vars.GIDEON_STAGING_API_BASE_URL }}
+          GIDEON_AUTH_CALLBACK_SECRET: ${{ secrets.GIDEON_AUTH_CALLBACK_SECRET }}
+          GIDEON_STAGING_SMOKE_LIVE: "true"
+          GIDEON_STAGING_SMOKE_RECORDING_PATH: tmp/live-fixtures/staging-recording.mp4
+          GIDEON_STAGING_SMOKE_POLL_TIMEOUT_MS: "600000"
+          GIDEON_STAGING_SMOKE_POLL_INTERVAL_MS: "5000"
+          GIDEON_STAGING_MCP_API_BASE_URL: ${{ vars.GIDEON_STAGING_MCP_API_BASE_URL }}
+          GIDEON_STAGING_MCP_SESSION_COOKIE: ${{ secrets.GIDEON_STAGING_MCP_SESSION_COOKIE }}
+          GIDEON_STAGING_MCP_PROJECT_ID: ${{ vars.GIDEON_STAGING_MCP_PROJECT_ID }}
+          GIDEON_STAGING_MCP_SMOKE_LIVE: "true"
+          GIDEON_STAGING_MCP_REQUIRE_METRIC_EXPORT: "true"
+          GIDEON_STAGING_MCP_METRIC_PROBE_URL: ${{ vars.GIDEON_STAGING_MCP_METRIC_PROBE_URL }}
+          GIDEON_STAGING_MCP_METRIC_PROBE_BEARER_TOKEN: ${{ secrets.GIDEON_STAGING_MCP_METRIC_PROBE_BEARER_TOKEN }}
+          GIDEON_RELEASE_CHANNEL: production
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_NAME: ${{ secrets.CSC_NAME }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          if [ "${{ inputs.skip_package }}" = "true" ]; then
+            pnpm production:promote:check -- --live --skip-package
+          else
+            pnpm production:promote:check -- --live
+          fi
+
+      - name: Verify archived promotion evidence
+        if: ${{ success() }}
+        run: |
+          if [ "${{ inputs.skip_package }}" = "true" ]; then
+            pnpm production:evidence:check -- --path tmp/production-promotion-evidence.json --allow-skip-package
+          else
+            pnpm production:evidence:check -- --path tmp/production-promotion-evidence.json
+          fi
+
+      - name: Upload promotion evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gideon-production-promotion-evidence
+          path: tmp/production-promotion-evidence.json
+          if-no-files-found: warn

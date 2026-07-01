@@ -43,3 +43,9 @@ The check also validates that `latest-mac.yml` hashes and sizes match the genera
 - file names, sizes, SHA-256 hashes, and SHA-512 hashes for generated artifacts.
 
 The GitHub macOS build uploads the DMG, ZIP, blockmaps, `latest-mac.yml`, and `provenance.json` as workflow artifacts.
+
+## Live promotion evidence workflow
+
+The macOS workflow has a manual `workflow_dispatch` live promotion path. Set `run_live_promotion=true` only after staging infrastructure, provider credentials, object storage, Redis/PostgreSQL, hosted MCP session/project, metric probe configuration, base64-encoded fixture secrets, and Apple signing credentials are configured in GitHub Secrets/Vars.
+
+The live job runs `pnpm production:promote:check -- --live`, self-verifies `tmp/production-promotion-evidence.json`, runs `pnpm production:evidence:check -- --path tmp/production-promotion-evidence.json`, and uploads `Gideon-production-promotion-evidence`. The evidence artifact is designed to contain step names, commands, safe env overrides, timings, exit codes, and failure status only; it must not contain cookies, API keys, signed URLs, provider payloads, transcripts, prompts, or media paths.
