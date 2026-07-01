@@ -122,6 +122,16 @@ if (args[0] === "run" && args[1] === "list") {
   process.stdout.write(JSON.stringify([{ databaseId: 67890, createdAt: new Date().toISOString(), status: "queued", conclusion: null, headBranch: "main" }]));
   process.exit(0);
 }
+if (args[0] === "run" && args[1] === "view") {
+  process.stdout.write(JSON.stringify({
+    databaseId: Number(args[2]),
+    status: "completed",
+    conclusion: "success",
+    event: "workflow_dispatch",
+    headSha: "0123456789abcdef0123456789abcdef01234567"
+  }));
+  process.exit(0);
+}
 if (args[0] === "run" && args[1] === "watch") {
   process.exit(0);
 }

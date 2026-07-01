@@ -8,6 +8,7 @@ const args = process.argv.slice(2).filter((arg) => arg !== "--");
 const options = parseArgs(args);
 const dryRun = options.flags.has("dry-run");
 const skipDownload = options.flags.has("skip-download");
+const skipRunMetadata = options.flags.has("skip-run-metadata");
 const allowSkipPackage = options.flags.has("allow-skip-package");
 const repo = options.values.repo ?? process.env.GITHUB_REPOSITORY ?? "mayowa2133/Gideon";
 const runId = options.values["run-id"] ?? process.env.GITHUB_RUN_ID;
@@ -22,6 +23,7 @@ if (dryRun) {
   console.log(`3. Download artifact ${artifactName} into ${downloadDir} with gh run download.`);
   console.log(`4. Locate ${evidenceFilename} recursively inside the artifact directory.`);
   console.log("5. Verify the evidence with the production evidence checker.");
+  console.log("6. When --run-id is available, verify evidence gitCommit matches gh run view headSha.");
   process.exit(0);
 }
 
@@ -41,6 +43,9 @@ if (allowSkipPackage) {
   verifyArgs.push("--allow-skip-package");
 }
 runCommand(process.execPath, verifyArgs);
+if (runId && !skipRunMetadata) {
+  validateRunMetadata({ repo, runId, evidencePath });
+}
 
 console.log(`GitHub promotion evidence artifact check passed for ${path.relative(process.cwd(), evidencePath)}.`);
 
@@ -97,18 +102,68 @@ function walk(dir, visit) {
   }
 }
 
-function runCommand(command, commandArgs) {
+function validateRunMetadata(input) {
+  const evidence = readEvidence(input.evidencePath);
+  const result = runCommand(
+    "gh",
+    ["run", "view", input.runId, "--repo", input.repo, "--json", "headSha,conclusion,status,event,databaseId"],
+    { capture: true }
+  );
+  let run;
+  try {
+    run = JSON.parse(result.stdout);
+  } catch (error) {
+    fail([`Could not parse gh run view JSON: ${error instanceof Error ? error.message : "unknown error"}.`]);
+  }
+  if (!run || typeof run !== "object" || Array.isArray(run)) {
+    fail(["gh run view JSON was not an object."]);
+  }
+  const errors = [];
+  if (run.status !== "completed") {
+    errors.push(`GitHub run ${input.runId} status must be completed.`);
+  }
+  if (run.conclusion !== "success") {
+    errors.push(`GitHub run ${input.runId} conclusion must be success.`);
+  }
+  if (run.event !== "workflow_dispatch") {
+    errors.push(`GitHub run ${input.runId} event must be workflow_dispatch.`);
+  }
+  if (typeof run.headSha !== "string" || !/^[0-9a-f]{40}$/i.test(run.headSha)) {
+    errors.push(`GitHub run ${input.runId} headSha must be a full git SHA.`);
+  } else if (run.headSha.toLowerCase() !== String(evidence.gitCommit ?? "").toLowerCase()) {
+    errors.push(`Evidence gitCommit ${evidence.gitCommit ?? "missing"} does not match GitHub run headSha ${run.headSha}.`);
+  }
+  if (errors.length > 0) {
+    fail(errors);
+  }
+}
+
+function readEvidence(evidencePath) {
+  try {
+    return JSON.parse(fs.readFileSync(evidencePath, "utf8"));
+  } catch (error) {
+    fail([`Could not read evidence JSON from ${path.relative(process.cwd(), evidencePath)}: ${error instanceof Error ? error.message : "unknown error"}.`]);
+  }
+}
+
+function runCommand(command, commandArgs, options = {}) {
   const result = spawnSync(command, commandArgs, {
     cwd: process.cwd(),
     env: process.env,
-    stdio: "inherit"
+    encoding: options.capture ? "utf8" : undefined,
+    stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit"
   });
   if (result.error) {
     fail([`${command} could not be started: ${result.error.message}.`]);
   }
   if (result.status !== 0) {
-    fail([`${[command, ...commandArgs].join(" ")} failed with exit code ${result.status ?? "unknown"}.`]);
+    const stderr = options.capture && result.stderr ? ` ${String(result.stderr).trim()}` : "";
+    fail([`${[command, ...commandArgs].join(" ")} failed with exit code ${result.status ?? "unknown"}.${stderr}`]);
   }
+  return {
+    stdout: options.capture ? String(result.stdout ?? "") : "",
+    stderr: options.capture ? String(result.stderr ?? "") : ""
+  };
 }
 
 function fail(errors) {
