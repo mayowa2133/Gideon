@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { redactSecrets, runProviderCanaries, type ProviderCanaryAdapter } from "./providerCanary";
+import { loadProviderCanaryCostConfig, redactSecrets, runProviderCanaries, type ProviderCanaryAdapter } from "./providerCanary";
 
-function fakeAdapter(calls: string[] = []): ProviderCanaryAdapter {
+function fakeAdapter(calls: string[] = [], costs: Partial<Record<string, number>> = {}): ProviderCanaryAdapter {
   return {
     async analyzeWalkthrough() {
       calls.push("analysis");
@@ -15,7 +15,8 @@ function fakeAdapter(calls: string[] = []): ProviderCanaryAdapter {
             evidence: "Fixture evidence",
             confidence: 0.9
           }
-        ]
+        ],
+        costUsd: costs.analysis
       };
     },
     async transcribeAudio() {
@@ -27,14 +28,16 @@ function fakeAdapter(calls: string[] = []): ProviderCanaryAdapter {
         model: "transcribe-test",
         text: "Canary transcript",
         segments: [],
-        createdAt: "2026-06-29T00:00:00.000Z"
+        createdAt: "2026-06-29T00:00:00.000Z",
+        costUsd: costs.transcription
       };
     },
     async extractFrameText() {
       calls.push("ocr");
       return {
         text: "Canary UI text",
-        confidence: 0.8
+        confidence: 0.8,
+        costUsd: costs.ocr
       };
     },
     async synthesizeSpeech() {
@@ -42,7 +45,8 @@ function fakeAdapter(calls: string[] = []): ProviderCanaryAdapter {
       return {
         outputPath: "/tmp/canary.wav",
         provider: "openai",
-        model: "tts-test"
+        model: "tts-test",
+        costUsd: costs.tts
       };
     }
   };
@@ -88,7 +92,31 @@ describe("provider canary", () => {
     expect(calls).toEqual([]);
   });
 
-  it("runs live analysis and TTS while skipping fixture-dependent ASR and OCR when media paths are absent", async () => {
+  it("runs live analysis and TTS within configured cost ceilings while skipping fixture-dependent ASR and OCR when media paths are absent", async () => {
+    const calls: string[] = [];
+    const report = await runProviderCanaries({
+      mode: "live",
+      env: {
+        GIDEON_OPENAI_API_KEY: "sk-test",
+        GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD: "0.05",
+        GIDEON_PROVIDER_CANARY_ANALYSIS_ESTIMATED_COST_USD: "0.01",
+        GIDEON_PROVIDER_CANARY_TTS_MAX_COST_USD: "0.02",
+        GIDEON_PROVIDER_CANARY_TTS_ESTIMATED_COST_USD: "0.005"
+      },
+      adapter: fakeAdapter(calls),
+      now: () => new Date("2026-06-29T00:00:00.000Z")
+    });
+
+    expect(report.results.find((result) => result.capability === "analysis")?.status).toBe("passed");
+    expect(report.results.find((result) => result.capability === "analysis")?.costUsd).toBe(0.01);
+    expect(report.results.find((result) => result.capability === "analysis")?.maxCostUsd).toBe(0.05);
+    expect(report.results.find((result) => result.capability === "tts")?.status).toBe("passed");
+    expect(report.results.find((result) => result.capability === "transcription")?.status).toBe("skipped");
+    expect(report.results.find((result) => result.capability === "ocr")?.status).toBe("skipped");
+    expect(calls).toEqual(["analysis", "tts"]);
+  });
+
+  it("fails live canaries when required cost ceilings are missing", async () => {
     const calls: string[] = [];
     const report = await runProviderCanaries({
       mode: "live",
@@ -99,11 +127,32 @@ describe("provider canary", () => {
       now: () => new Date("2026-06-29T00:00:00.000Z")
     });
 
-    expect(report.results.find((result) => result.capability === "analysis")?.status).toBe("passed");
-    expect(report.results.find((result) => result.capability === "tts")?.status).toBe("passed");
-    expect(report.results.find((result) => result.capability === "transcription")?.status).toBe("skipped");
-    expect(report.results.find((result) => result.capability === "ocr")?.status).toBe("skipped");
+    expect(report.results.find((result) => result.capability === "analysis")?.status).toBe("failed");
+    expect(report.results.find((result) => result.capability === "analysis")?.message).toContain(
+      "GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD"
+    );
+    expect(report.results.find((result) => result.capability === "tts")?.message).toContain(
+      "GIDEON_PROVIDER_CANARY_TTS_MAX_COST_USD"
+    );
     expect(calls).toEqual(["analysis", "tts"]);
+  });
+
+  it("fails live canaries when reported provider cost exceeds configured ceilings", async () => {
+    const calls: string[] = [];
+    const report = await runProviderCanaries({
+      mode: "live",
+      env: {
+        GIDEON_OPENAI_API_KEY: "sk-test",
+        GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD: "0.01",
+        GIDEON_PROVIDER_CANARY_TTS_MAX_COST_USD: "0.02"
+      },
+      adapter: fakeAdapter(calls, { analysis: 0.5, tts: 0.005 }),
+      now: () => new Date("2026-06-29T00:00:00.000Z")
+    });
+
+    expect(report.results.find((result) => result.capability === "analysis")?.status).toBe("failed");
+    expect(report.results.find((result) => result.capability === "analysis")?.message).toContain("exceeded max");
+    expect(report.results.find((result) => result.capability === "tts")?.status).toBe("passed");
   });
 
   it("fails all live canaries when credentials are missing", async () => {
@@ -123,5 +172,15 @@ describe("provider canary", () => {
     expect(redactSecrets("request failed for sk-supersecretvalue", ["sk-supersecretvalue"])).toBe(
       "request failed for [redacted]"
     );
+  });
+
+  it("loads provider canary cost ceilings from environment", () => {
+    expect(
+      loadProviderCanaryCostConfig({
+        GIDEON_PROVIDER_CANARY_ANALYSIS_ESTIMATED_COST_USD: "0.0123456",
+        GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD: "0.02",
+        GIDEON_PROVIDER_CANARY_TTS_MAX_COST_USD: "bad"
+      }).analysis
+    ).toEqual({ estimatedCostUsd: 0.012346, maxCostUsd: 0.02 });
   });
 });

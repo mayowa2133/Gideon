@@ -165,6 +165,7 @@ function validateOperationalEnvironment() {
   requireEquals("GIDEON_PROVIDER_CANARY_LIVE", "true", "Set GIDEON_PROVIDER_CANARY_LIVE=true before staging promotion.");
   requireReadableFile("GIDEON_PROVIDER_CANARY_AUDIO_PATH", "Set GIDEON_PROVIDER_CANARY_AUDIO_PATH to a small staging audio fixture.");
   requireReadableFile("GIDEON_PROVIDER_CANARY_IMAGE_PATH", "Set GIDEON_PROVIDER_CANARY_IMAGE_PATH to a small staging screenshot fixture.");
+  requireProviderCanaryCostCeilings();
   requireHostedSmokeEnvironment();
   requireHostedMcpSmokeEnvironment();
 
@@ -174,6 +175,21 @@ function validateOperationalEnvironment() {
   requireEnv("APPLE_APP_SPECIFIC_PASSWORD", "Set APPLE_APP_SPECIFIC_PASSWORD for production release notarization checks.");
   if (!normalize(env.CSC_LINK) && !normalize(env.CSC_NAME)) {
     errors.push("Set CSC_LINK or CSC_NAME so production release candidates can be signed.");
+  }
+}
+
+function requireProviderCanaryCostCeilings() {
+  for (const name of [
+    "GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD",
+    "GIDEON_PROVIDER_CANARY_ANALYSIS_ESTIMATED_COST_USD",
+    "GIDEON_PROVIDER_CANARY_TRANSCRIPTION_MAX_COST_USD",
+    "GIDEON_PROVIDER_CANARY_TRANSCRIPTION_ESTIMATED_COST_USD",
+    "GIDEON_PROVIDER_CANARY_OCR_MAX_COST_USD",
+    "GIDEON_PROVIDER_CANARY_OCR_ESTIMATED_COST_USD",
+    "GIDEON_PROVIDER_CANARY_TTS_MAX_COST_USD",
+    "GIDEON_PROVIDER_CANARY_TTS_ESTIMATED_COST_USD"
+  ]) {
+    requireNonNegativeDecimal(name, `Set ${name} to a non-negative USD amount before live provider canaries.`);
   }
 }
 
@@ -267,6 +283,14 @@ function requireEquals(name, expected, message) {
 function requirePositiveInteger(name, message) {
   const value = normalize(env[name]);
   if (!value || !Number.isInteger(Number(value)) || Number(value) < 1) {
+    errors.push(message);
+  }
+}
+
+function requireNonNegativeDecimal(name, message) {
+  const value = normalize(env[name]);
+  const parsed = Number(value);
+  if (!value || !Number.isFinite(parsed) || parsed < 0) {
     errors.push(message);
   }
 }

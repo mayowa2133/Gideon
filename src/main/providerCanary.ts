@@ -16,6 +16,8 @@ export interface ProviderCanaryResult {
   model: string;
   message: string;
   durationMs: number;
+  costUsd?: number;
+  maxCostUsd?: number;
 }
 
 export interface ProviderCanaryReport {
@@ -34,7 +36,7 @@ export interface ProviderCanaryAdapter {
     text: string;
     instructions: string;
     outputPath: string;
-  }): Promise<{ outputPath: string; provider: "openai"; model: string }>;
+  }): Promise<{ outputPath: string; provider: "openai"; model: string; costUsd?: number }>;
 }
 
 export interface ProviderCanaryOptions {
@@ -51,12 +53,13 @@ export async function runProviderCanaries(options: ProviderCanaryOptions = {}): 
   const mode = options.mode ?? (env.GIDEON_PROVIDER_CANARY_LIVE === "true" ? "live" : "dry_run");
   const now = options.now ?? (() => new Date());
   const adapter = options.adapter ?? new OpenAiProvider({ config: config.openai });
+  const costCeilings = loadProviderCanaryCostConfig(env);
   const startedAt = now().toISOString();
 
   const results =
     mode === "dry_run"
-      ? buildDryRunResults(config)
-      : await runLiveCanaries({ env, config, adapter, now });
+      ? buildDryRunResults(config, costCeilings)
+      : await runLiveCanaries({ env, config, adapter, now, costCeilings });
 
   return {
     mode,
@@ -67,17 +70,34 @@ export async function runProviderCanaries(options: ProviderCanaryOptions = {}): 
   };
 }
 
-function buildDryRunResults(config: ProviderConfig): ProviderCanaryResult[] {
+export type ProviderCanaryCostConfig = Record<
+  ProviderCanaryCapability,
+  {
+    estimatedCostUsd: number | null;
+    maxCostUsd: number | null;
+  }
+>;
+
+export function loadProviderCanaryCostConfig(env: NodeJS.ProcessEnv = process.env): ProviderCanaryCostConfig {
+  return {
+    analysis: capabilityCostConfig(env, "ANALYSIS"),
+    transcription: capabilityCostConfig(env, "TRANSCRIPTION"),
+    ocr: capabilityCostConfig(env, "OCR"),
+    tts: capabilityCostConfig(env, "TTS")
+  };
+}
+
+function buildDryRunResults(config: ProviderConfig, costCeilings: ProviderCanaryCostConfig): ProviderCanaryResult[] {
   const configured = Boolean(config.openai.apiKey);
   const message = configured
     ? "OpenAI provider configuration is present. Live canary calls were not made because dry-run mode is active."
     : "OpenAI provider configuration is missing. Set GIDEON_OPENAI_API_KEY or OPENAI_API_KEY to enable live provider canaries.";
 
   return [
-    dryRunResult("analysis", config.openai.llmModel, configured, message),
-    dryRunResult("transcription", config.openai.transcriptionModel, configured, message),
-    dryRunResult("ocr", config.openai.llmModel, configured, message),
-    dryRunResult("tts", config.openai.ttsModel, configured, message)
+    dryRunResult("analysis", config.openai.llmModel, configured, message, costCeilings),
+    dryRunResult("transcription", config.openai.transcriptionModel, configured, message, costCeilings),
+    dryRunResult("ocr", config.openai.llmModel, configured, message, costCeilings),
+    dryRunResult("tts", config.openai.ttsModel, configured, message, costCeilings)
   ];
 }
 
@@ -85,7 +105,8 @@ function dryRunResult(
   capability: ProviderCanaryCapability,
   model: string,
   configured: boolean,
-  message: string
+  message: string,
+  costCeilings: ProviderCanaryCostConfig
 ): ProviderCanaryResult {
   return {
     capability,
@@ -93,7 +114,9 @@ function dryRunResult(
     status: configured ? "configured" : "skipped",
     model,
     message,
-    durationMs: 0
+    durationMs: 0,
+    costUsd: costCeilings[capability].estimatedCostUsd ?? undefined,
+    maxCostUsd: costCeilings[capability].maxCostUsd ?? undefined
   };
 }
 
@@ -102,8 +125,9 @@ async function runLiveCanaries(input: {
   config: ProviderConfig;
   adapter: ProviderCanaryAdapter;
   now: () => Date;
+  costCeilings: ProviderCanaryCostConfig;
 }): Promise<ProviderCanaryResult[]> {
-  const { env, config, adapter, now } = input;
+  const { env, config, adapter, now, costCeilings } = input;
   if (!config.openai.apiKey) {
     return [
       missingKeyResult("analysis", config.openai.llmModel),
@@ -124,8 +148,12 @@ async function runLiveCanaries(input: {
         if (!result.summary.trim() || result.moments.length === 0) {
           throw new Error("Analysis canary returned no summary or moments.");
         }
-        return `Analysis canary passed with ${result.moments.length} grounded moment(s).`;
+        return {
+          message: `Analysis canary passed with ${result.moments.length} grounded moment(s).`,
+          costUsd: canaryCost("analysis", costCeilings, result)
+        };
       },
+      costCeiling: costCeilings.analysis,
       redactionHints: [config.openai.apiKey]
     })
   );
@@ -143,8 +171,12 @@ async function runLiveCanaries(input: {
           if (transcript.status !== "completed" || !transcript.text.trim()) {
             throw new Error("Transcription canary returned no completed transcript text.");
           }
-          return "Transcription canary passed with completed transcript text.";
+          return {
+            message: "Transcription canary passed with completed transcript text.",
+            costUsd: canaryCost("transcription", costCeilings, transcript)
+          };
         },
+        costCeiling: costCeilings.transcription,
         redactionHints: [config.openai.apiKey]
       })
     );
@@ -169,8 +201,12 @@ async function runLiveCanaries(input: {
           if (typeof result.text !== "string" || Number.isNaN(result.confidence)) {
             throw new Error("OCR canary returned an invalid result.");
           }
-          return "OCR canary passed with structured frame text output.";
+          return {
+            message: "OCR canary passed with structured frame text output.",
+            costUsd: canaryCost("ocr", costCeilings, result)
+          };
         },
+        costCeiling: costCeilings.ocr,
         redactionHints: [config.openai.apiKey]
       })
     );
@@ -195,8 +231,12 @@ async function runLiveCanaries(input: {
         if (!result.outputPath) {
           throw new Error("TTS canary returned no output path.");
         }
-        return "TTS canary passed with a generated speech artifact.";
+        return {
+          message: "TTS canary passed with a generated speech artifact.",
+          costUsd: canaryCost("tts", costCeilings, result)
+        };
       },
+      costCeiling: costCeilings.tts,
       redactionHints: [config.openai.apiKey]
     })
   );
@@ -234,19 +274,23 @@ async function executeCanary(input: {
   capability: ProviderCanaryCapability;
   model: string;
   now: () => Date;
-  run: () => Promise<string>;
+  run: () => Promise<{ message: string; costUsd?: number }>;
+  costCeiling: ProviderCanaryCostConfig[ProviderCanaryCapability];
   redactionHints: Array<string | null | undefined>;
 }): Promise<ProviderCanaryResult> {
   const started = input.now().getTime();
   try {
-    const message = await input.run();
+    const { message, costUsd } = await input.run();
+    assertCostWithinCeiling(input.capability, costUsd, input.costCeiling.maxCostUsd);
     return {
       capability: input.capability,
       provider: "openai",
       status: "passed",
       model: input.model,
       message,
-      durationMs: Math.max(0, input.now().getTime() - started)
+      durationMs: Math.max(0, input.now().getTime() - started),
+      costUsd,
+      maxCostUsd: input.costCeiling.maxCostUsd ?? undefined
     };
   } catch (error) {
     return {
@@ -255,9 +299,61 @@ async function executeCanary(input: {
       status: "failed",
       model: input.model,
       message: redactSecrets(error instanceof Error ? error.message : "Provider canary failed.", input.redactionHints),
-      durationMs: Math.max(0, input.now().getTime() - started)
+      durationMs: Math.max(0, input.now().getTime() - started),
+      maxCostUsd: input.costCeiling.maxCostUsd ?? undefined
     };
   }
+}
+
+function capabilityCostConfig(env: NodeJS.ProcessEnv, capabilityName: string): ProviderCanaryCostConfig[ProviderCanaryCapability] {
+  return {
+    estimatedCostUsd: parseOptionalMoney(env[`GIDEON_PROVIDER_CANARY_${capabilityName}_ESTIMATED_COST_USD`]),
+    maxCostUsd: parseOptionalMoney(env[`GIDEON_PROVIDER_CANARY_${capabilityName}_MAX_COST_USD`])
+  };
+}
+
+function canaryCost(
+  capability: ProviderCanaryCapability,
+  costCeilings: ProviderCanaryCostConfig,
+  result: unknown
+): number | undefined {
+  const reported = result && typeof result === "object" ? (result as { costUsd?: unknown }).costUsd : undefined;
+  if (typeof reported === "number" && Number.isFinite(reported) && reported >= 0) {
+    return roundUsd(reported);
+  }
+  return costCeilings[capability].estimatedCostUsd ?? undefined;
+}
+
+function assertCostWithinCeiling(
+  capability: ProviderCanaryCapability,
+  costUsd: number | undefined,
+  maxCostUsd: number | null
+): void {
+  if (maxCostUsd === null) {
+    throw new Error(`Set GIDEON_PROVIDER_CANARY_${capability.toUpperCase()}_MAX_COST_USD before live provider canaries.`);
+  }
+  if (costUsd === undefined) {
+    throw new Error(`Set GIDEON_PROVIDER_CANARY_${capability.toUpperCase()}_ESTIMATED_COST_USD or return provider cost before live provider canaries.`);
+  }
+  if (costUsd > maxCostUsd) {
+    throw new Error(`${capability} canary cost ${costUsd.toFixed(6)} exceeded max ${maxCostUsd.toFixed(6)} USD.`);
+  }
+}
+
+function parseOptionalMoney(value: string | undefined): number | null {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+  return roundUsd(parsed);
+}
+
+function roundUsd(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
 }
 
 async function assertReadable(filePath: string, label: string): Promise<void> {

@@ -14,6 +14,7 @@ describe("live promotion environment check", () => {
 
     expect(result.stdout).toContain("Live promotion environment check dry-run:");
     expect(result.stdout).toContain("GIDEON_STAGING_MCP_SESSION_COOKIE");
+    expect(result.stdout).toContain("GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD");
     expect(result.stdout).toContain("Require Apple signing/notarization env");
   });
 
@@ -88,6 +89,14 @@ function liveEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     GIDEON_STORAGE_ACCESS_KEY_ID: "storage-key",
     GIDEON_STORAGE_SECRET_ACCESS_KEY: "storage-secret",
     GIDEON_OPENAI_API_KEY: "sk-test",
+    GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD: "0.05",
+    GIDEON_PROVIDER_CANARY_ANALYSIS_ESTIMATED_COST_USD: "0.01",
+    GIDEON_PROVIDER_CANARY_TRANSCRIPTION_MAX_COST_USD: "0.05",
+    GIDEON_PROVIDER_CANARY_TRANSCRIPTION_ESTIMATED_COST_USD: "0.01",
+    GIDEON_PROVIDER_CANARY_OCR_MAX_COST_USD: "0.05",
+    GIDEON_PROVIDER_CANARY_OCR_ESTIMATED_COST_USD: "0.01",
+    GIDEON_PROVIDER_CANARY_TTS_MAX_COST_USD: "0.02",
+    GIDEON_PROVIDER_CANARY_TTS_ESTIMATED_COST_USD: "0.005",
     GIDEON_STAGING_API_BASE_URL: "https://staging.gideon.example.test",
     GIDEON_AUTH_CALLBACK_SECRET: "auth-callback-secret",
     GIDEON_STAGING_MCP_API_BASE_URL: "https://staging.gideon.example.test",

@@ -31,14 +31,26 @@ const requiredEnv = [
   "GIDEON_STAGING_MCP_METRIC_PROBE_URL"
 ];
 
+const providerCostEnv = [
+  "GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD",
+  "GIDEON_PROVIDER_CANARY_ANALYSIS_ESTIMATED_COST_USD",
+  "GIDEON_PROVIDER_CANARY_TRANSCRIPTION_MAX_COST_USD",
+  "GIDEON_PROVIDER_CANARY_TRANSCRIPTION_ESTIMATED_COST_USD",
+  "GIDEON_PROVIDER_CANARY_OCR_MAX_COST_USD",
+  "GIDEON_PROVIDER_CANARY_OCR_ESTIMATED_COST_USD",
+  "GIDEON_PROVIDER_CANARY_TTS_MAX_COST_USD",
+  "GIDEON_PROVIDER_CANARY_TTS_ESTIMATED_COST_USD"
+];
+
 const signingEnv = ["APPLE_TEAM_ID", "APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD"];
 
 if (dryRun) {
   console.log("Live promotion environment check dry-run:");
   console.log(`1. Require fixture secrets: ${fixtureEnv.join(", ")}.`);
   console.log(`2. Require staging/provider/storage/MCP env: ${requiredEnv.join(", ")}.`);
-  console.log("3. Validate rediss:// Redis, postgres:// database, https:// staging URLs, and s3/r2 storage provider.");
-  console.log("4. Require Apple signing/notarization env unless --skip-package or GIDEON_LIVE_PROMOTION_SKIP_PACKAGE=true.");
+  console.log(`3. Require provider canary cost ceilings: ${providerCostEnv.join(", ")}.`);
+  console.log("4. Validate rediss:// Redis, postgres:// database, https:// staging URLs, and s3/r2 storage provider.");
+  console.log("5. Require Apple signing/notarization env unless --skip-package or GIDEON_LIVE_PROMOTION_SKIP_PACKAGE=true.");
   process.exit(0);
 }
 
@@ -47,6 +59,9 @@ for (const name of fixtureEnv) {
 }
 for (const name of requiredEnv) {
   requireNonEmpty(name);
+}
+for (const name of providerCostEnv) {
+  requirePositiveMoney(name);
 }
 
 validateUrl("GIDEON_REDIS_URL", ["rediss:"], "GIDEON_REDIS_URL must be a rediss:// URL for live promotion.");
@@ -101,6 +116,18 @@ function requireBase64(name) {
   }
   if (Buffer.from(normalized, "base64").length < 1) {
     errors.push(`${name} must decode to non-empty fixture bytes.`);
+  }
+}
+
+function requirePositiveMoney(name) {
+  const raw = value(name);
+  if (!raw) {
+    errors.push(`${name} is required for live provider canary cost ceilings.`);
+    return;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    errors.push(`${name} must be a non-negative USD amount.`);
   }
 }
 

@@ -66,6 +66,7 @@ describe("staging readiness check", () => {
         GIDEON_PROVIDER_CANARY_LIVE: "true",
         GIDEON_PROVIDER_CANARY_AUDIO_PATH: audioPath,
         GIDEON_PROVIDER_CANARY_IMAGE_PATH: imagePath,
+        ...providerCanaryCostEnv(),
         GIDEON_STAGING_API_BASE_URL: "https://staging.gideon.example.test",
         GIDEON_AUTH_CALLBACK_SECRET: "auth-callback-secret",
         GIDEON_STAGING_SMOKE_LIVE: "true",
@@ -126,6 +127,7 @@ describe("staging readiness check", () => {
           GIDEON_PROVIDER_CANARY_LIVE: "true",
           GIDEON_PROVIDER_CANARY_AUDIO_PATH: audioPath,
           GIDEON_PROVIDER_CANARY_IMAGE_PATH: imagePath,
+          ...providerCanaryCostEnv(),
           GIDEON_RELEASE_DIR: releaseDir,
           GIDEON_RELEASE_CHANNEL: "production",
           APPLE_TEAM_ID: "TEAM123",
@@ -139,6 +141,19 @@ describe("staging readiness check", () => {
     });
   });
 });
+
+function providerCanaryCostEnv(): Record<string, string> {
+  return {
+    GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD: "0.05",
+    GIDEON_PROVIDER_CANARY_ANALYSIS_ESTIMATED_COST_USD: "0.01",
+    GIDEON_PROVIDER_CANARY_TRANSCRIPTION_MAX_COST_USD: "0.05",
+    GIDEON_PROVIDER_CANARY_TRANSCRIPTION_ESTIMATED_COST_USD: "0.01",
+    GIDEON_PROVIDER_CANARY_OCR_MAX_COST_USD: "0.05",
+    GIDEON_PROVIDER_CANARY_OCR_ESTIMATED_COST_USD: "0.01",
+    GIDEON_PROVIDER_CANARY_TTS_MAX_COST_USD: "0.02",
+    GIDEON_PROVIDER_CANARY_TTS_ESTIMATED_COST_USD: "0.005"
+  };
+}
 
 async function writeReleaseFixtures(releaseDir: string): Promise<void> {
   await fs.mkdir(releaseDir, { recursive: true });
