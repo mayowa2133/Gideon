@@ -18,6 +18,7 @@ describe("production readiness gate", () => {
     expect(result.stdout).toContain("staging readiness dry-run");
     expect(result.stdout).toContain("staging upload-to-export smoke dry-run");
     expect(result.stdout).toContain("staging hosted MCP smoke dry-run");
+    expect(result.stdout).toContain("live promotion GitHub config");
     expect(result.stdout).toContain("live promotion environment dry-run");
     expect(result.stdout).toContain("live promotion fixture materialization dry-run");
     expect(result.stdout).toContain("production promotion gate dry-run");
