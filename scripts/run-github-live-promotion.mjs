@@ -7,6 +7,7 @@ const options = parseArgs(args);
 const dryRun = options.flags.has("dry-run");
 const confirmLive = options.flags.has("confirm-live");
 const skipPackage = options.flags.has("skip-package");
+const skipSettingsCheck = options.flags.has("skip-settings-check");
 const repo = options.values.repo ?? process.env.GITHUB_REPOSITORY ?? "mayowa2133/Gideon";
 const workflow = options.values.workflow ?? "mac-build.yml";
 const ref = options.values.ref ?? "main";
@@ -22,10 +23,11 @@ if (dryRun) {
   if (providedRunId) {
     console.log(`6. Watch existing run ${providedRunId}.`);
   } else {
-    console.log("6. Dispatch the workflow only when --confirm-live is present.");
+    console.log(`6. ${skipSettingsCheck ? "Skip" : "Run"} GitHub Secrets/Vars repo settings preflight before dispatch.`);
+    console.log("7. Dispatch the workflow only when --confirm-live is present.");
   }
-  console.log("7. Wait for GitHub Actions to finish with gh run watch --exit-status.");
-  console.log("8. Download and verify Gideon-production-promotion-evidence with production:github-evidence:check.");
+  console.log("8. Wait for GitHub Actions to finish with gh run watch --exit-status.");
+  console.log("9. Download and verify Gideon-production-promotion-evidence with production:github-evidence:check.");
   process.exit(0);
 }
 
@@ -33,6 +35,9 @@ let runId = providedRunId;
 if (!runId) {
   if (!confirmLive) {
     fail(["Dispatching the live promotion workflow requires --confirm-live."]);
+  }
+  if (!skipSettingsCheck) {
+    runCommand(process.execPath, ["scripts/check-github-live-promotion-settings.mjs", "--repo", repo]);
   }
   const dispatchedAfter = new Date(Date.now() - 60_000);
   runCommand("gh", [

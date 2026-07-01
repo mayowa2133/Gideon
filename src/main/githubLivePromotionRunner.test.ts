@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
 const scriptPath = path.join(process.cwd(), "scripts/run-github-live-promotion.mjs");
+const configScriptPath = path.join(process.cwd(), "scripts/check-live-promotion-github-config.mjs");
 
 describe("GitHub live promotion runner", () => {
   it("prints the live workflow plan in dry-run mode", async () => {
@@ -17,6 +18,7 @@ describe("GitHub live promotion runner", () => {
 
     expect(result.stdout).toContain("GitHub live promotion runner dry-run:");
     expect(result.stdout).toContain("Live promotion input run_live_promotion=true.");
+    expect(result.stdout).toContain("Run GitHub Secrets/Vars repo settings preflight before dispatch.");
     expect(result.stdout).toContain("Dispatch the workflow only when --confirm-live is present.");
     expect(result.stdout).toContain("Download and verify Gideon-production-promotion-evidence");
   });
@@ -33,7 +35,8 @@ describe("GitHub live promotion runner", () => {
   });
 
   it("watches and verifies an existing run without dispatching", async () => {
-    const fakeGhDir = await writeFakeGh();
+    const expected = await readExpectedConfiguration();
+    const fakeGhDir = await writeFakeGh(expected.secrets, expected.vars);
 
     const result = await execFileAsync(process.execPath, [scriptPath, "--run-id", "12345", "--repo", "example/Gideon"], {
       cwd: process.cwd(),
@@ -49,7 +52,8 @@ describe("GitHub live promotion runner", () => {
   });
 
   it("dispatches, resolves, watches, and verifies a confirmed live workflow", async () => {
-    const fakeGhDir = await writeFakeGh();
+    const expected = await readExpectedConfiguration();
+    const fakeGhDir = await writeFakeGh(expected.secrets, expected.vars);
 
     const result = await execFileAsync(
       process.execPath,
@@ -64,11 +68,37 @@ describe("GitHub live promotion runner", () => {
     );
 
     expect(result.stdout).toContain("Production promotion evidence check passed");
+    expect(result.stdout).toContain("GitHub live promotion repo settings check passed");
     expect(result.stdout).toContain("GitHub live promotion workflow passed and evidence verified for run 67890.");
+  });
+
+  it("fails before dispatch when required GitHub settings are missing", async () => {
+    const expected = await readExpectedConfiguration();
+    const fakeGhDir = await writeFakeGh(expected.secrets.slice(1), expected.vars);
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath, "--confirm-live", "--repo", "example/Gideon"], {
+        cwd: process.cwd(),
+        env: {
+          PATH: `${fakeGhDir}${path.delimiter}${process.env.PATH ?? ""}`,
+          GIDEON_FAKE_EVIDENCE_JSON: JSON.stringify(createEvidence())
+        }
+      })
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining(expected.secrets[0])
+    });
   });
 });
 
-async function writeFakeGh(): Promise<string> {
+async function readExpectedConfiguration(): Promise<{ secrets: string[]; vars: string[] }> {
+  const result = await execFileAsync(process.execPath, [configScriptPath, "--json"], {
+    cwd: process.cwd(),
+    env: { PATH: process.env.PATH ?? "" }
+  });
+  return JSON.parse(result.stdout) as { secrets: string[]; vars: string[] };
+}
+
+async function writeFakeGh(secrets: string[], vars: string[]): Promise<string> {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-fake-gh-"));
   const ghPath = path.join(tempDir, "gh");
   await fs.writeFile(
@@ -77,6 +107,14 @@ async function writeFakeGh(): Promise<string> {
 const fs = require("node:fs");
 const path = require("node:path");
 const args = process.argv.slice(2);
+if (args[0] === "secret" && args[1] === "list") {
+  process.stdout.write(JSON.stringify(${JSON.stringify(secrets.map((name) => ({ name })))}));
+  process.exit(0);
+}
+if (args[0] === "variable" && args[1] === "list") {
+  process.stdout.write(JSON.stringify(${JSON.stringify(vars.map((name) => ({ name })))}));
+  process.exit(0);
+}
 if (args[0] === "workflow" && args[1] === "run") {
   process.exit(0);
 }
