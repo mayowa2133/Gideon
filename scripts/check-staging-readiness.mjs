@@ -56,6 +56,7 @@ function validateCommandContract() {
     "staging:mcp:smoke",
     "production:promote:check",
     "production:evidence:check",
+    "production:live-env:check",
     "production:fixtures:materialize"
   ]) {
     if (typeof scripts[scriptName] !== "string") {

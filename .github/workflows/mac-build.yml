@@ -102,6 +102,36 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check live promotion configuration
+        env:
+          GIDEON_LIVE_PROMOTION_SKIP_PACKAGE: ${{ inputs.skip_package }}
+          GIDEON_PROVIDER_CANARY_AUDIO_BASE64: ${{ secrets.GIDEON_PROVIDER_CANARY_AUDIO_BASE64 }}
+          GIDEON_PROVIDER_CANARY_IMAGE_BASE64: ${{ secrets.GIDEON_PROVIDER_CANARY_IMAGE_BASE64 }}
+          GIDEON_STAGING_SMOKE_RECORDING_BASE64: ${{ secrets.GIDEON_STAGING_SMOKE_RECORDING_BASE64 }}
+          GIDEON_REDIS_URL: ${{ secrets.GIDEON_REDIS_URL }}
+          GIDEON_BULLMQ_QUEUE_NAME: ${{ vars.GIDEON_BULLMQ_QUEUE_NAME }}
+          GIDEON_BULLMQ_PREFIX: ${{ vars.GIDEON_BULLMQ_PREFIX }}
+          GIDEON_WORKER_ID: ${{ vars.GIDEON_WORKER_ID }}
+          GIDEON_DATABASE_URL: ${{ secrets.GIDEON_DATABASE_URL }}
+          GIDEON_SESSION_SECRET: ${{ secrets.GIDEON_SESSION_SECRET }}
+          GIDEON_STORAGE_PROVIDER: ${{ vars.GIDEON_STORAGE_PROVIDER }}
+          GIDEON_STORAGE_BUCKET: ${{ vars.GIDEON_STORAGE_BUCKET }}
+          GIDEON_STORAGE_ACCESS_KEY_ID: ${{ secrets.GIDEON_STORAGE_ACCESS_KEY_ID }}
+          GIDEON_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.GIDEON_STORAGE_SECRET_ACCESS_KEY }}
+          GIDEON_OPENAI_API_KEY: ${{ secrets.GIDEON_OPENAI_API_KEY }}
+          GIDEON_STAGING_API_BASE_URL: ${{ vars.GIDEON_STAGING_API_BASE_URL }}
+          GIDEON_AUTH_CALLBACK_SECRET: ${{ secrets.GIDEON_AUTH_CALLBACK_SECRET }}
+          GIDEON_STAGING_MCP_API_BASE_URL: ${{ vars.GIDEON_STAGING_MCP_API_BASE_URL }}
+          GIDEON_STAGING_MCP_SESSION_COOKIE: ${{ secrets.GIDEON_STAGING_MCP_SESSION_COOKIE }}
+          GIDEON_STAGING_MCP_PROJECT_ID: ${{ vars.GIDEON_STAGING_MCP_PROJECT_ID }}
+          GIDEON_STAGING_MCP_METRIC_PROBE_URL: ${{ vars.GIDEON_STAGING_MCP_METRIC_PROBE_URL }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_NAME: ${{ secrets.CSC_NAME }}
+        run: pnpm production:live-env:check
+
       - name: Materialize private staging fixtures
         env:
           GIDEON_PROVIDER_CANARY_AUDIO_BASE64: ${{ secrets.GIDEON_PROVIDER_CANARY_AUDIO_BASE64 }}
