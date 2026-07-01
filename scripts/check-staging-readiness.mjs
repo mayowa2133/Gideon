@@ -60,6 +60,7 @@ function validateCommandContract() {
     "production:github-settings:check",
     "production:github-evidence:check",
     "production:github-receipt:check",
+    "production:github-archive:check",
     "production:github-promote:run",
     "production:live-env:check",
     "production:fixtures:materialize"

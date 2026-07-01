@@ -25,6 +25,7 @@ const steps = [
   step("live promotion GitHub repo settings dry-run", [pnpm, "production:github-settings:check", "--", "--dry-run"]),
   step("live promotion GitHub evidence artifact dry-run", [pnpm, "production:github-evidence:check", "--", "--dry-run"]),
   step("live promotion GitHub receipt dry-run", [pnpm, "production:github-receipt:check", "--", "--dry-run"]),
+  step("live promotion GitHub archive bundle dry-run", [pnpm, "production:github-archive:check", "--", "--dry-run"]),
   step("live promotion GitHub workflow runner dry-run", [pnpm, "production:github-promote:run", "--", "--dry-run"]),
   step("live promotion environment dry-run", [pnpm, "production:live-env:check", "--", "--dry-run"]),
   step("live promotion fixture materialization dry-run", [pnpm, "production:fixtures:materialize", "--", "--dry-run"]),

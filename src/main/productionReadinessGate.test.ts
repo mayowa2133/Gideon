@@ -22,6 +22,7 @@ describe("production readiness gate", () => {
     expect(result.stdout).toContain("live promotion GitHub repo settings dry-run");
     expect(result.stdout).toContain("live promotion GitHub evidence artifact dry-run");
     expect(result.stdout).toContain("live promotion GitHub receipt dry-run");
+    expect(result.stdout).toContain("live promotion GitHub archive bundle dry-run");
     expect(result.stdout).toContain("live promotion GitHub workflow runner dry-run");
     expect(result.stdout).toContain("live promotion environment dry-run");
     expect(result.stdout).toContain("live promotion fixture materialization dry-run");

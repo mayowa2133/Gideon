@@ -37,7 +37,7 @@ describe("GitHub promotion verification receipt check", () => {
   });
 
   it("rejects receipts containing secret-like material", async () => {
-    const receiptPath = await writeReceiptFixture({ repository: "sk-live-abc123abc123abc123abc123" });
+    const receiptPath = await writeReceiptFixture({ repository: "contains-uploadUrl-marker" });
 
     await expect(runReceiptCheck(receiptPath)).rejects.toMatchObject({
       stderr: expect.stringContaining("Receipt contains sensitive material")
