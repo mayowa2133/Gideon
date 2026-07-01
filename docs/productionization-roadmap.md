@@ -194,4 +194,4 @@ The next implementation slice is Milestone 5 production operations:
 
 1. Run `pnpm production:check`, then run `pnpm production:promote:check -- --live` against staging credentials, small ASR/OCR fixtures, and Apple signing credentials.
 2. Keep the existing provider/store interfaces intact so desktop, hosted worker, and MCP paths continue sharing the same execution boundaries.
-3. Run `pnpm production:github-promote:run -- --confirm-live` with staging upload-to-export, hosted MCP smoke, deployed metric export, signed/notarized release credentials, self-verified promotion evidence, and archived release evidence before removing snapshot reads entirely.
+3. Run `pnpm production:github-settings:check -- --repo mayowa2133/Gideon`, then `pnpm production:github-promote:run -- --confirm-live` with staging upload-to-export, hosted MCP smoke, deployed metric export, signed/notarized release credentials, self-verified promotion evidence, and archived release evidence before removing snapshot reads entirely.

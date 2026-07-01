@@ -212,6 +212,7 @@ function checkPackageContract() {
     "production:promote:check",
     "production:evidence:check",
     "production:github-config:check",
+    "production:github-settings:check",
     "production:github-evidence:check",
     "production:github-promote:run",
     "production:live-env:check",
