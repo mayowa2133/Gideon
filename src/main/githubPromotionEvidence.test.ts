@@ -19,6 +19,7 @@ describe("GitHub promotion evidence artifact check", () => {
     expect(result.stdout).toContain("Download artifact Gideon-production-promotion-evidence");
     expect(result.stdout).toContain("Verify the evidence with the production evidence checker.");
     expect(result.stdout).toContain("verify evidence gitCommit matches gh run view headSha");
+    expect(result.stdout).toContain("write a safe verification receipt");
   });
 
   it("verifies an already downloaded evidence artifact", async () => {
@@ -58,6 +59,49 @@ describe("GitHub promotion evidence artifact check", () => {
     );
 
     expect(result.stdout).toContain("GitHub promotion evidence artifact check passed");
+  });
+
+  it("writes a safe verification receipt for archived release evidence", async () => {
+    const downloadDir = await writeDownloadedArtifactFixture();
+    const fakeGhDir = await writeFakeGh({ headSha: "0123456789abcdef0123456789abcdef01234567" });
+    const receiptPath = path.join(downloadDir, "receipt.json");
+
+    await execFileAsync(
+      process.execPath,
+      [
+        scriptPath,
+        "--skip-download",
+        "--download-dir",
+        downloadDir,
+        "--run-id",
+        "12345",
+        "--repo",
+        "example/Gideon",
+        "--write-receipt",
+        receiptPath
+      ],
+      {
+        cwd: process.cwd(),
+        env: { PATH: `${fakeGhDir}${path.delimiter}${process.env.PATH ?? ""}` }
+      }
+    );
+
+    const receipt = JSON.parse(await fs.readFile(receiptPath, "utf8")) as {
+      repository: string;
+      runId: string;
+      evidence: { gitCommit: string; stepCount: number };
+      githubRun: { headSha: string; event: string };
+      checks: { secretPolicy: string; runMetadata: string };
+    };
+    expect(receipt.repository).toBe("example/Gideon");
+    expect(receipt.runId).toBe("12345");
+    expect(receipt.evidence.gitCommit).toBe("0123456789abcdef0123456789abcdef01234567");
+    expect(receipt.evidence.stepCount).toBe(8);
+    expect(receipt.githubRun.headSha).toBe("0123456789abcdef0123456789abcdef01234567");
+    expect(receipt.githubRun.event).toBe("workflow_dispatch");
+    expect(receipt.checks.runMetadata).toBe("passed");
+    expect(receipt.checks.secretPolicy).toContain("excludes environment");
+    expect(JSON.stringify(receipt)).not.toContain("secretPolicy:");
   });
 
   it("rejects evidence whose git commit does not match the GitHub run head SHA", async () => {

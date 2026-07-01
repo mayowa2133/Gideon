@@ -15,6 +15,7 @@ const runId = options.values["run-id"] ?? process.env.GITHUB_RUN_ID;
 const artifactName = options.values["artifact-name"] ?? "Gideon-production-promotion-evidence";
 const downloadDir = path.resolve(options.values["download-dir"] ?? path.join("tmp", "github-production-promotion-evidence"));
 const evidenceFilename = options.values["evidence-filename"] ?? "production-promotion-evidence.json";
+const receiptPath = options.values["write-receipt"] ? path.resolve(options.values["write-receipt"]) : null;
 
 if (dryRun) {
   console.log("GitHub promotion evidence artifact check dry-run:");
@@ -24,6 +25,7 @@ if (dryRun) {
   console.log(`4. Locate ${evidenceFilename} recursively inside the artifact directory.`);
   console.log("5. Verify the evidence with the production evidence checker.");
   console.log("6. When --run-id is available, verify evidence gitCommit matches gh run view headSha.");
+  console.log("7. When --write-receipt is provided, write a safe verification receipt without secrets or provider payloads.");
   process.exit(0);
 }
 
@@ -43,8 +45,13 @@ if (allowSkipPackage) {
   verifyArgs.push("--allow-skip-package");
 }
 runCommand(process.execPath, verifyArgs);
+const evidence = readEvidence(evidencePath);
+let runMetadata = null;
 if (runId && !skipRunMetadata) {
-  validateRunMetadata({ repo, runId, evidencePath });
+  runMetadata = validateRunMetadata({ repo, runId, evidence });
+}
+if (receiptPath) {
+  writeReceipt({ receiptPath, repo, runId, artifactName, evidencePath, evidence, runMetadata, allowSkipPackage, skipRunMetadata });
 }
 
 console.log(`GitHub promotion evidence artifact check passed for ${path.relative(process.cwd(), evidencePath)}.`);
@@ -103,7 +110,6 @@ function walk(dir, visit) {
 }
 
 function validateRunMetadata(input) {
-  const evidence = readEvidence(input.evidencePath);
   const result = runCommand(
     "gh",
     ["run", "view", input.runId, "--repo", input.repo, "--json", "headSha,conclusion,status,event,databaseId"],
@@ -130,12 +136,51 @@ function validateRunMetadata(input) {
   }
   if (typeof run.headSha !== "string" || !/^[0-9a-f]{40}$/i.test(run.headSha)) {
     errors.push(`GitHub run ${input.runId} headSha must be a full git SHA.`);
-  } else if (run.headSha.toLowerCase() !== String(evidence.gitCommit ?? "").toLowerCase()) {
-    errors.push(`Evidence gitCommit ${evidence.gitCommit ?? "missing"} does not match GitHub run headSha ${run.headSha}.`);
+  } else if (run.headSha.toLowerCase() !== String(input.evidence.gitCommit ?? "").toLowerCase()) {
+    errors.push(`Evidence gitCommit ${input.evidence.gitCommit ?? "missing"} does not match GitHub run headSha ${run.headSha}.`);
   }
   if (errors.length > 0) {
     fail(errors);
   }
+  return run;
+}
+
+function writeReceipt(input) {
+  const receipt = {
+    schemaVersion: 1,
+    verifiedAt: new Date().toISOString(),
+    repository: input.repo,
+    runId: input.runId ?? null,
+    artifactName: input.artifactName,
+    evidencePath: path.relative(process.cwd(), input.evidencePath),
+    evidence: {
+      schemaVersion: input.evidence.schemaVersion,
+      mode: input.evidence.mode,
+      status: input.evidence.status,
+      gitCommit: input.evidence.gitCommit,
+      generatedAt: input.evidence.generatedAt,
+      finishedAt: input.evidence.finishedAt,
+      skipPackage: Boolean(input.evidence.skipPackage),
+      stepCount: Array.isArray(input.evidence.steps) ? input.evidence.steps.length : 0
+    },
+    githubRun: input.runMetadata
+      ? {
+          databaseId: input.runMetadata.databaseId ?? null,
+          status: input.runMetadata.status,
+          conclusion: input.runMetadata.conclusion,
+          event: input.runMetadata.event,
+          headSha: input.runMetadata.headSha
+        }
+      : null,
+    checks: {
+      productionEvidenceSchema: "passed",
+      allowSkipPackage: Boolean(input.allowSkipPackage),
+      runMetadata: input.runId ? (input.skipRunMetadata ? "skipped" : "passed") : "not_applicable",
+      secretPolicy: "receipt excludes environment, cookies, API keys, signed URLs, provider payloads, transcripts, prompts, media paths, and artifact contents"
+    }
+  };
+  fs.mkdirSync(path.dirname(input.receiptPath), { recursive: true });
+  fs.writeFileSync(input.receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
 }
 
 function readEvidence(evidencePath) {

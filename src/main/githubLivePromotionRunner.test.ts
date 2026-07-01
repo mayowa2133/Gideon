@@ -21,6 +21,7 @@ describe("GitHub live promotion runner", () => {
     expect(result.stdout).toContain("Run GitHub Secrets/Vars repo settings preflight before dispatch.");
     expect(result.stdout).toContain("Dispatch the workflow only when --confirm-live is present.");
     expect(result.stdout).toContain("Download and verify Gideon-production-promotion-evidence");
+    expect(result.stdout).toContain("Write a safe verification receipt");
   });
 
   it("requires explicit confirmation before dispatching the live workflow", async () => {
@@ -54,10 +55,21 @@ describe("GitHub live promotion runner", () => {
   it("dispatches, resolves, watches, and verifies a confirmed live workflow", async () => {
     const expected = await readExpectedConfiguration();
     const fakeGhDir = await writeFakeGh(expected.secrets, expected.vars);
+    const receiptPath = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "gideon-live-runner-receipt-")), "receipt.json");
 
     const result = await execFileAsync(
       process.execPath,
-      [scriptPath, "--confirm-live", "--skip-package", "--repo", "example/Gideon", "--ref", "main"],
+      [
+        scriptPath,
+        "--confirm-live",
+        "--skip-package",
+        "--repo",
+        "example/Gideon",
+        "--ref",
+        "main",
+        "--receipt-path",
+        receiptPath
+      ],
       {
         cwd: process.cwd(),
         env: {
@@ -70,6 +82,9 @@ describe("GitHub live promotion runner", () => {
     expect(result.stdout).toContain("Production promotion evidence check passed");
     expect(result.stdout).toContain("GitHub live promotion repo settings check passed");
     expect(result.stdout).toContain("GitHub live promotion workflow passed and evidence verified for run 67890.");
+    const receipt = JSON.parse(await fs.readFile(receiptPath, "utf8")) as { runId: string; githubRun: { headSha: string } };
+    expect(receipt.runId).toBe("67890");
+    expect(receipt.githubRun.headSha).toBe("0123456789abcdef0123456789abcdef01234567");
   });
 
   it("fails before dispatch when required GitHub settings are missing", async () => {

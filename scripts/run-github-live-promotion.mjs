@@ -12,6 +12,7 @@ const repo = options.values.repo ?? process.env.GITHUB_REPOSITORY ?? "mayowa2133
 const workflow = options.values.workflow ?? "mac-build.yml";
 const ref = options.values.ref ?? "main";
 const providedRunId = options.values["run-id"] ?? process.env.GITHUB_RUN_ID;
+const receiptPath = options.values["receipt-path"] ?? "tmp/github-production-promotion-evidence/verification-receipt.json";
 
 if (dryRun) {
   console.log("GitHub live promotion runner dry-run:");
@@ -28,6 +29,7 @@ if (dryRun) {
   }
   console.log("8. Wait for GitHub Actions to finish with gh run watch --exit-status.");
   console.log("9. Download and verify Gideon-production-promotion-evidence with production:github-evidence:check.");
+  console.log(`10. Write a safe verification receipt to ${receiptPath}.`);
   process.exit(0);
 }
 
@@ -57,7 +59,7 @@ if (!runId) {
 }
 
 runCommand("gh", ["run", "watch", runId, "--repo", repo, "--exit-status"]);
-const verifyArgs = ["scripts/check-github-promotion-evidence.mjs", "--run-id", runId, "--repo", repo];
+const verifyArgs = ["scripts/check-github-promotion-evidence.mjs", "--run-id", runId, "--repo", repo, "--write-receipt", receiptPath];
 if (skipPackage) {
   verifyArgs.push("--allow-skip-package");
 }
