@@ -1,0 +1,120 @@
+#!/usr/bin/env node
+
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+
+const args = process.argv.slice(2).filter((arg) => arg !== "--");
+const options = parseArgs(args);
+const dryRun = options.flags.has("dry-run");
+const skipDownload = options.flags.has("skip-download");
+const allowSkipPackage = options.flags.has("allow-skip-package");
+const repo = options.values.repo ?? process.env.GITHUB_REPOSITORY ?? "mayowa2133/Gideon";
+const runId = options.values["run-id"] ?? process.env.GITHUB_RUN_ID;
+const artifactName = options.values["artifact-name"] ?? "Gideon-production-promotion-evidence";
+const downloadDir = path.resolve(options.values["download-dir"] ?? path.join("tmp", "github-production-promotion-evidence"));
+const evidenceFilename = options.values["evidence-filename"] ?? "production-promotion-evidence.json";
+
+if (dryRun) {
+  console.log("GitHub promotion evidence artifact check dry-run:");
+  console.log(`1. Resolve repository: ${repo}.`);
+  console.log("2. Require --run-id or GITHUB_RUN_ID unless --skip-download is set.");
+  console.log(`3. Download artifact ${artifactName} into ${downloadDir} with gh run download.`);
+  console.log(`4. Locate ${evidenceFilename} recursively inside the artifact directory.`);
+  console.log("5. Verify the evidence with the production evidence checker.");
+  process.exit(0);
+}
+
+if (!skipDownload && !runId) {
+  fail(["--run-id or GITHUB_RUN_ID is required unless --skip-download is set."]);
+}
+
+if (!skipDownload) {
+  fs.rmSync(downloadDir, { recursive: true, force: true });
+  fs.mkdirSync(downloadDir, { recursive: true });
+  runCommand("gh", ["run", "download", runId, "--repo", repo, "--name", artifactName, "--dir", downloadDir]);
+}
+
+const evidencePath = findEvidenceFile(downloadDir, evidenceFilename);
+const verifyArgs = ["scripts/check-production-promotion-evidence.mjs", "--path", evidencePath];
+if (allowSkipPackage) {
+  verifyArgs.push("--allow-skip-package");
+}
+runCommand(process.execPath, verifyArgs);
+
+console.log(`GitHub promotion evidence artifact check passed for ${path.relative(process.cwd(), evidencePath)}.`);
+
+function parseArgs(inputArgs) {
+  const flags = new Set();
+  const values = {};
+  for (let index = 0; index < inputArgs.length; index += 1) {
+    const arg = inputArgs[index];
+    if (!arg.startsWith("--")) {
+      continue;
+    }
+    const key = arg.slice(2);
+    const next = inputArgs[index + 1];
+    if (!next || next.startsWith("--")) {
+      flags.add(key);
+      continue;
+    }
+    values[key] = next;
+    index += 1;
+  }
+  return { flags, values };
+}
+
+function findEvidenceFile(rootDir, filename) {
+  if (!fs.existsSync(rootDir)) {
+    fail([`Evidence download directory does not exist: ${path.relative(process.cwd(), rootDir)}.`]);
+  }
+  const matches = [];
+  walk(rootDir, (filePath) => {
+    if (path.basename(filePath) === filename) {
+      matches.push(filePath);
+    }
+  });
+  if (matches.length === 0) {
+    fail([`Could not find ${filename} under ${path.relative(process.cwd(), rootDir)}.`]);
+  }
+  if (matches.length > 1) {
+    fail([
+      `Found multiple ${filename} files under ${path.relative(process.cwd(), rootDir)}:`,
+      ...matches.map((match) => `  - ${path.relative(process.cwd(), match)}`)
+    ]);
+  }
+  return matches[0];
+}
+
+function walk(dir, visit) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walk(entryPath, visit);
+    } else if (entry.isFile()) {
+      visit(entryPath);
+    }
+  }
+}
+
+function runCommand(command, commandArgs) {
+  const result = spawnSync(command, commandArgs, {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: "inherit"
+  });
+  if (result.error) {
+    fail([`${command} could not be started: ${result.error.message}.`]);
+  }
+  if (result.status !== 0) {
+    fail([`${[command, ...commandArgs].join(" ")} failed with exit code ${result.status ?? "unknown"}.`]);
+  }
+}
+
+function fail(errors) {
+  console.error("GitHub promotion evidence artifact check failed:");
+  for (const error of errors) {
+    console.error(`- ${error}`);
+  }
+  process.exit(1);
+}

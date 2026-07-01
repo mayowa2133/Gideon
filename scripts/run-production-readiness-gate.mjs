@@ -22,6 +22,7 @@ const steps = [
   step("staging upload-to-export smoke dry-run", [pnpm, "staging:smoke", "--", "--dry-run"]),
   step("staging hosted MCP smoke dry-run", [pnpm, "staging:mcp:smoke", "--", "--dry-run"]),
   step("live promotion GitHub config", [pnpm, "production:github-config:check"]),
+  step("live promotion GitHub evidence artifact dry-run", [pnpm, "production:github-evidence:check", "--", "--dry-run"]),
   step("live promotion environment dry-run", [pnpm, "production:live-env:check", "--", "--dry-run"]),
   step("live promotion fixture materialization dry-run", [pnpm, "production:fixtures:materialize", "--", "--dry-run"]),
   step("production promotion gate dry-run", [pnpm, "production:promote:check", "--", "--dry-run"]),
