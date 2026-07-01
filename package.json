@@ -28,6 +28,7 @@
     "production:github-config:check": "node scripts/check-live-promotion-github-config.mjs",
     "production:github-settings:check": "node scripts/check-github-live-promotion-settings.mjs",
     "production:github-evidence:check": "node scripts/check-github-promotion-evidence.mjs",
+    "production:github-receipt:check": "node scripts/check-github-promotion-receipt.mjs",
     "production:github-promote:run": "node scripts/run-github-live-promotion.mjs",
     "production:live-env:check": "node scripts/check-live-promotion-env.mjs",
     "production:fixtures:materialize": "node scripts/materialize-live-promotion-fixtures.mjs",

@@ -214,6 +214,7 @@ function checkPackageContract() {
     "production:github-config:check",
     "production:github-settings:check",
     "production:github-evidence:check",
+    "production:github-receipt:check",
     "production:github-promote:run",
     "production:live-env:check",
     "production:fixtures:materialize"
