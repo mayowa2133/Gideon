@@ -32,6 +32,8 @@ describe("macOS CI workflow", () => {
     expect(workflow).toContain("pnpm production:fixtures:materialize");
     expect(workflow).toContain("pnpm production:promote:check -- --live");
     expect(workflow).toContain("pnpm production:evidence:check -- --path tmp/production-promotion-evidence.json");
+    expect(workflow).toContain("cp \"${GIDEON_RELEASE_RECEIPT_PATH:-release/release-receipt.json}\" tmp/release-receipt.json");
+    expect(workflow).toContain("tmp/release-receipt.json");
     expect(workflow).toContain("Gideon-production-promotion-evidence");
     expect(workflow).toContain("secrets.GIDEON_STAGING_MCP_SESSION_COOKIE");
     expect(workflow).toContain("vars.GIDEON_STAGING_MCP_PROJECT_ID");

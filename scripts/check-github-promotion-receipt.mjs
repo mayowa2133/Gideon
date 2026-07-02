@@ -25,7 +25,7 @@ if (dryRun) {
   console.log("GitHub promotion verification receipt check dry-run:");
   console.log(`1. Read receipt JSON from ${receiptPath}.`);
   console.log("2. Require schemaVersion, verification timestamp, repository, artifact, and evidence summary.");
-  console.log("3. Require successful live evidence metadata, provider canary report summary, and safe check statuses.");
+  console.log("3. Require successful live evidence metadata, provider canary report summary, release receipt summary, and safe check statuses.");
   console.log("4. If GitHub run metadata is present, require completed/success workflow_dispatch and headSha matching evidence gitCommit.");
   console.log("5. Scan receipt fields for secret-like material, cookies, signed URLs, and provider keys.");
   process.exit(0);
@@ -89,6 +89,7 @@ function validateReceipt(receipt) {
   requireNonEmptyString(receipt.evidencePath, "evidencePath");
   validateEvidenceSummary(receipt.evidence);
   validateProviderCanaryReportSummary(receipt.providerCanaryReport);
+  validateReleaseReceiptSummary(receipt.releaseReceipt, receipt.evidence, receipt.checks);
   validateGitHubRun(receipt.githubRun, receipt.evidence?.gitCommit);
   validateChecks(receipt.checks, receipt.githubRun);
   validateSafeMetadata(receipt);
@@ -155,6 +156,58 @@ function validateProviderCanaryReportSummary(providerCanaryReport) {
   }
 }
 
+function validateReleaseReceiptSummary(releaseReceipt, evidence, checks) {
+  const skipPackage = Boolean(evidence?.skipPackage);
+  const allowSkipPackage = Boolean(checks?.allowSkipPackage);
+  if (skipPackage && allowSkipPackage) {
+    if (releaseReceipt !== null) {
+      errors.push("Receipt releaseReceipt must be null for allowed skip-package rehearsal evidence.");
+    }
+    if (checks?.releaseReceipt !== "skipped") {
+      errors.push("Receipt checks.releaseReceipt must be skipped for allowed skip-package rehearsal evidence.");
+    }
+    return;
+  }
+  if (!releaseReceipt || typeof releaseReceipt !== "object" || Array.isArray(releaseReceipt)) {
+    errors.push("Receipt releaseReceipt must be an object for production package evidence.");
+    return;
+  }
+  requireNonEmptyString(releaseReceipt.path, "releaseReceipt.path");
+  if (path.basename(String(releaseReceipt.path ?? "")) !== "release-receipt.json") {
+    errors.push("Receipt releaseReceipt.path must identify release-receipt.json.");
+  }
+  if (releaseReceipt.product !== "Gideon") {
+    errors.push("Receipt releaseReceipt.product must be Gideon.");
+  }
+  requireNonEmptyString(releaseReceipt.version, "releaseReceipt.version");
+  if (releaseReceipt.channel !== "production") {
+    errors.push("Receipt releaseReceipt.channel must be production.");
+  }
+  requireIsoTimestamp(releaseReceipt.generatedAt, "releaseReceipt.generatedAt");
+  if (typeof releaseReceipt.sourceGitCommit !== "string" || !/^[0-9a-f]{40}$/i.test(releaseReceipt.sourceGitCommit)) {
+    errors.push("Receipt releaseReceipt.sourceGitCommit must be a full git SHA.");
+  }
+  requireNonEmptyString(releaseReceipt.workflowRunId, "releaseReceipt.workflowRunId");
+  if (!Number.isInteger(releaseReceipt.artifactCount) || releaseReceipt.artifactCount < 4) {
+    errors.push("Receipt releaseReceipt.artifactCount must include the release artifacts.");
+  }
+  if (releaseReceipt.notarizationStatus !== "accepted") {
+    errors.push("Receipt releaseReceipt.notarizationStatus must be accepted.");
+  }
+  if (releaseReceipt.staplingDmg !== "accepted") {
+    errors.push("Receipt releaseReceipt.staplingDmg must be accepted.");
+  }
+  if (releaseReceipt.gatekeeperAssessment !== "accepted") {
+    errors.push("Receipt releaseReceipt.gatekeeperAssessment must be accepted.");
+  }
+  if (releaseReceipt.installSmokeResult !== "passed") {
+    errors.push("Receipt releaseReceipt.installSmokeResult must be passed.");
+  }
+  if (checks?.releaseReceipt !== "passed") {
+    errors.push("Receipt checks.releaseReceipt must be passed for production package evidence.");
+  }
+}
+
 function validateGitHubRun(githubRun, evidenceGitCommit) {
   if (githubRun === null) {
     return;
@@ -189,6 +242,9 @@ function validateChecks(checks, githubRun) {
   }
   if (checks.providerCanaryReport !== "passed") {
     errors.push("Receipt checks.providerCanaryReport must be passed.");
+  }
+  if (!["passed", "skipped"].includes(checks.releaseReceipt)) {
+    errors.push("Receipt checks.releaseReceipt must be passed or skipped.");
   }
   if (typeof checks.allowSkipPackage !== "boolean") {
     errors.push("Receipt checks.allowSkipPackage must be boolean.");

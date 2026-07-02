@@ -20,7 +20,7 @@ describe("GitHub live promotion runner", () => {
     expect(result.stdout).toContain("Live promotion input run_live_promotion=true.");
     expect(result.stdout).toContain("Run GitHub Secrets/Vars repo settings preflight before dispatch.");
     expect(result.stdout).toContain("Dispatch the workflow only when --confirm-live is present.");
-    expect(result.stdout).toContain("Download and verify Gideon-production-promotion-evidence, including provider-canary-report.json");
+    expect(result.stdout).toContain("Download and verify Gideon-production-promotion-evidence, including provider-canary-report.json and release-receipt.json");
     expect(result.stdout).toContain("Write a safe verification receipt");
   });
 
@@ -44,7 +44,8 @@ describe("GitHub live promotion runner", () => {
       env: {
         PATH: `${fakeGhDir}${path.delimiter}${process.env.PATH ?? ""}`,
         GIDEON_FAKE_EVIDENCE_JSON: JSON.stringify(createEvidence()),
-        GIDEON_FAKE_PROVIDER_CANARY_REPORT_JSON: JSON.stringify(createProviderCanaryReport())
+        GIDEON_FAKE_PROVIDER_CANARY_REPORT_JSON: JSON.stringify(createProviderCanaryReport()),
+        GIDEON_FAKE_RELEASE_RECEIPT_JSON: JSON.stringify(createReleaseReceipt())
       }
     });
 
@@ -157,6 +158,9 @@ if (args[0] === "run" && args[1] === "download") {
   fs.mkdirSync(path.join(dir, "artifact"), { recursive: true });
   fs.writeFileSync(path.join(dir, "artifact", "production-promotion-evidence.json"), process.env.GIDEON_FAKE_EVIDENCE_JSON + "\\n");
   fs.writeFileSync(path.join(dir, "artifact", "provider-canary-report.json"), process.env.GIDEON_FAKE_PROVIDER_CANARY_REPORT_JSON + "\\n");
+  if (process.env.GIDEON_FAKE_RELEASE_RECEIPT_JSON) {
+    fs.writeFileSync(path.join(dir, "artifact", "release-receipt.json"), process.env.GIDEON_FAKE_RELEASE_RECEIPT_JSON + "\\n");
+  }
   process.exit(0);
 }
 console.error("unexpected gh args: " + args.join(" "));
@@ -235,6 +239,43 @@ function createProviderCanaryReport() {
       providerResult("ocr", "gpt-4.1-mini", 0.002, 0.02),
       providerResult("tts", "gpt-4o-mini-tts", 0.001, 0.01)
     ]
+  };
+}
+
+function createReleaseReceipt() {
+  const now = "2026-07-01T12:00:00.000Z";
+  return {
+    schemaVersion: 1,
+    product: "Gideon",
+    version: "0.1.0",
+    channel: "production",
+    generatedAt: now,
+    source: {
+      gitCommit: "0123456789abcdef0123456789abcdef01234567",
+      workflowRunId: "12345"
+    },
+    artifacts: [
+      { fileName: "Gideon-0.1.0-arm64.dmg", size: 1, sha256: "0".repeat(64) },
+      { fileName: "Gideon-0.1.0-arm64-mac.zip", size: 1, sha256: "1".repeat(64) },
+      { fileName: "latest-mac.yml", size: 1, sha256: "2".repeat(64) },
+      { fileName: "provenance.json", size: 1, sha256: "3".repeat(64) }
+    ],
+    notarization: {
+      status: "accepted",
+      requestId: "notary-123456",
+      completedAt: now
+    },
+    stapling: {
+      dmg: "accepted"
+    },
+    gatekeeper: {
+      spctlAssessment: "accepted",
+      checkedAt: now
+    },
+    installSmoke: {
+      result: "passed",
+      checkedAt: now
+    }
   };
 }
 

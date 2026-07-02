@@ -88,7 +88,8 @@ const commands = [
   "pnpm production:live-env:check",
   "pnpm production:fixtures:materialize",
   "pnpm production:promote:check -- --live",
-  "pnpm production:evidence:check -- --path tmp/production-promotion-evidence.json"
+  "pnpm production:evidence:check -- --path tmp/production-promotion-evidence.json",
+  "tmp/release-receipt.json"
 ];
 
 if (json) {

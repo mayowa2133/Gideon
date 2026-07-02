@@ -33,6 +33,7 @@ describe("live promotion GitHub configuration check", () => {
     expect(result.stdout).toContain("GIDEON_STORAGE_TEMP_RETENTION_DAYS");
     expect(result.stdout).toContain("GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY");
     expect(result.stdout).toContain("pnpm production:promote:check -- --live");
+    expect(result.stdout).toContain("tmp/release-receipt.json");
   });
 
   it("prints machine-readable required secrets and variables", async () => {
@@ -54,5 +55,6 @@ describe("live promotion GitHub configuration check", () => {
     expect(parsed.vars).toContain("GIDEON_STORAGE_TEMP_RETENTION_DAYS");
     expect(parsed.vars).toContain("GIDEON_STAGING_MCP_PROJECT_ID");
     expect(parsed.commands).toContain("pnpm production:evidence:check -- --path tmp/production-promotion-evidence.json");
+    expect(parsed.commands).toContain("tmp/release-receipt.json");
   });
 });

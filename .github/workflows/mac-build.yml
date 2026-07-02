@@ -287,6 +287,14 @@ jobs:
             pnpm production:evidence:check -- --path tmp/production-promotion-evidence.json
           fi
 
+      - name: Copy release receipt evidence
+        if: ${{ success() && !inputs.skip_package }}
+        env:
+          GIDEON_RELEASE_RECEIPT_PATH: ${{ vars.GIDEON_RELEASE_RECEIPT_PATH }}
+        run: |
+          mkdir -p tmp
+          cp "${GIDEON_RELEASE_RECEIPT_PATH:-release/release-receipt.json}" tmp/release-receipt.json
+
       - name: Upload promotion evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -295,4 +303,5 @@ jobs:
           path: |
             tmp/production-promotion-evidence.json
             tmp/provider-canary-report.json
+            tmp/release-receipt.json
           if-no-files-found: warn

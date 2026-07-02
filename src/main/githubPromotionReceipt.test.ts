@@ -18,6 +18,7 @@ describe("GitHub promotion verification receipt check", () => {
     expect(result.stdout).toContain("GitHub promotion verification receipt check dry-run:");
     expect(result.stdout).toContain("Require successful live evidence metadata");
     expect(result.stdout).toContain("provider canary report summary");
+    expect(result.stdout).toContain("release receipt summary");
     expect(result.stdout).toContain("Scan receipt fields for secret-like material");
   });
 
@@ -52,6 +53,14 @@ describe("GitHub promotion verification receipt check", () => {
       stderr: expect.stringContaining("providerCanaryReport must be an object")
     });
   });
+
+  it("rejects package receipts without release receipt evidence", async () => {
+    const receiptPath = await writeReceiptFixture({ omitReleaseReceipt: true });
+
+    await expect(runReceiptCheck(receiptPath)).rejects.toMatchObject({
+      stderr: expect.stringContaining("releaseReceipt must be an object")
+    });
+  });
 });
 
 async function runReceiptCheck(receiptPath: string): Promise<{ stdout: string; stderr: string }> {
@@ -61,14 +70,16 @@ async function runReceiptCheck(receiptPath: string): Promise<{ stdout: string; s
   });
 }
 
-async function writeReceiptFixture(input: { headSha?: string; repository?: string; omitProviderCanaryReport?: boolean } = {}): Promise<string> {
+async function writeReceiptFixture(
+  input: { headSha?: string; repository?: string; omitProviderCanaryReport?: boolean; omitReleaseReceipt?: boolean } = {}
+): Promise<string> {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-promotion-receipt-"));
   const receiptPath = path.join(tempDir, "verification-receipt.json");
   await fs.writeFile(receiptPath, `${JSON.stringify(createReceipt(input), null, 2)}\n`);
   return receiptPath;
 }
 
-function createReceipt(input: { headSha?: string; repository?: string; omitProviderCanaryReport?: boolean } = {}) {
+function createReceipt(input: { headSha?: string; repository?: string; omitProviderCanaryReport?: boolean; omitReleaseReceipt?: boolean } = {}) {
   const now = "2026-07-01T12:00:00.000Z";
   const gitCommit = "0123456789abcdef0123456789abcdef01234567";
   const receipt = {
@@ -96,6 +107,20 @@ function createReceipt(input: { headSha?: string; repository?: string; omitProvi
       capabilityCount: 4,
       capabilities: ["analysis", "ocr", "transcription", "tts"]
     },
+    releaseReceipt: {
+      path: "tmp/github-production-promotion-evidence/artifact/release-receipt.json",
+      product: "Gideon",
+      version: "0.1.0",
+      channel: "production",
+      generatedAt: now,
+      sourceGitCommit: gitCommit,
+      workflowRunId: "12345",
+      artifactCount: 4,
+      notarizationStatus: "accepted",
+      staplingDmg: "accepted",
+      gatekeeperAssessment: "accepted",
+      installSmokeResult: "passed"
+    },
     githubRun: {
       databaseId: 12345,
       status: "completed",
@@ -106,6 +131,7 @@ function createReceipt(input: { headSha?: string; repository?: string; omitProvi
     checks: {
       productionEvidenceSchema: "passed",
       providerCanaryReport: "passed",
+      releaseReceipt: "passed",
       allowSkipPackage: false,
       runMetadata: "passed",
       secretPolicy:
@@ -114,6 +140,9 @@ function createReceipt(input: { headSha?: string; repository?: string; omitProvi
   };
   if (input.omitProviderCanaryReport) {
     delete (receipt as { providerCanaryReport?: unknown }).providerCanaryReport;
+  }
+  if (input.omitReleaseReceipt) {
+    delete (receipt as { releaseReceipt?: unknown }).releaseReceipt;
   }
   return receipt;
 }

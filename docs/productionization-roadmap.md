@@ -1,6 +1,6 @@
 # Gideon productionization roadmap
 
-Last updated: 2026-06-29
+Last updated: 2026-07-02
 
 This roadmap turns the current downloadable macOS MVP into the fuller Gideon product described by the PRD. The current app already packages and downloads on macOS, accepts local walkthrough videos, generates deterministic moments/concepts/scripts, and renders captioned vertical MP4 drafts. The remaining work is to replace deterministic/local-only pieces with real provider-backed analysis, transcription, storage, jobs, auth, workspaces, operational controls, and an MCP control plane that lets tools like Codex or Claude Code inspect and edit Gideon projects without requiring Gideon to hold LLM API keys.
 
@@ -194,4 +194,4 @@ The next implementation slice is Milestone 5 production operations:
 
 1. Run `pnpm production:check`, then run `pnpm production:promote:check -- --live` against staging credentials, small ASR/OCR fixtures, and Apple signing credentials.
 2. Keep the existing provider/store interfaces intact so desktop, hosted worker, and MCP paths continue sharing the same execution boundaries.
-3. Run `pnpm production:billing:check -- --live`, `pnpm production:db:check`, `pnpm production:observability:check`, `pnpm production:github-settings:check -- --repo mayowa2133/Gideon`, then `pnpm production:github-promote:run -- --confirm-live` with staging upload-to-export, hosted MCP smoke, deployed metric export, signed/notarized release credentials, notarization receipt verification, self-verified promotion evidence, archived provider canary report verification, and archived release evidence plus `pnpm production:github-receipt:check -- --path tmp/github-production-promotion-evidence/verification-receipt.json` and `pnpm production:github-archive:check -- --archive-dir tmp/github-production-promotion-evidence` validation before removing snapshot reads entirely.
+3. Run `pnpm production:billing:check -- --live`, `pnpm production:db:check`, `pnpm production:observability:check`, `pnpm production:github-settings:check -- --repo mayowa2133/Gideon`, then `pnpm production:github-promote:run -- --confirm-live` with staging upload-to-export, hosted MCP smoke, deployed metric export, signed/notarized release credentials, notarization receipt verification, self-verified promotion evidence, archived provider canary report and release receipt verification, and archived release evidence plus `pnpm production:github-receipt:check -- --path tmp/github-production-promotion-evidence/verification-receipt.json` and `pnpm production:github-archive:check -- --archive-dir tmp/github-production-promotion-evidence` validation before removing snapshot reads entirely.

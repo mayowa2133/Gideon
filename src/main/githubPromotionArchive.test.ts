@@ -18,7 +18,7 @@ describe("GitHub promotion archive bundle check", () => {
     expect(result.stdout).toContain("GitHub promotion archive bundle check dry-run:");
     expect(result.stdout).toContain("Re-run production evidence, provider canary report, and GitHub receipt validators");
     expect(result.stdout).toContain("provider canary report");
-    expect(result.stdout).toContain("Compare the receipt evidence and provider report summaries");
+    expect(result.stdout).toContain("release receipt summaries");
   });
 
   it("accepts a consistent archived evidence and receipt bundle", async () => {
@@ -64,11 +64,13 @@ async function writeArchiveFixture(input: { receiptStepCount?: number } = {}): P
   await fs.mkdir(artifactDir);
   const evidence = createEvidence();
   const providerReport = createProviderCanaryReport();
+  const releaseReceipt = createReleaseReceipt();
   await fs.writeFile(path.join(artifactDir, "production-promotion-evidence.json"), `${JSON.stringify(evidence, null, 2)}\n`);
   await fs.writeFile(path.join(artifactDir, "provider-canary-report.json"), `${JSON.stringify(providerReport, null, 2)}\n`);
+  await fs.writeFile(path.join(artifactDir, "release-receipt.json"), `${JSON.stringify(releaseReceipt, null, 2)}\n`);
   await fs.writeFile(
     path.join(archiveDir, "verification-receipt.json"),
-    `${JSON.stringify(createReceipt(evidence, providerReport, input), null, 2)}\n`
+    `${JSON.stringify(createReceipt(evidence, providerReport, releaseReceipt, input), null, 2)}\n`
   );
   return archiveDir;
 }
@@ -141,6 +143,43 @@ function createProviderCanaryReport() {
   };
 }
 
+function createReleaseReceipt() {
+  const now = "2026-07-01T12:00:00.000Z";
+  return {
+    schemaVersion: 1,
+    product: "Gideon",
+    version: "0.1.0",
+    channel: "production",
+    generatedAt: now,
+    source: {
+      gitCommit: "0123456789abcdef0123456789abcdef01234567",
+      workflowRunId: "12345"
+    },
+    artifacts: [
+      { fileName: "Gideon-0.1.0-arm64.dmg", size: 1, sha256: "0".repeat(64) },
+      { fileName: "Gideon-0.1.0-arm64-mac.zip", size: 1, sha256: "1".repeat(64) },
+      { fileName: "latest-mac.yml", size: 1, sha256: "2".repeat(64) },
+      { fileName: "provenance.json", size: 1, sha256: "3".repeat(64) }
+    ],
+    notarization: {
+      status: "accepted",
+      requestId: "notary-123456",
+      completedAt: now
+    },
+    stapling: {
+      dmg: "accepted"
+    },
+    gatekeeper: {
+      spctlAssessment: "accepted",
+      checkedAt: now
+    },
+    installSmoke: {
+      result: "passed",
+      checkedAt: now
+    }
+  };
+}
+
 function providerResult(capability: string, model: string, costUsd: number, maxCostUsd: number) {
   return {
     capability,
@@ -157,6 +196,7 @@ function providerResult(capability: string, model: string, costUsd: number, maxC
 function createReceipt(
   evidence: ReturnType<typeof createEvidence>,
   providerReport: ReturnType<typeof createProviderCanaryReport>,
+  releaseReceipt: ReturnType<typeof createReleaseReceipt>,
   input: { receiptStepCount?: number } = {}
 ) {
   const capabilities = providerReport.results.map((result) => result.capability).sort();
@@ -185,6 +225,20 @@ function createReceipt(
       capabilityCount: capabilities.length,
       capabilities
     },
+    releaseReceipt: {
+      path: "artifact/release-receipt.json",
+      product: releaseReceipt.product,
+      version: releaseReceipt.version,
+      channel: releaseReceipt.channel,
+      generatedAt: releaseReceipt.generatedAt,
+      sourceGitCommit: releaseReceipt.source.gitCommit,
+      workflowRunId: releaseReceipt.source.workflowRunId,
+      artifactCount: releaseReceipt.artifacts.length,
+      notarizationStatus: releaseReceipt.notarization.status,
+      staplingDmg: releaseReceipt.stapling.dmg,
+      gatekeeperAssessment: releaseReceipt.gatekeeper.spctlAssessment,
+      installSmokeResult: releaseReceipt.installSmoke.result
+    },
     githubRun: {
       databaseId: 12345,
       status: "completed",
@@ -195,6 +249,7 @@ function createReceipt(
     checks: {
       productionEvidenceSchema: "passed",
       providerCanaryReport: "passed",
+      releaseReceipt: "passed",
       allowSkipPackage: false,
       runMetadata: "passed",
       secretPolicy:

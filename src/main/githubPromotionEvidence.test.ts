@@ -18,7 +18,8 @@ describe("GitHub promotion evidence artifact check", () => {
     expect(result.stdout).toContain("GitHub promotion evidence artifact check dry-run:");
     expect(result.stdout).toContain("Download artifact Gideon-production-promotion-evidence");
     expect(result.stdout).toContain("provider-canary-report.json");
-    expect(result.stdout).toContain("Verify the promotion evidence and provider canary report with local checkers.");
+    expect(result.stdout).toContain("release receipt evidence");
+    expect(result.stdout).toContain("Verify the promotion evidence, provider canary report, and release receipt summary with local checkers.");
     expect(result.stdout).toContain("verify evidence gitCommit matches gh run view headSha");
     expect(result.stdout).toContain("write a safe verification receipt");
   });
@@ -46,6 +47,32 @@ describe("GitHub promotion evidence artifact check", () => {
       })
     ).rejects.toMatchObject({
       stderr: expect.stringContaining("Could not find provider-canary-report.json")
+    });
+  });
+
+  it("requires the archived release receipt for package promotion evidence", async () => {
+    const downloadDir = await writeDownloadedArtifactFixture({ includeReleaseReceipt: false });
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath, "--skip-download", "--download-dir", downloadDir], {
+        cwd: process.cwd(),
+        env: { PATH: process.env.PATH ?? "" }
+      })
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining("Could not find release-receipt.json")
+    });
+  });
+
+  it("rejects archived release receipts containing secret-like material", async () => {
+    const downloadDir = await writeDownloadedArtifactFixture({ releaseReceiptOverrides: { notes: "APPLE_APP_SPECIFIC_PASSWORD=secret" } });
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath, "--skip-download", "--download-dir", downloadDir], {
+        cwd: process.cwd(),
+        env: { PATH: process.env.PATH ?? "" }
+      })
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining("Release receipt contains sensitive material")
     });
   });
 
@@ -106,8 +133,9 @@ describe("GitHub promotion evidence artifact check", () => {
       runId: string;
       evidence: { gitCommit: string; stepCount: number };
       providerCanaryReport: { mode: string; capabilityCount: number; capabilities: string[] };
+      releaseReceipt: { product: string; channel: string; notarizationStatus: string; installSmokeResult: string };
       githubRun: { headSha: string; event: string };
-      checks: { secretPolicy: string; runMetadata: string; providerCanaryReport: string };
+      checks: { secretPolicy: string; runMetadata: string; providerCanaryReport: string; releaseReceipt: string };
     };
     expect(receipt.repository).toBe("example/Gideon");
     expect(receipt.runId).toBe("12345");
@@ -116,10 +144,15 @@ describe("GitHub promotion evidence artifact check", () => {
     expect(receipt.providerCanaryReport.mode).toBe("live");
     expect(receipt.providerCanaryReport.capabilityCount).toBe(4);
     expect(receipt.providerCanaryReport.capabilities).toEqual(["analysis", "ocr", "transcription", "tts"]);
+    expect(receipt.releaseReceipt.product).toBe("Gideon");
+    expect(receipt.releaseReceipt.channel).toBe("production");
+    expect(receipt.releaseReceipt.notarizationStatus).toBe("accepted");
+    expect(receipt.releaseReceipt.installSmokeResult).toBe("passed");
     expect(receipt.githubRun.headSha).toBe("0123456789abcdef0123456789abcdef01234567");
     expect(receipt.githubRun.event).toBe("workflow_dispatch");
     expect(receipt.checks.runMetadata).toBe("passed");
     expect(receipt.checks.providerCanaryReport).toBe("passed");
+    expect(receipt.checks.releaseReceipt).toBe("passed");
     expect(receipt.checks.secretPolicy).toContain("excludes environment");
     expect(JSON.stringify(receipt)).not.toContain("secretPolicy:");
   });
@@ -143,13 +176,21 @@ describe("GitHub promotion evidence artifact check", () => {
   });
 });
 
-async function writeDownloadedArtifactFixture(input: { includeProviderReport?: boolean } = {}): Promise<string> {
+async function writeDownloadedArtifactFixture(
+  input: { includeProviderReport?: boolean; includeReleaseReceipt?: boolean; releaseReceiptOverrides?: Record<string, unknown> } = {}
+): Promise<string> {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-github-promotion-evidence-"));
   const artifactDir = path.join(tempDir, "artifact");
   await fs.mkdir(artifactDir, { recursive: true });
   await fs.writeFile(path.join(artifactDir, "production-promotion-evidence.json"), `${JSON.stringify(createEvidence(), null, 2)}\n`);
   if (input.includeProviderReport !== false) {
     await fs.writeFile(path.join(artifactDir, "provider-canary-report.json"), `${JSON.stringify(createProviderCanaryReport(), null, 2)}\n`);
+  }
+  if (input.includeReleaseReceipt !== false) {
+    await fs.writeFile(
+      path.join(artifactDir, "release-receipt.json"),
+      `${JSON.stringify({ ...createReleaseReceipt(), ...input.releaseReceiptOverrides }, null, 2)}\n`
+    );
   }
   return tempDir;
 }
@@ -244,6 +285,43 @@ function createProviderCanaryReport() {
       providerResult("ocr", "gpt-4.1-mini", 0.002, 0.02),
       providerResult("tts", "gpt-4o-mini-tts", 0.001, 0.01)
     ]
+  };
+}
+
+function createReleaseReceipt() {
+  const now = "2026-07-01T12:00:00.000Z";
+  return {
+    schemaVersion: 1,
+    product: "Gideon",
+    version: "0.1.0",
+    channel: "production",
+    generatedAt: now,
+    source: {
+      gitCommit: "0123456789abcdef0123456789abcdef01234567",
+      workflowRunId: "12345"
+    },
+    artifacts: [
+      { fileName: "Gideon-0.1.0-arm64.dmg", size: 1, sha256: "0".repeat(64) },
+      { fileName: "Gideon-0.1.0-arm64-mac.zip", size: 1, sha256: "1".repeat(64) },
+      { fileName: "latest-mac.yml", size: 1, sha256: "2".repeat(64) },
+      { fileName: "provenance.json", size: 1, sha256: "3".repeat(64) }
+    ],
+    notarization: {
+      status: "accepted",
+      requestId: "notary-123456",
+      completedAt: now
+    },
+    stapling: {
+      dmg: "accepted"
+    },
+    gatekeeper: {
+      spctlAssessment: "accepted",
+      checkedAt: now
+    },
+    installSmoke: {
+      result: "passed",
+      checkedAt: now
+    }
   };
 }
 

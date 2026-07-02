@@ -28,7 +28,7 @@ if (dryRun) {
     console.log("7. Dispatch the workflow only when --confirm-live is present.");
   }
   console.log("8. Wait for GitHub Actions to finish with gh run watch --exit-status.");
-  console.log("9. Download and verify Gideon-production-promotion-evidence, including provider-canary-report.json, with production:github-evidence:check.");
+  console.log("9. Download and verify Gideon-production-promotion-evidence, including provider-canary-report.json and release-receipt.json, with production:github-evidence:check.");
   console.log(`10. Write a safe verification receipt to ${receiptPath}.`);
   process.exit(0);
 }

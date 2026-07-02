@@ -16,15 +16,25 @@ const artifactName = options.values["artifact-name"] ?? "Gideon-production-promo
 const downloadDir = path.resolve(options.values["download-dir"] ?? path.join("tmp", "github-production-promotion-evidence"));
 const evidenceFilename = options.values["evidence-filename"] ?? "production-promotion-evidence.json";
 const providerReportFilename = options.values["provider-report-filename"] ?? "provider-canary-report.json";
+const releaseReceiptFilename = options.values["release-receipt-filename"] ?? "release-receipt.json";
 const receiptPath = options.values["write-receipt"] ? path.resolve(options.values["write-receipt"]) : null;
+const SENSITIVE_PATTERNS = [
+  /APPLE_APP_SPECIFIC_PASSWORD/i,
+  /CSC_KEY_PASSWORD/i,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /sk-[A-Za-z0-9_-]{12,}/,
+  /x-amz-signature=/i,
+  /signedUrl/i,
+  /downloadUrl/i
+];
 
 if (dryRun) {
   console.log("GitHub promotion evidence artifact check dry-run:");
   console.log(`1. Resolve repository: ${repo}.`);
   console.log("2. Require --run-id or GITHUB_RUN_ID unless --skip-download is set.");
   console.log(`3. Download artifact ${artifactName} into ${downloadDir} with gh run download.`);
-  console.log(`4. Locate ${evidenceFilename} and ${providerReportFilename} recursively inside the artifact directory.`);
-  console.log("5. Verify the promotion evidence and provider canary report with local checkers.");
+  console.log(`4. Locate ${evidenceFilename}, ${providerReportFilename}, and release receipt evidence recursively inside the artifact directory.`);
+  console.log("5. Verify the promotion evidence, provider canary report, and release receipt summary with local checkers.");
   console.log("6. When --run-id is available, verify evidence gitCommit matches gh run view headSha.");
   console.log("7. When --write-receipt is provided, write a safe verification receipt without secrets or provider payloads.");
   process.exit(0);
@@ -42,6 +52,7 @@ if (!skipDownload) {
 
 const evidencePath = findEvidenceFile(downloadDir, evidenceFilename);
 const providerReportPath = findEvidenceFile(downloadDir, providerReportFilename);
+const releaseReceiptPath = allowSkipPackage ? null : findEvidenceFile(downloadDir, releaseReceiptFilename);
 const verifyArgs = ["scripts/check-production-promotion-evidence.mjs", "--path", evidencePath];
 if (allowSkipPackage) {
   verifyArgs.push("--allow-skip-package");
@@ -50,6 +61,10 @@ runCommand(process.execPath, verifyArgs);
 runCommand(process.execPath, ["scripts/check-provider-canary-report.mjs", "--path", providerReportPath]);
 const evidence = readEvidence(evidencePath);
 const providerReport = readEvidence(providerReportPath);
+const releaseReceipt = releaseReceiptPath ? readEvidence(releaseReceiptPath) : null;
+if (releaseReceipt) {
+  validateArchivedReleaseReceipt(releaseReceipt);
+}
 let runMetadata = null;
 if (runId && !skipRunMetadata) {
   runMetadata = validateRunMetadata({ repo, runId, evidence });
@@ -64,6 +79,8 @@ if (receiptPath) {
     evidence,
     providerReportPath,
     providerReport,
+    releaseReceiptPath,
+    releaseReceipt,
     runMetadata,
     allowSkipPackage,
     skipRunMetadata
@@ -71,10 +88,10 @@ if (receiptPath) {
 }
 
 console.log(
-  `GitHub promotion evidence artifact check passed for ${path.relative(process.cwd(), evidencePath)} and ${path.relative(
+  `GitHub promotion evidence artifact check passed for ${path.relative(process.cwd(), evidencePath)}, ${path.relative(
     process.cwd(),
     providerReportPath
-  )}.`
+  )}${releaseReceiptPath ? `, and ${path.relative(process.cwd(), releaseReceiptPath)}` : ""}.`
 );
 
 function parseArgs(inputArgs) {
@@ -195,6 +212,22 @@ function writeReceipt(input) {
       capabilityCount: providerCapabilities.length,
       capabilities: providerCapabilities
     },
+    releaseReceipt: input.releaseReceipt
+      ? {
+          path: path.relative(process.cwd(), input.releaseReceiptPath),
+          product: input.releaseReceipt.product,
+          version: input.releaseReceipt.version,
+          channel: input.releaseReceipt.channel,
+          generatedAt: input.releaseReceipt.generatedAt,
+          sourceGitCommit: input.releaseReceipt.source?.gitCommit ?? null,
+          workflowRunId: input.releaseReceipt.source?.workflowRunId ?? null,
+          artifactCount: Array.isArray(input.releaseReceipt.artifacts) ? input.releaseReceipt.artifacts.length : 0,
+          notarizationStatus: input.releaseReceipt.notarization?.status ?? null,
+          staplingDmg: input.releaseReceipt.stapling?.dmg ?? null,
+          gatekeeperAssessment: input.releaseReceipt.gatekeeper?.spctlAssessment ?? null,
+          installSmokeResult: input.releaseReceipt.installSmoke?.result ?? null
+        }
+      : null,
     githubRun: input.runMetadata
       ? {
           databaseId: input.runMetadata.databaseId ?? null,
@@ -207,6 +240,7 @@ function writeReceipt(input) {
     checks: {
       productionEvidenceSchema: "passed",
       providerCanaryReport: "passed",
+      releaseReceipt: input.releaseReceipt ? "passed" : "skipped",
       allowSkipPackage: Boolean(input.allowSkipPackage),
       runMetadata: input.runId ? (input.skipRunMetadata ? "skipped" : "passed") : "not_applicable",
       secretPolicy: "receipt excludes environment, cookies, API keys, signed URLs, provider payloads, transcripts, prompts, media paths, and artifact contents"
@@ -214,6 +248,47 @@ function writeReceipt(input) {
   };
   fs.mkdirSync(path.dirname(input.receiptPath), { recursive: true });
   fs.writeFileSync(input.receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+}
+
+function validateArchivedReleaseReceipt(releaseReceipt) {
+  const errors = [];
+  if (!releaseReceipt || typeof releaseReceipt !== "object" || Array.isArray(releaseReceipt)) {
+    errors.push("Release receipt root must be an object.");
+  } else {
+    if (releaseReceipt.schemaVersion !== 1) {
+      errors.push("Release receipt schemaVersion must be 1.");
+    }
+    if (releaseReceipt.product !== "Gideon") {
+      errors.push("Release receipt product must be Gideon.");
+    }
+    if (releaseReceipt.channel !== "production") {
+      errors.push("Release receipt channel must be production.");
+    }
+    if (releaseReceipt.notarization?.status !== "accepted") {
+      errors.push("Release receipt notarization.status must be accepted.");
+    }
+    if (releaseReceipt.stapling?.dmg !== "accepted") {
+      errors.push("Release receipt stapling.dmg must be accepted.");
+    }
+    if (releaseReceipt.gatekeeper?.spctlAssessment !== "accepted") {
+      errors.push("Release receipt gatekeeper.spctlAssessment must be accepted.");
+    }
+    if (releaseReceipt.installSmoke?.result !== "passed") {
+      errors.push("Release receipt installSmoke.result must be passed.");
+    }
+    if (typeof releaseReceipt.source?.gitCommit !== "string" || !/^[0-9a-f]{40}$/i.test(releaseReceipt.source.gitCommit)) {
+      errors.push("Release receipt source.gitCommit must be a full 40-character git SHA.");
+    }
+    const serialized = JSON.stringify(releaseReceipt);
+    for (const pattern of SENSITIVE_PATTERNS) {
+      if (pattern.test(serialized)) {
+        errors.push(`Release receipt contains sensitive material matching ${pattern}.`);
+      }
+    }
+  }
+  if (errors.length > 0) {
+    fail(errors);
+  }
 }
 
 function readEvidence(evidencePath) {
