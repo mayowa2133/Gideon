@@ -20,7 +20,7 @@ describe("GitHub live promotion runner", () => {
     expect(result.stdout).toContain("Live promotion input run_live_promotion=true.");
     expect(result.stdout).toContain("Run GitHub Secrets/Vars repo settings preflight before dispatch.");
     expect(result.stdout).toContain("Dispatch the workflow only when --confirm-live is present.");
-    expect(result.stdout).toContain("Download and verify Gideon-production-promotion-evidence");
+    expect(result.stdout).toContain("Download and verify Gideon-production-promotion-evidence, including provider-canary-report.json");
     expect(result.stdout).toContain("Write a safe verification receipt");
   });
 
@@ -43,7 +43,8 @@ describe("GitHub live promotion runner", () => {
       cwd: process.cwd(),
       env: {
         PATH: `${fakeGhDir}${path.delimiter}${process.env.PATH ?? ""}`,
-        GIDEON_FAKE_EVIDENCE_JSON: JSON.stringify(createEvidence())
+        GIDEON_FAKE_EVIDENCE_JSON: JSON.stringify(createEvidence()),
+        GIDEON_FAKE_PROVIDER_CANARY_REPORT_JSON: JSON.stringify(createProviderCanaryReport())
       }
     });
 
@@ -74,7 +75,8 @@ describe("GitHub live promotion runner", () => {
         cwd: process.cwd(),
         env: {
           PATH: `${fakeGhDir}${path.delimiter}${process.env.PATH ?? ""}`,
-          GIDEON_FAKE_EVIDENCE_JSON: JSON.stringify(createEvidence({ skipPackage: true }))
+          GIDEON_FAKE_EVIDENCE_JSON: JSON.stringify(createEvidence({ skipPackage: true })),
+          GIDEON_FAKE_PROVIDER_CANARY_REPORT_JSON: JSON.stringify(createProviderCanaryReport())
         }
       }
     );
@@ -154,6 +156,7 @@ if (args[0] === "run" && args[1] === "download") {
   const dir = args[args.indexOf("--dir") + 1];
   fs.mkdirSync(path.join(dir, "artifact"), { recursive: true });
   fs.writeFileSync(path.join(dir, "artifact", "production-promotion-evidence.json"), process.env.GIDEON_FAKE_EVIDENCE_JSON + "\\n");
+  fs.writeFileSync(path.join(dir, "artifact", "provider-canary-report.json"), process.env.GIDEON_FAKE_PROVIDER_CANARY_REPORT_JSON + "\\n");
   process.exit(0);
 }
 console.error("unexpected gh args: " + args.join(" "));
@@ -216,5 +219,34 @@ function createEvidence(input: { skipPackage?: boolean } = {}) {
       secretPolicy:
         "Commands, step names, exit codes, safe env overrides, and timings are recorded. Process environment, cookies, API keys, signed URLs, provider payloads, transcripts, prompts, and media paths are not recorded."
     }
+  };
+}
+
+function createProviderCanaryReport() {
+  const now = "2026-07-01T12:00:00.000Z";
+  return {
+    mode: "live",
+    providerConfigured: true,
+    baseUrl: "https://api.openai.com/v1",
+    generatedAt: now,
+    results: [
+      providerResult("analysis", "gpt-4.1-mini", 0.003, 0.02),
+      providerResult("transcription", "gpt-4o-transcribe", 0.001, 0.01),
+      providerResult("ocr", "gpt-4.1-mini", 0.002, 0.02),
+      providerResult("tts", "gpt-4o-mini-tts", 0.001, 0.01)
+    ]
+  };
+}
+
+function providerResult(capability: string, model: string, costUsd: number, maxCostUsd: number) {
+  return {
+    capability,
+    provider: "openai",
+    status: "passed",
+    model,
+    message: `${capability} canary passed.`,
+    durationMs: 10,
+    costUsd,
+    maxCostUsd
   };
 }

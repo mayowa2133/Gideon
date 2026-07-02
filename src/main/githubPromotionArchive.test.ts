@@ -16,8 +16,9 @@ describe("GitHub promotion archive bundle check", () => {
     });
 
     expect(result.stdout).toContain("GitHub promotion archive bundle check dry-run:");
-    expect(result.stdout).toContain("Re-run production evidence and GitHub receipt validators");
-    expect(result.stdout).toContain("Compare the receipt evidence summary");
+    expect(result.stdout).toContain("Re-run production evidence, provider canary report, and GitHub receipt validators");
+    expect(result.stdout).toContain("provider canary report");
+    expect(result.stdout).toContain("Compare the receipt evidence and provider report summaries");
   });
 
   it("accepts a consistent archived evidence and receipt bundle", async () => {
@@ -62,10 +63,12 @@ async function writeArchiveFixture(input: { receiptStepCount?: number } = {}): P
   const artifactDir = path.join(archiveDir, "artifact");
   await fs.mkdir(artifactDir);
   const evidence = createEvidence();
+  const providerReport = createProviderCanaryReport();
   await fs.writeFile(path.join(artifactDir, "production-promotion-evidence.json"), `${JSON.stringify(evidence, null, 2)}\n`);
+  await fs.writeFile(path.join(artifactDir, "provider-canary-report.json"), `${JSON.stringify(providerReport, null, 2)}\n`);
   await fs.writeFile(
     path.join(archiveDir, "verification-receipt.json"),
-    `${JSON.stringify(createReceipt(evidence, input), null, 2)}\n`
+    `${JSON.stringify(createReceipt(evidence, providerReport, input), null, 2)}\n`
   );
   return archiveDir;
 }
@@ -122,7 +125,41 @@ function createEvidence() {
   };
 }
 
-function createReceipt(evidence: ReturnType<typeof createEvidence>, input: { receiptStepCount?: number } = {}) {
+function createProviderCanaryReport() {
+  const now = "2026-07-01T12:00:00.000Z";
+  return {
+    mode: "live",
+    providerConfigured: true,
+    baseUrl: "https://api.openai.com/v1",
+    generatedAt: now,
+    results: [
+      providerResult("analysis", "gpt-4.1-mini", 0.003, 0.02),
+      providerResult("transcription", "gpt-4o-transcribe", 0.001, 0.01),
+      providerResult("ocr", "gpt-4.1-mini", 0.002, 0.02),
+      providerResult("tts", "gpt-4o-mini-tts", 0.001, 0.01)
+    ]
+  };
+}
+
+function providerResult(capability: string, model: string, costUsd: number, maxCostUsd: number) {
+  return {
+    capability,
+    provider: "openai",
+    status: "passed",
+    model,
+    message: `${capability} canary passed.`,
+    durationMs: 10,
+    costUsd,
+    maxCostUsd
+  };
+}
+
+function createReceipt(
+  evidence: ReturnType<typeof createEvidence>,
+  providerReport: ReturnType<typeof createProviderCanaryReport>,
+  input: { receiptStepCount?: number } = {}
+) {
+  const capabilities = providerReport.results.map((result) => result.capability).sort();
   return {
     schemaVersion: 1,
     verifiedAt: "2026-07-01T12:01:00.000Z",
@@ -140,6 +177,14 @@ function createReceipt(evidence: ReturnType<typeof createEvidence>, input: { rec
       skipPackage: evidence.skipPackage,
       stepCount: input.receiptStepCount ?? evidence.steps.length
     },
+    providerCanaryReport: {
+      path: "artifact/provider-canary-report.json",
+      mode: providerReport.mode,
+      providerConfigured: providerReport.providerConfigured,
+      generatedAt: providerReport.generatedAt,
+      capabilityCount: capabilities.length,
+      capabilities
+    },
     githubRun: {
       databaseId: 12345,
       status: "completed",
@@ -149,6 +194,7 @@ function createReceipt(evidence: ReturnType<typeof createEvidence>, input: { rec
     },
     checks: {
       productionEvidenceSchema: "passed",
+      providerCanaryReport: "passed",
       allowSkipPackage: false,
       runMetadata: "passed",
       secretPolicy:

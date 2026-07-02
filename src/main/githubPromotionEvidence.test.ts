@@ -17,7 +17,8 @@ describe("GitHub promotion evidence artifact check", () => {
 
     expect(result.stdout).toContain("GitHub promotion evidence artifact check dry-run:");
     expect(result.stdout).toContain("Download artifact Gideon-production-promotion-evidence");
-    expect(result.stdout).toContain("Verify the evidence with the production evidence checker.");
+    expect(result.stdout).toContain("provider-canary-report.json");
+    expect(result.stdout).toContain("Verify the promotion evidence and provider canary report with local checkers.");
     expect(result.stdout).toContain("verify evidence gitCommit matches gh run view headSha");
     expect(result.stdout).toContain("write a safe verification receipt");
   });
@@ -31,7 +32,21 @@ describe("GitHub promotion evidence artifact check", () => {
     });
 
     expect(result.stdout).toContain("Production promotion evidence check passed");
+    expect(result.stdout).toContain("Provider canary report check passed");
     expect(result.stdout).toContain("GitHub promotion evidence artifact check passed");
+  });
+
+  it("requires the archived provider canary report", async () => {
+    const downloadDir = await writeDownloadedArtifactFixture({ includeProviderReport: false });
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath, "--skip-download", "--download-dir", downloadDir], {
+        cwd: process.cwd(),
+        env: { PATH: process.env.PATH ?? "" }
+      })
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining("Could not find provider-canary-report.json")
+    });
   });
 
   it("requires a GitHub run id when downloading the artifact", async () => {
@@ -90,16 +105,21 @@ describe("GitHub promotion evidence artifact check", () => {
       repository: string;
       runId: string;
       evidence: { gitCommit: string; stepCount: number };
+      providerCanaryReport: { mode: string; capabilityCount: number; capabilities: string[] };
       githubRun: { headSha: string; event: string };
-      checks: { secretPolicy: string; runMetadata: string };
+      checks: { secretPolicy: string; runMetadata: string; providerCanaryReport: string };
     };
     expect(receipt.repository).toBe("example/Gideon");
     expect(receipt.runId).toBe("12345");
     expect(receipt.evidence.gitCommit).toBe("0123456789abcdef0123456789abcdef01234567");
     expect(receipt.evidence.stepCount).toBe(16);
+    expect(receipt.providerCanaryReport.mode).toBe("live");
+    expect(receipt.providerCanaryReport.capabilityCount).toBe(4);
+    expect(receipt.providerCanaryReport.capabilities).toEqual(["analysis", "ocr", "transcription", "tts"]);
     expect(receipt.githubRun.headSha).toBe("0123456789abcdef0123456789abcdef01234567");
     expect(receipt.githubRun.event).toBe("workflow_dispatch");
     expect(receipt.checks.runMetadata).toBe("passed");
+    expect(receipt.checks.providerCanaryReport).toBe("passed");
     expect(receipt.checks.secretPolicy).toContain("excludes environment");
     expect(JSON.stringify(receipt)).not.toContain("secretPolicy:");
   });
@@ -123,11 +143,14 @@ describe("GitHub promotion evidence artifact check", () => {
   });
 });
 
-async function writeDownloadedArtifactFixture(): Promise<string> {
+async function writeDownloadedArtifactFixture(input: { includeProviderReport?: boolean } = {}): Promise<string> {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-github-promotion-evidence-"));
   const artifactDir = path.join(tempDir, "artifact");
   await fs.mkdir(artifactDir, { recursive: true });
   await fs.writeFile(path.join(artifactDir, "production-promotion-evidence.json"), `${JSON.stringify(createEvidence(), null, 2)}\n`);
+  if (input.includeProviderReport !== false) {
+    await fs.writeFile(path.join(artifactDir, "provider-canary-report.json"), `${JSON.stringify(createProviderCanaryReport(), null, 2)}\n`);
+  }
   return tempDir;
 }
 
@@ -205,5 +228,34 @@ function createEvidence() {
       secretPolicy:
         "Commands, step names, exit codes, safe env overrides, and timings are recorded. Process environment, cookies, API keys, signed URLs, provider payloads, transcripts, prompts, and media paths are not recorded."
     }
+  };
+}
+
+function createProviderCanaryReport() {
+  const now = "2026-07-01T12:00:00.000Z";
+  return {
+    mode: "live",
+    providerConfigured: true,
+    baseUrl: "https://api.openai.com/v1",
+    generatedAt: now,
+    results: [
+      providerResult("analysis", "gpt-4.1-mini", 0.003, 0.02),
+      providerResult("transcription", "gpt-4o-transcribe", 0.001, 0.01),
+      providerResult("ocr", "gpt-4.1-mini", 0.002, 0.02),
+      providerResult("tts", "gpt-4o-mini-tts", 0.001, 0.01)
+    ]
+  };
+}
+
+function providerResult(capability: string, model: string, costUsd: number, maxCostUsd: number) {
+  return {
+    capability,
+    provider: "openai",
+    status: "passed",
+    model,
+    message: `${capability} canary passed.`,
+    durationMs: 10,
+    costUsd,
+    maxCostUsd
   };
 }

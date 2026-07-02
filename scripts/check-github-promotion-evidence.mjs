@@ -15,6 +15,7 @@ const runId = options.values["run-id"] ?? process.env.GITHUB_RUN_ID;
 const artifactName = options.values["artifact-name"] ?? "Gideon-production-promotion-evidence";
 const downloadDir = path.resolve(options.values["download-dir"] ?? path.join("tmp", "github-production-promotion-evidence"));
 const evidenceFilename = options.values["evidence-filename"] ?? "production-promotion-evidence.json";
+const providerReportFilename = options.values["provider-report-filename"] ?? "provider-canary-report.json";
 const receiptPath = options.values["write-receipt"] ? path.resolve(options.values["write-receipt"]) : null;
 
 if (dryRun) {
@@ -22,8 +23,8 @@ if (dryRun) {
   console.log(`1. Resolve repository: ${repo}.`);
   console.log("2. Require --run-id or GITHUB_RUN_ID unless --skip-download is set.");
   console.log(`3. Download artifact ${artifactName} into ${downloadDir} with gh run download.`);
-  console.log(`4. Locate ${evidenceFilename} recursively inside the artifact directory.`);
-  console.log("5. Verify the evidence with the production evidence checker.");
+  console.log(`4. Locate ${evidenceFilename} and ${providerReportFilename} recursively inside the artifact directory.`);
+  console.log("5. Verify the promotion evidence and provider canary report with local checkers.");
   console.log("6. When --run-id is available, verify evidence gitCommit matches gh run view headSha.");
   console.log("7. When --write-receipt is provided, write a safe verification receipt without secrets or provider payloads.");
   process.exit(0);
@@ -40,21 +41,41 @@ if (!skipDownload) {
 }
 
 const evidencePath = findEvidenceFile(downloadDir, evidenceFilename);
+const providerReportPath = findEvidenceFile(downloadDir, providerReportFilename);
 const verifyArgs = ["scripts/check-production-promotion-evidence.mjs", "--path", evidencePath];
 if (allowSkipPackage) {
   verifyArgs.push("--allow-skip-package");
 }
 runCommand(process.execPath, verifyArgs);
+runCommand(process.execPath, ["scripts/check-provider-canary-report.mjs", "--path", providerReportPath]);
 const evidence = readEvidence(evidencePath);
+const providerReport = readEvidence(providerReportPath);
 let runMetadata = null;
 if (runId && !skipRunMetadata) {
   runMetadata = validateRunMetadata({ repo, runId, evidence });
 }
 if (receiptPath) {
-  writeReceipt({ receiptPath, repo, runId, artifactName, evidencePath, evidence, runMetadata, allowSkipPackage, skipRunMetadata });
+  writeReceipt({
+    receiptPath,
+    repo,
+    runId,
+    artifactName,
+    evidencePath,
+    evidence,
+    providerReportPath,
+    providerReport,
+    runMetadata,
+    allowSkipPackage,
+    skipRunMetadata
+  });
 }
 
-console.log(`GitHub promotion evidence artifact check passed for ${path.relative(process.cwd(), evidencePath)}.`);
+console.log(
+  `GitHub promotion evidence artifact check passed for ${path.relative(process.cwd(), evidencePath)} and ${path.relative(
+    process.cwd(),
+    providerReportPath
+  )}.`
+);
 
 function parseArgs(inputArgs) {
   const flags = new Set();
@@ -146,6 +167,9 @@ function validateRunMetadata(input) {
 }
 
 function writeReceipt(input) {
+  const providerCapabilities = Array.isArray(input.providerReport.results)
+    ? input.providerReport.results.map((result) => result?.capability).filter((capability) => typeof capability === "string").sort()
+    : [];
   const receipt = {
     schemaVersion: 1,
     verifiedAt: new Date().toISOString(),
@@ -163,6 +187,14 @@ function writeReceipt(input) {
       skipPackage: Boolean(input.evidence.skipPackage),
       stepCount: Array.isArray(input.evidence.steps) ? input.evidence.steps.length : 0
     },
+    providerCanaryReport: {
+      path: path.relative(process.cwd(), input.providerReportPath),
+      mode: input.providerReport.mode,
+      providerConfigured: input.providerReport.providerConfigured,
+      generatedAt: input.providerReport.generatedAt,
+      capabilityCount: providerCapabilities.length,
+      capabilities: providerCapabilities
+    },
     githubRun: input.runMetadata
       ? {
           databaseId: input.runMetadata.databaseId ?? null,
@@ -174,6 +206,7 @@ function writeReceipt(input) {
       : null,
     checks: {
       productionEvidenceSchema: "passed",
+      providerCanaryReport: "passed",
       allowSkipPackage: Boolean(input.allowSkipPackage),
       runMetadata: input.runId ? (input.skipRunMetadata ? "skipped" : "passed") : "not_applicable",
       secretPolicy: "receipt excludes environment, cookies, API keys, signed URLs, provider payloads, transcripts, prompts, media paths, and artifact contents"

@@ -25,7 +25,7 @@ if (dryRun) {
   console.log("GitHub promotion verification receipt check dry-run:");
   console.log(`1. Read receipt JSON from ${receiptPath}.`);
   console.log("2. Require schemaVersion, verification timestamp, repository, artifact, and evidence summary.");
-  console.log("3. Require successful live evidence metadata and safe check statuses.");
+  console.log("3. Require successful live evidence metadata, provider canary report summary, and safe check statuses.");
   console.log("4. If GitHub run metadata is present, require completed/success workflow_dispatch and headSha matching evidence gitCommit.");
   console.log("5. Scan receipt fields for secret-like material, cookies, signed URLs, and provider keys.");
   process.exit(0);
@@ -88,6 +88,7 @@ function validateReceipt(receipt) {
   }
   requireNonEmptyString(receipt.evidencePath, "evidencePath");
   validateEvidenceSummary(receipt.evidence);
+  validateProviderCanaryReportSummary(receipt.providerCanaryReport);
   validateGitHubRun(receipt.githubRun, receipt.evidence?.gitCommit);
   validateChecks(receipt.checks, receipt.githubRun);
   validateSafeMetadata(receipt);
@@ -117,6 +118,40 @@ function validateEvidenceSummary(evidence) {
   }
   if (!Number.isInteger(evidence.stepCount) || evidence.stepCount < 12) {
     errors.push("Receipt evidence.stepCount must include at least the required live promotion steps.");
+  }
+}
+
+function validateProviderCanaryReportSummary(providerCanaryReport) {
+  if (!providerCanaryReport || typeof providerCanaryReport !== "object" || Array.isArray(providerCanaryReport)) {
+    errors.push("Receipt providerCanaryReport must be an object.");
+    return;
+  }
+  requireNonEmptyString(providerCanaryReport.path, "providerCanaryReport.path");
+  if (path.basename(String(providerCanaryReport.path ?? "")) !== "provider-canary-report.json") {
+    errors.push("Receipt providerCanaryReport.path must identify provider-canary-report.json.");
+  }
+  if (providerCanaryReport.mode !== "live") {
+    errors.push("Receipt providerCanaryReport.mode must be live.");
+  }
+  if (providerCanaryReport.providerConfigured !== true) {
+    errors.push("Receipt providerCanaryReport.providerConfigured must be true.");
+  }
+  requireIsoTimestamp(providerCanaryReport.generatedAt, "providerCanaryReport.generatedAt");
+  if (providerCanaryReport.capabilityCount !== 4) {
+    errors.push("Receipt providerCanaryReport.capabilityCount must be 4.");
+  }
+  const capabilities = providerCanaryReport.capabilities;
+  const expected = ["analysis", "ocr", "transcription", "tts"];
+  if (!Array.isArray(capabilities) || capabilities.length !== expected.length) {
+    errors.push("Receipt providerCanaryReport.capabilities must list analysis, OCR, transcription, and TTS.");
+    return;
+  }
+  const sorted = [...capabilities].sort();
+  for (const [index, capability] of expected.entries()) {
+    if (sorted[index] !== capability) {
+      errors.push("Receipt providerCanaryReport.capabilities must list analysis, OCR, transcription, and TTS.");
+      return;
+    }
   }
 }
 
@@ -151,6 +186,9 @@ function validateChecks(checks, githubRun) {
   }
   if (checks.productionEvidenceSchema !== "passed") {
     errors.push("Receipt checks.productionEvidenceSchema must be passed.");
+  }
+  if (checks.providerCanaryReport !== "passed") {
+    errors.push("Receipt checks.providerCanaryReport must be passed.");
   }
   if (typeof checks.allowSkipPackage !== "boolean") {
     errors.push("Receipt checks.allowSkipPackage must be boolean.");
