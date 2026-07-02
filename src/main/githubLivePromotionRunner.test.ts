@@ -171,6 +171,7 @@ function createEvidence(input: { skipPackage?: boolean } = {}) {
     "strict staging readiness gate",
     "production billing reconciliation",
     "production storage lifecycle policy",
+    "production storage signed-download smoke",
     "live provider canaries",
     "live staging upload-to-export smoke",
     "live staging hosted MCP smoke"

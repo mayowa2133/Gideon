@@ -166,7 +166,8 @@ function storagePolicyEnv(): Record<string, string> {
     GIDEON_STORAGE_SOURCE_RETENTION_DAYS: "365",
     GIDEON_STORAGE_EXPORT_RETENTION_DAYS: "365",
     GIDEON_STORAGE_DELETION_SLA_HOURS: "24",
-    GIDEON_SIGNED_URL_MAX_SECONDS: "900"
+    GIDEON_SIGNED_URL_MAX_SECONDS: "900",
+    GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY: "workspaces/workspace-1/projects/project-1/export/export-1.mp4"
   };
 }
 

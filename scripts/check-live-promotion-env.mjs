@@ -29,6 +29,7 @@ const requiredEnv = [
   "GIDEON_STORAGE_EXPORT_RETENTION_DAYS",
   "GIDEON_STORAGE_DELETION_SLA_HOURS",
   "GIDEON_SIGNED_URL_MAX_SECONDS",
+  "GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY",
   "GIDEON_OPENAI_API_KEY",
   "GIDEON_STAGING_API_BASE_URL",
   "GIDEON_AUTH_CALLBACK_SECRET",
@@ -93,6 +94,10 @@ validateRetentionWindow("GIDEON_STORAGE_DELETION_SLA_HOURS", 1, 168);
 validateRetentionWindow("GIDEON_SIGNED_URL_MAX_SECONDS", 60, 3600);
 if (value("GIDEON_STORAGE_PUBLIC_BASE_URL") && value("GIDEON_ALLOW_PUBLIC_STORAGE_BASE_URL") !== "true") {
   errors.push("GIDEON_STORAGE_PUBLIC_BASE_URL must be unset for live private artifacts unless GIDEON_ALLOW_PUBLIC_STORAGE_BASE_URL=true.");
+}
+const signedDownloadSmokeKey = value("GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY");
+if (signedDownloadSmokeKey && !/^workspaces\/[^/]+\/projects\/[^/]+\/(?:export|render|source_recording)\//.test(signedDownloadSmokeKey)) {
+  errors.push("GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY must reference a workspace/project scoped source_recording, render, or export object.");
 }
 
 if (!skipPackage) {

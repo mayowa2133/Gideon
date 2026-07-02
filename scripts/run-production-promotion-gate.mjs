@@ -19,6 +19,7 @@ const steps = [
   step("strict staging readiness gate", [pnpm, "staging:check", "--", "--strict"]),
   step("production billing reconciliation", [pnpm, "production:billing:check", "--", "--live"]),
   step("production storage lifecycle policy", [pnpm, "production:storage:check", "--", "--verify-bucket-lifecycle"]),
+  step("production storage signed-download smoke", [pnpm, "production:storage-download:smoke"]),
   step("live provider canaries", [pnpm, "provider:canary", "--", "--live"]),
   step("live staging upload-to-export smoke", [pnpm, "staging:smoke", "--", "--live"]),
   step("live staging hosted MCP smoke", [pnpm, "staging:mcp:smoke", "--", "--live", "--require-metric-export"]),

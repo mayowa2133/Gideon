@@ -220,7 +220,8 @@ function checkPackageContract() {
     "production:live-env:check",
     "production:fixtures:materialize",
     "production:billing:check",
-    "production:storage:check"
+    "production:storage:check",
+    "production:storage-download:smoke"
   ]) {
     if (typeof packageJson.scripts?.[scriptName] !== "string") {
       errors.push(`package.json must define ${scriptName}.`);

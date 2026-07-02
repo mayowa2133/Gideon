@@ -65,7 +65,8 @@ function validateCommandContract() {
     "production:live-env:check",
     "production:fixtures:materialize",
     "production:billing:check",
-    "production:storage:check"
+    "production:storage:check",
+    "production:storage-download:smoke"
   ]) {
     if (typeof scripts[scriptName] !== "string") {
       errors.push(`package.json must define ${scriptName}.`);
@@ -160,6 +161,7 @@ function validateOperationalEnvironment() {
   requireEnv("GIDEON_STORAGE_ACCESS_KEY_ID", "Set GIDEON_STORAGE_ACCESS_KEY_ID for staging private object storage.");
   requireEnv("GIDEON_STORAGE_SECRET_ACCESS_KEY", "Set GIDEON_STORAGE_SECRET_ACCESS_KEY for staging private object storage.");
   requireStorageLifecyclePolicy();
+  requireStorageSignedDownloadSmoke();
 
   if (!normalize(env.GIDEON_OPENAI_API_KEY ?? env.OPENAI_API_KEY)) {
     errors.push("Set GIDEON_OPENAI_API_KEY or OPENAI_API_KEY before running live provider canaries.");
@@ -177,6 +179,17 @@ function validateOperationalEnvironment() {
   requireEnv("APPLE_APP_SPECIFIC_PASSWORD", "Set APPLE_APP_SPECIFIC_PASSWORD for production release notarization checks.");
   if (!normalize(env.CSC_LINK) && !normalize(env.CSC_NAME)) {
     errors.push("Set CSC_LINK or CSC_NAME so production release candidates can be signed.");
+  }
+}
+
+function requireStorageSignedDownloadSmoke() {
+  const storageKey = normalize(env.GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY);
+  if (!storageKey) {
+    errors.push("Set GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY to an existing private export/render/source object key for signed-download smoke.");
+    return;
+  }
+  if (!/^workspaces\/[^/]+\/projects\/[^/]+\/(?:export|render|source_recording)\//.test(storageKey)) {
+    errors.push("GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY must reference a workspace/project scoped source_recording, render, or export object.");
   }
 }
 
