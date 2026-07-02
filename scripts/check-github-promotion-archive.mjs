@@ -35,7 +35,7 @@ if (dryRun) {
   console.log("3. Locate verification-receipt.json unless --receipt-path is provided.");
   console.log("4. Re-run production evidence, provider canary report, and GitHub receipt validators against the archived files.");
   console.log("5. Compare the receipt evidence, provider report, and release receipt summaries to the archived JSON files.");
-  console.log("6. Require artifact name, git commit, timestamps, skip-package flag, step count, provider capabilities, release receipt status, and SHA-256 artifact digests to stay consistent.");
+  console.log("6. Require artifact name, git commit, timestamps, skip-package flag, step count, provider capabilities, release receipt status, byte sizes, and SHA-256 artifact digests to stay consistent.");
   process.exit(0);
 }
 
@@ -192,6 +192,7 @@ function validateArchiveConsistency(input) {
   requireEqual(input.receipt.evidence?.finishedAt, input.evidence.finishedAt, "evidence.finishedAt", input.errors);
   requireEqual(Boolean(input.receipt.evidence?.skipPackage), Boolean(input.evidence.skipPackage), "evidence.skipPackage", input.errors);
   requireEqual(input.receipt.evidence?.stepCount, Array.isArray(input.evidence.steps) ? input.evidence.steps.length : 0, "evidence.stepCount", input.errors);
+  requireEqual(input.receipt.evidence?.sizeBytes, fileSizeBytes(input.evidencePath), "evidence.sizeBytes", input.errors);
   requireEqual(input.receipt.evidence?.sha256, sha256File(input.evidencePath), "evidence.sha256", input.errors);
   if (input.receipt.githubRun?.headSha && input.receipt.githubRun.headSha !== input.evidence.gitCommit) {
     input.errors.push("Receipt githubRun.headSha must match archived evidence gitCommit.");
@@ -211,6 +212,7 @@ function validateArchiveConsistency(input) {
   if (JSON.stringify(input.receipt.providerCanaryReport?.capabilities ?? []) !== JSON.stringify(capabilities)) {
     input.errors.push("Receipt providerCanaryReport.capabilities must match archived provider canary report.");
   }
+  requireEqual(input.receipt.providerCanaryReport?.sizeBytes, fileSizeBytes(input.providerReportPath), "providerCanaryReport.sizeBytes", input.errors);
   requireEqual(input.receipt.providerCanaryReport?.sha256, sha256File(input.providerReportPath), "providerCanaryReport.sha256", input.errors);
   if (input.releaseReceipt) {
     const serializedReleaseReceipt = JSON.stringify(input.releaseReceipt);
@@ -250,6 +252,7 @@ function validateArchiveConsistency(input) {
       "releaseReceipt.installSmokeResult",
       input.errors
     );
+    requireEqual(input.receipt.releaseReceipt?.sizeBytes, fileSizeBytes(input.releaseReceiptPath), "releaseReceipt.sizeBytes", input.errors);
     requireEqual(input.receipt.releaseReceipt?.sha256, sha256File(input.releaseReceiptPath), "releaseReceipt.sha256", input.errors);
   }
 }
@@ -262,6 +265,10 @@ function requireEqual(receiptValue, evidenceValue, label, errors) {
 
 function sha256File(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function fileSizeBytes(filePath) {
+  return fs.statSync(filePath).size;
 }
 
 function fail(errors) {

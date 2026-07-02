@@ -20,6 +20,7 @@ describe("GitHub promotion archive bundle check", () => {
     expect(result.stdout).toContain("Re-run production evidence, provider canary report, and GitHub receipt validators");
     expect(result.stdout).toContain("provider canary report");
     expect(result.stdout).toContain("release receipt summaries");
+    expect(result.stdout).toContain("byte sizes");
     expect(result.stdout).toContain("SHA-256 artifact digests");
   });
 
@@ -48,6 +49,14 @@ describe("GitHub promotion archive bundle check", () => {
     });
   });
 
+  it("rejects receipt byte sizes that drift from archived files", async () => {
+    const archiveDir = await writeArchiveFixture({ providerReportSizeBytes: 1 });
+
+    await expect(runArchiveCheck(archiveDir)).rejects.toMatchObject({
+      stderr: expect.stringContaining("Receipt providerCanaryReport.sizeBytes must match archived promotion evidence")
+    });
+  });
+
   it("rejects archives with ambiguous evidence files", async () => {
     const archiveDir = await writeArchiveFixture();
     await fs.mkdir(path.join(archiveDir, "duplicate"));
@@ -69,7 +78,7 @@ async function runArchiveCheck(archiveDir: string): Promise<{ stdout: string; st
   });
 }
 
-async function writeArchiveFixture(input: { receiptStepCount?: number } = {}): Promise<string> {
+async function writeArchiveFixture(input: { receiptStepCount?: number; providerReportSizeBytes?: number } = {}): Promise<string> {
   const archiveDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-promotion-archive-"));
   const artifactDir = path.join(archiveDir, "artifact");
   await fs.mkdir(artifactDir);
@@ -87,6 +96,9 @@ async function writeArchiveFixture(input: { receiptStepCount?: number } = {}): P
     `${JSON.stringify(
       createReceipt(evidence, providerReport, releaseReceipt, {
         ...input,
+        evidenceSizeBytes: Buffer.byteLength(evidenceJson),
+        providerReportSizeBytes: input.providerReportSizeBytes ?? Buffer.byteLength(providerReportJson),
+        releaseReceiptSizeBytes: Buffer.byteLength(releaseReceiptJson),
         evidenceSha256: sha256(evidenceJson),
         providerReportSha256: sha256(providerReportJson),
         releaseReceiptSha256: sha256(releaseReceiptJson)
@@ -220,7 +232,15 @@ function createReceipt(
   evidence: ReturnType<typeof createEvidence>,
   providerReport: ReturnType<typeof createProviderCanaryReport>,
   releaseReceipt: ReturnType<typeof createReleaseReceipt>,
-  input: { receiptStepCount?: number; evidenceSha256?: string; providerReportSha256?: string; releaseReceiptSha256?: string } = {}
+  input: {
+    receiptStepCount?: number;
+    evidenceSizeBytes?: number;
+    providerReportSizeBytes?: number;
+    releaseReceiptSizeBytes?: number;
+    evidenceSha256?: string;
+    providerReportSha256?: string;
+    releaseReceiptSha256?: string;
+  } = {}
 ) {
   const capabilities = providerReport.results.map((result) => result.capability).sort();
   return {
@@ -239,6 +259,7 @@ function createReceipt(
       finishedAt: evidence.finishedAt,
       skipPackage: evidence.skipPackage,
       stepCount: input.receiptStepCount ?? evidence.steps.length,
+      sizeBytes: input.evidenceSizeBytes ?? 100,
       sha256: input.evidenceSha256 ?? "a".repeat(64)
     },
     providerCanaryReport: {
@@ -248,6 +269,7 @@ function createReceipt(
       generatedAt: providerReport.generatedAt,
       capabilityCount: capabilities.length,
       capabilities,
+      sizeBytes: input.providerReportSizeBytes ?? 100,
       sha256: input.providerReportSha256 ?? "b".repeat(64)
     },
     releaseReceipt: {
@@ -263,6 +285,7 @@ function createReceipt(
       staplingDmg: releaseReceipt.stapling.dmg,
       gatekeeperAssessment: releaseReceipt.gatekeeper.spctlAssessment,
       installSmokeResult: releaseReceipt.installSmoke.result,
+      sizeBytes: input.releaseReceiptSizeBytes ?? 100,
       sha256: input.releaseReceiptSha256 ?? "c".repeat(64)
     },
     githubRun: {

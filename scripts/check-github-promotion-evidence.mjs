@@ -37,7 +37,7 @@ if (dryRun) {
   console.log(`4. Locate ${evidenceFilename}, ${providerReportFilename}, and release receipt evidence recursively inside the artifact directory.`);
   console.log("5. Verify the promotion evidence, provider canary report, and release receipt summary with local checkers.");
   console.log("6. When --run-id is available, verify evidence gitCommit matches gh run view headSha.");
-  console.log("7. When --write-receipt is provided, write a safe verification receipt with SHA-256 artifact digests and without secrets or provider payloads.");
+  console.log("7. When --write-receipt is provided, write a safe verification receipt with SHA-256 artifact digests, byte sizes, and without secrets or provider payloads.");
   process.exit(0);
 }
 
@@ -204,6 +204,7 @@ function writeReceipt(input) {
       finishedAt: input.evidence.finishedAt,
       skipPackage: Boolean(input.evidence.skipPackage),
       stepCount: Array.isArray(input.evidence.steps) ? input.evidence.steps.length : 0,
+      sizeBytes: fileSizeBytes(input.evidencePath),
       sha256: sha256File(input.evidencePath)
     },
     providerCanaryReport: {
@@ -213,6 +214,7 @@ function writeReceipt(input) {
       generatedAt: input.providerReport.generatedAt,
       capabilityCount: providerCapabilities.length,
       capabilities: providerCapabilities,
+      sizeBytes: fileSizeBytes(input.providerReportPath),
       sha256: sha256File(input.providerReportPath)
     },
     releaseReceipt: input.releaseReceipt
@@ -229,6 +231,7 @@ function writeReceipt(input) {
           staplingDmg: input.releaseReceipt.stapling?.dmg ?? null,
           gatekeeperAssessment: input.releaseReceipt.gatekeeper?.spctlAssessment ?? null,
           installSmokeResult: input.releaseReceipt.installSmoke?.result ?? null,
+          sizeBytes: fileSizeBytes(input.releaseReceiptPath),
           sha256: sha256File(input.releaseReceiptPath)
         }
       : null,
@@ -256,6 +259,10 @@ function writeReceipt(input) {
 
 function sha256File(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function fileSizeBytes(filePath) {
+  return fs.statSync(filePath).size;
 }
 
 function validateArchivedReleaseReceipt(releaseReceipt) {
