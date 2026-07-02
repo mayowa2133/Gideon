@@ -26,7 +26,7 @@ if (dryRun) {
   console.log(`1. Read receipt JSON from ${receiptPath}.`);
   console.log("2. Require schemaVersion, verification timestamp, repository, artifact, and evidence summary.");
   console.log("3. Require successful live evidence metadata, provider canary report summary, release receipt summary, byte sizes, SHA-256 artifact digests, and safe check statuses.");
-  console.log("4. If GitHub run metadata is present, require completed/success workflow_dispatch and headSha matching evidence gitCommit.");
+  console.log("4. If GitHub run metadata is present, require completed/success workflow_dispatch plus run id and headSha matching evidence/release metadata.");
   console.log("5. Scan receipt fields for secret-like material, cookies, signed URLs, and provider keys.");
   process.exit(0);
 }
@@ -91,6 +91,7 @@ function validateReceipt(receipt) {
   validateProviderCanaryReportSummary(receipt.providerCanaryReport);
   validateReleaseReceiptSummary(receipt.releaseReceipt, receipt.evidence, receipt.checks);
   validateGitHubRun(receipt.githubRun, receipt.evidence?.gitCommit);
+  validateRunLinkage(receipt);
   validateChecks(receipt.checks, receipt.githubRun);
   validateSafeMetadata(receipt);
 }
@@ -235,6 +236,19 @@ function validateGitHubRun(githubRun, evidenceGitCommit) {
     errors.push("Receipt githubRun.headSha must be a full git SHA.");
   } else if (githubRun.headSha.toLowerCase() !== String(evidenceGitCommit ?? "").toLowerCase()) {
     errors.push("Receipt githubRun.headSha must match evidence.gitCommit.");
+  }
+}
+
+function validateRunLinkage(receipt) {
+  if (!receipt.runId) {
+    return;
+  }
+  const runId = String(receipt.runId);
+  if (receipt.githubRun && receipt.githubRun.databaseId !== null && String(receipt.githubRun.databaseId) !== runId) {
+    errors.push("Receipt githubRun.databaseId must match receipt runId.");
+  }
+  if (receipt.releaseReceipt && receipt.releaseReceipt.workflowRunId && String(receipt.releaseReceipt.workflowRunId) !== runId) {
+    errors.push("Receipt releaseReceipt.workflowRunId must match receipt runId.");
   }
 }
 

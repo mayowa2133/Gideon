@@ -40,6 +40,22 @@ describe("GitHub promotion verification receipt check", () => {
     });
   });
 
+  it("rejects receipts whose GitHub run database id does not match the receipt run id", async () => {
+    const receiptPath = await writeReceiptFixture({ githubRunDatabaseId: 67890 });
+
+    await expect(runReceiptCheck(receiptPath)).rejects.toMatchObject({
+      stderr: expect.stringContaining("githubRun.databaseId must match receipt runId")
+    });
+  });
+
+  it("rejects receipts whose release receipt came from another workflow run", async () => {
+    const receiptPath = await writeReceiptFixture({ releaseWorkflowRunId: "67890" });
+
+    await expect(runReceiptCheck(receiptPath)).rejects.toMatchObject({
+      stderr: expect.stringContaining("releaseReceipt.workflowRunId must match receipt runId")
+    });
+  });
+
   it("rejects receipts containing secret-like material", async () => {
     const receiptPath = await writeReceiptFixture({ repository: "contains-uploadUrl-marker" });
 
@@ -73,7 +89,14 @@ async function runReceiptCheck(receiptPath: string): Promise<{ stdout: string; s
 }
 
 async function writeReceiptFixture(
-  input: { headSha?: string; repository?: string; omitProviderCanaryReport?: boolean; omitReleaseReceipt?: boolean } = {}
+  input: {
+    headSha?: string;
+    repository?: string;
+    githubRunDatabaseId?: number;
+    releaseWorkflowRunId?: string;
+    omitProviderCanaryReport?: boolean;
+    omitReleaseReceipt?: boolean;
+  } = {}
 ): Promise<string> {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-promotion-receipt-"));
   const receiptPath = path.join(tempDir, "verification-receipt.json");
@@ -81,7 +104,16 @@ async function writeReceiptFixture(
   return receiptPath;
 }
 
-function createReceipt(input: { headSha?: string; repository?: string; omitProviderCanaryReport?: boolean; omitReleaseReceipt?: boolean } = {}) {
+function createReceipt(
+  input: {
+    headSha?: string;
+    repository?: string;
+    githubRunDatabaseId?: number;
+    releaseWorkflowRunId?: string;
+    omitProviderCanaryReport?: boolean;
+    omitReleaseReceipt?: boolean;
+  } = {}
+) {
   const now = "2026-07-01T12:00:00.000Z";
   const gitCommit = "0123456789abcdef0123456789abcdef01234567";
   const receipt = {
@@ -120,7 +152,7 @@ function createReceipt(input: { headSha?: string; repository?: string; omitProvi
       channel: "production",
       generatedAt: now,
       sourceGitCommit: gitCommit,
-      workflowRunId: "12345",
+      workflowRunId: input.releaseWorkflowRunId ?? "12345",
       artifactCount: 4,
       notarizationStatus: "accepted",
       staplingDmg: "accepted",
@@ -130,7 +162,7 @@ function createReceipt(input: { headSha?: string; repository?: string; omitProvi
       sha256: "c".repeat(64)
     },
     githubRun: {
-      databaseId: 12345,
+      databaseId: input.githubRunDatabaseId ?? 12345,
       status: "completed",
       conclusion: "success",
       event: "workflow_dispatch",
