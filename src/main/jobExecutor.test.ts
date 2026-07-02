@@ -185,6 +185,106 @@ describe("Gideon job executor", () => {
     ]);
   });
 
+  it("rejects invalid provider voiceover audio before private storage import", async () => {
+    const project = projectFixture({
+      concepts: [
+        {
+          id: "concept-1",
+          title: "Fast export",
+          formatFamily: "demo",
+          targetPain: "Manual clipping",
+          hookDirection: "show outcome",
+          proofMomentIds: ["moment-1"],
+          platformFit: ["youtube_shorts"],
+          estimatedDurationSec: 30,
+          rationale: "Good proof",
+          selected: true,
+          brief: "Show fast export"
+        }
+      ],
+      moments: [momentFixture()],
+      scripts: [scriptFixture()]
+    });
+    const store = new FakeExecutorStore(project);
+    store.project.jobs = [createJob({ id: "job-1", projectId: store.project.id, kind: "render", now: "2026-06-25T12:00:00.000Z" })];
+    const metrics: GideonJobExecutorMetricEvent[] = [];
+    let storedVoiceover = false;
+    const executor = createGideonJobExecutor({
+      store,
+      now: clock(),
+      nowMs: numberSequence([0, 10, 20]),
+      onMetric(event) {
+        metrics.push(event);
+      },
+      loadProviderConfig: () => providerConfig(true),
+      createSpeechProvider: () => ({
+        isConfigured: () => true,
+        async synthesizeSpeech() {
+          return {
+            outputPath: "/tmp/invalid-voiceover.wav",
+            provider: "openai",
+            model: "tts-test"
+          };
+        }
+      }),
+      validateVoiceoverAudio: async () => {
+        throw new Error("Generated voiceover is not valid WAV audio.");
+      },
+      renderDraft: async (input) => ({
+        outputPath: input.voiceoverPath ? "/tmp/render-with-voice.mp4" : "/tmp/render-without-voice.mp4",
+        validation: {
+          width: 1080,
+          height: 1920,
+          durationMs: 30_000,
+          videoCodec: "h264",
+          audioCodec: "aac",
+          fastStart: true
+        }
+      }),
+      statFile: async () => ({ size: 4096 }),
+      createPrivateObjectStorage: () => ({
+        async putFile(input) {
+          if (input.kind === "voiceover") {
+            storedVoiceover = true;
+          }
+          return {
+            filePath: `/private/storage/${input.kind}.bin`,
+            fileUrl: `file:///private/storage/${input.kind}.bin`,
+            artifact: artifactFixture({
+              id: `artifact-${input.kind}`,
+              kind: input.kind,
+              byteSize: 4096,
+              contentType: input.contentType
+            })
+          };
+        }
+      })
+    });
+
+    const rendered = await executor.runRenderJob(store.project.id, "job-1");
+
+    expect(storedVoiceover).toBe(false);
+    expect(rendered.renders[0]).toMatchObject({
+      status: "completed",
+      outputPath: "/private/storage/render.bin"
+    });
+    expect(rendered.artifacts).toEqual([expect.objectContaining({ kind: "render" })]);
+    expect(rendered.providerRuns).toEqual([
+      expect.objectContaining({
+        kind: "tts",
+        provider: "openai",
+        status: "failed",
+        error: "Generated voiceover is not valid WAV audio."
+      })
+    ]);
+    expect(metrics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "tts_provider_finished", model: "tts-test" }),
+        expect.objectContaining({ name: "render_draft_finished" })
+      ])
+    );
+  });
+
   it("rounds media durations up to billable minutes", () => {
     expect(minutesForDuration(1)).toBe(1);
     expect(minutesForDuration(60_000)).toBe(1);

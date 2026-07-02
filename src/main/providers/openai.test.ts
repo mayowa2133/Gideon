@@ -3,7 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadProviderConfig } from "./config";
-import { OpenAiProvider, parseFrameOcr, parseTranscriptSegments, parseWalkthroughAnalysis } from "./openai";
+import {
+  OpenAiProvider,
+  parseFrameOcr,
+  parseTranscriptSegments,
+  parseWalkthroughAnalysis,
+  validateWavAudioBuffer
+} from "./openai";
 import type { ProductProfile, RecordingMetadata } from "../../shared/types";
 
 const profile: ProductProfile = {
@@ -269,6 +275,21 @@ describe("OpenAI transcription parsing", () => {
   });
 });
 
+describe("OpenAI speech audio validation", () => {
+  it("validates WAV audio with a non-empty data chunk", () => {
+    const wav = wavFixture(8);
+
+    expect(validateWavAudioBuffer(wav)).toEqual({
+      byteSize: wav.byteLength,
+      dataBytes: 8
+    });
+  });
+
+  it("rejects non-WAV provider audio", () => {
+    expect(() => validateWavAudioBuffer(Buffer.from("not-a-wav"))).toThrow(/too small|RIFF\/WAVE/);
+  });
+});
+
 describe("OpenAI provider requests", () => {
   it("posts structured analysis requests to the Responses API", async () => {
     const requests: Array<{ url: string; init: RequestInit }> = [];
@@ -442,4 +463,78 @@ describe("OpenAI provider requests", () => {
     expect(form.getAll("timestamp_granularities[]")).toEqual(["segment"]);
     expect(form.get("file")).toBeInstanceOf(Blob);
   });
+
+  it("writes validated WAV audio for speech synthesis", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const provider = new OpenAiProvider({
+      config: {
+        apiKey: "sk-test",
+        baseUrl: "https://api.example.test/v1",
+        llmModel: "gpt-test",
+        transcriptionModel: "gpt-transcribe-test",
+        ttsModel: "tts-test",
+        ttsVoice: "coral"
+      },
+      fetchImpl: async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(wavFixture(8), { status: 200, headers: { "Content-Type": "audio/wav" } });
+      }
+    });
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-tts-"));
+    const outputPath = path.join(tempDir, "speech.wav");
+
+    const result = await provider.synthesizeSpeech({
+      text: "Generate a short demo.",
+      instructions: "Clear voice.",
+      outputPath
+    });
+
+    expect(result).toEqual({ outputPath, provider: "openai", model: "tts-test" });
+    expect(await fs.readFile(outputPath)).toEqual(wavFixture(8));
+    const body = JSON.parse(String(requests[0]?.init.body)) as { model: string; voice: string; response_format: string };
+    expect(body).toMatchObject({ model: "tts-test", voice: "coral", response_format: "wav" });
+  });
+
+  it("rejects invalid speech synthesis audio before writing output", async () => {
+    const provider = new OpenAiProvider({
+      config: {
+        apiKey: "sk-test",
+        baseUrl: "https://api.example.test/v1",
+        llmModel: "gpt-test",
+        transcriptionModel: "gpt-transcribe-test",
+        ttsModel: "tts-test",
+        ttsVoice: "coral"
+      },
+      fetchImpl: async () => new Response(Buffer.from("not audio"), { status: 200 })
+    });
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-tts-invalid-"));
+    const outputPath = path.join(tempDir, "speech.wav");
+
+    await expect(
+      provider.synthesizeSpeech({
+        text: "Generate a short demo.",
+        instructions: "Clear voice.",
+        outputPath
+      })
+    ).rejects.toThrow(/too small|RIFF\/WAVE/);
+    await expect(fs.stat(outputPath)).rejects.toThrow();
+  });
 });
+
+function wavFixture(dataBytes: number): Buffer {
+  const buffer = Buffer.alloc(44 + dataBytes);
+  buffer.write("RIFF", 0, "ascii");
+  buffer.writeUInt32LE(36 + dataBytes, 4);
+  buffer.write("WAVE", 8, "ascii");
+  buffer.write("fmt ", 12, "ascii");
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(16_000, 24);
+  buffer.writeUInt32LE(32_000, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write("data", 36, "ascii");
+  buffer.writeUInt32LE(dataBytes, 40);
+  return buffer;
+}

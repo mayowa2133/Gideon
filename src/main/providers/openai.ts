@@ -51,6 +51,13 @@ export interface OpenAiClientOptions {
   fetchImpl?: FetchLike;
 }
 
+export interface WavAudioValidation {
+  byteSize: number;
+  dataBytes: number;
+}
+
+const MAX_TTS_AUDIO_BYTES = 25 * 1024 * 1024;
+
 export class OpenAiProvider {
   private readonly fetchImpl: FetchLike;
   private readonly config: OpenAiProviderConfig;
@@ -205,6 +212,7 @@ export class OpenAiProvider {
       throw new Error(`OpenAI speech request failed with status ${response.status}.`);
     }
     const audio = Buffer.from(await response.arrayBuffer());
+    validateWavAudioBuffer(audio);
     await fs.writeFile(input.outputPath, audio);
     return { outputPath: input.outputPath, provider: "openai", model: this.config.ttsModel };
   }
@@ -362,6 +370,49 @@ export function parseTranscriptSegments(
         }
       ]
     : [];
+}
+
+export async function validateWavAudioFile(filePath: string): Promise<WavAudioValidation> {
+  const audio = await fs.readFile(filePath);
+  return validateWavAudioBuffer(audio);
+}
+
+export function validateWavAudioBuffer(audio: Buffer | Uint8Array): WavAudioValidation {
+  const bytes = Buffer.isBuffer(audio) ? audio : Buffer.from(audio);
+  if (bytes.byteLength < 44) {
+    throw new Error("TTS provider returned audio that is too small to be a WAV file.");
+  }
+  if (bytes.byteLength > MAX_TTS_AUDIO_BYTES) {
+    throw new Error("TTS provider returned audio that exceeds the maximum WAV size.");
+  }
+  if (bytes.toString("ascii", 0, 4) !== "RIFF" || bytes.toString("ascii", 8, 12) !== "WAVE") {
+    throw new Error("TTS provider returned audio that is not a RIFF/WAVE file.");
+  }
+  const dataOffset = findWavDataChunk(bytes);
+  if (dataOffset === null) {
+    throw new Error("TTS provider returned WAV audio without a data chunk.");
+  }
+  const dataBytes = bytes.readUInt32LE(dataOffset + 4);
+  if (dataBytes <= 0 || dataOffset + 8 + dataBytes > bytes.byteLength) {
+    throw new Error("TTS provider returned WAV audio with an invalid data chunk.");
+  }
+  return {
+    byteSize: bytes.byteLength,
+    dataBytes
+  };
+}
+
+function findWavDataChunk(bytes: Buffer): number | null {
+  let offset = 12;
+  while (offset + 8 <= bytes.byteLength) {
+    const chunkId = bytes.toString("ascii", offset, offset + 4);
+    const chunkSize = bytes.readUInt32LE(offset + 4);
+    if (chunkId === "data") {
+      return offset;
+    }
+    offset += 8 + chunkSize + (chunkSize % 2);
+  }
+  return null;
 }
 
 function buildEvidencePayload(input: WalkthroughAnalysisInput): Record<string, unknown> {

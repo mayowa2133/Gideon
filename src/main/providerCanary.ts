@@ -1,7 +1,13 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { OpenAiProvider, type FrameOcrResult, type WalkthroughAnalysisInput, type WalkthroughAnalysisResult } from "./providers/openai";
+import {
+  OpenAiProvider,
+  validateWavAudioFile,
+  type FrameOcrResult,
+  type WalkthroughAnalysisInput,
+  type WalkthroughAnalysisResult
+} from "./providers/openai";
 import { loadProviderConfig, type ProviderConfig } from "./providers/config";
 import type { ProductProfile, RecordingMetadata, TranscriptArtifact } from "../shared/types";
 
@@ -237,8 +243,9 @@ async function runLiveCanaries(input: {
         if (!result.outputPath) {
           throw new Error("TTS canary returned no output path.");
         }
+        const validation = await validateWavAudioFile(result.outputPath);
         return {
-          message: "TTS canary passed with a generated speech artifact.",
+          message: `TTS canary passed with a validated ${validation.byteSize}-byte WAV speech artifact.`,
           costUsd: canaryCost("tts", costCeilings, result)
         };
       },

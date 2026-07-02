@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs/promises";
 import { loadProviderCanaryCostConfig, redactSecrets, runProviderCanaries, type ProviderCanaryAdapter } from "./providerCanary";
 
 function fakeAdapter(calls: string[] = [], costs: Partial<Record<string, number>> = {}): ProviderCanaryAdapter {
@@ -41,10 +42,11 @@ function fakeAdapter(calls: string[] = [], costs: Partial<Record<string, number>
         costUsd: costs.ocr
       };
     },
-    async synthesizeSpeech() {
+    async synthesizeSpeech(input) {
       calls.push("tts");
+      await fs.writeFile(input.outputPath, wavFixture(8));
       return {
-        outputPath: "/tmp/canary.wav",
+        outputPath: input.outputPath,
         provider: "openai",
         model: "tts-test",
         costUsd: costs.tts
@@ -185,3 +187,21 @@ describe("provider canary", () => {
     ).toEqual({ estimatedCostUsd: 0.012346, maxCostUsd: 0.02 });
   });
 });
+
+function wavFixture(dataBytes: number): Buffer {
+  const buffer = Buffer.alloc(44 + dataBytes);
+  buffer.write("RIFF", 0, "ascii");
+  buffer.writeUInt32LE(36 + dataBytes, 4);
+  buffer.write("WAVE", 8, "ascii");
+  buffer.write("fmt ", 12, "ascii");
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(16_000, 24);
+  buffer.writeUInt32LE(32_000, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write("data", 36, "ascii");
+  buffer.writeUInt32LE(dataBytes, 40);
+  return buffer;
+}

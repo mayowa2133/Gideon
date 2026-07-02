@@ -446,6 +446,7 @@ Prompt changes require eval results in the PR. No production prompt is edited on
 - Provider interface accepts text, locale, configured voice ID, style/rate enums; it returns audio object, duration, timing marks if available, provider voice/model version, and cost.
 - Never pass arbitrary provider voice IDs directly from the client; map safe product choices to server configuration.
 - Normalize returned audio, measure duration/loudness, and validate decodability.
+- Provider speech bytes are untrusted: the current provider-backed path rejects audio that is too small, oversized, not RIFF/WAVE, or missing a non-empty `data` chunk before writing or importing it as a private voiceover artifact.
 - If duration violates script/visual budget, return to script review or deterministic retiming rules; do not silently speed speech beyond acceptable range.
 - No voice cloning in MVP. Future cloning requires consent evidence, revocation/deletion, audit logs, rate limits, abuse monitoring, and output disclosure policy.
 

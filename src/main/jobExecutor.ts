@@ -5,7 +5,7 @@ import { renderDraft as defaultRenderDraft } from "./media";
 import { runAnalysisPipeline as defaultRunAnalysisPipeline, safeProviderError } from "./analysisPipeline";
 import { createPrivateObjectStorage as defaultCreatePrivateObjectStorage, type PrivateObjectStorage } from "./storage";
 import { loadProviderConfig as defaultLoadProviderConfig, type ProviderConfig } from "./providers/config";
-import { OpenAiProvider } from "./providers/openai";
+import { OpenAiProvider, validateWavAudioFile as defaultValidateWavAudioFile } from "./providers/openai";
 import { failJob, startJob, succeedJob, updateJobStage } from "../shared/jobState";
 import type {
   ArtifactRecord,
@@ -159,6 +159,7 @@ export interface GideonJobExecutorOptions {
   createPrivateObjectStorage?: (input: { localRootDir: string }) => PrivateObjectStorage;
   loadProviderConfig?: () => ProviderConfig;
   createSpeechProvider?: (config: ProviderConfig) => SpeechProvider;
+  validateVoiceoverAudio?: (filePath: string) => Promise<{ byteSize: number; dataBytes: number }>;
   statFile?: (filePath: string) => Promise<{ size: number }>;
   makeId?: () => string;
   now?: () => string;
@@ -174,6 +175,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
   const loadProviderConfig = options.loadProviderConfig ?? defaultLoadProviderConfig;
   const createSpeechProvider =
     options.createSpeechProvider ?? ((config: ProviderConfig) => new OpenAiProvider({ config: config.openai }));
+  const validateVoiceoverAudio = options.validateVoiceoverAudio ?? defaultValidateWavAudioFile;
   const statFile = options.statFile ?? ((filePath: string) => fs.stat(filePath));
   const makeId = options.makeId ?? randomUUID;
   const now = options.now ?? (() => new Date().toISOString());
@@ -519,7 +521,11 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
         throw error;
       }
       const project = await store.getProject(projectId);
+      const validation = await validateVoiceoverAudio(result.outputPath);
       const synthesized = await statFile(result.outputPath);
+      if (synthesized.size !== validation.byteSize) {
+        throw new Error("Generated voiceover size changed before storage.");
+      }
       await store.assertUsageAvailable(projectId, "storage_bytes", synthesized.size);
       const stored = await storeArtifactWithMetrics(projectId, "voiceover", () =>
         createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
