@@ -98,6 +98,7 @@ export async function runAnalysisPipeline(
             momentLabel: moment?.label
           });
           frame.ocrText = result.text;
+          frame.uiElements = result.uiElements;
           frame.ocrProvider = "openai";
           frame.confidence = result.confidence;
           completedFrames += 1;

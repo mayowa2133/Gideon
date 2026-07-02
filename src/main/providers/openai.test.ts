@@ -193,13 +193,32 @@ describe("OpenAI frame OCR parsing", () => {
     const parsed = parseFrameOcr({
       output_text: JSON.stringify({
         text: "Create campaign\nGenerate scripts",
+        uiElements: [
+          { kind: "heading", text: "Create campaign", confidence: 0.82 },
+          { kind: "button", text: "Generate scripts", role: "primary action", confidence: 1.4 }
+        ],
         confidence: 1.4
       })
     });
     expect(parsed).toEqual({
       text: "Create campaign\nGenerate scripts",
-      confidence: 1
+      confidence: 1,
+      uiElements: [
+        { id: "ui-1", kind: "heading", text: "Create campaign", role: undefined, confidence: 0.82 },
+        { id: "ui-2", kind: "button", text: "Generate scripts", role: "primary action", confidence: 1 }
+      ]
     });
+  });
+
+  it("rejects OCR output without structured UI elements", () => {
+    expect(() =>
+      parseFrameOcr({
+        output_text: JSON.stringify({
+          text: "Create campaign",
+          confidence: 0.7
+        })
+      })
+    ).toThrow(/missing uiElements/);
   });
 });
 
@@ -295,6 +314,7 @@ describe("OpenAI provider requests", () => {
           timestampMs: 1000,
           ocrProvider: "openai",
           ocrText: "Qualified leads generated",
+          uiElements: [{ id: "ui-1", kind: "status", text: "Qualified leads generated", confidence: 0.9 }],
           confidence: 0.9,
           createdAt: "2026-06-25T00:00:00.000Z"
         }
@@ -323,6 +343,7 @@ describe("OpenAI provider requests", () => {
     expect(body.model).toBe("gpt-test");
     expect(body.text.format.type).toBe("json_schema");
     expect(body.input[1]?.content).toContain("Qualified leads generated");
+    expect(body.input[1]?.content).toContain("status");
     expect(body.input[1]?.content).toContain("frame:frame-moment-1");
     expect(body.input[1]?.content).toContain("moment:moment-1");
   });
@@ -344,6 +365,7 @@ describe("OpenAI provider requests", () => {
           JSON.stringify({
             output_text: JSON.stringify({
               text: "Generate scripts",
+              uiElements: [{ kind: "button", text: "Generate scripts", role: "primary action", confidence: 0.74 }],
               confidence: 0.74
             })
           }),
@@ -358,6 +380,15 @@ describe("OpenAI provider requests", () => {
     const result = await provider.extractFrameText({ imagePath, timestampMs: 1200, momentLabel: "Setup" });
 
     expect(result.text).toBe("Generate scripts");
+    expect(result.uiElements).toEqual([
+      {
+        id: "ui-1",
+        kind: "button",
+        text: "Generate scripts",
+        role: "primary action",
+        confidence: 0.74
+      }
+    ]);
     expect(requests[0]?.url).toBe("https://api.example.test/v1/responses");
     const body = JSON.parse(String(requests[0]?.init.body)) as {
       input: Array<{ content: Array<{ type: string; image_url?: string; detail?: string }> }>;
@@ -367,6 +398,7 @@ describe("OpenAI provider requests", () => {
     expect(imagePart?.image_url).toMatch(/^data:image\/jpeg;base64,/);
     expect(imagePart?.detail).toBe("low");
     expect(body.text.format).toMatchObject({ type: "json_schema", name: "gideon_frame_ocr" });
+    expect(String(body.input[1]?.content[0]?.type)).toBe("input_text");
   });
 
   it("requests verbose timestamped transcription segments", async () => {

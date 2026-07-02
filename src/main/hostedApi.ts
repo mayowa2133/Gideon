@@ -1432,6 +1432,7 @@ function mcpProjectContextResource(project: Project, state: AppState) {
       timestampMs: frame.timestampMs,
       imageUrl: frame.imageUrl,
       ocrText: frame.ocrText,
+      uiElements: frame.uiElements,
       ocrProvider: frame.ocrProvider,
       confidence: frame.confidence,
       createdAt: frame.createdAt

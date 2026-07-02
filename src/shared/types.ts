@@ -331,9 +331,20 @@ export interface FrameEvidence {
   imagePath?: string;
   imageUrl?: string;
   ocrText?: string;
+  uiElements?: FrameUiElement[];
   ocrProvider?: "openai" | "local" | "none";
   confidence?: number;
   createdAt: string;
+}
+
+export type FrameUiElementKind = "heading" | "button" | "input" | "navigation" | "status" | "table" | "copy" | "other";
+
+export interface FrameUiElement {
+  id: string;
+  kind: FrameUiElementKind;
+  text: string;
+  role?: string;
+  confidence?: number;
 }
 
 export interface ProviderRun {

@@ -204,8 +204,11 @@ async function runLiveCanaries(input: {
           if (typeof result.text !== "string" || Number.isNaN(result.confidence)) {
             throw new Error("OCR canary returned an invalid result.");
           }
+          if (!Array.isArray(result.uiElements) || result.uiElements.length === 0) {
+            throw new Error("OCR canary returned no structured UI elements.");
+          }
           return {
-            message: "OCR canary passed with structured frame text output.",
+            message: `OCR canary passed with ${result.uiElements.length} structured UI element(s).`,
             costUsd: canaryCost("ocr", costCeilings, result)
           };
         },

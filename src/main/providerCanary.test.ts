@@ -27,7 +27,7 @@ function fakeAdapter(calls: string[] = [], costs: Partial<Record<string, number>
         provider: "openai",
         model: "transcribe-test",
         text: "Canary transcript",
-        segments: [],
+        segments: [{ id: "segment-1", startMs: 0, endMs: 1000, text: "Canary transcript" }],
         createdAt: "2026-06-29T00:00:00.000Z",
         costUsd: costs.transcription
       };
@@ -36,6 +36,7 @@ function fakeAdapter(calls: string[] = [], costs: Partial<Record<string, number>
       calls.push("ocr");
       return {
         text: "Canary UI text",
+        uiElements: [{ id: "ui-1", kind: "button", text: "Canary UI text", confidence: 0.8 }],
         confidence: 0.8,
         costUsd: costs.ocr
       };

@@ -779,6 +779,34 @@ video {
   color: #9ba8c2;
 }
 
+.ui-evidence-list {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-evidence-list li {
+  display: grid;
+  gap: 0.1rem;
+  border-radius: 12px;
+  background: rgba(79, 124, 255, 0.1);
+  padding: 0.45rem 0.55rem;
+}
+
+.ui-evidence-list span {
+  color: #8fb0ff;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.ui-evidence-list em {
+  color: #edf3ff;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+
 .provider-run-list {
   display: flex;
   flex-wrap: wrap;

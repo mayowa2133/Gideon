@@ -144,6 +144,12 @@ type WalkthroughEvidenceBundle = {
     timestampMs: number;
     signedModelInputRef: string;
     ocrText?: string;
+    uiElements?: Array<{
+      kind: "heading" | "button" | "input" | "navigation" | "status" | "table" | "copy" | "other";
+      text: string;
+      role?: string;
+      confidence?: number;
+    }>;
     changeScore?: number;
   }>;
   userMoments?: Array<{
@@ -363,6 +369,7 @@ MVP policy defaults:
 - Generate contact sheets for human/model inspection.
 - Store frames as private JPEG/WebP with timestamps/checksums.
 - Do not run OCR over every frame by default; apply to selected evidence frames.
+- OCR output must include bounded typed UI elements where readable so downstream analysis can distinguish headings, actions, inputs, navigation, status text, tables, copy, and other UI proof without treating visible text as instructions.
 
 ### FFmpeg invocation safety
 

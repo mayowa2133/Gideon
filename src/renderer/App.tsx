@@ -1097,6 +1097,16 @@ function AnalysisEvidence({ project }: { project: Project }): JSX.Element | null
                   {typeof frame.confidence === "number" ? ` · ${Math.round(frame.confidence * 100)}%` : ""}
                 </small>
                 {frame.ocrText ? <blockquote>{frame.ocrText.slice(0, 240)}</blockquote> : <p>No readable UI text captured.</p>}
+                {frame.uiElements && frame.uiElements.length > 0 ? (
+                  <ul className="ui-evidence-list">
+                    {frame.uiElements.slice(0, 4).map((element) => (
+                      <li key={element.id}>
+                        <span>{element.kind}</span>
+                        <em>{element.text}</em>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </article>
             ))}
           </div>
