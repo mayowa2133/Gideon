@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 
 const args = process.argv.slice(2).filter((arg) => arg !== "--");
 const options = parseArgs(args);
@@ -13,6 +14,7 @@ const workflow = options.values.workflow ?? "mac-build.yml";
 const ref = options.values.ref ?? "main";
 const providedRunId = options.values["run-id"] ?? process.env.GITHUB_RUN_ID;
 const receiptPath = options.values["receipt-path"] ?? "tmp/github-production-promotion-evidence/verification-receipt.json";
+const archiveDir = options.values["archive-dir"] ?? "tmp/github-production-promotion-evidence";
 
 if (dryRun) {
   console.log("GitHub live promotion runner dry-run:");
@@ -30,6 +32,7 @@ if (dryRun) {
   console.log("8. Wait for GitHub Actions to finish with gh run watch --exit-status.");
   console.log("9. Download and verify Gideon-production-promotion-evidence, including provider-canary-report.json and release-receipt.json, with production:github-evidence:check.");
   console.log(`10. Write a safe verification receipt to ${receiptPath}.`);
+  console.log("11. Re-run receipt and archive-bundle validators before reporting success.");
   process.exit(0);
 }
 
@@ -59,13 +62,32 @@ if (!runId) {
 }
 
 runCommand("gh", ["run", "watch", runId, "--repo", repo, "--exit-status"]);
-const verifyArgs = ["scripts/check-github-promotion-evidence.mjs", "--run-id", runId, "--repo", repo, "--write-receipt", receiptPath];
+const verifyArgs = [
+  "scripts/check-github-promotion-evidence.mjs",
+  "--run-id",
+  runId,
+  "--repo",
+  repo,
+  "--download-dir",
+  archiveDir,
+  "--write-receipt",
+  receiptPath
+];
 if (skipPackage) {
   verifyArgs.push("--allow-skip-package");
 }
 runCommand(process.execPath, verifyArgs);
+runCommand(process.execPath, ["scripts/check-github-promotion-receipt.mjs", "--path", receiptPath]);
+const archiveArgs = ["scripts/check-github-promotion-archive.mjs", "--archive-dir", archiveDir];
+if (path.resolve(receiptPath) !== path.resolve(path.join(archiveDir, "verification-receipt.json"))) {
+  archiveArgs.push("--receipt-path", receiptPath);
+}
+if (skipPackage) {
+  archiveArgs.push("--allow-skip-package");
+}
+runCommand(process.execPath, archiveArgs);
 
-console.log(`GitHub live promotion workflow passed and evidence verified for run ${runId}.`);
+console.log(`GitHub live promotion workflow passed and archived evidence verified for run ${runId}.`);
 
 function parseArgs(inputArgs) {
   const flags = new Set();

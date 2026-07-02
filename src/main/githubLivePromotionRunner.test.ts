@@ -22,6 +22,7 @@ describe("GitHub live promotion runner", () => {
     expect(result.stdout).toContain("Dispatch the workflow only when --confirm-live is present.");
     expect(result.stdout).toContain("Download and verify Gideon-production-promotion-evidence, including provider-canary-report.json and release-receipt.json");
     expect(result.stdout).toContain("Write a safe verification receipt");
+    expect(result.stdout).toContain("Re-run receipt and archive-bundle validators");
   });
 
   it("requires explicit confirmation before dispatching the live workflow", async () => {
@@ -51,7 +52,9 @@ describe("GitHub live promotion runner", () => {
 
     expect(result.stdout).toContain("Production promotion evidence check passed");
     expect(result.stdout).toContain("GitHub promotion evidence artifact check passed");
-    expect(result.stdout).toContain("GitHub live promotion workflow passed and evidence verified for run 12345.");
+    expect(result.stdout).toContain("GitHub promotion verification receipt check passed");
+    expect(result.stdout).toContain("GitHub promotion archive bundle check passed");
+    expect(result.stdout).toContain("GitHub live promotion workflow passed and archived evidence verified for run 12345.");
   });
 
   it("dispatches, resolves, watches, and verifies a confirmed live workflow", async () => {
@@ -84,7 +87,9 @@ describe("GitHub live promotion runner", () => {
 
     expect(result.stdout).toContain("Production promotion evidence check passed");
     expect(result.stdout).toContain("GitHub live promotion repo settings check passed");
-    expect(result.stdout).toContain("GitHub live promotion workflow passed and evidence verified for run 67890.");
+    expect(result.stdout).toContain("GitHub promotion verification receipt check passed");
+    expect(result.stdout).toContain("GitHub promotion archive bundle check passed");
+    expect(result.stdout).toContain("GitHub live promotion workflow passed and archived evidence verified for run 67890.");
     const receipt = JSON.parse(await fs.readFile(receiptPath, "utf8")) as { runId: string; githubRun: { headSha: string } };
     expect(receipt.runId).toBe("67890");
     expect(receipt.githubRun.headSha).toBe("0123456789abcdef0123456789abcdef01234567");
