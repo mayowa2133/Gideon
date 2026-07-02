@@ -863,11 +863,24 @@ async function handleRetryJob(
   requestId: string,
   jobId: string
 ): Promise<HostedApiResponse> {
+  if (!dependencies.jobQueueService) {
+    throw new ApiError(503, "job_queue_not_configured", "Hosted job queue is not configured.");
+  }
   const claims = requiredSession(request, dependencies);
   try {
     assertCsrfToken(claims, header(request, "x-csrf-token"));
   } catch {
     throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+  }
+  const { job: existingJob } = await storeCall(() =>
+    dependencies.store.getJobForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      jobId
+    })
+  );
+  if (existingJob.kind !== "analysis" && existingJob.kind !== "render") {
+    throw new ApiError(409, "state_conflict", `Retry queueing is not supported for ${existingJob.kind} jobs.`);
   }
   const { project, job } = await storeCall(() =>
     dependencies.store.retryJobForSession({
@@ -876,6 +889,20 @@ async function handleRetryJob(
       jobId
     })
   );
+  try {
+    if (job.kind === "analysis") {
+      await dependencies.jobQueueService.enqueueAnalysisJob({ projectId: project.id, jobId: job.id });
+    } else if (job.kind === "render") {
+      await dependencies.jobQueueService.enqueueRenderJob({ projectId: project.id, jobId: job.id });
+    } else {
+      throw new ApiError(409, "state_conflict", `Retry queueing is not supported for ${job.kind} jobs.`);
+    }
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw jobQueueError(error);
+  }
   return jsonResponse(202, { job: jobResource(project, job) }, requestId);
 }
 

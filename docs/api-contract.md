@@ -891,9 +891,9 @@ Retry terminal retryable job using same immutable inputs.
 - **Auth:** `member+`.
 - **Headers:** CSRF, `Idempotency-Key`.
 - **Request:** `{}`.
-- **Validation:** status failed; retryable true; attempts/policy/quota; inputs still exist/current enough.
+- **Validation:** status failed/canceled; retryable true; attempts/policy/quota; inputs still exist/current enough; hosted retries require a configured worker queue and currently re-enqueue analysis/render jobs only.
 - **Response 202:** New attempt/job relation (prefer new job ID) or updated job by chosen invariant.
-- **Errors:** 404, 409 not retryable/active/stale, 429.
+- **Errors:** 404, 409 not retryable/active/stale/unsupported job kind, 429, 503 queue unavailable/not configured.
 - **Rate limit:** 30/hour/workspace.
 
 ## Usage and plan readiness

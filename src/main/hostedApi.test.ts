@@ -1390,7 +1390,17 @@ describe("hosted API foundation", () => {
   });
 
   it("cancels and retries jobs through authenticated CSRF-protected hosted API requests", async () => {
-    const api = testApi();
+    const enqueued: Array<{ kind: "analysis" | "render"; projectId: string; jobId: string }> = [];
+    const api = testApi({
+      jobQueueService: {
+        enqueueAnalysisJob(input) {
+          enqueued.push({ kind: "analysis", ...input });
+        },
+        enqueueRenderJob(input) {
+          enqueued.push({ kind: "render", ...input });
+        }
+      }
+    });
     api.store.state.projects = [
       projectFixture({
         id: "project-1",
@@ -1475,6 +1485,156 @@ describe("hosted API foundation", () => {
       }
     });
     expect(api.store.state.projects[0]?.jobs[0]?.status).toBe("queued");
+    expect(enqueued).toEqual([{ kind: "analysis", projectId: "project-1", jobId: "job-1" }]);
+  });
+
+  it("re-enqueues hosted render jobs when retrying through authenticated hosted API requests", async () => {
+    const enqueued: Array<{ kind: "analysis" | "render"; projectId: string; jobId: string }> = [];
+    const api = testApi({
+      jobQueueService: {
+        enqueueAnalysisJob(input) {
+          enqueued.push({ kind: "analysis", ...input });
+        },
+        enqueueRenderJob(input) {
+          enqueued.push({ kind: "render", ...input });
+        }
+      }
+    });
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        jobs: [
+          jobFixture({
+            id: "job-1",
+            projectId: "project-1",
+            kind: "render",
+            status: "canceled",
+            retryable: true
+          })
+        ]
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const retried = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/jobs/job-1/retry",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1"
+        },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:02:00.000Z")
+      },
+      api
+    );
+
+    expect(retried.status).toBe(202);
+    expect(retried.body).toMatchObject({ data: { job: { id: "job-1", kind: "render", status: "queued" } } });
+    expect(enqueued).toEqual([{ kind: "render", projectId: "project-1", jobId: "job-1" }]);
+  });
+
+  it("rejects hosted job retries when the worker queue service is not configured", async () => {
+    const api = testApi();
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        jobs: [jobFixture({ id: "job-1", projectId: "project-1", status: "canceled", retryable: true })]
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const retried = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/jobs/job-1/retry",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1"
+        },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:02:00.000Z")
+      },
+      api
+    );
+
+    expect(retried.status).toBe(503);
+    expect(retried.body).toMatchObject({ error: { code: "job_queue_not_configured" } });
+    expect(api.store.state.projects[0]?.jobs[0]?.status).toBe("canceled");
+  });
+
+  it("rejects hosted retries for job kinds that the hosted worker queue cannot run", async () => {
+    const api = testApi({
+      jobQueueService: {
+        enqueueAnalysisJob() {
+          throw new Error("Unexpected analysis enqueue.");
+        },
+        enqueueRenderJob() {
+          throw new Error("Unexpected render enqueue.");
+        }
+      }
+    });
+    api.store.state.projects = [
+      projectFixture({
+        id: "project-1",
+        workspaceId: "local-workspace",
+        name: "Visible project",
+        jobs: [
+          jobFixture({
+            id: "job-1",
+            projectId: "project-1",
+            kind: "export",
+            status: "canceled",
+            retryable: true
+          })
+        ]
+      })
+    ];
+    const created = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-06-25T12:00:00.000Z")
+    });
+
+    const retried = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/jobs/job-1/retry",
+        headers: {
+          cookie: `gideon_session=${created.token}`,
+          "x-csrf-token": "csrf-1"
+        },
+        body: {},
+        nowMs: Date.parse("2026-06-25T12:02:00.000Z")
+      },
+      api
+    );
+
+    expect(retried.status).toBe(409);
+    expect(retried.body).toMatchObject({ error: { code: "state_conflict" } });
+    expect(api.store.state.projects[0]?.jobs[0]?.status).toBe("canceled");
   });
 
   it("verifies Stripe webhooks and applies subscription updates", async () => {
