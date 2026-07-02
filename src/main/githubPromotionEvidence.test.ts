@@ -96,7 +96,7 @@ describe("GitHub promotion evidence artifact check", () => {
     expect(receipt.repository).toBe("example/Gideon");
     expect(receipt.runId).toBe("12345");
     expect(receipt.evidence.gitCommit).toBe("0123456789abcdef0123456789abcdef01234567");
-    expect(receipt.evidence.stepCount).toBe(13);
+    expect(receipt.evidence.stepCount).toBe(14);
     expect(receipt.githubRun.headSha).toBe("0123456789abcdef0123456789abcdef01234567");
     expect(receipt.githubRun.event).toBe("workflow_dispatch");
     expect(receipt.checks.runMetadata).toBe("passed");
@@ -164,6 +164,7 @@ function createEvidence() {
     "production billing reconciliation",
     "production PostgreSQL policy",
     "production BullMQ policy",
+    "production observability policy",
     "production storage lifecycle policy",
     "production storage signed-download smoke",
     "live provider canaries",

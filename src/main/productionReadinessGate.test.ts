@@ -29,6 +29,7 @@ describe("production readiness gate", () => {
     expect(result.stdout).toContain("production billing reconciliation dry-run");
     expect(result.stdout).toContain("production PostgreSQL policy dry-run");
     expect(result.stdout).toContain("production BullMQ policy dry-run");
+    expect(result.stdout).toContain("production observability policy dry-run");
     expect(result.stdout).toContain("production storage lifecycle dry-run");
     expect(result.stdout).toContain("production storage signed-download smoke dry-run");
     expect(result.stdout).toContain("production promotion gate dry-run");

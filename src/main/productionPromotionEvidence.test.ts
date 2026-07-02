@@ -78,6 +78,7 @@ async function writeEvidenceFixture(
     "production billing reconciliation",
     "production PostgreSQL policy",
     "production BullMQ policy",
+    "production observability policy",
     "production storage lifecycle policy",
     "production storage signed-download smoke",
     "live provider canaries",

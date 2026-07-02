@@ -20,6 +20,7 @@ const steps = [
   step("production billing reconciliation", [pnpm, "production:billing:check", "--", "--live"]),
   step("production PostgreSQL policy", [pnpm, "production:db:check"]),
   step("production BullMQ policy", [pnpm, "production:queue:check"]),
+  step("production observability policy", [pnpm, "production:observability:check"]),
   step("production storage lifecycle policy", [pnpm, "production:storage:check", "--", "--verify-bucket-lifecycle"]),
   step("production storage signed-download smoke", [pnpm, "production:storage-download:smoke"]),
   step("live provider canaries", [pnpm, "provider:canary", "--", "--live"]),

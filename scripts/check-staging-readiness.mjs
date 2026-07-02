@@ -67,6 +67,7 @@ function validateCommandContract() {
     "production:billing:check",
     "production:db:check",
     "production:queue:check",
+    "production:observability:check",
     "production:storage:check",
     "production:storage-download:smoke"
   ]) {
@@ -176,6 +177,7 @@ function validateOperationalEnvironment() {
   requireProviderCanaryCostCeilings();
   requireHostedSmokeEnvironment();
   requireHostedMcpSmokeEnvironment();
+  requireObservabilityPolicy();
 
   requireEquals("GIDEON_RELEASE_CHANNEL", "production", "Set GIDEON_RELEASE_CHANNEL=production for staging release promotion checks.");
   requireEnv("APPLE_TEAM_ID", "Set APPLE_TEAM_ID for production release notarization checks.");
@@ -350,6 +352,62 @@ function requireHostedMcpSmokeEnvironment() {
       validateUrl(metricProbeUrl, ["https:"], "GIDEON_STAGING_MCP_METRIC_PROBE_URL must be an absolute https:// URL.");
     }
   }
+}
+
+function requireObservabilityPolicy() {
+  const backend = normalize(env.GIDEON_OBSERVABILITY_BACKEND);
+  if (!["datadog", "prometheus", "grafana", "honeycomb", "otel"].includes(backend)) {
+    errors.push("Set GIDEON_OBSERVABILITY_BACKEND to datadog, prometheus, grafana, honeycomb, or otel.");
+  }
+  const metricExportUrl = normalize(env.GIDEON_OBSERVABILITY_METRIC_EXPORT_URL);
+  if (!metricExportUrl) {
+    errors.push("Set GIDEON_OBSERVABILITY_METRIC_EXPORT_URL for production metric export.");
+  } else {
+    validateUrl(metricExportUrl, ["https:"], "GIDEON_OBSERVABILITY_METRIC_EXPORT_URL must be an absolute https:// URL.");
+  }
+  const dashboardUrl = normalize(env.GIDEON_OBSERVABILITY_DASHBOARD_URL);
+  if (!dashboardUrl) {
+    errors.push("Set GIDEON_OBSERVABILITY_DASHBOARD_URL for production operations.");
+  } else {
+    validateUrl(dashboardUrl, ["https:"], "GIDEON_OBSERVABILITY_DASHBOARD_URL must be an absolute https:// URL.");
+  }
+  const runbookUrl = normalize(env.GIDEON_OBSERVABILITY_RUNBOOK_URL);
+  if (!runbookUrl) {
+    errors.push("Set GIDEON_OBSERVABILITY_RUNBOOK_URL for production incident response.");
+  } else {
+    validateUrl(runbookUrl, ["https:"], "GIDEON_OBSERVABILITY_RUNBOOK_URL must be an absolute https:// URL.");
+  }
+  const alertRoute = normalize(env.GIDEON_OBSERVABILITY_ALERT_ROUTE);
+  if (!alertRoute || ["default", "dev", "local", "test"].includes(alertRoute.toLowerCase())) {
+    errors.push("Set GIDEON_OBSERVABILITY_ALERT_ROUTE to a production alert route.");
+  }
+  if (normalize(env.GIDEON_OBSERVABILITY_PAGING_ENABLED) !== "true") {
+    errors.push("Set GIDEON_OBSERVABILITY_PAGING_ENABLED=true for production incidents.");
+  }
+  requireIntegerRange(
+    "GIDEON_OBSERVABILITY_QUEUE_AGE_WARNING_SECONDS",
+    60,
+    3_600,
+    "Set GIDEON_OBSERVABILITY_QUEUE_AGE_WARNING_SECONDS to an integer between 60 and 3600."
+  );
+  requireIntegerRange(
+    "GIDEON_OBSERVABILITY_TERMINAL_FAILURES_PER_HOUR",
+    1,
+    100,
+    "Set GIDEON_OBSERVABILITY_TERMINAL_FAILURES_PER_HOUR to an integer between 1 and 100."
+  );
+  requireIntegerRange(
+    "GIDEON_OBSERVABILITY_PROVIDER_TTS_P95_MS",
+    1_000,
+    60_000,
+    "Set GIDEON_OBSERVABILITY_PROVIDER_TTS_P95_MS to an integer between 1000 and 60000."
+  );
+  requireIntegerRange(
+    "GIDEON_OBSERVABILITY_STORAGE_P95_MS",
+    100,
+    60_000,
+    "Set GIDEON_OBSERVABILITY_STORAGE_P95_MS to an integer between 100 and 60000."
+  );
 }
 
 function readJson(filePath) {

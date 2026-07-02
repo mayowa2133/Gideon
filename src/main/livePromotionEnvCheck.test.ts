@@ -16,6 +16,7 @@ describe("live promotion environment check", () => {
     expect(result.stdout).toContain("GIDEON_STAGING_MCP_SESSION_COOKIE");
     expect(result.stdout).toContain("GIDEON_BULLMQ_ATTEMPTS");
     expect(result.stdout).toContain("GIDEON_POSTGRES_PITR_ENABLED");
+    expect(result.stdout).toContain("GIDEON_OBSERVABILITY_BACKEND");
     expect(result.stdout).toContain("GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD");
     expect(result.stdout).toContain("GIDEON_STORAGE_TEMP_RETENTION_DAYS");
     expect(result.stdout).toContain("GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY");
@@ -130,10 +131,26 @@ function liveEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     GIDEON_STAGING_MCP_SESSION_COOKIE: "gideon_session=session-token",
     GIDEON_STAGING_MCP_PROJECT_ID: "project-staging-mcp",
     GIDEON_STAGING_MCP_METRIC_PROBE_URL: "https://metrics.gideon.example.test/hosted-mcp",
+    ...observabilityPolicyEnv(),
     APPLE_TEAM_ID: "TEAM123",
     APPLE_ID: "release@example.com",
     APPLE_APP_SPECIFIC_PASSWORD: "app-password",
     CSC_NAME: "Developer ID Application: Example",
     ...overrides
+  };
+}
+
+function observabilityPolicyEnv(): Record<string, string> {
+  return {
+    GIDEON_OBSERVABILITY_BACKEND: "datadog",
+    GIDEON_OBSERVABILITY_METRIC_EXPORT_URL: "https://observability.example.test/gideon/metrics",
+    GIDEON_OBSERVABILITY_DASHBOARD_URL: "https://observability.example.test/dashboards/gideon-production",
+    GIDEON_OBSERVABILITY_RUNBOOK_URL: "https://runbooks.example.test/gideon/production-incidents",
+    GIDEON_OBSERVABILITY_ALERT_ROUTE: "pagerduty/gideon-production",
+    GIDEON_OBSERVABILITY_PAGING_ENABLED: "true",
+    GIDEON_OBSERVABILITY_QUEUE_AGE_WARNING_SECONDS: "300",
+    GIDEON_OBSERVABILITY_TERMINAL_FAILURES_PER_HOUR: "3",
+    GIDEON_OBSERVABILITY_PROVIDER_TTS_P95_MS: "15000",
+    GIDEON_OBSERVABILITY_STORAGE_P95_MS: "5000"
   };
 }

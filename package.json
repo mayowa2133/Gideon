@@ -36,6 +36,7 @@
     "production:billing:check": "node scripts/check-billing-reconciliation.mjs",
     "production:db:check": "node scripts/check-postgres-policy.mjs",
     "production:queue:check": "node scripts/check-bullmq-policy.mjs",
+    "production:observability:check": "node scripts/check-observability-policy.mjs",
     "production:storage:check": "node scripts/check-storage-policy.mjs",
     "production:storage-download:smoke": "node scripts/run-storage-download-smoke.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs",

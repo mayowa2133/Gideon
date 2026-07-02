@@ -51,7 +51,17 @@ const requiredEnv = [
   "GIDEON_STAGING_MCP_API_BASE_URL",
   "GIDEON_STAGING_MCP_SESSION_COOKIE",
   "GIDEON_STAGING_MCP_PROJECT_ID",
-  "GIDEON_STAGING_MCP_METRIC_PROBE_URL"
+  "GIDEON_STAGING_MCP_METRIC_PROBE_URL",
+  "GIDEON_OBSERVABILITY_BACKEND",
+  "GIDEON_OBSERVABILITY_METRIC_EXPORT_URL",
+  "GIDEON_OBSERVABILITY_DASHBOARD_URL",
+  "GIDEON_OBSERVABILITY_RUNBOOK_URL",
+  "GIDEON_OBSERVABILITY_ALERT_ROUTE",
+  "GIDEON_OBSERVABILITY_PAGING_ENABLED",
+  "GIDEON_OBSERVABILITY_QUEUE_AGE_WARNING_SECONDS",
+  "GIDEON_OBSERVABILITY_TERMINAL_FAILURES_PER_HOUR",
+  "GIDEON_OBSERVABILITY_PROVIDER_TTS_P95_MS",
+  "GIDEON_OBSERVABILITY_STORAGE_P95_MS"
 ];
 
 const providerCostEnv = [
@@ -132,6 +142,7 @@ validateUrl("GIDEON_STORAGE_ENDPOINT", ["https:"], "GIDEON_STORAGE_ENDPOINT must
 validateUrl("GIDEON_STAGING_API_BASE_URL", ["https:"], "GIDEON_STAGING_API_BASE_URL must be an https:// URL.");
 validateUrl("GIDEON_STAGING_MCP_API_BASE_URL", ["https:"], "GIDEON_STAGING_MCP_API_BASE_URL must be an https:// URL.");
 validateUrl("GIDEON_STAGING_MCP_METRIC_PROBE_URL", ["https:"], "GIDEON_STAGING_MCP_METRIC_PROBE_URL must be an https:// URL.");
+validateObservabilityPolicy();
 
 const storageProvider = value("GIDEON_STORAGE_PROVIDER");
 if (storageProvider && storageProvider !== "s3" && storageProvider !== "r2") {
@@ -227,6 +238,26 @@ function validateUrl(name, protocols, message) {
   } catch {
     errors.push(message);
   }
+}
+
+function validateObservabilityPolicy() {
+  const backend = value("GIDEON_OBSERVABILITY_BACKEND");
+  if (!["datadog", "prometheus", "grafana", "honeycomb", "otel"].includes(backend)) {
+    errors.push("GIDEON_OBSERVABILITY_BACKEND must be one of: datadog, prometheus, grafana, honeycomb, otel.");
+  }
+  validateUrl("GIDEON_OBSERVABILITY_METRIC_EXPORT_URL", ["https:"], "GIDEON_OBSERVABILITY_METRIC_EXPORT_URL must be an https:// URL.");
+  validateUrl("GIDEON_OBSERVABILITY_DASHBOARD_URL", ["https:"], "GIDEON_OBSERVABILITY_DASHBOARD_URL must be an https:// URL.");
+  validateUrl("GIDEON_OBSERVABILITY_RUNBOOK_URL", ["https:"], "GIDEON_OBSERVABILITY_RUNBOOK_URL must be an https:// URL.");
+  if (["default", "dev", "local", "test"].includes(value("GIDEON_OBSERVABILITY_ALERT_ROUTE").toLowerCase())) {
+    errors.push("GIDEON_OBSERVABILITY_ALERT_ROUTE must identify a production alert route.");
+  }
+  if (value("GIDEON_OBSERVABILITY_PAGING_ENABLED") !== "true") {
+    errors.push("GIDEON_OBSERVABILITY_PAGING_ENABLED must be true for live promotion.");
+  }
+  validateRetentionWindow("GIDEON_OBSERVABILITY_QUEUE_AGE_WARNING_SECONDS", 60, 3_600);
+  validateRetentionWindow("GIDEON_OBSERVABILITY_TERMINAL_FAILURES_PER_HOUR", 1, 100);
+  validateRetentionWindow("GIDEON_OBSERVABILITY_PROVIDER_TTS_P95_MS", 1_000, 60_000);
+  validateRetentionWindow("GIDEON_OBSERVABILITY_STORAGE_P95_MS", 100, 60_000);
 }
 
 function validateRecentIsoTimestamp(name, maxAgeDays) {

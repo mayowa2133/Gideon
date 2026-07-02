@@ -71,6 +71,7 @@ Run the preflight before starting a deployed worker:
 pnpm worker:hosted:check
 pnpm production:db:check
 pnpm production:queue:check
+pnpm production:observability:check
 ```
 
 The check fails on missing BullMQ/Redis/lease identity configuration and warns when optional provider-backed AI, storage, or web-session settings are absent. With `GIDEON_DEPLOYMENT_ENV=production`, it also fails on:
@@ -78,6 +79,7 @@ The check fails on missing BullMQ/Redis/lease identity configuration and warns w
 - non-`rediss://` Redis unless `GIDEON_ALLOW_INSECURE_REDIS=true` is explicitly set;
 - missing `GIDEON_BULLMQ_QUEUE_NAME` or `GIDEON_BULLMQ_PREFIX`;
 - missing or invalid BullMQ concurrency, retry/backoff, retention, or `retain_failed` dead-letter policy when running `pnpm production:queue:check`;
+- missing or invalid observability backend, dashboard, runbook, alert route, paging, or alert thresholds when running `pnpm production:observability:check`;
 - missing PostgreSQL database settings when `GIDEON_STORE_PROVIDER=postgres_snapshot`;
 - missing or invalid PostgreSQL pool, timeout, backup retention, PITR, restore-drill, or predeploy migration policy when running `pnpm production:db:check`;
 - local file-backed app state unless `GIDEON_ALLOW_LOCAL_PRODUCTION_STORE=true` is explicitly set;
@@ -109,4 +111,4 @@ This starts Redis and one hosted worker using the same BullMQ provider path as p
 - Keep worker instances off public ingress.
 - Use separate runtime identities from any web/API service.
 - Restrict egress to Redis, PostgreSQL, private storage, provider APIs, and any future database service.
-- Export JSON logs to the observability backend; alert on oldest queued age, expired leases, recovered lease failures, terminal failure rate, provider failures, and storage failures. See [observability-alerts.md](./observability-alerts.md).
+- Export JSON logs to the observability backend; alert on oldest queued age, expired leases, recovered lease failures, terminal failure rate, provider failures, and storage failures. `pnpm production:observability:check` verifies the backend, dashboard, runbook, paging route, and threshold contract before promotion. See [observability-alerts.md](./observability-alerts.md).

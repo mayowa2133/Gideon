@@ -222,6 +222,7 @@ function checkPackageContract() {
     "production:billing:check",
     "production:db:check",
     "production:queue:check",
+    "production:observability:check",
     "production:storage:check",
     "production:storage-download:smoke"
   ]) {

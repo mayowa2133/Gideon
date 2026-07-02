@@ -83,6 +83,7 @@ describe("staging readiness check", () => {
         GIDEON_STAGING_MCP_SMOKE_LIVE: "true",
         GIDEON_STAGING_MCP_REQUIRE_METRIC_EXPORT: "true",
         GIDEON_STAGING_MCP_METRIC_PROBE_URL: "https://metrics.gideon.example.test/hosted-mcp",
+        ...observabilityPolicyEnv(),
         GIDEON_RELEASE_DIR: releaseDir,
         GIDEON_RELEASE_CHANNEL: "production",
         APPLE_TEAM_ID: "TEAM123",
@@ -197,6 +198,21 @@ function postgresPolicyEnv(): Record<string, string> {
     GIDEON_POSTGRES_RESTORE_DRILL_AT: new Date().toISOString(),
     GIDEON_POSTGRES_RESTORE_DRILL_MAX_AGE_DAYS: "90",
     GIDEON_POSTGRES_MIGRATION_POLICY: "predeploy_migrate"
+  };
+}
+
+function observabilityPolicyEnv(): Record<string, string> {
+  return {
+    GIDEON_OBSERVABILITY_BACKEND: "datadog",
+    GIDEON_OBSERVABILITY_METRIC_EXPORT_URL: "https://observability.example.test/gideon/metrics",
+    GIDEON_OBSERVABILITY_DASHBOARD_URL: "https://observability.example.test/dashboards/gideon-production",
+    GIDEON_OBSERVABILITY_RUNBOOK_URL: "https://runbooks.example.test/gideon/production-incidents",
+    GIDEON_OBSERVABILITY_ALERT_ROUTE: "pagerduty/gideon-production",
+    GIDEON_OBSERVABILITY_PAGING_ENABLED: "true",
+    GIDEON_OBSERVABILITY_QUEUE_AGE_WARNING_SECONDS: "300",
+    GIDEON_OBSERVABILITY_TERMINAL_FAILURES_PER_HOUR: "3",
+    GIDEON_OBSERVABILITY_PROVIDER_TTS_P95_MS: "15000",
+    GIDEON_OBSERVABILITY_STORAGE_P95_MS: "5000"
   };
 }
 

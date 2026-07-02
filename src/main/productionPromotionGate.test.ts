@@ -20,6 +20,7 @@ describe("production promotion gate", () => {
     expect(result.stdout).toContain("production billing reconciliation");
     expect(result.stdout).toContain("production PostgreSQL policy");
     expect(result.stdout).toContain("production BullMQ policy");
+    expect(result.stdout).toContain("production observability policy");
     expect(result.stdout).toContain("production storage lifecycle policy");
     expect(result.stdout).toContain("production storage signed-download smoke");
     expect(result.stdout).toContain("live provider canaries");
@@ -80,13 +81,14 @@ describe("production promotion gate", () => {
       skipPackage: true,
       failedStep: null
     });
-    expect(evidence.steps).toHaveLength(10);
+    expect(evidence.steps).toHaveLength(11);
     expect(evidence.steps.every((step: { status: string }) => step.status === "succeeded")).toBe(true);
     expect(JSON.stringify(evidence)).not.toContain("gideon_session");
     expect(JSON.stringify(evidence)).not.toContain("OPENAI_API_KEY");
     expect(invocations).toContain("production:billing:check -- --live");
     expect(invocations).toContain("production:db:check");
     expect(invocations).toContain("production:queue:check");
+    expect(invocations).toContain("production:observability:check");
     expect(invocations).toContain("production:storage:check");
     expect(invocations).toContain("production:storage-download:smoke");
     expect(invocations).toContain("staging:mcp:smoke -- --live --require-metric-export");

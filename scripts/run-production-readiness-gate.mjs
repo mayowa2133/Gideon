@@ -32,6 +32,7 @@ const steps = [
   step("production billing reconciliation dry-run", [pnpm, "production:billing:check", "--", "--dry-run"]),
   step("production PostgreSQL policy dry-run", [pnpm, "production:db:check", "--", "--dry-run"]),
   step("production BullMQ policy dry-run", [pnpm, "production:queue:check", "--", "--dry-run"]),
+  step("production observability policy dry-run", [pnpm, "production:observability:check", "--", "--dry-run"]),
   step("production storage lifecycle dry-run", [pnpm, "production:storage:check", "--", "--dry-run"]),
   step("production storage signed-download smoke dry-run", [pnpm, "production:storage-download:smoke", "--", "--dry-run"]),
   step("production promotion gate dry-run", [pnpm, "production:promote:check", "--", "--dry-run"]),
