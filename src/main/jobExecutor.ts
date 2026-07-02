@@ -201,7 +201,8 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
       kind: "started",
       stage: "queued",
       message: "Analysis job started.",
-      progress: job.progress
+      progress: job.progress,
+      metadata: jobAttemptMetadata(job)
     });
     try {
       job = await advanceJobStage(projectId, jobId, "quota", 1, 5, "Checking workspace AI and media quotas.");
@@ -245,7 +246,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
         stage: "usage",
         message: "Recording provider usage for analysis.",
         progress: job.progress,
-        metadata: { providerRuns: analyzed.providerRuns.length }
+        metadata: { ...jobAttemptMetadata(job), providerRuns: analyzed.providerRuns.length }
       });
       await recordAnalysisUsage(projectId, analyzed, analyzed.providerRuns.slice(providerRunStartCount));
       if (await finishIfCancelRequested(projectId, jobId)) {
@@ -259,7 +260,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
         stage: "finalize",
         message: "Analysis completed.",
         progress: job.progress,
-        metadata: { moments: analyzed.moments.length, frameEvidence: analyzed.frameEvidence.length }
+        metadata: { ...jobAttemptMetadata(job), moments: analyzed.moments.length, frameEvidence: analyzed.frameEvidence.length }
       });
       return store.updateJob(projectId, job);
     } catch (error) {
@@ -290,7 +291,8 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
       kind: "started",
       stage: "queued",
       message: "Render job started.",
-      progress: job.progress
+      progress: job.progress,
+      metadata: jobAttemptMetadata(job)
     });
     const renders: RenderedVideo[] = [];
     let reservedRenderStorageBytes = 0;
@@ -412,7 +414,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
         stage: "usage",
         message: "Recording render usage.",
         progress: job.progress,
-        metadata: { renders: renders.length }
+        metadata: { ...jobAttemptMetadata(job), renders: renders.length }
       });
       await recordRenderUsage(projectId, renders);
       job = await store.getJob(projectId, jobId);
@@ -426,6 +428,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
         message: job.userMessage,
         progress: job.progress,
         metadata: {
+          ...jobAttemptMetadata(job),
           completed: renders.filter((render) => render.status === "completed").length,
           failed: renders.filter((render) => render.status === "failed").length
         }
@@ -452,7 +455,8 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
       kind: "stage",
       stage,
       message,
-      progress: job.progress
+      progress: job.progress,
+      metadata: jobAttemptMetadata(job)
     });
     return job;
   }
@@ -478,9 +482,16 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
       stage: "finalize",
       message: failed.safeError ?? "Job failed.",
       progress: failed.progress,
-      metadata: { retryable: failed.retryable }
+      metadata: { ...jobAttemptMetadata(failed), retryable: failed.retryable }
     });
     return store.updateJob(projectId, failed);
+  }
+
+  function jobAttemptMetadata(job: JobRecord): { attempt: number; maxAttempts: number } {
+    return {
+      attempt: job.attempt,
+      maxAttempts: job.maxAttempts
+    };
   }
 
   async function createProviderVoiceover(projectId: string, script: ScriptDraft): Promise<string | null> {

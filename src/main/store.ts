@@ -2191,6 +2191,7 @@ export class GideonStore {
     const job = await this.getJob(projectId, jobId);
     const now = new Date().toISOString();
     const retried = retryJobState(job, now);
+    const nextAttempt = retried.attempt + 1;
     await this.updateProject(
       projectId,
       (project) => {
@@ -2205,7 +2206,7 @@ export class GideonStore {
             stage: "queued",
             message: retried.userMessage,
             progress: retried.progress,
-            metadata: { nextAttempt: retried.attempt },
+            metadata: { previousAttempt: job.attempt, nextAttempt, maxAttempts: retried.maxAttempts },
             now
           })
         ].slice(-MAX_PROJECT_JOB_EVENTS);
@@ -2218,7 +2219,7 @@ export class GideonStore {
           targetType: "job",
           targetId: jobId,
           summary: `Retried ${job.kind} job.`,
-          metadata: { jobKind: job.kind, nextAttempt: retried.attempt }
+          metadata: { jobKind: job.kind, previousAttempt: job.attempt, nextAttempt, maxAttempts: retried.maxAttempts }
         }
       }
     );
@@ -2241,6 +2242,7 @@ export class GideonStore {
     const { project, job } = this.findJobInWorkspace(state, input.workspaceId, input.jobId);
     const now = new Date().toISOString();
     const retried = retryJobState(job, now);
+    const nextAttempt = retried.attempt + 1;
     project.jobs = (project.jobs ?? []).map((candidate) => (candidate.id === input.jobId ? retried : candidate));
     project.jobEvents = [
       ...(project.jobEvents ?? []),
@@ -2252,7 +2254,7 @@ export class GideonStore {
         stage: "queued",
         message: retried.userMessage,
         progress: retried.progress,
-        metadata: { nextAttempt: retried.attempt },
+        metadata: { previousAttempt: job.attempt, nextAttempt, maxAttempts: retried.maxAttempts },
         now
       })
     ].slice(-MAX_PROJECT_JOB_EVENTS);
@@ -2265,7 +2267,7 @@ export class GideonStore {
       targetType: "job",
       targetId: input.jobId,
       summary: `Retried ${job.kind} job.`,
-      metadata: { jobKind: job.kind, nextAttempt: retried.attempt }
+      metadata: { jobKind: job.kind, previousAttempt: job.attempt, nextAttempt, maxAttempts: retried.maxAttempts }
     });
     await this.save();
     return { project, job: retried };

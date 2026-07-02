@@ -69,6 +69,13 @@ describe("Gideon job executor", () => {
       "stage:usage",
       "succeeded:finalize"
     ]);
+    expect(store.events.map((event) => event.metadata)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ attempt: 1, maxAttempts: 3 }),
+        expect.objectContaining({ attempt: 1, maxAttempts: 3, providerRuns: 1 }),
+        expect.objectContaining({ attempt: 1, maxAttempts: 3, moments: 1, frameEvidence: 1 })
+      ])
+    );
     expect(store.usage).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ metric: "llm_runs", quantity: 1, source: "analysis" }),
@@ -156,6 +163,13 @@ describe("Gideon job executor", () => {
       })
     ]);
     expect(rendered.artifacts).toEqual([expect.objectContaining({ id: "artifact-render-1", kind: "render" })]);
+    expect(store.events.map((event) => event.metadata)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ attempt: 1, maxAttempts: 3 }),
+        expect.objectContaining({ attempt: 1, maxAttempts: 3, renders: 1 }),
+        expect.objectContaining({ attempt: 1, maxAttempts: 3, completed: 1, failed: 0 })
+      ])
+    );
     expect(store.usage).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ metric: "render_minutes", quantity: 1, source: "render" }),

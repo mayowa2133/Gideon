@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createJob } from "../shared/jobState";
+import { createJob, failJob, startJob } from "../shared/jobState";
 
 const electronMock = vi.hoisted(() => ({ userDataDir: "" }));
 
@@ -257,6 +257,60 @@ describe("GideonStore billing reconciliation", () => {
     expect(
       state.auditEvents.some((event) => event.action === "job.retry" && event.actorUserId === DEFAULT_LOCAL_USER_ID)
     ).toBe(true);
+    expect(state.projects.find((candidate) => candidate.id === project.id)?.jobEvents.at(-1)?.metadata).toMatchObject({
+      previousAttempt: 0,
+      nextAttempt: 1,
+      maxAttempts: 3
+    });
+  });
+
+  it("records the next retry attempt after a failed attempt", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Retry metadata project",
+      profile: profileFixture()
+    });
+    const failed = failJob(
+      startJob(
+        createJob({
+          id: "job-1",
+          projectId: project.id,
+          kind: "render",
+          now: "2026-06-25T12:00:00.000Z"
+        }),
+        "2026-06-25T12:01:00.000Z"
+      ),
+      "2026-06-25T12:02:00.000Z",
+      "Render failed."
+    );
+    await store.appendJob(project.id, failed);
+
+    const retried = await store.retryJobForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      jobId: "job-1"
+    });
+    const state = await store.load();
+    const retryEvent = state.projects.find((candidate) => candidate.id === project.id)?.jobEvents.at(-1);
+    const retryAudit = state.auditEvents.findLast((event) => event.action === "job.retry");
+
+    expect(retried.job).toMatchObject({ attempt: 1, status: "queued" });
+    expect(retryEvent).toMatchObject({
+      kind: "retried",
+      metadata: {
+        previousAttempt: 1,
+        nextAttempt: 2,
+        maxAttempts: 3
+      }
+    });
+    expect(retryAudit?.metadata).toMatchObject({
+      previousAttempt: 1,
+      nextAttempt: 2,
+      maxAttempts: 3
+    });
   });
 
   it("persists worker job leases, heartbeats, and expired lease recovery", async () => {
