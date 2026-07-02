@@ -20,6 +20,13 @@ GIDEON_HOSTED_QUEUE_PROVIDER=bullmq
 GIDEON_REDIS_URL=rediss://...
 GIDEON_BULLMQ_QUEUE_NAME=gideon-prod-workers
 GIDEON_BULLMQ_PREFIX=gideon-prod
+GIDEON_BULLMQ_CONCURRENCY=4
+GIDEON_BULLMQ_ATTEMPTS=3
+GIDEON_BULLMQ_BACKOFF_TYPE=exponential
+GIDEON_BULLMQ_BACKOFF_DELAY_MS=5000
+GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT=1000
+GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT=5000
+GIDEON_BULLMQ_DEAD_LETTER_POLICY=retain_failed
 GIDEON_WORKER_ID=worker-media-1
 GIDEON_WORKER_LEASE_SECONDS=300
 GIDEON_WORKER_HEARTBEAT_INTERVAL_MS=30000
@@ -36,7 +43,7 @@ GIDEON_STORAGE_SECRET_ACCESS_KEY=...
 GIDEON_OPENAI_API_KEY=...
 ```
 
-Use `GIDEON_BULLMQ_QUEUE_NAME` and `GIDEON_BULLMQ_PREFIX` to isolate preview, staging, and production queues. Use `GIDEON_STORE_PROVIDER=postgres_snapshot` plus a TLS-enabled PostgreSQL URL for hosted app state; the hosted worker creates a `pg` connection pool, persists app-state snapshots, and closes the pool on worker shutdown. Use private object storage variables from the README for production media/artifacts instead of relying on container-local storage.
+Use `GIDEON_BULLMQ_QUEUE_NAME` and `GIDEON_BULLMQ_PREFIX` to isolate preview, staging, and production queues. Use `GIDEON_BULLMQ_CONCURRENCY`, `GIDEON_BULLMQ_ATTEMPTS`, `GIDEON_BULLMQ_BACKOFF_TYPE`, `GIDEON_BULLMQ_BACKOFF_DELAY_MS`, `GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT`, `GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT`, and `GIDEON_BULLMQ_DEAD_LETTER_POLICY=retain_failed` to make worker concurrency, retry/backoff, completed retention, and failed-job retention explicit per environment. Use `GIDEON_STORE_PROVIDER=postgres_snapshot` plus a TLS-enabled PostgreSQL URL for hosted app state; the hosted worker creates a `pg` connection pool, persists app-state snapshots, and closes the pool on worker shutdown. Use private object storage variables from the README for production media/artifacts instead of relying on container-local storage.
 
 Run migrations before starting a worker against a new database:
 
@@ -54,12 +61,14 @@ Run the preflight before starting a deployed worker:
 
 ```bash
 pnpm worker:hosted:check
+pnpm production:queue:check
 ```
 
 The check fails on missing BullMQ/Redis/lease identity configuration and warns when optional provider-backed AI, storage, or web-session settings are absent. With `GIDEON_DEPLOYMENT_ENV=production`, it also fails on:
 
 - non-`rediss://` Redis unless `GIDEON_ALLOW_INSECURE_REDIS=true` is explicitly set;
 - missing `GIDEON_BULLMQ_QUEUE_NAME` or `GIDEON_BULLMQ_PREFIX`;
+- missing or invalid BullMQ concurrency, retry/backoff, retention, or `retain_failed` dead-letter policy when running `pnpm production:queue:check`;
 - missing PostgreSQL database settings when `GIDEON_STORE_PROVIDER=postgres_snapshot`;
 - local file-backed app state unless `GIDEON_ALLOW_LOCAL_PRODUCTION_STORE=true` is explicitly set;
 - PostgreSQL database URLs without `sslmode=require` unless `GIDEON_ALLOW_INSECURE_DATABASE=true` is explicitly set;
@@ -81,8 +90,10 @@ This starts Redis and one hosted worker using the same BullMQ provider path as p
 ## Scaling and isolation
 
 - Scale worker replicas horizontally against the same Redis queue.
+- Keep `GIDEON_BULLMQ_CONCURRENCY` below provider/storage throughput limits and raise it only after staging load tests.
 - Give each replica a unique `GIDEON_WORKER_ID`.
 - Use environment-specific queue names and Redis prefixes for preview, staging, and production.
+- Keep failed-job retention greater than or equal to completed-job retention so production incidents remain inspectable.
 - Prefer managed Redis with TLS (`rediss://`) and persistence enabled.
 - Keep worker instances off public ingress.
 - Use separate runtime identities from any web/API service.

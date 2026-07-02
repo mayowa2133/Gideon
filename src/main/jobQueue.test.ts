@@ -18,6 +18,14 @@ import {
   verifyHostedWorkerQueueRequest
 } from "./jobQueue";
 
+function defaultBullMqJobOptions() {
+  return {
+    attempts: 1,
+    removeOnComplete: { count: 1000 },
+    removeOnFail: { count: 5000 }
+  };
+}
+
 describe("local worker queue", () => {
   it("runs queued jobs serially by default", async () => {
     const queue = new LocalWorkerQueue();
@@ -304,7 +312,9 @@ describe("local worker queue", () => {
       signingSecret: "queue-secret",
       redisUrl: null,
       bullMqQueueName: "gideon-hosted-worker-jobs",
-      bullMqPrefix: null
+      bullMqPrefix: null,
+      bullMqConcurrency: 1,
+      bullMqDefaultJobOptions: defaultBullMqJobOptions()
     });
     expect(
       loadHostedJobQueueConfig({
@@ -316,7 +326,9 @@ describe("local worker queue", () => {
       signingSecret: null,
       redisUrl: null,
       bullMqQueueName: "gideon-hosted-worker-jobs",
-      bullMqPrefix: null
+      bullMqPrefix: null,
+      bullMqConcurrency: 1,
+      bullMqDefaultJobOptions: defaultBullMqJobOptions()
     });
     expect(
       loadHostedJobQueueConfig({
@@ -329,7 +341,9 @@ describe("local worker queue", () => {
       signingSecret: "queue-secret",
       redisUrl: null,
       bullMqQueueName: "gideon-hosted-worker-jobs",
-      bullMqPrefix: null
+      bullMqPrefix: null,
+      bullMqConcurrency: 1,
+      bullMqDefaultJobOptions: defaultBullMqJobOptions()
     });
     expect(
       loadHostedJobQueueConfig({
@@ -341,14 +355,22 @@ describe("local worker queue", () => {
       signingSecret: null,
       redisUrl: null,
       bullMqQueueName: "gideon-hosted-worker-jobs",
-      bullMqPrefix: null
+      bullMqPrefix: null,
+      bullMqConcurrency: 1,
+      bullMqDefaultJobOptions: defaultBullMqJobOptions()
     });
     expect(
       loadHostedJobQueueConfig({
         GIDEON_HOSTED_QUEUE_PROVIDER: "bullmq",
         GIDEON_REDIS_URL: "rediss://default:secret@redis.example.test:6380/2",
         GIDEON_BULLMQ_QUEUE_NAME: "gideon-prod-workers",
-        GIDEON_BULLMQ_PREFIX: "gideon-prod"
+        GIDEON_BULLMQ_PREFIX: "gideon-prod",
+        GIDEON_BULLMQ_CONCURRENCY: "4",
+        GIDEON_BULLMQ_ATTEMPTS: "3",
+        GIDEON_BULLMQ_BACKOFF_TYPE: "exponential",
+        GIDEON_BULLMQ_BACKOFF_DELAY_MS: "5000",
+        GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT: "1000",
+        GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT: "5000"
       })
     ).toEqual({
       provider: "bullmq",
@@ -356,7 +378,14 @@ describe("local worker queue", () => {
       signingSecret: null,
       redisUrl: "rediss://default:secret@redis.example.test:6380/2",
       bullMqQueueName: "gideon-prod-workers",
-      bullMqPrefix: "gideon-prod"
+      bullMqPrefix: "gideon-prod",
+      bullMqConcurrency: 4,
+      bullMqDefaultJobOptions: {
+        attempts: 3,
+        removeOnComplete: { count: 1000 },
+        removeOnFail: { count: 5000 },
+        backoff: { type: "exponential", delay: 5000 }
+      }
     });
   });
 

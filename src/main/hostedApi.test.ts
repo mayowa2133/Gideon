@@ -30,6 +30,14 @@ import type {
 } from "../shared/types";
 import { createLocalUserWorkspace } from "../shared/usage";
 
+function defaultBullMqJobOptions() {
+  return {
+    attempts: 1,
+    removeOnComplete: { count: 1000 },
+    removeOnFail: { count: 5000 }
+  };
+}
+
 describe("hosted API foundation", () => {
   it("returns a null auth session without a cookie", async () => {
     const api = testApi();
@@ -126,7 +134,9 @@ describe("hosted API foundation", () => {
       signingSecret: "queue-secret",
       redisUrl: null,
       bullMqQueueName: "gideon-hosted-worker-jobs",
-      bullMqPrefix: null
+      bullMqPrefix: null,
+      bullMqConcurrency: 1,
+      bullMqDefaultJobOptions: defaultBullMqJobOptions()
     });
     expect(dependencies.jobQueueService).toBeDefined();
   });
@@ -146,7 +156,9 @@ describe("hosted API foundation", () => {
       signingSecret: null,
       redisUrl: null,
       bullMqQueueName: "gideon-hosted-worker-jobs",
-      bullMqPrefix: null
+      bullMqPrefix: null,
+      bullMqConcurrency: 1,
+      bullMqDefaultJobOptions: defaultBullMqJobOptions()
     });
     expect(dependencies.jobQueueService).toBeDefined();
     expect(dependencies.jobQueueBroker).toBeDefined();

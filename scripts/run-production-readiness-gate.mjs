@@ -30,6 +30,7 @@ const steps = [
   step("live promotion environment dry-run", [pnpm, "production:live-env:check", "--", "--dry-run"]),
   step("live promotion fixture materialization dry-run", [pnpm, "production:fixtures:materialize", "--", "--dry-run"]),
   step("production billing reconciliation dry-run", [pnpm, "production:billing:check", "--", "--dry-run"]),
+  step("production BullMQ policy dry-run", [pnpm, "production:queue:check", "--", "--dry-run"]),
   step("production storage lifecycle dry-run", [pnpm, "production:storage:check", "--", "--dry-run"]),
   step("production storage signed-download smoke dry-run", [pnpm, "production:storage-download:smoke", "--", "--dry-run"]),
   step("production promotion gate dry-run", [pnpm, "production:promote:check", "--", "--dry-run"]),

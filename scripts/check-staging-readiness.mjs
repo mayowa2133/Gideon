@@ -65,6 +65,7 @@ function validateCommandContract() {
     "production:live-env:check",
     "production:fixtures:materialize",
     "production:billing:check",
+    "production:queue:check",
     "production:storage:check",
     "production:storage-download:smoke"
   ]) {
@@ -125,6 +126,7 @@ function validateOperationalEnvironment() {
   requireEquals("GIDEON_HOSTED_QUEUE_PROVIDER", "bullmq", "Use BullMQ for staging hosted workers.");
   requireEnv("GIDEON_BULLMQ_QUEUE_NAME", "Set GIDEON_BULLMQ_QUEUE_NAME with a staging-specific queue name.");
   requireEnv("GIDEON_BULLMQ_PREFIX", "Set GIDEON_BULLMQ_PREFIX with a staging-specific Redis prefix.");
+  requireBullMqPolicy();
   requireEnv("GIDEON_WORKER_ID", "Set a stable staging worker identity.");
   requirePositiveInteger("GIDEON_WORKER_LEASE_SECONDS", "Set a positive staging worker lease duration.");
   requirePositiveInteger("GIDEON_WORKER_HEARTBEAT_INTERVAL_MS", "Set a positive staging worker heartbeat interval.");
@@ -179,6 +181,34 @@ function validateOperationalEnvironment() {
   requireEnv("APPLE_APP_SPECIFIC_PASSWORD", "Set APPLE_APP_SPECIFIC_PASSWORD for production release notarization checks.");
   if (!normalize(env.CSC_LINK) && !normalize(env.CSC_NAME)) {
     errors.push("Set CSC_LINK or CSC_NAME so production release candidates can be signed.");
+  }
+}
+
+function requireBullMqPolicy() {
+  requireIntegerRange("GIDEON_BULLMQ_CONCURRENCY", 1, 100, "Set GIDEON_BULLMQ_CONCURRENCY to an integer between 1 and 100.");
+  requireIntegerRange("GIDEON_BULLMQ_ATTEMPTS", 2, 10, "Set GIDEON_BULLMQ_ATTEMPTS to an integer between 2 and 10.");
+  const backoffType = normalize(env.GIDEON_BULLMQ_BACKOFF_TYPE);
+  if (backoffType !== "fixed" && backoffType !== "exponential") {
+    errors.push("Set GIDEON_BULLMQ_BACKOFF_TYPE to fixed or exponential.");
+  }
+  requireIntegerRange("GIDEON_BULLMQ_BACKOFF_DELAY_MS", 1_000, 300_000, "Set GIDEON_BULLMQ_BACKOFF_DELAY_MS to an integer between 1000 and 300000.");
+  const completeRetention = requireIntegerRange(
+    "GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT",
+    100,
+    100_000,
+    "Set GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT to an integer between 100 and 100000."
+  );
+  const failedRetention = requireIntegerRange(
+    "GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT",
+    1_000,
+    500_000,
+    "Set GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT to an integer between 1000 and 500000."
+  );
+  if (Number.isInteger(completeRetention) && Number.isInteger(failedRetention) && failedRetention < completeRetention) {
+    errors.push("GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT must be greater than or equal to GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT.");
+  }
+  if (normalize(env.GIDEON_BULLMQ_DEAD_LETTER_POLICY) !== "retain_failed") {
+    errors.push("Set GIDEON_BULLMQ_DEAD_LETTER_POLICY=retain_failed for production incident review.");
   }
 }
 
@@ -323,7 +353,9 @@ function requireIntegerRange(name, min, max, message) {
   const parsed = Number(value);
   if (!value || !Number.isInteger(parsed) || parsed < min || parsed > max) {
     errors.push(message);
+    return null;
   }
+  return parsed;
 }
 
 function requireNonNegativeDecimal(name, message) {

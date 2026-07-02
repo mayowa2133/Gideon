@@ -34,6 +34,7 @@
     "production:live-env:check": "node scripts/check-live-promotion-env.mjs",
     "production:fixtures:materialize": "node scripts/materialize-live-promotion-fixtures.mjs",
     "production:billing:check": "node scripts/check-billing-reconciliation.mjs",
+    "production:queue:check": "node scripts/check-bullmq-policy.mjs",
     "production:storage:check": "node scripts/check-storage-policy.mjs",
     "production:storage-download:smoke": "node scripts/run-storage-download-smoke.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs",

@@ -15,6 +15,13 @@ const requiredEnv = [
   "GIDEON_REDIS_URL",
   "GIDEON_BULLMQ_QUEUE_NAME",
   "GIDEON_BULLMQ_PREFIX",
+  "GIDEON_BULLMQ_CONCURRENCY",
+  "GIDEON_BULLMQ_ATTEMPTS",
+  "GIDEON_BULLMQ_BACKOFF_TYPE",
+  "GIDEON_BULLMQ_BACKOFF_DELAY_MS",
+  "GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT",
+  "GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT",
+  "GIDEON_BULLMQ_DEAD_LETTER_POLICY",
   "GIDEON_WORKER_ID",
   "GIDEON_DATABASE_URL",
   "GIDEON_SESSION_SECRET",
@@ -73,6 +80,20 @@ for (const name of providerCostEnv) {
 }
 
 validateUrl("GIDEON_REDIS_URL", ["rediss:"], "GIDEON_REDIS_URL must be a rediss:// URL for live promotion.");
+validateRetentionWindow("GIDEON_BULLMQ_CONCURRENCY", 1, 100);
+validateRetentionWindow("GIDEON_BULLMQ_ATTEMPTS", 2, 10);
+if (value("GIDEON_BULLMQ_BACKOFF_TYPE") !== "fixed" && value("GIDEON_BULLMQ_BACKOFF_TYPE") !== "exponential") {
+  errors.push("GIDEON_BULLMQ_BACKOFF_TYPE must be fixed or exponential.");
+}
+validateRetentionWindow("GIDEON_BULLMQ_BACKOFF_DELAY_MS", 1_000, 300_000);
+validateRetentionWindow("GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT", 100, 100_000);
+validateRetentionWindow("GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT", 1_000, 500_000);
+if (Number(value("GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT")) < Number(value("GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT"))) {
+  errors.push("GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT must be greater than or equal to GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT.");
+}
+if (value("GIDEON_BULLMQ_DEAD_LETTER_POLICY") !== "retain_failed") {
+  errors.push("GIDEON_BULLMQ_DEAD_LETTER_POLICY must be retain_failed.");
+}
 validateUrl("GIDEON_DATABASE_URL", ["postgres:", "postgresql:"], "GIDEON_DATABASE_URL must be a postgres:// URL.");
 if (value("GIDEON_DATABASE_URL") && !value("GIDEON_DATABASE_URL").includes("sslmode=require")) {
   errors.push("GIDEON_DATABASE_URL must include sslmode=require for live promotion.");

@@ -18,6 +18,7 @@ const steps = [
   step("local production readiness gate", [pnpm, "production:check"]),
   step("strict staging readiness gate", [pnpm, "staging:check", "--", "--strict"]),
   step("production billing reconciliation", [pnpm, "production:billing:check", "--", "--live"]),
+  step("production BullMQ policy", [pnpm, "production:queue:check"]),
   step("production storage lifecycle policy", [pnpm, "production:storage:check", "--", "--verify-bucket-lifecycle"]),
   step("production storage signed-download smoke", [pnpm, "production:storage-download:smoke"]),
   step("live provider canaries", [pnpm, "provider:canary", "--", "--live"]),

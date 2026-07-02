@@ -487,7 +487,9 @@ function createHostedJobQueueBroker(config: HostedJobQueueConfig): HostedWorkerJ
     return new BullMqHostedWorkerJobBroker({
       connection: redisConnectionFromUrl(config.redisUrl),
       queueName: config.bullMqQueueName,
-      prefix: config.bullMqPrefix ?? undefined
+      prefix: config.bullMqPrefix ?? undefined,
+      concurrency: config.bullMqConcurrency,
+      defaultJobOptions: config.bullMqDefaultJobOptions
     });
   }
   return undefined;

@@ -24,6 +24,7 @@ describe("live promotion GitHub configuration check", () => {
     expect(result.stdout).toContain("Live promotion GitHub configuration checklist:");
     expect(result.stdout).toContain("GIDEON_STAGING_MCP_SESSION_COOKIE");
     expect(result.stdout).toContain("GIDEON_STAGING_MCP_PROJECT_ID");
+    expect(result.stdout).toContain("GIDEON_BULLMQ_ATTEMPTS");
     expect(result.stdout).toContain("GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD");
     expect(result.stdout).toContain("GIDEON_STORAGE_ENDPOINT");
     expect(result.stdout).toContain("GIDEON_STORAGE_TEMP_RETENTION_DAYS");
@@ -42,6 +43,7 @@ describe("live promotion GitHub configuration check", () => {
     expect(parsed.secrets).toContain("GIDEON_STAGING_MCP_SESSION_COOKIE");
     expect(parsed.secrets).toContain("GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY");
     expect(parsed.vars).toContain("GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD");
+    expect(parsed.vars).toContain("GIDEON_BULLMQ_ATTEMPTS");
     expect(parsed.vars).toContain("GIDEON_STORAGE_ENDPOINT");
     expect(parsed.vars).toContain("GIDEON_STORAGE_TEMP_RETENTION_DAYS");
     expect(parsed.vars).toContain("GIDEON_STAGING_MCP_PROJECT_ID");

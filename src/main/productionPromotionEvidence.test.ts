@@ -76,6 +76,7 @@ async function writeEvidenceFixture(
     "local production readiness gate",
     "strict staging readiness gate",
     "production billing reconciliation",
+    "production BullMQ policy",
     "production storage lifecycle policy",
     "production storage signed-download smoke",
     "live provider canaries",

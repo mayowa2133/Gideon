@@ -28,6 +28,8 @@ export interface HostedJobQueueConfig {
   redisUrl: string | null;
   bullMqQueueName: string;
   bullMqPrefix: string | null;
+  bullMqConcurrency: number;
+  bullMqDefaultJobOptions: JobsOptions;
 }
 
 export interface HostedWorkerQueueJob {
@@ -345,6 +347,23 @@ export function loadHostedJobQueueConfig(env: NodeJS.ProcessEnv = process.env): 
   const redisUrl = normalizeRedisUrl(env.GIDEON_REDIS_URL ?? env.REDIS_URL);
   const bullMqQueueName = nonEmpty(env.GIDEON_BULLMQ_QUEUE_NAME ?? env.GIDEON_WORKER_QUEUE_NAME) ?? "gideon-hosted-worker-jobs";
   const bullMqPrefix = nonEmpty(env.GIDEON_BULLMQ_PREFIX);
+  const bullMqConcurrency = parsePositiveInteger(env.GIDEON_BULLMQ_CONCURRENCY) ?? parsePositiveInteger(env.GIDEON_QUEUE_CONCURRENCY) ?? 1;
+  const bullMqAttempts = parsePositiveInteger(env.GIDEON_BULLMQ_ATTEMPTS) ?? 1;
+  const bullMqBackoffDelay = parsePositiveInteger(env.GIDEON_BULLMQ_BACKOFF_DELAY_MS);
+  const bullMqBackoffType = nonEmpty(env.GIDEON_BULLMQ_BACKOFF_TYPE);
+  const bullMqDefaultJobOptions: JobsOptions = {
+    attempts: bullMqAttempts,
+    removeOnComplete: { count: parsePositiveInteger(env.GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT) ?? 1_000 },
+    removeOnFail: { count: parsePositiveInteger(env.GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT) ?? 5_000 },
+    ...(bullMqAttempts > 1 && bullMqBackoffDelay
+      ? {
+          backoff: {
+            type: bullMqBackoffType === "fixed" ? "fixed" : "exponential",
+            delay: bullMqBackoffDelay
+          }
+        }
+      : {})
+  };
   const provider =
     requestedProvider === "memory" || requestedProvider === "in_memory"
       ? "memory"
@@ -361,7 +380,9 @@ export function loadHostedJobQueueConfig(env: NodeJS.ProcessEnv = process.env): 
     signingSecret,
     redisUrl,
     bullMqQueueName,
-    bullMqPrefix
+    bullMqPrefix,
+    bullMqConcurrency,
+    bullMqDefaultJobOptions
   };
 }
 

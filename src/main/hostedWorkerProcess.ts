@@ -134,7 +134,9 @@ export function createHostedWorkerBrokerFromEnv(env: NodeJS.ProcessEnv = process
     return new BullMqHostedWorkerJobBroker({
       connection: redisConnectionFromUrl(config.redisUrl),
       queueName: config.bullMqQueueName,
-      prefix: config.bullMqPrefix ?? undefined
+      prefix: config.bullMqPrefix ?? undefined,
+      concurrency: config.bullMqConcurrency,
+      defaultJobOptions: config.bullMqDefaultJobOptions
     });
   }
   if (config.provider === "memory") {

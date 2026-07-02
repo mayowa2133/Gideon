@@ -14,6 +14,7 @@ describe("live promotion environment check", () => {
 
     expect(result.stdout).toContain("Live promotion environment check dry-run:");
     expect(result.stdout).toContain("GIDEON_STAGING_MCP_SESSION_COOKIE");
+    expect(result.stdout).toContain("GIDEON_BULLMQ_ATTEMPTS");
     expect(result.stdout).toContain("GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD");
     expect(result.stdout).toContain("GIDEON_STORAGE_TEMP_RETENTION_DAYS");
     expect(result.stdout).toContain("GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY");
@@ -83,6 +84,13 @@ function liveEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     GIDEON_REDIS_URL: "rediss://default:secret@redis.example.test:6380/0",
     GIDEON_BULLMQ_QUEUE_NAME: "gideon-staging-workers",
     GIDEON_BULLMQ_PREFIX: "gideon-staging",
+    GIDEON_BULLMQ_CONCURRENCY: "4",
+    GIDEON_BULLMQ_ATTEMPTS: "3",
+    GIDEON_BULLMQ_BACKOFF_TYPE: "exponential",
+    GIDEON_BULLMQ_BACKOFF_DELAY_MS: "5000",
+    GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT: "1000",
+    GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT: "5000",
+    GIDEON_BULLMQ_DEAD_LETTER_POLICY: "retain_failed",
     GIDEON_WORKER_ID: "staging-worker-1",
     GIDEON_DATABASE_URL: "postgres://gideon:secret@db.example.test:5432/gideon?sslmode=require",
     GIDEON_SESSION_SECRET: "session-secret",

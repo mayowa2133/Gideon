@@ -49,6 +49,7 @@ describe("staging readiness check", () => {
         GIDEON_REDIS_URL: "rediss://default:secret@redis.example.test:6380/0",
         GIDEON_BULLMQ_QUEUE_NAME: "gideon-staging-workers",
         GIDEON_BULLMQ_PREFIX: "gideon-staging",
+        ...bullMqPolicyEnv(),
         GIDEON_WORKER_ID: "staging-worker-1",
         GIDEON_WORKER_LEASE_SECONDS: "300",
         GIDEON_WORKER_HEARTBEAT_INTERVAL_MS: "30000",
@@ -112,6 +113,7 @@ describe("staging readiness check", () => {
           GIDEON_REDIS_URL: "rediss://default:secret@redis.example.test:6380/0",
           GIDEON_BULLMQ_QUEUE_NAME: "gideon-staging-workers",
           GIDEON_BULLMQ_PREFIX: "gideon-staging",
+          ...bullMqPolicyEnv(),
           GIDEON_WORKER_ID: "staging-worker-1",
           GIDEON_WORKER_LEASE_SECONDS: "300",
           GIDEON_WORKER_HEARTBEAT_INTERVAL_MS: "30000",
@@ -156,6 +158,18 @@ function providerCanaryCostEnv(): Record<string, string> {
     GIDEON_PROVIDER_CANARY_OCR_ESTIMATED_COST_USD: "0.01",
     GIDEON_PROVIDER_CANARY_TTS_MAX_COST_USD: "0.02",
     GIDEON_PROVIDER_CANARY_TTS_ESTIMATED_COST_USD: "0.005"
+  };
+}
+
+function bullMqPolicyEnv(): Record<string, string> {
+  return {
+    GIDEON_BULLMQ_CONCURRENCY: "4",
+    GIDEON_BULLMQ_ATTEMPTS: "3",
+    GIDEON_BULLMQ_BACKOFF_TYPE: "exponential",
+    GIDEON_BULLMQ_BACKOFF_DELAY_MS: "5000",
+    GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT: "1000",
+    GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT: "5000",
+    GIDEON_BULLMQ_DEAD_LETTER_POLICY: "retain_failed"
   };
 }
 

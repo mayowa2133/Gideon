@@ -77,7 +77,7 @@ function createReceipt(input: { headSha?: string; repository?: string } = {}) {
       generatedAt: now,
       finishedAt: now,
       skipPackage: false,
-      stepCount: 11
+      stepCount: 12
     },
     githubRun: {
       databaseId: 12345,
