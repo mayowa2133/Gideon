@@ -16,7 +16,7 @@ describe("storage lifecycle policy check", () => {
     });
 
     expect(result.stdout).toContain("Storage lifecycle policy check dry-run:");
-    expect(result.stdout).toContain("Require temp/failed/source/export retention windows");
+    expect(result.stdout).toContain("Require temp/failed/source/voiceover/export retention windows");
     expect(result.stdout).toContain("signed URL lifetime");
     expect(result.stdout).toContain("--verify-bucket-lifecycle");
   });
@@ -110,6 +110,7 @@ function storageEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     GIDEON_STORAGE_TEMP_RETENTION_DAYS: "3",
     GIDEON_STORAGE_FAILED_RETENTION_DAYS: "14",
     GIDEON_STORAGE_SOURCE_RETENTION_DAYS: "365",
+    GIDEON_VOICEOVER_RETENTION_DAYS: "365",
     GIDEON_STORAGE_EXPORT_RETENTION_DAYS: "365",
     GIDEON_STORAGE_DELETION_SLA_HOURS: "24",
     GIDEON_SIGNED_URL_MAX_SECONDS: "900",

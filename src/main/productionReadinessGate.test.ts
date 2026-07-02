@@ -33,6 +33,7 @@ describe("production readiness gate", () => {
     expect(result.stdout).toContain("production observability policy dry-run");
     expect(result.stdout).toContain("production storage lifecycle dry-run");
     expect(result.stdout).toContain("production storage signed-download smoke dry-run");
+    expect(result.stdout).toContain("production TTS policy dry-run");
     expect(result.stdout).toContain("production promotion gate dry-run");
     expect(result.stdout).toContain("production-shaped hosted worker preflight");
     expect(result.stdout).toContain("macOS release metadata");

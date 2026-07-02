@@ -187,6 +187,7 @@ function createEvidence(input: { skipPackage?: boolean } = {}) {
     "production observability policy",
     "production storage lifecycle policy",
     "production storage signed-download smoke",
+    "production TTS policy",
     "live provider canaries",
     "provider canary report",
     "live staging upload-to-export smoke",

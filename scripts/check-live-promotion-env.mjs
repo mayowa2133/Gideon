@@ -41,10 +41,16 @@ const requiredEnv = [
   "GIDEON_STORAGE_TEMP_RETENTION_DAYS",
   "GIDEON_STORAGE_FAILED_RETENTION_DAYS",
   "GIDEON_STORAGE_SOURCE_RETENTION_DAYS",
+  "GIDEON_VOICEOVER_RETENTION_DAYS",
   "GIDEON_STORAGE_EXPORT_RETENTION_DAYS",
   "GIDEON_STORAGE_DELETION_SLA_HOURS",
   "GIDEON_SIGNED_URL_MAX_SECONDS",
   "GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY",
+  "GIDEON_OPENAI_TTS_MODEL",
+  "GIDEON_OPENAI_TTS_VOICE",
+  "GIDEON_TTS_APPROVED_VOICES",
+  "GIDEON_TTS_VOICE_REVIEWED_AT",
+  "GIDEON_VOICEOVER_DELETION_SLA_HOURS",
   "GIDEON_OPENAI_API_KEY",
   "GIDEON_STAGING_API_BASE_URL",
   "GIDEON_AUTH_CALLBACK_SECRET",
@@ -151,9 +157,11 @@ if (storageProvider && storageProvider !== "s3" && storageProvider !== "r2") {
 validateRetentionWindow("GIDEON_STORAGE_TEMP_RETENTION_DAYS", 1, 7);
 validateRetentionWindow("GIDEON_STORAGE_FAILED_RETENTION_DAYS", 1, 30);
 validateRetentionWindow("GIDEON_STORAGE_SOURCE_RETENTION_DAYS", 1, 3650);
+validateRetentionWindow("GIDEON_VOICEOVER_RETENTION_DAYS", 1, 3650);
 validateRetentionWindow("GIDEON_STORAGE_EXPORT_RETENTION_DAYS", 1, 3650);
 validateRetentionWindow("GIDEON_STORAGE_DELETION_SLA_HOURS", 1, 168);
 validateRetentionWindow("GIDEON_SIGNED_URL_MAX_SECONDS", 60, 3600);
+validateTtsPolicy();
 if (value("GIDEON_STORAGE_PUBLIC_BASE_URL") && value("GIDEON_ALLOW_PUBLIC_STORAGE_BASE_URL") !== "true") {
   errors.push("GIDEON_STORAGE_PUBLIC_BASE_URL must be unset for live private artifacts unless GIDEON_ALLOW_PUBLIC_STORAGE_BASE_URL=true.");
 }
@@ -258,6 +266,37 @@ function validateObservabilityPolicy() {
   validateRetentionWindow("GIDEON_OBSERVABILITY_TERMINAL_FAILURES_PER_HOUR", 1, 100);
   validateRetentionWindow("GIDEON_OBSERVABILITY_PROVIDER_TTS_P95_MS", 1_000, 60_000);
   validateRetentionWindow("GIDEON_OBSERVABILITY_STORAGE_P95_MS", 100, 60_000);
+}
+
+function validateTtsPolicy() {
+  validateSafeIdentifier("GIDEON_OPENAI_TTS_MODEL", 2, 80);
+  validateSafeIdentifier("GIDEON_OPENAI_TTS_VOICE", 2, 80);
+  const voice = value("GIDEON_OPENAI_TTS_VOICE");
+  const voices = value("GIDEON_TTS_APPROVED_VOICES")
+    .split(",")
+    .map((candidate) => candidate.trim())
+    .filter(Boolean);
+  for (const candidate of voices) {
+    if (!/^[A-Za-z0-9._-]{2,80}$/.test(candidate)) {
+      errors.push("GIDEON_TTS_APPROVED_VOICES must be a comma-separated list of safe voice identifiers.");
+      break;
+    }
+  }
+  if (voice && voices.length > 0 && !voices.includes(voice)) {
+    errors.push("GIDEON_OPENAI_TTS_VOICE must be included in GIDEON_TTS_APPROVED_VOICES.");
+  }
+  validateRecentIsoTimestamp("GIDEON_TTS_VOICE_REVIEWED_AT", 180);
+  validateRetentionWindow("GIDEON_VOICEOVER_DELETION_SLA_HOURS", 1, 168);
+}
+
+function validateSafeIdentifier(name, minLength, maxLength) {
+  const raw = value(name);
+  if (!raw) {
+    return;
+  }
+  if (raw.length < minLength || raw.length > maxLength || !/^[A-Za-z0-9._-]+$/.test(raw)) {
+    errors.push(`${name} must be ${minLength}-${maxLength} characters using only letters, numbers, dots, underscores, and hyphens.`);
+  }
 }
 
 function validateRecentIsoTimestamp(name, maxAgeDays) {

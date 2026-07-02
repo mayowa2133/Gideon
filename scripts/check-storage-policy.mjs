@@ -20,6 +20,7 @@ const requiredEnv = [
   "GIDEON_STORAGE_TEMP_RETENTION_DAYS",
   "GIDEON_STORAGE_FAILED_RETENTION_DAYS",
   "GIDEON_STORAGE_SOURCE_RETENTION_DAYS",
+  "GIDEON_VOICEOVER_RETENTION_DAYS",
   "GIDEON_STORAGE_EXPORT_RETENTION_DAYS",
   "GIDEON_STORAGE_DELETION_SLA_HOURS",
   "GIDEON_SIGNED_URL_MAX_SECONDS"
@@ -29,10 +30,10 @@ if (dryRun) {
   console.log("Storage lifecycle policy check dry-run:");
   console.log(`1. Require private S3/R2 storage env: ${requiredEnv.join(", ")}.`);
   console.log("2. Validate HTTPS storage endpoint, non-empty bucket, and non-public production artifact URLs.");
-  console.log("3. Require temp/failed/source/export retention windows and deletion SLA.");
+  console.log("3. Require temp/failed/source/voiceover/export retention windows and deletion SLA.");
   console.log("4. Require signed URL lifetime to stay short-lived.");
   console.log("5. Fail on public base URL configuration unless explicitly allowed for controlled rehearsal.");
-  console.log("6. With --verify-bucket-lifecycle, fetch or read actual S3/R2 lifecycle XML and verify enabled expiration rules cover temp, failed, source, and export objects.");
+  console.log("6. With --verify-bucket-lifecycle, fetch or read actual S3/R2 lifecycle XML and verify enabled expiration rules cover temp, failed, source, voiceover, and export objects.");
   process.exit(0);
 }
 
@@ -50,6 +51,7 @@ validateBucketName();
 validateRetentionWindow("GIDEON_STORAGE_TEMP_RETENTION_DAYS", 1, 7);
 validateRetentionWindow("GIDEON_STORAGE_FAILED_RETENTION_DAYS", 1, 30);
 validateRetentionWindow("GIDEON_STORAGE_SOURCE_RETENTION_DAYS", 1, 3650);
+validateRetentionWindow("GIDEON_VOICEOVER_RETENTION_DAYS", 1, 3650);
 validateRetentionWindow("GIDEON_STORAGE_EXPORT_RETENTION_DAYS", 1, 3650);
 validateRetentionWindow("GIDEON_STORAGE_DELETION_SLA_HOURS", 1, 168);
 validateRetentionWindow("GIDEON_SIGNED_URL_MAX_SECONDS", 60, 3600);
@@ -276,6 +278,11 @@ function lifecycleRequirements() {
       label: "source recordings",
       probePrefix: value("GIDEON_STORAGE_SOURCE_LIFECYCLE_PROBE_PREFIX") || "workspaces/gideon-lifecycle-probe/projects/gideon-lifecycle-probe/source_recording/",
       maxDays: Number(value("GIDEON_STORAGE_SOURCE_RETENTION_DAYS"))
+    },
+    {
+      label: "voiceover artifacts",
+      probePrefix: value("GIDEON_STORAGE_VOICEOVER_LIFECYCLE_PROBE_PREFIX") || "workspaces/gideon-lifecycle-probe/projects/gideon-lifecycle-probe/voiceover/",
+      maxDays: Number(value("GIDEON_VOICEOVER_RETENTION_DAYS"))
     },
     {
       label: "export artifacts",

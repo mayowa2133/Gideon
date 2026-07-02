@@ -26,6 +26,7 @@ const steps = [
   step("production observability policy", [pnpm, "production:observability:check"]),
   step("production storage lifecycle policy", [pnpm, "production:storage:check", "--", "--verify-bucket-lifecycle"]),
   step("production storage signed-download smoke", [pnpm, "production:storage-download:smoke"]),
+  step("production TTS policy", [pnpm, "production:tts:check"]),
   step("live provider canaries", [pnpm, "provider:canary", "--", "--live"], {
     GIDEON_PROVIDER_CANARY_REPORT_PATH: providerCanaryReportPath
   }),
