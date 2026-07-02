@@ -156,6 +156,7 @@ export async function runAnalysisPipeline(
         startMs: moment.startMs,
         endMs: moment.endMs,
         evidence: moment.evidence,
+        sourceEvidenceIds: moment.sourceEvidenceIds,
         confidence: moment.confidence,
         enabled: true
       }));

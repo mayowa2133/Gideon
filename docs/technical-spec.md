@@ -124,13 +124,22 @@ type WalkthroughEvidenceBundle = {
     height: number;
     hasAudio: boolean;
   };
+  evidenceCatalog: Array<{
+    sourceId: `transcript:${string}` | `frame:${string}` | `moment:${string}`;
+    kind: "transcript_segment" | "frame" | "fallback_moment";
+    startMs?: number;
+    endMs?: number;
+    timestampMs?: number;
+  }>;
   transcript?: Array<{
+    sourceId: `transcript:${string}`;
     startMs: number;
     endMs: number;
     text: string;
     confidence?: number;
   }>;
   frames: Array<{
+    sourceId: `frame:${string}`;
     frameId: string;
     timestampMs: number;
     signedModelInputRef: string;
@@ -146,6 +155,7 @@ type WalkthroughEvidenceBundle = {
 ```
 
 The model sees only bounded media inputs or provider-uploaded ephemeral assets. Signed references are not persisted in prompts/logs. OCR/transcript text is wrapped as untrusted evidence and cannot supply instructions.
+Provider semantic-analysis outputs must carry `sourceEvidenceIds` copied from the evidence catalog. The server rejects missing or unknown source IDs before accepting AI-detected moments, so generated claims stay tied to transcript segments, OCR frames, or deterministic fallback moments.
 
 ### Edit decision list
 
@@ -405,7 +415,7 @@ Prompt changes require eval results in the PR. No production prompt is edited on
 - Use provider structured-output/JSON schema when available.
 - Parse then validate with Zod/Pydantic; reject unknown fields.
 - At most one bounded repair request for malformed output.
-- Validate timestamps and evidence IDs against inputs.
+- Validate timestamps and `sourceEvidenceIds` against the bounded evidence catalog before accepting model moments.
 - Run semantic diversity checks on concepts and deterministic phrase/claim rules.
 - Model output cannot choose queue names, object keys, component code, URL destinations, or FFmpeg arguments.
 

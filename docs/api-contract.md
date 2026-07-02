@@ -246,7 +246,7 @@ Return project summary, active artifacts, sanitized completed/queued render proj
 Return sanitized project context for Codex/Claude Code MCP agents using the user's hosted session.
 
 - **Auth:** Active member authorized for project workspace.
-- **Response 200:** Project summary plus product profile, recording metadata without private paths or object keys, transcript text/segments, detected moments with revision values and without local thumbnail paths, frame OCR evidence without local image paths, scripts with revision values, jobs, sanitized renders, and recent project audit events.
+- **Response 200:** Project summary plus product profile, recording metadata without private paths or object keys, transcript text/segments, detected moments with revision values and source-evidence IDs but without local thumbnail paths, frame OCR evidence without local image paths, scripts with revision values, jobs, sanitized renders, and recent project audit events.
 - **Errors:** 404.
 - **Rate limit:** 120/min.
 
@@ -497,7 +497,7 @@ Authenticated SSE for job/artifact progress.
 
 - **Auth:** Active member.
 - **Query:** `includeHidden=false`, cursor/limit up to 100.
-- **Response 200:** Ordered moments with evidence-frame thumbnail signed URLs and transcript excerpts.
+- **Response 200:** Ordered moments with evidence-frame thumbnail signed URLs, transcript excerpts, and validated `sourceEvidenceIds` that point to transcript segments, frame OCR evidence, or fallback moments from the analysis evidence catalog.
 - **Errors:** 404, 409 analysis not sufficiently complete (or return empty with state; choose consistently).
 - **Rate limit:** 120/min.
 

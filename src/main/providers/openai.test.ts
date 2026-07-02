@@ -58,6 +58,7 @@ describe("OpenAI structured analysis parsing", () => {
               startMs: -50,
               endMs: 35_000,
               evidence: "Transcript and visible result both support the generated lead list.",
+              sourceEvidenceIds: ["transcript:segment-1"],
               confidence: 0.8
             }
           ]
@@ -70,7 +71,8 @@ describe("OpenAI structured analysis parsing", () => {
       label: "Lead research result",
       startMs: 0,
       endMs: 30_000,
-      confidence: 0.8
+      confidence: 0.8,
+      sourceEvidenceIds: ["transcript:segment-1"]
     });
   });
 
@@ -89,6 +91,7 @@ describe("OpenAI structured analysis parsing", () => {
                       startMs: 0,
                       endMs: 5000,
                       evidence: "The first screen establishes the setup.",
+                      sourceEvidenceIds: ["moment:moment-1"],
                       confidence: 0.7
                     }
                   ]
@@ -101,6 +104,87 @@ describe("OpenAI structured analysis parsing", () => {
       30_000
     );
     expect(parsed.moments).toHaveLength(1);
+  });
+
+  it("rejects provider moments that cite unknown source evidence when source grounding is required", () => {
+    expect(() =>
+      parseWalkthroughAnalysis(
+        {
+          output_text: JSON.stringify({
+            summary: "The demo shows setup, product action, and final outcome.",
+            moments: [
+              {
+                label: "Setup",
+                startMs: 0,
+                endMs: 5000,
+                evidence: "The first screen establishes the setup.",
+                sourceEvidenceIds: ["frame:missing"],
+                confidence: 0.7
+              }
+            ]
+          })
+        },
+        30_000,
+        {
+          allowedEvidenceIds: ["frame:frame-1"],
+          requireSourceEvidence: true
+        }
+      )
+    ).toThrow(/unknown source evidence/);
+  });
+
+  it("rejects provider moments without source evidence when source grounding is required", () => {
+    expect(() =>
+      parseWalkthroughAnalysis(
+        {
+          output_text: JSON.stringify({
+            summary: "The demo shows setup, product action, and final outcome.",
+            moments: [
+              {
+                label: "Setup",
+                startMs: 0,
+                endMs: 5000,
+                evidence: "The first screen establishes the setup.",
+                sourceEvidenceIds: [],
+                confidence: 0.7
+              }
+            ]
+          })
+        },
+        30_000,
+        {
+          allowedEvidenceIds: ["frame:frame-1"],
+          requireSourceEvidence: true
+        }
+      )
+    ).toThrow(/did not cite source evidence/);
+  });
+
+  it("rejects malformed source evidence references", () => {
+    expect(() =>
+      parseWalkthroughAnalysis(
+        {
+          output_text: JSON.stringify({
+            summary: "The demo shows setup, product action, and final outcome.",
+            moments: [
+              {
+                label: "Setup",
+                startMs: 0,
+                endMs: 5000,
+                evidence: "The first screen establishes the setup.",
+                sourceEvidenceIds: ["frame:frame-1", 42],
+                confidence: 0.7
+              }
+            ]
+          })
+        },
+        30_000,
+        {
+          allowedEvidenceIds: ["frame:frame-1"],
+          requireSourceEvidence: true
+        }
+      )
+    ).toThrow(/invalid sourceEvidenceIds/);
   });
 });
 
@@ -143,6 +227,7 @@ describe("OpenAI provider requests", () => {
                   startMs: 1000,
                   endMs: 5000,
                   evidence: "The transcript and fallback moment both describe the result.",
+                  sourceEvidenceIds: ["frame:frame-moment-1", "moment:moment-1"],
                   confidence: 0.82
                 }
               ]
@@ -181,6 +266,7 @@ describe("OpenAI provider requests", () => {
     });
 
     expect(result.moments[0]?.label).toBe("Proof moment");
+    expect(result.moments[0]?.sourceEvidenceIds).toEqual(["frame:frame-moment-1", "moment:moment-1"]);
     expect(requests[0]?.url).toBe("https://api.example.test/v1/responses");
     const body = JSON.parse(String(requests[0]?.init.body)) as {
       model: string;
@@ -190,6 +276,8 @@ describe("OpenAI provider requests", () => {
     expect(body.model).toBe("gpt-test");
     expect(body.text.format.type).toBe("json_schema");
     expect(body.input[1]?.content).toContain("Qualified leads generated");
+    expect(body.input[1]?.content).toContain("frame:frame-moment-1");
+    expect(body.input[1]?.content).toContain("moment:moment-1");
   });
 
   it("posts image data URLs for frame OCR requests", async () => {

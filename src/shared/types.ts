@@ -353,6 +353,7 @@ export interface DetectedMoment {
   startMs: number;
   endMs: number;
   evidence: string;
+  sourceEvidenceIds?: string[];
   confidence: number;
   enabled: boolean;
   thumbnailPath?: string;
