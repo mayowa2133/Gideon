@@ -10,7 +10,7 @@ Gideon is no longer only a local deterministic desktop prototype. The repository
 
 The remaining production gap is narrower and mostly operational: replace local JSON-backed hosted state with production database-backed persistence, run Redis/BullMQ and object storage as managed production services, complete deployment/release operations, and execute a final end-to-end production smoke with real infrastructure. Social posting, scheduling, avatar generation, and voice cloning remain explicit post-MVP items.
 
-Current engineering estimate: **99.999997% complete** toward the full original product vision.
+Current engineering estimate: **99.999998% complete** toward the full original product vision.
 
 ## Capability audit
 
@@ -105,6 +105,7 @@ pnpm production:observability:check -- --dry-run
 pnpm production:storage:check -- --dry-run
 pnpm production:storage:check -- --verify-bucket-lifecycle
 pnpm production:storage-download:smoke -- --dry-run
+pnpm production:provider-canary-report:check -- --dry-run
 pnpm production:release-receipt:check -- --dry-run
 pnpm production:promote:check -- --dry-run
 pnpm production:evidence:check -- --dry-run
@@ -120,9 +121,9 @@ pnpm production:check
 1. Production database-backed hosted persistence is mostly closed by the pluggable persistence boundary, hosted-worker PostgreSQL snapshot wiring, live relational mirroring for users, workspaces, members, projects, upload sessions, jobs, artifacts, usage, and audit records, scoped core/job/artifact service-query reads, billing reconciliation preflight, production PostgreSQL policy verification through `pnpm production:db:check`, and an aggregate staging-readiness gate; remaining work is running strict checks against real staging infrastructure and live Stripe data.
 2. Managed Redis/BullMQ operations live execution. Production retention, concurrency, retry, and dead-letter policy validation is now covered by `pnpm production:queue:check`.
 3. Production object storage credentials. The private S3/R2 lifecycle/deletion/signed-URL policy preflight, actual bucket lifecycle XML coverage check, and signed-download smoke are now covered by `pnpm production:storage:check -- --verify-bucket-lifecycle` and `pnpm production:storage-download:smoke`.
-4. Live provider canary execution for analysis, ASR/OCR where configured, and TTS with production credentials and staging fixtures; cost ceilings are now enforced by `pnpm provider:canary -- --live` and strict staging/live env checks.
+4. Live provider canary execution for analysis, ASR/OCR where configured, and TTS with production credentials and staging fixtures; cost ceilings are now enforced by `pnpm provider:canary -- --live`, persisted safe report verification through `pnpm production:provider-canary-report:check`, and strict staging/live env checks.
 5. Signed and notarized macOS release artifact, plus production release provenance. Safe notarization/stapling/Gatekeeper/install-smoke receipt verification is now covered by `pnpm production:release-receipt:check`.
-6. End-to-end staging smoke from upload to private export package and hosted MCP smoke using production-shaped infrastructure; `pnpm staging:check -- --strict` now guards the required deployed API, auth callback, live flags, recording fixture, scratch MCP session/project, provider, storage lifecycle policy, queue, database, observability, and release configuration, `pnpm staging:smoke -- --live` executes the deployed upload-to-export path, `pnpm staging:mcp:smoke -- --live --require-metric-export` verifies the hosted Codex/Claude control path, `pnpm production:check` runs the local non-credential promotion gate, and `pnpm production:promote:check -- --live` now composes billing reconciliation, production PostgreSQL policy verification, production BullMQ policy verification, production observability policy verification, actual bucket lifecycle verification, the live promotion sequence, and writes plus self-verifies a safe promotion evidence report.
+6. End-to-end staging smoke from upload to private export package and hosted MCP smoke using production-shaped infrastructure; `pnpm staging:check -- --strict` now guards the required deployed API, auth callback, live flags, recording fixture, scratch MCP session/project, provider, storage lifecycle policy, queue, database, observability, and release configuration, `pnpm staging:smoke -- --live` executes the deployed upload-to-export path, `pnpm staging:mcp:smoke -- --live --require-metric-export` verifies the hosted Codex/Claude control path, `pnpm production:check` runs the local non-credential promotion gate, and `pnpm production:promote:check -- --live` now composes billing reconciliation, production PostgreSQL policy verification, production BullMQ policy verification, production observability policy verification, actual bucket lifecycle verification, live provider canary report verification, the live promotion sequence, and writes plus self-verifies a safe promotion evidence report.
 
 ## Next engineering slice
 

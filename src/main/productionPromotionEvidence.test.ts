@@ -82,6 +82,7 @@ async function writeEvidenceFixture(
     "production storage lifecycle policy",
     "production storage signed-download smoke",
     "live provider canaries",
+    "provider canary report",
     "live staging upload-to-export smoke",
     "live staging hosted MCP smoke"
   ];
@@ -95,7 +96,12 @@ async function writeEvidenceFixture(
   const steps = stepNames.map((name, index) => ({
     name,
     command: ["pnpm", name.replaceAll(" ", "-"), ...(input.unsafeCommandPart && index === 0 ? [input.unsafeCommandPart] : [])],
-    env: name === "production macOS release metadata" ? { GIDEON_RELEASE_CHANNEL: "production" } : {},
+    env:
+      name === "production macOS release metadata"
+        ? { GIDEON_RELEASE_CHANNEL: "production" }
+        : name === "live provider canaries" || name === "provider canary report"
+          ? { GIDEON_PROVIDER_CANARY_REPORT_PATH: "tmp/provider-canary-report.json" }
+          : {},
     startedAt: now,
     finishedAt: now,
     durationMs: 10,

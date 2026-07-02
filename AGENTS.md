@@ -80,6 +80,7 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm production:queue:check
 - pnpm production:observability:check
 - pnpm production:storage:check
+- pnpm production:provider-canary-report:check
 - pnpm production:release-receipt:check
 - pnpm worker:hosted:check
 - pnpm release:mac:check

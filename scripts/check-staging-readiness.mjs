@@ -70,6 +70,7 @@ function validateCommandContract() {
     "production:observability:check",
     "production:storage:check",
     "production:storage-download:smoke",
+    "production:provider-canary-report:check",
     "production:release-receipt:check"
   ]) {
     if (typeof scripts[scriptName] !== "string") {

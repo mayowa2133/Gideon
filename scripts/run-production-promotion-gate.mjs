@@ -13,6 +13,9 @@ const releaseDmg = path.join("release", "Gideon-0.1.0-arm64.dmg");
 const evidencePath =
   process.env.GIDEON_PRODUCTION_PROMOTION_EVIDENCE_PATH?.trim() ||
   path.join("tmp", "production-promotion-evidence.json");
+const providerCanaryReportPath =
+  process.env.GIDEON_PROVIDER_CANARY_REPORT_PATH?.trim() ||
+  path.join("tmp", "provider-canary-report.json");
 
 const steps = [
   step("local production readiness gate", [pnpm, "production:check"]),
@@ -23,7 +26,12 @@ const steps = [
   step("production observability policy", [pnpm, "production:observability:check"]),
   step("production storage lifecycle policy", [pnpm, "production:storage:check", "--", "--verify-bucket-lifecycle"]),
   step("production storage signed-download smoke", [pnpm, "production:storage-download:smoke"]),
-  step("live provider canaries", [pnpm, "provider:canary", "--", "--live"]),
+  step("live provider canaries", [pnpm, "provider:canary", "--", "--live"], {
+    GIDEON_PROVIDER_CANARY_REPORT_PATH: providerCanaryReportPath
+  }),
+  step("provider canary report", [pnpm, "production:provider-canary-report:check"], {
+    GIDEON_PROVIDER_CANARY_REPORT_PATH: providerCanaryReportPath
+  }),
   step("live staging upload-to-export smoke", [pnpm, "staging:smoke", "--", "--live"]),
   step("live staging hosted MCP smoke", [pnpm, "staging:mcp:smoke", "--", "--live", "--require-metric-export"]),
   ...(skipPackage
@@ -153,7 +161,7 @@ function finishEvidenceStep(evidenceStep, startedAt, status, exitCode, error) {
 
 function safeEnv(env) {
   return Object.fromEntries(
-    Object.entries(env ?? {}).filter(([key]) => key === "GIDEON_RELEASE_CHANNEL")
+    Object.entries(env ?? {}).filter(([key]) => key === "GIDEON_RELEASE_CHANNEL" || key === "GIDEON_PROVIDER_CANARY_REPORT_PATH")
   );
 }
 

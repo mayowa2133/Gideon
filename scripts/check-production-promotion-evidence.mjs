@@ -20,6 +20,7 @@ const REQUIRED_BASE_STEPS = [
   "production storage lifecycle policy",
   "production storage signed-download smoke",
   "live provider canaries",
+  "provider canary report",
   "live staging upload-to-export smoke",
   "live staging hosted MCP smoke"
 ];
@@ -169,7 +170,7 @@ function validateStep(step, position) {
     return;
   }
   for (const key of Object.keys(env)) {
-    if (key !== "GIDEON_RELEASE_CHANNEL") {
+    if (key !== "GIDEON_RELEASE_CHANNEL" && key !== "GIDEON_PROVIDER_CANARY_REPORT_PATH") {
       errors.push(`Step ${position} (${step.name ?? "unknown"}) records unsafe env key ${key}.`);
     }
   }

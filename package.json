@@ -39,6 +39,7 @@
     "production:observability:check": "node scripts/check-observability-policy.mjs",
     "production:storage:check": "node scripts/check-storage-policy.mjs",
     "production:storage-download:smoke": "node scripts/run-storage-download-smoke.mjs",
+    "production:provider-canary-report:check": "node scripts/check-provider-canary-report.mjs",
     "production:release-receipt:check": "node scripts/check-release-receipt.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs",
     "lint": "node scripts/lint-repository.mjs",
