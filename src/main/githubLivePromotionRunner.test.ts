@@ -179,7 +179,12 @@ function createEvidence(input: { skipPackage?: boolean } = {}) {
     "live staging upload-to-export smoke",
     "live staging hosted MCP smoke"
   ];
-  const releaseSteps = ["signed macOS package", "production macOS release metadata", "production macOS DMG verification"];
+  const releaseSteps = [
+    "signed macOS package",
+    "production macOS release metadata",
+    "production release notarization receipt",
+    "production macOS DMG verification"
+  ];
   const stepNames = input.skipPackage ? baseSteps : [...baseSteps, ...releaseSteps];
   return {
     schemaVersion: 1,

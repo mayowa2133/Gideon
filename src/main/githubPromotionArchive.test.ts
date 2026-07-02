@@ -86,6 +86,7 @@ function createEvidence() {
     "live staging hosted MCP smoke",
     "signed macOS package",
     "production macOS release metadata",
+    "production release notarization receipt",
     "production macOS DMG verification"
   ];
   return {

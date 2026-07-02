@@ -69,7 +69,8 @@ function validateCommandContract() {
     "production:queue:check",
     "production:observability:check",
     "production:storage:check",
-    "production:storage-download:smoke"
+    "production:storage-download:smoke",
+    "production:release-receipt:check"
   ]) {
     if (typeof scripts[scriptName] !== "string") {
       errors.push(`package.json must define ${scriptName}.`);

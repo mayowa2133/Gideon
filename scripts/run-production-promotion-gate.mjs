@@ -33,6 +33,7 @@ const steps = [
         step("production macOS release metadata", [pnpm, "release:mac:check"], {
           GIDEON_RELEASE_CHANNEL: "production"
         }),
+        step("production release notarization receipt", [pnpm, "production:release-receipt:check"]),
         step("production macOS DMG verification", ["hdiutil", "verify", releaseDmg], undefined, {
           requireFile: releaseDmg
         })

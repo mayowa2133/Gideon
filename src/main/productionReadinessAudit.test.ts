@@ -8,8 +8,8 @@ describe("production readiness audit", () => {
   it("tracks the current README completion estimate", () => {
     const readme = readFileSync(path.join(process.cwd(), "README.md"), "utf8");
 
-    expect(readme).toContain("Current engineering estimate: **99.999996% complete**");
-    expect(audit).toContain("Current engineering estimate: **99.999996% complete**");
+    expect(readme).toContain("Current engineering estimate: **99.999997% complete**");
+    expect(audit).toContain("Current engineering estimate: **99.999997% complete**");
   });
 
   it("maps the original product gaps to evidence and remaining work", () => {
@@ -51,6 +51,7 @@ describe("production readiness audit", () => {
       "pnpm production:queue:check",
       "pnpm production:observability:check",
       "pnpm production:storage:check",
+      "pnpm production:release-receipt:check",
       "pnpm production:check"
     ]) {
       expect(audit).toContain(blocker);

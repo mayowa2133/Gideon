@@ -35,6 +35,7 @@ const steps = [
   step("production observability policy dry-run", [pnpm, "production:observability:check", "--", "--dry-run"]),
   step("production storage lifecycle dry-run", [pnpm, "production:storage:check", "--", "--dry-run"]),
   step("production storage signed-download smoke dry-run", [pnpm, "production:storage-download:smoke", "--", "--dry-run"]),
+  step("production release receipt dry-run", [pnpm, "production:release-receipt:check", "--", "--dry-run"]),
   step("production promotion gate dry-run", [pnpm, "production:promote:check", "--", "--dry-run"]),
   step("local hosted worker preflight", [pnpm, "worker:hosted:check"], localWorkerEnv()),
   step("production-shaped hosted worker preflight", [pnpm, "worker:hosted:check"], productionWorkerEnv()),

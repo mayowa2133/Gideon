@@ -28,6 +28,7 @@ describe("production promotion gate", () => {
     expect(result.stdout).toContain("live staging hosted MCP smoke");
     expect(result.stdout).toContain("signed macOS package");
     expect(result.stdout).toContain("GIDEON_RELEASE_CHANNEL=production");
+    expect(result.stdout).toContain("production release notarization receipt");
     expect(result.stdout).toContain("Live evidence report path:");
     expect(result.stdout).toContain("GIDEON_PRODUCTION_PROMOTION_LIVE=true");
   });

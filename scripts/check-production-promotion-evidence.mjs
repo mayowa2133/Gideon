@@ -27,6 +27,7 @@ const REQUIRED_BASE_STEPS = [
 const REQUIRED_RELEASE_STEPS = [
   "signed macOS package",
   "production macOS release metadata",
+  "production release notarization receipt",
   "production macOS DMG verification"
 ];
 
