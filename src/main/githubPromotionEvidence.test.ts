@@ -21,7 +21,7 @@ describe("GitHub promotion evidence artifact check", () => {
     expect(result.stdout).toContain("release receipt evidence");
     expect(result.stdout).toContain("Verify the promotion evidence, provider canary report, and release receipt summary with local checkers.");
     expect(result.stdout).toContain("verify evidence gitCommit matches gh run view headSha");
-    expect(result.stdout).toContain("write a safe verification receipt");
+    expect(result.stdout).toContain("write a safe verification receipt with SHA-256 artifact digests");
   });
 
   it("verifies an already downloaded evidence artifact", async () => {
@@ -131,9 +131,9 @@ describe("GitHub promotion evidence artifact check", () => {
     const receipt = JSON.parse(await fs.readFile(receiptPath, "utf8")) as {
       repository: string;
       runId: string;
-      evidence: { gitCommit: string; stepCount: number };
-      providerCanaryReport: { mode: string; capabilityCount: number; capabilities: string[] };
-      releaseReceipt: { product: string; channel: string; notarizationStatus: string; installSmokeResult: string };
+      evidence: { gitCommit: string; stepCount: number; sha256: string };
+      providerCanaryReport: { mode: string; capabilityCount: number; capabilities: string[]; sha256: string };
+      releaseReceipt: { product: string; channel: string; notarizationStatus: string; installSmokeResult: string; sha256: string };
       githubRun: { headSha: string; event: string };
       checks: { secretPolicy: string; runMetadata: string; providerCanaryReport: string; releaseReceipt: string };
     };
@@ -141,13 +141,16 @@ describe("GitHub promotion evidence artifact check", () => {
     expect(receipt.runId).toBe("12345");
     expect(receipt.evidence.gitCommit).toBe("0123456789abcdef0123456789abcdef01234567");
     expect(receipt.evidence.stepCount).toBe(16);
+    expect(receipt.evidence.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(receipt.providerCanaryReport.mode).toBe("live");
     expect(receipt.providerCanaryReport.capabilityCount).toBe(4);
     expect(receipt.providerCanaryReport.capabilities).toEqual(["analysis", "ocr", "transcription", "tts"]);
+    expect(receipt.providerCanaryReport.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(receipt.releaseReceipt.product).toBe("Gideon");
     expect(receipt.releaseReceipt.channel).toBe("production");
     expect(receipt.releaseReceipt.notarizationStatus).toBe("accepted");
     expect(receipt.releaseReceipt.installSmokeResult).toBe("passed");
+    expect(receipt.releaseReceipt.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(receipt.githubRun.headSha).toBe("0123456789abcdef0123456789abcdef01234567");
     expect(receipt.githubRun.event).toBe("workflow_dispatch");
     expect(receipt.checks.runMetadata).toBe("passed");

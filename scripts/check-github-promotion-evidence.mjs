@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -36,7 +37,7 @@ if (dryRun) {
   console.log(`4. Locate ${evidenceFilename}, ${providerReportFilename}, and release receipt evidence recursively inside the artifact directory.`);
   console.log("5. Verify the promotion evidence, provider canary report, and release receipt summary with local checkers.");
   console.log("6. When --run-id is available, verify evidence gitCommit matches gh run view headSha.");
-  console.log("7. When --write-receipt is provided, write a safe verification receipt without secrets or provider payloads.");
+  console.log("7. When --write-receipt is provided, write a safe verification receipt with SHA-256 artifact digests and without secrets or provider payloads.");
   process.exit(0);
 }
 
@@ -202,7 +203,8 @@ function writeReceipt(input) {
       generatedAt: input.evidence.generatedAt,
       finishedAt: input.evidence.finishedAt,
       skipPackage: Boolean(input.evidence.skipPackage),
-      stepCount: Array.isArray(input.evidence.steps) ? input.evidence.steps.length : 0
+      stepCount: Array.isArray(input.evidence.steps) ? input.evidence.steps.length : 0,
+      sha256: sha256File(input.evidencePath)
     },
     providerCanaryReport: {
       path: path.relative(process.cwd(), input.providerReportPath),
@@ -210,7 +212,8 @@ function writeReceipt(input) {
       providerConfigured: input.providerReport.providerConfigured,
       generatedAt: input.providerReport.generatedAt,
       capabilityCount: providerCapabilities.length,
-      capabilities: providerCapabilities
+      capabilities: providerCapabilities,
+      sha256: sha256File(input.providerReportPath)
     },
     releaseReceipt: input.releaseReceipt
       ? {
@@ -225,7 +228,8 @@ function writeReceipt(input) {
           notarizationStatus: input.releaseReceipt.notarization?.status ?? null,
           staplingDmg: input.releaseReceipt.stapling?.dmg ?? null,
           gatekeeperAssessment: input.releaseReceipt.gatekeeper?.spctlAssessment ?? null,
-          installSmokeResult: input.releaseReceipt.installSmoke?.result ?? null
+          installSmokeResult: input.releaseReceipt.installSmoke?.result ?? null,
+          sha256: sha256File(input.releaseReceiptPath)
         }
       : null,
     githubRun: input.runMetadata
@@ -248,6 +252,10 @@ function writeReceipt(input) {
   };
   fs.mkdirSync(path.dirname(input.receiptPath), { recursive: true });
   fs.writeFileSync(input.receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+}
+
+function sha256File(filePath) {
+  return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 }
 
 function validateArchivedReleaseReceipt(releaseReceipt) {

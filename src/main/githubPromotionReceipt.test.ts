@@ -19,6 +19,7 @@ describe("GitHub promotion verification receipt check", () => {
     expect(result.stdout).toContain("Require successful live evidence metadata");
     expect(result.stdout).toContain("provider canary report summary");
     expect(result.stdout).toContain("release receipt summary");
+    expect(result.stdout).toContain("SHA-256 artifact digests");
     expect(result.stdout).toContain("Scan receipt fields for secret-like material");
   });
 
@@ -97,7 +98,8 @@ function createReceipt(input: { headSha?: string; repository?: string; omitProvi
       generatedAt: now,
       finishedAt: now,
       skipPackage: false,
-      stepCount: 16
+      stepCount: 16,
+      sha256: "a".repeat(64)
     },
     providerCanaryReport: {
       path: "tmp/github-production-promotion-evidence/artifact/provider-canary-report.json",
@@ -105,7 +107,8 @@ function createReceipt(input: { headSha?: string; repository?: string; omitProvi
       providerConfigured: true,
       generatedAt: now,
       capabilityCount: 4,
-      capabilities: ["analysis", "ocr", "transcription", "tts"]
+      capabilities: ["analysis", "ocr", "transcription", "tts"],
+      sha256: "b".repeat(64)
     },
     releaseReceipt: {
       path: "tmp/github-production-promotion-evidence/artifact/release-receipt.json",
@@ -119,7 +122,8 @@ function createReceipt(input: { headSha?: string; repository?: string; omitProvi
       notarizationStatus: "accepted",
       staplingDmg: "accepted",
       gatekeeperAssessment: "accepted",
-      installSmokeResult: "passed"
+      installSmokeResult: "passed",
+      sha256: "c".repeat(64)
     },
     githubRun: {
       databaseId: 12345,

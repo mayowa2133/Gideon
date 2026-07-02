@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -19,6 +20,7 @@ describe("GitHub promotion archive bundle check", () => {
     expect(result.stdout).toContain("Re-run production evidence, provider canary report, and GitHub receipt validators");
     expect(result.stdout).toContain("provider canary report");
     expect(result.stdout).toContain("release receipt summaries");
+    expect(result.stdout).toContain("SHA-256 artifact digests");
   });
 
   it("accepts a consistent archived evidence and receipt bundle", async () => {
@@ -34,6 +36,15 @@ describe("GitHub promotion archive bundle check", () => {
 
     await expect(runArchiveCheck(archiveDir)).rejects.toMatchObject({
       stderr: expect.stringContaining("Receipt evidence.stepCount must match archived promotion evidence")
+    });
+  });
+
+  it("rejects archived file contents that drift without summary changes", async () => {
+    const archiveDir = await writeArchiveFixture();
+    await fs.appendFile(path.join(archiveDir, "artifact", "provider-canary-report.json"), "\n");
+
+    await expect(runArchiveCheck(archiveDir)).rejects.toMatchObject({
+      stderr: expect.stringContaining("Receipt providerCanaryReport.sha256 must match archived promotion evidence")
     });
   });
 
@@ -65,12 +76,24 @@ async function writeArchiveFixture(input: { receiptStepCount?: number } = {}): P
   const evidence = createEvidence();
   const providerReport = createProviderCanaryReport();
   const releaseReceipt = createReleaseReceipt();
-  await fs.writeFile(path.join(artifactDir, "production-promotion-evidence.json"), `${JSON.stringify(evidence, null, 2)}\n`);
-  await fs.writeFile(path.join(artifactDir, "provider-canary-report.json"), `${JSON.stringify(providerReport, null, 2)}\n`);
-  await fs.writeFile(path.join(artifactDir, "release-receipt.json"), `${JSON.stringify(releaseReceipt, null, 2)}\n`);
+  const evidenceJson = `${JSON.stringify(evidence, null, 2)}\n`;
+  const providerReportJson = `${JSON.stringify(providerReport, null, 2)}\n`;
+  const releaseReceiptJson = `${JSON.stringify(releaseReceipt, null, 2)}\n`;
+  await fs.writeFile(path.join(artifactDir, "production-promotion-evidence.json"), evidenceJson);
+  await fs.writeFile(path.join(artifactDir, "provider-canary-report.json"), providerReportJson);
+  await fs.writeFile(path.join(artifactDir, "release-receipt.json"), releaseReceiptJson);
   await fs.writeFile(
     path.join(archiveDir, "verification-receipt.json"),
-    `${JSON.stringify(createReceipt(evidence, providerReport, releaseReceipt, input), null, 2)}\n`
+    `${JSON.stringify(
+      createReceipt(evidence, providerReport, releaseReceipt, {
+        ...input,
+        evidenceSha256: sha256(evidenceJson),
+        providerReportSha256: sha256(providerReportJson),
+        releaseReceiptSha256: sha256(releaseReceiptJson)
+      }),
+      null,
+      2
+    )}\n`
   );
   return archiveDir;
 }
@@ -197,7 +220,7 @@ function createReceipt(
   evidence: ReturnType<typeof createEvidence>,
   providerReport: ReturnType<typeof createProviderCanaryReport>,
   releaseReceipt: ReturnType<typeof createReleaseReceipt>,
-  input: { receiptStepCount?: number } = {}
+  input: { receiptStepCount?: number; evidenceSha256?: string; providerReportSha256?: string; releaseReceiptSha256?: string } = {}
 ) {
   const capabilities = providerReport.results.map((result) => result.capability).sort();
   return {
@@ -215,7 +238,8 @@ function createReceipt(
       generatedAt: evidence.generatedAt,
       finishedAt: evidence.finishedAt,
       skipPackage: evidence.skipPackage,
-      stepCount: input.receiptStepCount ?? evidence.steps.length
+      stepCount: input.receiptStepCount ?? evidence.steps.length,
+      sha256: input.evidenceSha256 ?? "a".repeat(64)
     },
     providerCanaryReport: {
       path: "artifact/provider-canary-report.json",
@@ -223,7 +247,8 @@ function createReceipt(
       providerConfigured: providerReport.providerConfigured,
       generatedAt: providerReport.generatedAt,
       capabilityCount: capabilities.length,
-      capabilities
+      capabilities,
+      sha256: input.providerReportSha256 ?? "b".repeat(64)
     },
     releaseReceipt: {
       path: "artifact/release-receipt.json",
@@ -237,7 +262,8 @@ function createReceipt(
       notarizationStatus: releaseReceipt.notarization.status,
       staplingDmg: releaseReceipt.stapling.dmg,
       gatekeeperAssessment: releaseReceipt.gatekeeper.spctlAssessment,
-      installSmokeResult: releaseReceipt.installSmoke.result
+      installSmokeResult: releaseReceipt.installSmoke.result,
+      sha256: input.releaseReceiptSha256 ?? "c".repeat(64)
     },
     githubRun: {
       databaseId: 12345,
@@ -256,4 +282,8 @@ function createReceipt(
         "receipt excludes environment, cookies, API keys, signed URLs, provider payloads, transcripts, prompts, media paths, and artifact contents"
     }
   };
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
