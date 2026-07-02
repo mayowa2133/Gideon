@@ -25,7 +25,7 @@ if (dryRun) {
   console.log("GitHub promotion verification receipt check dry-run:");
   console.log(`1. Read receipt JSON from ${receiptPath}.`);
   console.log("2. Require schemaVersion, verification timestamp, repository, artifact, and evidence summary.");
-  console.log("3. Require successful live evidence metadata, provider canary report summary, release receipt summary, byte sizes, SHA-256 artifact digests, and safe check statuses.");
+  console.log("3. Require successful live evidence metadata, provider canary report summary, release receipt summary, ordered timestamps, byte sizes, SHA-256 artifact digests, and safe check statuses.");
   console.log("4. If GitHub run metadata is present, require completed/success workflow_dispatch plus run id and headSha matching evidence/release metadata.");
   console.log("5. Scan receipt fields for secret-like material, cookies, signed URLs, and provider keys.");
   process.exit(0);
@@ -92,6 +92,7 @@ function validateReceipt(receipt) {
   validateReleaseReceiptSummary(receipt.releaseReceipt, receipt.evidence, receipt.checks);
   validateGitHubRun(receipt.githubRun, receipt.evidence?.gitCommit);
   validateRunLinkage(receipt);
+  validateTimeline(receipt);
   validateChecks(receipt.checks, receipt.githubRun);
   validateSafeMetadata(receipt);
 }
@@ -252,6 +253,27 @@ function validateRunLinkage(receipt) {
   }
 }
 
+function validateTimeline(receipt) {
+  const verifiedAt = parseTimestamp(receipt.verifiedAt);
+  const evidenceGeneratedAt = parseTimestamp(receipt.evidence?.generatedAt);
+  const evidenceFinishedAt = parseTimestamp(receipt.evidence?.finishedAt);
+  const providerGeneratedAt = parseTimestamp(receipt.providerCanaryReport?.generatedAt);
+  const releaseGeneratedAt = receipt.releaseReceipt ? parseTimestamp(receipt.releaseReceipt.generatedAt) : null;
+
+  if (evidenceGeneratedAt !== null && evidenceFinishedAt !== null && evidenceFinishedAt < evidenceGeneratedAt) {
+    errors.push("Receipt evidence.finishedAt must be at or after evidence.generatedAt.");
+  }
+  if (verifiedAt !== null && evidenceFinishedAt !== null && verifiedAt < evidenceFinishedAt) {
+    errors.push("Receipt verifiedAt must be at or after evidence.finishedAt.");
+  }
+  if (verifiedAt !== null && providerGeneratedAt !== null && verifiedAt < providerGeneratedAt) {
+    errors.push("Receipt verifiedAt must be at or after providerCanaryReport.generatedAt.");
+  }
+  if (verifiedAt !== null && releaseGeneratedAt !== null && verifiedAt < releaseGeneratedAt) {
+    errors.push("Receipt verifiedAt must be at or after releaseReceipt.generatedAt.");
+  }
+}
+
 function validateChecks(checks, githubRun) {
   if (!checks || typeof checks !== "object" || Array.isArray(checks)) {
     errors.push("Receipt checks must be an object.");
@@ -299,6 +321,14 @@ function requireIsoTimestamp(value, label) {
   if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
     errors.push(`Receipt ${label} must be an ISO timestamp.`);
   }
+}
+
+function parseTimestamp(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
 }
 
 function requireSha256(value, label) {

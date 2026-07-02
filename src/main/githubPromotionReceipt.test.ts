@@ -56,6 +56,25 @@ describe("GitHub promotion verification receipt check", () => {
     });
   });
 
+  it("rejects receipts verified before evidence finished", async () => {
+    const receiptPath = await writeReceiptFixture({ verifiedAt: "2026-07-01T11:59:59.000Z" });
+
+    await expect(runReceiptCheck(receiptPath)).rejects.toMatchObject({
+      stderr: expect.stringContaining("verifiedAt must be at or after evidence.finishedAt")
+    });
+  });
+
+  it("rejects evidence chronology where finish precedes generation", async () => {
+    const receiptPath = await writeReceiptFixture({
+      evidenceGeneratedAt: "2026-07-01T12:01:00.000Z",
+      evidenceFinishedAt: "2026-07-01T12:00:00.000Z"
+    });
+
+    await expect(runReceiptCheck(receiptPath)).rejects.toMatchObject({
+      stderr: expect.stringContaining("evidence.finishedAt must be at or after evidence.generatedAt")
+    });
+  });
+
   it("rejects receipts containing secret-like material", async () => {
     const receiptPath = await writeReceiptFixture({ repository: "contains-uploadUrl-marker" });
 
@@ -92,6 +111,9 @@ async function writeReceiptFixture(
   input: {
     headSha?: string;
     repository?: string;
+    verifiedAt?: string;
+    evidenceGeneratedAt?: string;
+    evidenceFinishedAt?: string;
     githubRunDatabaseId?: number;
     releaseWorkflowRunId?: string;
     omitProviderCanaryReport?: boolean;
@@ -108,6 +130,9 @@ function createReceipt(
   input: {
     headSha?: string;
     repository?: string;
+    verifiedAt?: string;
+    evidenceGeneratedAt?: string;
+    evidenceFinishedAt?: string;
     githubRunDatabaseId?: number;
     releaseWorkflowRunId?: string;
     omitProviderCanaryReport?: boolean;
@@ -118,7 +143,7 @@ function createReceipt(
   const gitCommit = "0123456789abcdef0123456789abcdef01234567";
   const receipt = {
     schemaVersion: 1,
-    verifiedAt: now,
+    verifiedAt: input.verifiedAt ?? now,
     repository: input.repository ?? "example/Gideon",
     runId: "12345",
     artifactName: "Gideon-production-promotion-evidence",
@@ -128,8 +153,8 @@ function createReceipt(
       mode: "live",
       status: "succeeded",
       gitCommit,
-      generatedAt: now,
-      finishedAt: now,
+      generatedAt: input.evidenceGeneratedAt ?? now,
+      finishedAt: input.evidenceFinishedAt ?? now,
       skipPackage: false,
       stepCount: 16,
       sizeBytes: 1024,
