@@ -171,8 +171,11 @@ async function runLiveCanaries(input: {
           if (transcript.status !== "completed" || !transcript.text.trim()) {
             throw new Error("Transcription canary returned no completed transcript text.");
           }
+          if (transcript.segments.length === 0) {
+            throw new Error("Transcription canary returned no timestamped transcript segments.");
+          }
           return {
-            message: "Transcription canary passed with completed transcript text.",
+            message: `Transcription canary passed with ${transcript.segments.length} timestamped segment(s).`,
             costUsd: canaryCost("transcription", costCeilings, transcript)
           };
         },

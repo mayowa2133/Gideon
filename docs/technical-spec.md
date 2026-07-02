@@ -382,6 +382,7 @@ MVP policy defaults:
 - Use VAD to reduce silence hallucinations while preserving timestamps.
 - Output immutable JSON with segments, words, language, confidence where available, provider/model/version, compute type, duration, and warnings.
 - Validate word order/bounds and cap text size before database projection.
+- Provider-backed ASR requests must ask for timestamped segment output when the provider supports it; plain-text responses are tolerated only as a bounded full-duration fallback and live canaries must prove timestamped segments are available before promotion.
 - Store full transcript artifact in object storage and query-friendly segments/words or compressed JSON in PostgreSQL according to measured size.
 - Silent/no-audio is a successful typed result, not a job failure.
 

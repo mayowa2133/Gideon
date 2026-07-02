@@ -154,7 +154,8 @@ export class OpenAiProvider {
     const audioBytes = await fs.readFile(audioPath);
     const form = new FormData();
     form.append("model", this.config.transcriptionModel);
-    form.append("response_format", "json");
+    form.append("response_format", "verbose_json");
+    form.append("timestamp_granularities[]", "segment");
     form.append("file", new Blob([new Uint8Array(audioBytes)], { type: "audio/wav" }), path.basename(audioPath));
 
     const response = await this.fetchJson(`${this.config.baseUrl}/audio/transcriptions`, {
@@ -311,7 +312,7 @@ function extractOutputText(response: Record<string, unknown>): string {
   throw new Error("OpenAI response did not include output text.");
 }
 
-function parseTranscriptSegments(
+export function parseTranscriptSegments(
   response: Record<string, unknown>,
   text: string,
   durationMs: number
@@ -330,10 +331,16 @@ function parseTranscriptSegments(
       if (!segmentText) {
         return;
       }
+      const maxEndMs = Math.max(1, durationMs);
+      const startMs = clampInteger(Math.round(startSec * 1000), 0, maxEndMs - 1);
+      const endMs = clampInteger(Math.round(endSec * 1000), startMs + 1, maxEndMs);
+      if (endMs <= startMs) {
+        return;
+      }
       segments.push({
         id: randomUUID(),
-        startMs: clampInteger(Math.round(startSec * 1000), 0, durationMs),
-        endMs: clampInteger(Math.round(endSec * 1000), 0, durationMs),
+        startMs,
+        endMs,
         text: segmentText,
         confidence: typeof item.confidence === "number" ? item.confidence : undefined,
         speaker: typeof item.speaker === "string" ? item.speaker : undefined

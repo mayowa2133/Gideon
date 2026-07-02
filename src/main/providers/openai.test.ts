@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadProviderConfig } from "./config";
-import { OpenAiProvider, parseFrameOcr, parseWalkthroughAnalysis } from "./openai";
+import { OpenAiProvider, parseFrameOcr, parseTranscriptSegments, parseWalkthroughAnalysis } from "./openai";
 import type { ProductProfile, RecordingMetadata } from "../../shared/types";
 
 const profile: ProductProfile = {
@@ -203,6 +203,53 @@ describe("OpenAI frame OCR parsing", () => {
   });
 });
 
+describe("OpenAI transcription parsing", () => {
+  it("normalizes timestamped transcript segments and skips empty text", () => {
+    const segments = parseTranscriptSegments(
+      {
+        segments: [
+          { start: -1, end: 1.4, text: "  First step  ", confidence: 0.91, speaker: "founder" },
+          { start: 1.4, end: 1.4, text: "zero length" },
+          { start: 2, end: 40, text: "Final result" },
+          { start: 3, end: 4, text: "   " }
+        ]
+      },
+      "First step Final result",
+      30_000
+    );
+
+    expect(segments).toHaveLength(3);
+    expect(segments[0]).toMatchObject({
+      startMs: 0,
+      endMs: 1400,
+      text: "First step",
+      confidence: 0.91,
+      speaker: "founder"
+    });
+    expect(segments[1]).toMatchObject({
+      startMs: 1400,
+      endMs: 1401,
+      text: "zero length"
+    });
+    expect(segments[2]).toMatchObject({
+      startMs: 2000,
+      endMs: 30_000,
+      text: "Final result"
+    });
+  });
+
+  it("falls back to one full-duration segment for plain text transcription responses", () => {
+    const segments = parseTranscriptSegments({}, "Here is the walkthrough.", 12_000);
+
+    expect(segments).toHaveLength(1);
+    expect(segments[0]).toMatchObject({
+      startMs: 0,
+      endMs: 12_000,
+      text: "Here is the walkthrough."
+    });
+  });
+});
+
 describe("OpenAI provider requests", () => {
   it("posts structured analysis requests to the Responses API", async () => {
     const requests: Array<{ url: string; init: RequestInit }> = [];
@@ -320,5 +367,47 @@ describe("OpenAI provider requests", () => {
     expect(imagePart?.image_url).toMatch(/^data:image\/jpeg;base64,/);
     expect(imagePart?.detail).toBe("low");
     expect(body.text.format).toMatchObject({ type: "json_schema", name: "gideon_frame_ocr" });
+  });
+
+  it("requests verbose timestamped transcription segments", async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const provider = new OpenAiProvider({
+      config: {
+        apiKey: "sk-test",
+        baseUrl: "https://api.example.test/v1",
+        llmModel: "gpt-test",
+        transcriptionModel: "gpt-transcribe-test",
+        ttsModel: "gpt-4o-mini-tts",
+        ttsVoice: "coral"
+      },
+      fetchImpl: async (url, init) => {
+        requests.push({ url: String(url), init: init ?? {} });
+        return new Response(
+          JSON.stringify({
+            text: "Create campaign. Generate scripts.",
+            segments: [
+              { start: 0, end: 1.2, text: "Create campaign." },
+              { start: 1.2, end: 2.6, text: "Generate scripts." }
+            ]
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+    });
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-transcribe-"));
+    const audioPath = path.join(tempDir, "source.wav");
+    await fs.writeFile(audioPath, Buffer.from("RIFF----WAVEfmt "));
+
+    const result = await provider.transcribeAudio(audioPath, recording);
+
+    expect(result.text).toBe("Create campaign. Generate scripts.");
+    expect(result.segments).toHaveLength(2);
+    expect(result.segments[0]).toMatchObject({ startMs: 0, endMs: 1200, text: "Create campaign." });
+    expect(requests[0]?.url).toBe("https://api.example.test/v1/audio/transcriptions");
+    const form = requests[0]?.init.body as FormData;
+    expect(form.get("model")).toBe("gpt-transcribe-test");
+    expect(form.get("response_format")).toBe("verbose_json");
+    expect(form.getAll("timestamp_granularities[]")).toEqual(["segment"]);
+    expect(form.get("file")).toBeInstanceOf(Blob);
   });
 });
