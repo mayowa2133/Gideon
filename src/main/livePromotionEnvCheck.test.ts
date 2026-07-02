@@ -15,6 +15,7 @@ describe("live promotion environment check", () => {
     expect(result.stdout).toContain("Live promotion environment check dry-run:");
     expect(result.stdout).toContain("GIDEON_STAGING_MCP_SESSION_COOKIE");
     expect(result.stdout).toContain("GIDEON_BULLMQ_ATTEMPTS");
+    expect(result.stdout).toContain("GIDEON_POSTGRES_PITR_ENABLED");
     expect(result.stdout).toContain("GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD");
     expect(result.stdout).toContain("GIDEON_STORAGE_TEMP_RETENTION_DAYS");
     expect(result.stdout).toContain("GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY");
@@ -93,6 +94,14 @@ function liveEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     GIDEON_BULLMQ_DEAD_LETTER_POLICY: "retain_failed",
     GIDEON_WORKER_ID: "staging-worker-1",
     GIDEON_DATABASE_URL: "postgres://gideon:secret@db.example.test:5432/gideon?sslmode=require",
+    GIDEON_DATABASE_POOL_MAX: "10",
+    GIDEON_DATABASE_STATEMENT_TIMEOUT_MS: "30000",
+    GIDEON_DATABASE_IDLE_TIMEOUT_MS: "30000",
+    GIDEON_POSTGRES_BACKUP_RETENTION_DAYS: "30",
+    GIDEON_POSTGRES_PITR_ENABLED: "true",
+    GIDEON_POSTGRES_RESTORE_DRILL_AT: new Date().toISOString(),
+    GIDEON_POSTGRES_RESTORE_DRILL_MAX_AGE_DAYS: "90",
+    GIDEON_POSTGRES_MIGRATION_POLICY: "predeploy_migrate",
     GIDEON_SESSION_SECRET: "session-secret",
     GIDEON_STORAGE_PROVIDER: "s3",
     GIDEON_STORAGE_BUCKET: "gideon-private-staging",

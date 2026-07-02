@@ -65,6 +65,7 @@ function validateCommandContract() {
     "production:live-env:check",
     "production:fixtures:materialize",
     "production:billing:check",
+    "production:db:check",
     "production:queue:check",
     "production:storage:check",
     "production:storage-download:smoke"
@@ -149,6 +150,7 @@ function validateOperationalEnvironment() {
       errors.push("Staging database URL should require TLS with sslmode=require unless GIDEON_ALLOW_INSECURE_DATABASE=true.");
     }
   }
+  requirePostgresPolicy();
 
   requireEnv("GIDEON_SESSION_SECRET", "Set GIDEON_SESSION_SECRET for hosted web/API sessions.");
   requireEnv("GIDEON_USER_DATA_DIR", "Set GIDEON_USER_DATA_DIR for worker-local cache/state paths.");
@@ -209,6 +211,45 @@ function requireBullMqPolicy() {
   }
   if (normalize(env.GIDEON_BULLMQ_DEAD_LETTER_POLICY) !== "retain_failed") {
     errors.push("Set GIDEON_BULLMQ_DEAD_LETTER_POLICY=retain_failed for production incident review.");
+  }
+}
+
+function requirePostgresPolicy() {
+  requireIntegerRange("GIDEON_DATABASE_POOL_MAX", 2, 100, "Set GIDEON_DATABASE_POOL_MAX to an integer between 2 and 100.");
+  requireIntegerRange(
+    "GIDEON_DATABASE_STATEMENT_TIMEOUT_MS",
+    1_000,
+    300_000,
+    "Set GIDEON_DATABASE_STATEMENT_TIMEOUT_MS to an integer between 1000 and 300000."
+  );
+  requireIntegerRange(
+    "GIDEON_DATABASE_IDLE_TIMEOUT_MS",
+    1_000,
+    600_000,
+    "Set GIDEON_DATABASE_IDLE_TIMEOUT_MS to an integer between 1000 and 600000."
+  );
+  requireIntegerRange(
+    "GIDEON_POSTGRES_BACKUP_RETENTION_DAYS",
+    7,
+    365,
+    "Set GIDEON_POSTGRES_BACKUP_RETENTION_DAYS to an integer between 7 and 365."
+  );
+  if (normalize(env.GIDEON_POSTGRES_PITR_ENABLED) !== "true") {
+    errors.push("Set GIDEON_POSTGRES_PITR_ENABLED=true for staging point-in-time recovery.");
+  }
+  const restoreMaxAgeDays = requireIntegerRange(
+    "GIDEON_POSTGRES_RESTORE_DRILL_MAX_AGE_DAYS",
+    1,
+    365,
+    "Set GIDEON_POSTGRES_RESTORE_DRILL_MAX_AGE_DAYS to an integer between 1 and 365."
+  );
+  requireRecentIsoTimestamp(
+    "GIDEON_POSTGRES_RESTORE_DRILL_AT",
+    restoreMaxAgeDays,
+    "Set GIDEON_POSTGRES_RESTORE_DRILL_AT to a recent ISO timestamp from a verified restore drill."
+  );
+  if (normalize(env.GIDEON_POSTGRES_MIGRATION_POLICY) !== "predeploy_migrate") {
+    errors.push("Set GIDEON_POSTGRES_MIGRATION_POLICY=predeploy_migrate so migrations run before traffic promotion.");
   }
 }
 
@@ -379,6 +420,25 @@ function requireReadableFile(name, message) {
     }
   } catch {
     errors.push(`${name} must point to a readable file.`);
+  }
+}
+
+function requireRecentIsoTimestamp(name, maxAgeDays, message) {
+  const value = normalize(env[name]);
+  if (!value) {
+    errors.push(message);
+    return;
+  }
+  const parsedMs = Date.parse(value);
+  if (!Number.isFinite(parsedMs)) {
+    errors.push(`${name} must be an ISO-8601 timestamp.`);
+    return;
+  }
+  if (parsedMs > Date.now() + 60_000) {
+    errors.push(`${name} must not be in the future.`);
+  }
+  if (Number.isInteger(maxAgeDays) && Date.now() - parsedMs > maxAgeDays * 24 * 60 * 60 * 1_000) {
+    errors.push(`${name} must be within the last ${maxAgeDays} days.`);
   }
 }
 

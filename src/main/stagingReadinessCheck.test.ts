@@ -55,6 +55,7 @@ describe("staging readiness check", () => {
         GIDEON_WORKER_HEARTBEAT_INTERVAL_MS: "30000",
         GIDEON_STORE_PROVIDER: "postgres_snapshot",
         GIDEON_DATABASE_URL: "postgres://gideon:secret@db.example.test:5432/gideon?sslmode=require",
+        ...postgresPolicyEnv(),
         GIDEON_SESSION_SECRET: "session-secret",
         GIDEON_USER_DATA_DIR: "/var/lib/gideon-worker",
         GIDEON_PROJECTS_DIR: "/var/lib/gideon-worker/projects",
@@ -119,6 +120,7 @@ describe("staging readiness check", () => {
           GIDEON_WORKER_HEARTBEAT_INTERVAL_MS: "30000",
           GIDEON_STORE_PROVIDER: "postgres_snapshot",
           GIDEON_DATABASE_URL: "postgres://gideon:secret@db.example.test:5432/gideon?sslmode=require",
+          ...postgresPolicyEnv(),
           GIDEON_SESSION_SECRET: "session-secret",
           GIDEON_USER_DATA_DIR: "/var/lib/gideon-worker",
           GIDEON_PROJECTS_DIR: "/var/lib/gideon-worker/projects",
@@ -182,6 +184,19 @@ function storagePolicyEnv(): Record<string, string> {
     GIDEON_STORAGE_DELETION_SLA_HOURS: "24",
     GIDEON_SIGNED_URL_MAX_SECONDS: "900",
     GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY: "workspaces/workspace-1/projects/project-1/export/export-1.mp4"
+  };
+}
+
+function postgresPolicyEnv(): Record<string, string> {
+  return {
+    GIDEON_DATABASE_POOL_MAX: "10",
+    GIDEON_DATABASE_STATEMENT_TIMEOUT_MS: "30000",
+    GIDEON_DATABASE_IDLE_TIMEOUT_MS: "30000",
+    GIDEON_POSTGRES_BACKUP_RETENTION_DAYS: "30",
+    GIDEON_POSTGRES_PITR_ENABLED: "true",
+    GIDEON_POSTGRES_RESTORE_DRILL_AT: new Date().toISOString(),
+    GIDEON_POSTGRES_RESTORE_DRILL_MAX_AGE_DAYS: "90",
+    GIDEON_POSTGRES_MIGRATION_POLICY: "predeploy_migrate"
   };
 }
 

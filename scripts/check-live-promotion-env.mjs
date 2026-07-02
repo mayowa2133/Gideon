@@ -24,6 +24,14 @@ const requiredEnv = [
   "GIDEON_BULLMQ_DEAD_LETTER_POLICY",
   "GIDEON_WORKER_ID",
   "GIDEON_DATABASE_URL",
+  "GIDEON_DATABASE_POOL_MAX",
+  "GIDEON_DATABASE_STATEMENT_TIMEOUT_MS",
+  "GIDEON_DATABASE_IDLE_TIMEOUT_MS",
+  "GIDEON_POSTGRES_BACKUP_RETENTION_DAYS",
+  "GIDEON_POSTGRES_PITR_ENABLED",
+  "GIDEON_POSTGRES_RESTORE_DRILL_AT",
+  "GIDEON_POSTGRES_RESTORE_DRILL_MAX_AGE_DAYS",
+  "GIDEON_POSTGRES_MIGRATION_POLICY",
   "GIDEON_SESSION_SECRET",
   "GIDEON_STORAGE_PROVIDER",
   "GIDEON_STORAGE_ENDPOINT",
@@ -97,6 +105,28 @@ if (value("GIDEON_BULLMQ_DEAD_LETTER_POLICY") !== "retain_failed") {
 validateUrl("GIDEON_DATABASE_URL", ["postgres:", "postgresql:"], "GIDEON_DATABASE_URL must be a postgres:// URL.");
 if (value("GIDEON_DATABASE_URL") && !value("GIDEON_DATABASE_URL").includes("sslmode=require")) {
   errors.push("GIDEON_DATABASE_URL must include sslmode=require for live promotion.");
+}
+if (value("GIDEON_DATABASE_URL")) {
+  try {
+    const databaseUrl = new URL(value("GIDEON_DATABASE_URL"));
+    if (databaseUrl.hostname === "localhost" || databaseUrl.hostname === "127.0.0.1") {
+      errors.push("GIDEON_DATABASE_URL must point to managed PostgreSQL for live promotion.");
+    }
+  } catch {
+    // validateUrl already records the URL failure.
+  }
+}
+validateRetentionWindow("GIDEON_DATABASE_POOL_MAX", 2, 100);
+validateRetentionWindow("GIDEON_DATABASE_STATEMENT_TIMEOUT_MS", 1_000, 300_000);
+validateRetentionWindow("GIDEON_DATABASE_IDLE_TIMEOUT_MS", 1_000, 600_000);
+validateRetentionWindow("GIDEON_POSTGRES_BACKUP_RETENTION_DAYS", 7, 365);
+if (value("GIDEON_POSTGRES_PITR_ENABLED") !== "true") {
+  errors.push("GIDEON_POSTGRES_PITR_ENABLED must be true for live promotion.");
+}
+const restoreDrillMaxAgeDays = validateRetentionWindow("GIDEON_POSTGRES_RESTORE_DRILL_MAX_AGE_DAYS", 1, 365);
+validateRecentIsoTimestamp("GIDEON_POSTGRES_RESTORE_DRILL_AT", restoreDrillMaxAgeDays);
+if (value("GIDEON_POSTGRES_MIGRATION_POLICY") !== "predeploy_migrate") {
+  errors.push("GIDEON_POSTGRES_MIGRATION_POLICY must be predeploy_migrate.");
 }
 validateUrl("GIDEON_STORAGE_ENDPOINT", ["https:"], "GIDEON_STORAGE_ENDPOINT must be an https:// URL.");
 validateUrl("GIDEON_STAGING_API_BASE_URL", ["https:"], "GIDEON_STAGING_API_BASE_URL must be an https:// URL.");
@@ -179,7 +209,9 @@ function validateRetentionWindow(name, min, max) {
   const parsed = Number(raw);
   if (!raw || !Number.isInteger(parsed) || parsed < min || parsed > max) {
     errors.push(`${name} must be an integer between ${min} and ${max}.`);
+    return null;
   }
+  return parsed;
 }
 
 function validateUrl(name, protocols, message) {
@@ -194,6 +226,25 @@ function validateUrl(name, protocols, message) {
     }
   } catch {
     errors.push(message);
+  }
+}
+
+function validateRecentIsoTimestamp(name, maxAgeDays) {
+  const raw = value(name);
+  if (!raw) {
+    errors.push(`${name} is required for live promotion.`);
+    return;
+  }
+  const parsedMs = Date.parse(raw);
+  if (!Number.isFinite(parsedMs)) {
+    errors.push(`${name} must be an ISO-8601 timestamp.`);
+    return;
+  }
+  if (parsedMs > Date.now() + 60_000) {
+    errors.push(`${name} must not be in the future.`);
+  }
+  if (Number.isInteger(maxAgeDays) && Date.now() - parsedMs > maxAgeDays * 24 * 60 * 60 * 1_000) {
+    errors.push(`${name} must be within the last ${maxAgeDays} days.`);
   }
 }
 

@@ -32,6 +32,14 @@ GIDEON_WORKER_LEASE_SECONDS=300
 GIDEON_WORKER_HEARTBEAT_INTERVAL_MS=30000
 GIDEON_STORE_PROVIDER=postgres_snapshot
 GIDEON_DATABASE_URL=postgres://...?...sslmode=require
+GIDEON_DATABASE_POOL_MAX=10
+GIDEON_DATABASE_STATEMENT_TIMEOUT_MS=30000
+GIDEON_DATABASE_IDLE_TIMEOUT_MS=30000
+GIDEON_POSTGRES_BACKUP_RETENTION_DAYS=30
+GIDEON_POSTGRES_PITR_ENABLED=true
+GIDEON_POSTGRES_RESTORE_DRILL_AT=<recent-restore-drill-iso>
+GIDEON_POSTGRES_RESTORE_DRILL_MAX_AGE_DAYS=90
+GIDEON_POSTGRES_MIGRATION_POLICY=predeploy_migrate
 GIDEON_POSTGRES_SNAPSHOT_TABLE=gideon_app_state_snapshots
 GIDEON_POSTGRES_SNAPSHOT_ID=production
 GIDEON_PROJECTS_DIR=/data/projects
@@ -43,7 +51,7 @@ GIDEON_STORAGE_SECRET_ACCESS_KEY=...
 GIDEON_OPENAI_API_KEY=...
 ```
 
-Use `GIDEON_BULLMQ_QUEUE_NAME` and `GIDEON_BULLMQ_PREFIX` to isolate preview, staging, and production queues. Use `GIDEON_BULLMQ_CONCURRENCY`, `GIDEON_BULLMQ_ATTEMPTS`, `GIDEON_BULLMQ_BACKOFF_TYPE`, `GIDEON_BULLMQ_BACKOFF_DELAY_MS`, `GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT`, `GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT`, and `GIDEON_BULLMQ_DEAD_LETTER_POLICY=retain_failed` to make worker concurrency, retry/backoff, completed retention, and failed-job retention explicit per environment. Use `GIDEON_STORE_PROVIDER=postgres_snapshot` plus a TLS-enabled PostgreSQL URL for hosted app state; the hosted worker creates a `pg` connection pool, persists app-state snapshots, and closes the pool on worker shutdown. Use private object storage variables from the README for production media/artifacts instead of relying on container-local storage.
+Use `GIDEON_BULLMQ_QUEUE_NAME` and `GIDEON_BULLMQ_PREFIX` to isolate preview, staging, and production queues. Use `GIDEON_BULLMQ_CONCURRENCY`, `GIDEON_BULLMQ_ATTEMPTS`, `GIDEON_BULLMQ_BACKOFF_TYPE`, `GIDEON_BULLMQ_BACKOFF_DELAY_MS`, `GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT`, `GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT`, and `GIDEON_BULLMQ_DEAD_LETTER_POLICY=retain_failed` to make worker concurrency, retry/backoff, completed retention, and failed-job retention explicit per environment. Use `GIDEON_STORE_PROVIDER=postgres_snapshot` plus a TLS-enabled PostgreSQL URL for hosted app state; the hosted worker creates a `pg` connection pool, persists app-state snapshots, and closes the pool on worker shutdown. Use the database policy variables to make pool size, statement/idle timeout, backup retention, PITR, restore-drill recency, and predeploy migration behavior explicit before production promotion. Use private object storage variables from the README for production media/artifacts instead of relying on container-local storage.
 
 Run migrations before starting a worker against a new database:
 
@@ -61,6 +69,7 @@ Run the preflight before starting a deployed worker:
 
 ```bash
 pnpm worker:hosted:check
+pnpm production:db:check
 pnpm production:queue:check
 ```
 
@@ -70,6 +79,7 @@ The check fails on missing BullMQ/Redis/lease identity configuration and warns w
 - missing `GIDEON_BULLMQ_QUEUE_NAME` or `GIDEON_BULLMQ_PREFIX`;
 - missing or invalid BullMQ concurrency, retry/backoff, retention, or `retain_failed` dead-letter policy when running `pnpm production:queue:check`;
 - missing PostgreSQL database settings when `GIDEON_STORE_PROVIDER=postgres_snapshot`;
+- missing or invalid PostgreSQL pool, timeout, backup retention, PITR, restore-drill, or predeploy migration policy when running `pnpm production:db:check`;
 - local file-backed app state unless `GIDEON_ALLOW_LOCAL_PRODUCTION_STORE=true` is explicitly set;
 - PostgreSQL database URLs without `sslmode=require` unless `GIDEON_ALLOW_INSECURE_DATABASE=true` is explicitly set;
 - heartbeat intervals greater than or equal to the lease duration;
@@ -95,6 +105,7 @@ This starts Redis and one hosted worker using the same BullMQ provider path as p
 - Use environment-specific queue names and Redis prefixes for preview, staging, and production.
 - Keep failed-job retention greater than or equal to completed-job retention so production incidents remain inspectable.
 - Prefer managed Redis with TLS (`rediss://`) and persistence enabled.
+- Prefer managed PostgreSQL with TLS, encrypted backups, PITR, and a restore drill within the configured maximum age.
 - Keep worker instances off public ingress.
 - Use separate runtime identities from any web/API service.
 - Restrict egress to Redis, PostgreSQL, private storage, provider APIs, and any future database service.

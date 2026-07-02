@@ -220,6 +220,7 @@ function checkPackageContract() {
     "production:live-env:check",
     "production:fixtures:materialize",
     "production:billing:check",
+    "production:db:check",
     "production:queue:check",
     "production:storage:check",
     "production:storage-download:smoke"
