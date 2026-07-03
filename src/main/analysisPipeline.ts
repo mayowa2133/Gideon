@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DetectedMoment, FrameEvidence, Project, ProviderRun, TranscriptArtifact } from "../shared/types";
 import { extractAudioForTranscription, enrichMomentThumbnails } from "./media";
+import type { OpenAiProviderConfig } from "./providers/config";
 import { loadProviderConfig } from "./providers/config";
 import { OpenAiProvider } from "./providers/openai";
 
@@ -112,6 +113,7 @@ export async function runAnalysisPipeline(
         kind: "ocr",
         provider: "openai",
         model: config.openai.llmModel,
+        promptVersion: config.openai.ocrPromptVersion ?? "ocr-v1",
         status: completedFrames > 0 ? "completed" : "failed",
         startedAt: ocrStartedAt,
         finishedAt: new Date().toISOString(),
@@ -166,6 +168,7 @@ export async function runAnalysisPipeline(
         kind: "analysis",
         provider: "openai",
         model: config.openai.llmModel,
+        ...analysisPromptProvenance(config.openai),
         status: "completed",
         startedAt,
         finishedAt: new Date().toISOString()
@@ -177,6 +180,7 @@ export async function runAnalysisPipeline(
         kind: "analysis",
         provider: "openai",
         model: config.openai.llmModel,
+        ...analysisPromptProvenance(config.openai),
         status: "failed",
         startedAt,
         finishedAt: new Date().toISOString(),
@@ -211,6 +215,19 @@ export function safeProviderError(error: unknown): string {
     return error.message.slice(0, 240);
   }
   return "Provider request failed.";
+}
+
+function analysisPromptProvenance(config: OpenAiProviderConfig): Pick<
+  ProviderRun,
+  "promptVersion" | "promptReviewedAt" | "promptRolloutStage" | "promptRolloutPercent" | "promptCanaryPercent"
+> {
+  return {
+    promptVersion: config.analysisPromptVersion ?? "analysis-v1",
+    promptReviewedAt: config.analysisPromptReviewedAt,
+    promptRolloutStage: config.analysisPromptRolloutStage,
+    promptRolloutPercent: config.analysisModelRolloutPercent,
+    promptCanaryPercent: config.analysisModelCanaryPercent
+  };
 }
 
 function createFrameEvidence(moments: DetectedMoment[], createdAt: string): FrameEvidence[] {

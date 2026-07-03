@@ -287,6 +287,7 @@ describe("Gideon job executor", () => {
       expect.objectContaining({
         kind: "tts",
         provider: "openai",
+        promptVersion: "tts-v2",
         status: "failed",
         error: "Generated voiceover is not valid WAV audio."
       })
@@ -530,7 +531,8 @@ function providerConfig(configured: boolean) {
       llmModel: "gpt-test",
       transcriptionModel: "transcribe-test",
       ttsModel: "tts-test",
-      ttsVoice: "coral"
+      ttsVoice: "coral",
+      ttsPromptVersion: "tts-v2"
     }
   };
 }

@@ -42,13 +42,27 @@ describe("OpenAI provider config", () => {
     const config = loadProviderConfig({
       OPENAI_API_KEY: "sk-test",
       GIDEON_OPENAI_BASE_URL: "https://example.test/v1/",
-      GIDEON_OPENAI_LLM_MODEL: "custom-llm"
+      GIDEON_OPENAI_LLM_MODEL: "custom-llm",
+      GIDEON_ANALYSIS_PROMPT_VERSION: "analysis-v2",
+      GIDEON_ANALYSIS_PROMPT_REVIEWED_AT: "2026-07-01T00:00:00.000Z",
+      GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE: "production",
+      GIDEON_ANALYSIS_MODEL_ROLLOUT_PERCENT: "100",
+      GIDEON_ANALYSIS_MODEL_CANARY_PERCENT: "0",
+      GIDEON_OCR_PROMPT_VERSION: "ocr-v2",
+      GIDEON_TTS_PROMPT_VERSION: "tts-v2"
     });
     expect(config.openai.apiKey).toBe("sk-test");
     expect(config.openai.baseUrl).toBe("https://example.test/v1");
     expect(config.openai.llmModel).toBe("custom-llm");
+    expect(config.openai.analysisPromptVersion).toBe("analysis-v2");
+    expect(config.openai.analysisPromptReviewedAt).toBe("2026-07-01T00:00:00.000Z");
+    expect(config.openai.analysisPromptRolloutStage).toBe("production");
+    expect(config.openai.analysisModelRolloutPercent).toBe(100);
+    expect(config.openai.analysisModelCanaryPercent).toBe(0);
+    expect(config.openai.ocrPromptVersion).toBe("ocr-v2");
     expect(config.openai.transcriptionModel).toBe("gpt-4o-transcribe");
     expect(config.openai.ttsModel).toBe("gpt-4o-mini-tts");
+    expect(config.openai.ttsPromptVersion).toBe("tts-v2");
   });
 });
 

@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createMoments } from "../shared/contentEngine";
 import type { ProductProfile, Project, RecordingMetadata } from "../shared/types";
 import { runAnalysisPipeline } from "./analysisPipeline";
@@ -79,4 +79,115 @@ describe("analysis pipeline", () => {
       process.env.GIDEON_OPENAI_API_KEY = oldGideonKey;
     }
   });
+
+  it("records prompt provenance on provider-backed semantic analysis runs", async () => {
+    const oldEnv = snapshotEnv([
+      "OPENAI_API_KEY",
+      "GIDEON_OPENAI_API_KEY",
+      "GIDEON_OPENAI_BASE_URL",
+      "GIDEON_OPENAI_LLM_MODEL",
+      "GIDEON_ANALYSIS_PROMPT_VERSION",
+      "GIDEON_ANALYSIS_PROMPT_REVIEWED_AT",
+      "GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE",
+      "GIDEON_ANALYSIS_MODEL_ROLLOUT_PERCENT",
+      "GIDEON_ANALYSIS_MODEL_CANARY_PERCENT"
+    ]);
+    const originalFetch = globalThis.fetch;
+    process.env.GIDEON_OPENAI_API_KEY = "sk-test";
+    process.env.GIDEON_OPENAI_BASE_URL = "https://api.example.test/v1";
+    process.env.GIDEON_OPENAI_LLM_MODEL = "gpt-analysis";
+    process.env.GIDEON_ANALYSIS_PROMPT_VERSION = "analysis-v2";
+    process.env.GIDEON_ANALYSIS_PROMPT_REVIEWED_AT = "2026-07-01T00:00:00.000Z";
+    process.env.GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE = "production";
+    process.env.GIDEON_ANALYSIS_MODEL_ROLLOUT_PERCENT = "100";
+    process.env.GIDEON_ANALYSIS_MODEL_CANARY_PERCENT = "0";
+
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-analysis-provider-"));
+    const project = projectFixture();
+    const baseMoments = createMoments(profile, recording, randomUUID);
+    const firstMoment = baseMoments[0]!;
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          output_text: JSON.stringify({
+            summary: "The walkthrough proves the setup flow.",
+            moments: [
+              {
+                label: "Setup proof",
+                startMs: firstMoment.startMs,
+                endMs: firstMoment.endMs,
+                evidence: "The seeded moment supports the setup proof.",
+                sourceEvidenceIds: [`moment:${firstMoment.id}`],
+                confidence: 0.86
+              }
+            ]
+          })
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      const result = await runAnalysisPipeline(project, baseMoments, tempDir);
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(result.analysisSummary).toContain("setup flow");
+      expect(result.providerRuns).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "analysis",
+            provider: "openai",
+            model: "gpt-analysis",
+            promptVersion: "analysis-v2",
+            promptReviewedAt: "2026-07-01T00:00:00.000Z",
+            promptRolloutStage: "production",
+            promptRolloutPercent: 100,
+            promptCanaryPercent: 0,
+            status: "completed"
+          })
+        ])
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+      restoreEnv(oldEnv);
+    }
+  });
 });
+
+function projectFixture(): Project {
+  return {
+    id: "project-1",
+    workspaceId: "workspace-1",
+    name: "LeadPilot campaign",
+    status: "recording_ready",
+    profile,
+    recording,
+    frameEvidence: [],
+    moments: [],
+    concepts: [],
+    scripts: [],
+    renders: [],
+    artifacts: [],
+    uploadSessions: [],
+    providerRuns: [],
+    jobs: [],
+    jobEvents: [],
+    createdAt: "2026-06-25T00:00:00.000Z",
+    updatedAt: "2026-06-25T00:00:00.000Z"
+  };
+}
+
+function snapshotEnv(names: string[]): Record<string, string | undefined> {
+  return Object.fromEntries(names.map((name) => [name, process.env[name]]));
+}
+
+function restoreEnv(snapshot: Record<string, string | undefined>): void {
+  for (const [name, value] of Object.entries(snapshot)) {
+    if (value === undefined) {
+      delete process.env[name];
+    } else {
+      process.env[name] = value;
+    }
+  }
+}

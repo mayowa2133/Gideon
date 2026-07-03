@@ -555,6 +555,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
           kind: "tts",
           provider: "openai",
           model: result.model,
+          promptVersion: config.openai.ttsPromptVersion ?? "tts-v1",
           status: "completed",
           startedAt,
           finishedAt: now()
@@ -582,6 +583,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
           kind: "tts",
           provider: "openai",
           model: config.openai.ttsModel,
+          promptVersion: config.openai.ttsPromptVersion ?? "tts-v1",
           status: "failed",
           startedAt,
           finishedAt: now(),

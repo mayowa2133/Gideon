@@ -352,6 +352,11 @@ export interface ProviderRun {
   kind: "analysis" | "transcription" | "ocr" | "tts";
   provider: "openai" | "local" | "none";
   model?: string;
+  promptVersion?: string;
+  promptReviewedAt?: string;
+  promptRolloutStage?: "canary" | "staging" | "production";
+  promptRolloutPercent?: number;
+  promptCanaryPercent?: number;
   status: "completed" | "skipped" | "failed";
   startedAt: string;
   finishedAt: string;
