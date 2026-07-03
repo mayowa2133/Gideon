@@ -1,6 +1,6 @@
 # Gideon production-readiness audit
 
-Last updated: 2026-07-02
+Last updated: 2026-07-03
 
 This audit maps the original full-product gaps to the current implementation evidence and the remaining production work. It is intentionally evidence-based: a capability is counted only when there is code, documentation, or a verification command that demonstrates the path.
 
@@ -10,7 +10,7 @@ Gideon is no longer only a local deterministic desktop prototype. The repository
 
 The remaining production gap is narrower and mostly operational: replace local JSON-backed hosted state with production database-backed persistence, run Redis/BullMQ and object storage as managed production services, complete deployment/release operations, and execute a final end-to-end production smoke with real infrastructure. Social posting, scheduling, avatar generation, and voice cloning remain explicit post-MVP items.
 
-Current engineering estimate: **99.99999999986% complete** toward the full original product vision.
+Current engineering estimate: **99.99999999987% complete** toward the full original product vision.
 
 ## Capability audit
 
@@ -128,6 +128,10 @@ pnpm production:check
 5. Signed and notarized macOS release artifact, plus production release provenance. Safe notarization/stapling/Gatekeeper/install-smoke receipt verification is now covered by `pnpm production:release-receipt:check`.
 6. End-to-end staging smoke from upload to private export package and hosted MCP smoke using production-shaped infrastructure; `pnpm staging:check -- --strict` now guards the required deployed API, auth callback, live flags, recording fixture, scratch MCP session/project, provider, storage lifecycle policy, queue, database, observability, and release configuration, `pnpm production:mcp:check` verifies the remote MCP SSO/session/load policy, `pnpm production:prompt:check` verifies prompt/model rollout policy, `pnpm staging:smoke -- --live` executes the deployed upload-to-export path, `pnpm staging:mcp:smoke -- --live --require-metric-export` verifies the hosted Codex/Claude control path, `pnpm production:check` runs the local non-credential promotion gate, and `pnpm production:promote:check -- --live` now composes MCP access policy verification, billing reconciliation, production PostgreSQL policy verification, production BullMQ policy verification, production observability policy verification, actual bucket lifecycle verification, prompt rollout policy verification, live provider canary report verification, the live promotion sequence, and writes plus self-verifies a safe promotion evidence report.
 
+## Latest live-evidence attempt
+
+The 2026-07-03 live-evidence attempt is recorded in `docs/live-evidence-status.md`. The live promotion runner, strict staging check, live upload-to-export smoke, hosted MCP smoke, provider canaries, storage, database, queue, billing, observability, prompt, TTS, and release receipt checks all stopped before real live execution because required external staging infrastructure, GitHub Secrets/Variables, provider credentials, storage/database/queue configuration, hosted MCP session data, observability endpoints, Stripe settings, and Apple signing/notarization evidence are not configured yet. The guarded GitHub runner correctly stopped before dispatching a `workflow_dispatch` live promotion run.
+
 ## Next engineering slice
 
-The next slice should run `pnpm production:github-promote:run -- --confirm-live` against staging credentials/fixtures, a scratch hosted MCP project/session, deployed metric export, and Apple signing credentials, then archive the verified uploaded `Gideon-production-promotion-evidence` artifact and validate the safe receipt plus bundle consistency, including `provider-canary-report.json` and `release-receipt.json`, with `pnpm production:github-receipt:check -- --path tmp/github-production-promotion-evidence/verification-receipt.json` and `pnpm production:github-archive:check -- --archive-dir tmp/github-production-promotion-evidence`.
+The next slice should configure the GitHub Secrets/Variables listed in `docs/live-evidence-status.md`, then run `pnpm production:github-promote:run -- --confirm-live` against staging credentials/fixtures, a scratch hosted MCP project/session, deployed metric export, and Apple signing credentials. After it completes, archive the uploaded `Gideon-production-promotion-evidence` artifact and validate the safe receipt plus bundle consistency, including `provider-canary-report.json` and `release-receipt.json`, with `pnpm production:github-receipt:check -- --path tmp/github-production-promotion-evidence/verification-receipt.json` and `pnpm production:github-archive:check -- --archive-dir tmp/github-production-promotion-evidence`.
