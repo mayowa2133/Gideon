@@ -21,6 +21,7 @@ describe("live promotion environment check", () => {
     expect(result.stdout).toContain("GIDEON_STORAGE_TEMP_RETENTION_DAYS");
     expect(result.stdout).toContain("GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY");
     expect(result.stdout).toContain("GIDEON_TTS_APPROVED_VOICES");
+    expect(result.stdout).toContain("GIDEON_ANALYSIS_PROMPT_VERSION");
     expect(result.stdout).toContain("GIDEON_MCP_SSO_PROVIDER");
     expect(result.stdout).toContain("Require Apple signing/notarization env");
   });
@@ -94,6 +95,22 @@ describe("live promotion environment check", () => {
     });
   });
 
+  it("rejects unapproved live prompt rollout configuration", async () => {
+    const env = liveEnv({
+      GIDEON_ANALYSIS_PROMPT_VERSION: "analysis-v3",
+      GIDEON_ANALYSIS_PROMPT_APPROVED_VERSIONS: "analysis-v1,analysis-v2"
+    });
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath], {
+        cwd: process.cwd(),
+        env
+      })
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining("GIDEON_ANALYSIS_PROMPT_VERSION must be included in GIDEON_ANALYSIS_PROMPT_APPROVED_VERSIONS")
+    });
+  });
+
   it("rejects weak live MCP access policy", async () => {
     const env = liveEnv({
       GIDEON_MCP_SSO_PROVIDER: "local",
@@ -156,6 +173,14 @@ function liveEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     GIDEON_TTS_APPROVED_VOICES: "coral,verse",
     GIDEON_TTS_VOICE_REVIEWED_AT: new Date().toISOString(),
     GIDEON_VOICEOVER_DELETION_SLA_HOURS: "24",
+    GIDEON_OPENAI_LLM_MODEL: "gpt-5.1",
+    GIDEON_ANALYSIS_PROMPT_VERSION: "analysis-v2",
+    GIDEON_ANALYSIS_PROMPT_APPROVED_VERSIONS: "analysis-v1,analysis-v2",
+    GIDEON_ANALYSIS_PROMPT_ROLLBACK_VERSION: "analysis-v1",
+    GIDEON_ANALYSIS_PROMPT_REVIEWED_AT: new Date().toISOString(),
+    GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE: "production",
+    GIDEON_ANALYSIS_MODEL_ROLLOUT_PERCENT: "100",
+    GIDEON_ANALYSIS_MODEL_CANARY_PERCENT: "0",
     GIDEON_OPENAI_API_KEY: "sk-test",
     GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD: "0.05",
     GIDEON_PROVIDER_CANARY_ANALYSIS_ESTIMATED_COST_USD: "0.01",

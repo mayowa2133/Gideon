@@ -78,6 +78,7 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm production:check
 - pnpm production:promote:check
 - pnpm production:mcp:check
+- pnpm production:prompt:check
 - pnpm production:billing:check
 - pnpm production:db:check
 - pnpm production:queue:check

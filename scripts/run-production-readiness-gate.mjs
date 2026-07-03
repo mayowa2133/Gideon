@@ -18,6 +18,7 @@ const steps = [
   step("PostgreSQL migration dry-run", [pnpm, "db:migrate", "--", "--dry-run"]),
   step("provider canary dry-run", [pnpm, "provider:canary", "--", "--dry-run"]),
   step("provider canary report dry-run", [pnpm, "production:provider-canary-report:check", "--", "--dry-run"]),
+  step("production prompt rollout policy dry-run", [pnpm, "production:prompt:check", "--", "--dry-run"]),
   step("hosted review policy", [pnpm, "hosted:review:check"]),
   step("staging readiness dry-run", [pnpm, "staging:check"]),
   step("staging upload-to-export smoke dry-run", [pnpm, "staging:smoke", "--", "--dry-run"]),

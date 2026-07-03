@@ -147,7 +147,7 @@ describe("GitHub promotion evidence artifact check", () => {
     expect(receipt.repository).toBe("example/Gideon");
     expect(receipt.runId).toBe("12345");
     expect(receipt.evidence.gitCommit).toBe("0123456789abcdef0123456789abcdef01234567");
-    expect(receipt.evidence.stepCount).toBe(18);
+    expect(receipt.evidence.stepCount).toBe(19);
     expect(receipt.evidence.sizeBytes).toBeGreaterThan(0);
     expect(receipt.evidence.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(receipt.providerCanaryReport.mode).toBe("live");
@@ -246,6 +246,7 @@ function createEvidence() {
     "production storage lifecycle policy",
     "production storage signed-download smoke",
     "production TTS policy",
+    "production prompt rollout policy",
     "live provider canaries",
     "provider canary report",
     "live staging upload-to-export smoke",

@@ -51,6 +51,14 @@ const requiredEnv = [
   "GIDEON_TTS_APPROVED_VOICES",
   "GIDEON_TTS_VOICE_REVIEWED_AT",
   "GIDEON_VOICEOVER_DELETION_SLA_HOURS",
+  "GIDEON_OPENAI_LLM_MODEL",
+  "GIDEON_ANALYSIS_PROMPT_VERSION",
+  "GIDEON_ANALYSIS_PROMPT_APPROVED_VERSIONS",
+  "GIDEON_ANALYSIS_PROMPT_ROLLBACK_VERSION",
+  "GIDEON_ANALYSIS_PROMPT_REVIEWED_AT",
+  "GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE",
+  "GIDEON_ANALYSIS_MODEL_ROLLOUT_PERCENT",
+  "GIDEON_ANALYSIS_MODEL_CANARY_PERCENT",
   "GIDEON_OPENAI_API_KEY",
   "GIDEON_STAGING_API_BASE_URL",
   "GIDEON_AUTH_CALLBACK_SECRET",
@@ -172,6 +180,7 @@ validateRetentionWindow("GIDEON_STORAGE_EXPORT_RETENTION_DAYS", 1, 3650);
 validateRetentionWindow("GIDEON_STORAGE_DELETION_SLA_HOURS", 1, 168);
 validateRetentionWindow("GIDEON_SIGNED_URL_MAX_SECONDS", 60, 3600);
 validateTtsPolicy();
+validatePromptRolloutPolicy();
 if (value("GIDEON_STORAGE_PUBLIC_BASE_URL") && value("GIDEON_ALLOW_PUBLIC_STORAGE_BASE_URL") !== "true") {
   errors.push("GIDEON_STORAGE_PUBLIC_BASE_URL must be unset for live private artifacts unless GIDEON_ALLOW_PUBLIC_STORAGE_BASE_URL=true.");
 }
@@ -297,6 +306,63 @@ function validateTtsPolicy() {
   }
   validateRecentIsoTimestamp("GIDEON_TTS_VOICE_REVIEWED_AT", 180);
   validateRetentionWindow("GIDEON_VOICEOVER_DELETION_SLA_HOURS", 1, 168);
+}
+
+function validatePromptRolloutPolicy() {
+  validateSafeIdentifier("GIDEON_OPENAI_LLM_MODEL", 2, 80);
+  validateSafeIdentifier("GIDEON_ANALYSIS_PROMPT_VERSION", 2, 80);
+  validateSafeIdentifier("GIDEON_ANALYSIS_PROMPT_ROLLBACK_VERSION", 2, 80);
+  const active = value("GIDEON_ANALYSIS_PROMPT_VERSION");
+  const rollback = value("GIDEON_ANALYSIS_PROMPT_ROLLBACK_VERSION");
+  const approved = value("GIDEON_ANALYSIS_PROMPT_APPROVED_VERSIONS")
+    .split(",")
+    .map((candidate) => candidate.trim())
+    .filter(Boolean);
+  for (const candidate of approved) {
+    if (!/^[A-Za-z0-9._-]{2,80}$/.test(candidate)) {
+      errors.push("GIDEON_ANALYSIS_PROMPT_APPROVED_VERSIONS must be a comma-separated list of safe prompt version identifiers.");
+      break;
+    }
+  }
+  if (active && approved.length > 0 && !approved.includes(active)) {
+    errors.push("GIDEON_ANALYSIS_PROMPT_VERSION must be included in GIDEON_ANALYSIS_PROMPT_APPROVED_VERSIONS.");
+  }
+  if (rollback && approved.length > 0 && !approved.includes(rollback)) {
+    errors.push("GIDEON_ANALYSIS_PROMPT_ROLLBACK_VERSION must be included in GIDEON_ANALYSIS_PROMPT_APPROVED_VERSIONS.");
+  }
+  if (active && rollback && active === rollback) {
+    errors.push("GIDEON_ANALYSIS_PROMPT_ROLLBACK_VERSION must differ from GIDEON_ANALYSIS_PROMPT_VERSION.");
+  }
+  validateRecentIsoTimestamp("GIDEON_ANALYSIS_PROMPT_REVIEWED_AT", 180);
+
+  const stage = value("GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE");
+  if (!["canary", "staging", "production"].includes(stage)) {
+    errors.push("GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE must be one of: canary, staging, production.");
+  }
+  const rolloutPercent = validateRetentionWindow("GIDEON_ANALYSIS_MODEL_ROLLOUT_PERCENT", 1, 100);
+  const canaryPercent = validateRetentionWindow("GIDEON_ANALYSIS_MODEL_CANARY_PERCENT", 0, 50);
+  if (!Number.isInteger(rolloutPercent) || !Number.isInteger(canaryPercent)) {
+    return;
+  }
+  if (stage === "canary") {
+    if (rolloutPercent > 50) {
+      errors.push("GIDEON_ANALYSIS_MODEL_ROLLOUT_PERCENT must be 50 or lower when GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE=canary.");
+    }
+    if (canaryPercent < 1) {
+      errors.push("GIDEON_ANALYSIS_MODEL_CANARY_PERCENT must be at least 1 when GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE=canary.");
+    }
+  }
+  if (stage === "staging" && canaryPercent !== 0) {
+    errors.push("GIDEON_ANALYSIS_MODEL_CANARY_PERCENT must be 0 when GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE=staging.");
+  }
+  if (stage === "production") {
+    if (rolloutPercent !== 100) {
+      errors.push("GIDEON_ANALYSIS_MODEL_ROLLOUT_PERCENT must be 100 when GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE=production.");
+    }
+    if (canaryPercent !== 0) {
+      errors.push("GIDEON_ANALYSIS_MODEL_CANARY_PERCENT must be 0 when GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE=production.");
+    }
+  }
 }
 
 function validateMcpAccessPolicy() {
