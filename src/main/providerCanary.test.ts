@@ -101,6 +101,13 @@ describe("provider canary", () => {
       mode: "live",
       env: {
         GIDEON_OPENAI_API_KEY: "sk-test",
+        GIDEON_OPENAI_LLM_MODEL: "llm-test",
+        GIDEON_ANALYSIS_PROMPT_VERSION: "analysis-v2",
+        GIDEON_ANALYSIS_PROMPT_REVIEWED_AT: "2026-07-01T00:00:00.000Z",
+        GIDEON_ANALYSIS_PROMPT_ROLLOUT_STAGE: "production",
+        GIDEON_ANALYSIS_MODEL_ROLLOUT_PERCENT: "100",
+        GIDEON_ANALYSIS_MODEL_CANARY_PERCENT: "0",
+        GIDEON_TTS_PROMPT_VERSION: "tts-v2",
         GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD: "0.05",
         GIDEON_PROVIDER_CANARY_ANALYSIS_ESTIMATED_COST_USD: "0.01",
         GIDEON_PROVIDER_CANARY_TTS_MAX_COST_USD: "0.02",
@@ -111,9 +118,18 @@ describe("provider canary", () => {
     });
 
     expect(report.results.find((result) => result.capability === "analysis")?.status).toBe("passed");
+    expect(report.results.find((result) => result.capability === "analysis")).toMatchObject({
+      model: "llm-test",
+      promptVersion: "analysis-v2",
+      promptReviewedAt: "2026-07-01T00:00:00.000Z",
+      promptRolloutStage: "production",
+      promptRolloutPercent: 100,
+      promptCanaryPercent: 0
+    });
     expect(report.results.find((result) => result.capability === "analysis")?.costUsd).toBe(0.01);
     expect(report.results.find((result) => result.capability === "analysis")?.maxCostUsd).toBe(0.05);
     expect(report.results.find((result) => result.capability === "tts")?.status).toBe("passed");
+    expect(report.results.find((result) => result.capability === "tts")?.promptVersion).toBe("tts-v2");
     expect(report.results.find((result) => result.capability === "transcription")?.status).toBe("skipped");
     expect(report.results.find((result) => result.capability === "ocr")?.status).toBe("skipped");
     expect(calls).toEqual(["analysis", "tts"]);

@@ -32,7 +32,8 @@ if (dryRun) {
   console.log("2. Require live mode, configured provider, HTTPS base URL, and generatedAt timestamp.");
   console.log("3. Require passed analysis, transcription, OCR, and TTS canaries.");
   console.log("4. Require every capability cost to be present, non-negative, and within its ceiling.");
-  console.log("5. Scan report fields for secret-like material, cookies, signed URLs, and provider keys.");
+  console.log("5. Require prompt/model provenance for analysis, OCR, and TTS canaries.");
+  console.log("6. Scan report fields for secret-like material, cookies, signed URLs, and provider keys.");
   process.exit(0);
 }
 
@@ -145,6 +146,31 @@ function validateResult(result, capability) {
   }
   if (Number.isFinite(result.costUsd) && Number.isFinite(result.maxCostUsd) && result.costUsd > result.maxCostUsd) {
     errors.push(`Report ${capability} costUsd must not exceed maxCostUsd.`);
+  }
+  validatePromptProvenance(result, capability);
+}
+
+function validatePromptProvenance(result, capability) {
+  if (capability === "transcription") {
+    return;
+  }
+  if (typeof result.promptVersion !== "string" || !/^[A-Za-z0-9._-]{2,80}$/.test(result.promptVersion)) {
+    errors.push(`Report ${capability} promptVersion must be a safe non-empty prompt version.`);
+  }
+  if (capability !== "analysis") {
+    return;
+  }
+  if (typeof result.promptReviewedAt !== "string" || Number.isNaN(Date.parse(result.promptReviewedAt))) {
+    errors.push("Report analysis promptReviewedAt must be an ISO timestamp.");
+  }
+  if (!["canary", "staging", "production"].includes(result.promptRolloutStage)) {
+    errors.push("Report analysis promptRolloutStage must be canary, staging, or production.");
+  }
+  if (!Number.isInteger(result.promptRolloutPercent) || result.promptRolloutPercent < 1 || result.promptRolloutPercent > 100) {
+    errors.push("Report analysis promptRolloutPercent must be an integer between 1 and 100.");
+  }
+  if (!Number.isInteger(result.promptCanaryPercent) || result.promptCanaryPercent < 0 || result.promptCanaryPercent > 50) {
+    errors.push("Report analysis promptCanaryPercent must be an integer between 0 and 50.");
   }
 }
 

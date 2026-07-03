@@ -342,7 +342,7 @@ function createReleaseReceipt() {
 }
 
 function providerResult(capability: string, model: string, costUsd: number, maxCostUsd: number) {
-  return {
+  const base = {
     capability,
     provider: "openai",
     status: "passed",
@@ -351,5 +351,22 @@ function providerResult(capability: string, model: string, costUsd: number, maxC
     durationMs: 10,
     costUsd,
     maxCostUsd
+  };
+  if (capability === "transcription") {
+    return base;
+  }
+  if (capability === "analysis") {
+    return {
+      ...base,
+      promptVersion: "analysis-v2",
+      promptReviewedAt: "2026-07-01T00:00:00.000Z",
+      promptRolloutStage: "production",
+      promptRolloutPercent: 100,
+      promptCanaryPercent: 0
+    };
+  }
+  return {
+    ...base,
+    promptVersion: `${capability}-v2`
   };
 }

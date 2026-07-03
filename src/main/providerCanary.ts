@@ -20,6 +20,11 @@ export interface ProviderCanaryResult {
   provider: "openai";
   status: ProviderCanaryStatus;
   model: string;
+  promptVersion?: string;
+  promptReviewedAt?: string;
+  promptRolloutStage?: "canary" | "staging" | "production";
+  promptRolloutPercent?: number;
+  promptCanaryPercent?: number;
   message: string;
   durationMs: number;
   costUsd?: number;
@@ -148,6 +153,7 @@ async function runLiveCanaries(input: {
     await executeCanary({
       capability: "analysis",
       model: config.openai.llmModel,
+      promptProvenance: analysisPromptProvenance(config),
       now,
       run: async () => {
         const result = await adapter.analyzeWalkthrough(buildCanaryAnalysisInput());
@@ -199,6 +205,9 @@ async function runLiveCanaries(input: {
       await executeCanary({
         capability: "ocr",
         model: config.openai.llmModel,
+        promptProvenance: {
+          promptVersion: config.openai.ocrPromptVersion ?? "ocr-v1"
+        },
         now,
         run: async () => {
           await assertReadable(imagePath, "OCR fixture");
@@ -230,6 +239,9 @@ async function runLiveCanaries(input: {
     await executeCanary({
       capability: "tts",
       model: config.openai.ttsModel,
+      promptProvenance: {
+        promptVersion: config.openai.ttsPromptVersion ?? "tts-v1"
+      },
       now,
       run: async () => {
         const outputPath =
@@ -286,6 +298,10 @@ function skippedFixtureResult(
 async function executeCanary(input: {
   capability: ProviderCanaryCapability;
   model: string;
+  promptProvenance?: Pick<
+    ProviderCanaryResult,
+    "promptVersion" | "promptReviewedAt" | "promptRolloutStage" | "promptRolloutPercent" | "promptCanaryPercent"
+  >;
   now: () => Date;
   run: () => Promise<{ message: string; costUsd?: number }>;
   costCeiling: ProviderCanaryCostConfig[ProviderCanaryCapability];
@@ -300,6 +316,7 @@ async function executeCanary(input: {
       provider: "openai",
       status: "passed",
       model: input.model,
+      ...input.promptProvenance,
       message,
       durationMs: Math.max(0, input.now().getTime() - started),
       costUsd,
@@ -311,11 +328,25 @@ async function executeCanary(input: {
       provider: "openai",
       status: "failed",
       model: input.model,
+      ...input.promptProvenance,
       message: redactSecrets(error instanceof Error ? error.message : "Provider canary failed.", input.redactionHints),
       durationMs: Math.max(0, input.now().getTime() - started),
       maxCostUsd: input.costCeiling.maxCostUsd ?? undefined
     };
   }
+}
+
+function analysisPromptProvenance(config: ProviderConfig): Pick<
+  ProviderCanaryResult,
+  "promptVersion" | "promptReviewedAt" | "promptRolloutStage" | "promptRolloutPercent" | "promptCanaryPercent"
+> {
+  return {
+    promptVersion: config.openai.analysisPromptVersion ?? "analysis-v1",
+    promptReviewedAt: config.openai.analysisPromptReviewedAt,
+    promptRolloutStage: config.openai.analysisPromptRolloutStage,
+    promptRolloutPercent: config.openai.analysisModelRolloutPercent,
+    promptCanaryPercent: config.openai.analysisModelCanaryPercent
+  };
 }
 
 function capabilityCostConfig(env: NodeJS.ProcessEnv, capabilityName: string): ProviderCanaryCostConfig[ProviderCanaryCapability] {

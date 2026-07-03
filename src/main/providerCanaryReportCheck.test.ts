@@ -17,6 +17,7 @@ describe("provider canary report check", () => {
 
     expect(result.stdout).toContain("Provider canary report check dry-run:");
     expect(result.stdout).toContain("Require passed analysis, transcription, OCR, and TTS canaries.");
+    expect(result.stdout).toContain("Require prompt/model provenance");
     expect(result.stdout).toContain("Scan report fields for secret-like material");
   });
 
@@ -44,6 +45,14 @@ describe("provider canary report check", () => {
     });
   });
 
+  it("rejects missing prompt provenance for prompt-backed canaries", async () => {
+    const reportPath = await writeReportFixture({ omitPromptProvenance: true });
+
+    await expect(runReportCheck(reportPath)).rejects.toMatchObject({
+      stderr: expect.stringContaining("Report analysis promptVersion must be a safe non-empty prompt version")
+    });
+  });
+
   it("rejects report fields containing secret-like material", async () => {
     const reportPath = await writeReportFixture({ analysisMessage: "provider returned sk-this-is-not-safe-to-log" });
 
@@ -66,6 +75,7 @@ async function writeReportFixture(
     ttsCostUsd?: number;
     ttsMaxCostUsd?: number;
     analysisMessage?: string;
+    omitPromptProvenance?: boolean;
   } = {}
 ): Promise<string> {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-provider-canary-report-"));
@@ -77,10 +87,10 @@ async function writeReportFixture(
     baseUrl: "https://api.openai.com/v1",
     generatedAt: now,
     results: [
-      result("analysis", "gpt-4.1-mini", input.analysisMessage ?? "Analysis canary passed.", 0.003, 0.02),
+      result("analysis", "gpt-4.1-mini", input.analysisMessage ?? "Analysis canary passed.", 0.003, 0.02, "passed", input.omitPromptProvenance),
       result("transcription", "gpt-4o-transcribe", "Transcription canary passed.", 0.001, 0.01, input.transcriptionStatus),
-      result("ocr", "gpt-4.1-mini", "OCR canary passed.", 0.002, 0.02),
-      result("tts", "gpt-4o-mini-tts", "TTS canary passed.", input.ttsCostUsd ?? 0.001, input.ttsMaxCostUsd ?? 0.01)
+      result("ocr", "gpt-4.1-mini", "OCR canary passed.", 0.002, 0.02, "passed", input.omitPromptProvenance),
+      result("tts", "gpt-4o-mini-tts", "TTS canary passed.", input.ttsCostUsd ?? 0.001, input.ttsMaxCostUsd ?? 0.01, "passed", input.omitPromptProvenance)
     ]
   };
   await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
@@ -93,9 +103,10 @@ function result(
   message: string,
   costUsd: number,
   maxCostUsd: number,
-  status = "passed"
+  status = "passed",
+  omitPromptProvenance = false
 ) {
-  return {
+  const base = {
     capability,
     provider: "openai",
     status,
@@ -104,5 +115,22 @@ function result(
     durationMs: 12,
     costUsd,
     maxCostUsd
+  };
+  if (omitPromptProvenance || capability === "transcription") {
+    return base;
+  }
+  if (capability === "analysis") {
+    return {
+      ...base,
+      promptVersion: "analysis-v2",
+      promptReviewedAt: "2026-07-01T00:00:00.000Z",
+      promptRolloutStage: "production",
+      promptRolloutPercent: 100,
+      promptCanaryPercent: 0
+    };
+  }
+  return {
+    ...base,
+    promptVersion: `${capability}-v2`
   };
 }
