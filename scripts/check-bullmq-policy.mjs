@@ -16,7 +16,12 @@ const requiredEnv = [
   "GIDEON_BULLMQ_BACKOFF_DELAY_MS",
   "GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT",
   "GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT",
-  "GIDEON_BULLMQ_DEAD_LETTER_POLICY"
+  "GIDEON_BULLMQ_DEAD_LETTER_POLICY",
+  "GIDEON_ANALYSIS_QUEUE_CONCURRENCY",
+  "GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY",
+  "GIDEON_OCR_QUEUE_CONCURRENCY",
+  "GIDEON_TTS_QUEUE_CONCURRENCY",
+  "GIDEON_RENDER_QUEUE_CONCURRENCY"
 ];
 
 if (dryRun) {
@@ -27,6 +32,7 @@ if (dryRun) {
   console.log("4. Validate retry attempts and fixed/exponential backoff.");
   console.log("5. Validate completed/failed job retention counts.");
   console.log("6. Require an explicit dead-letter policy based on retained failed jobs.");
+  console.log("7. Require explicit stage-lane concurrency limits for analysis, transcription, OCR, TTS, and render work.");
   process.exit(0);
 }
 
@@ -41,6 +47,7 @@ const backoffDelayMs = requireIntegerRange("GIDEON_BULLMQ_BACKOFF_DELAY_MS", 1_0
 const completeRetention = requireIntegerRange("GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT", 100, 100_000);
 const failedRetention = requireIntegerRange("GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT", 1_000, 500_000);
 requireEnum("GIDEON_BULLMQ_DEAD_LETTER_POLICY", ["retain_failed"]);
+validateStageLanes(concurrency);
 
 if (Number.isInteger(failedRetention) && Number.isInteger(completeRetention) && failedRetention < completeRetention) {
   errors.push("GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT must be greater than or equal to GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT for incident review.");
@@ -124,6 +131,34 @@ function requireEnum(name, allowed) {
     return null;
   }
   return raw;
+}
+
+function validateStageLanes(globalConcurrency) {
+  const lanes = {
+    GIDEON_ANALYSIS_QUEUE_CONCURRENCY: requireIntegerRange("GIDEON_ANALYSIS_QUEUE_CONCURRENCY", 1, 25),
+    GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY: requireIntegerRange("GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY", 1, 25),
+    GIDEON_OCR_QUEUE_CONCURRENCY: requireIntegerRange("GIDEON_OCR_QUEUE_CONCURRENCY", 1, 25),
+    GIDEON_TTS_QUEUE_CONCURRENCY: requireIntegerRange("GIDEON_TTS_QUEUE_CONCURRENCY", 1, 25),
+    GIDEON_RENDER_QUEUE_CONCURRENCY: requireIntegerRange("GIDEON_RENDER_QUEUE_CONCURRENCY", 1, 25)
+  };
+  if (!Number.isInteger(globalConcurrency)) {
+    return;
+  }
+  const providerHeavyLimit = Math.max(1, Math.floor(globalConcurrency / 2));
+  for (const [name, laneConcurrency] of Object.entries(lanes)) {
+    if (!Number.isInteger(laneConcurrency)) {
+      continue;
+    }
+    if (laneConcurrency > globalConcurrency) {
+      errors.push(`${name} must not exceed GIDEON_BULLMQ_CONCURRENCY.`);
+    }
+    if (
+      ["GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY", "GIDEON_OCR_QUEUE_CONCURRENCY", "GIDEON_TTS_QUEUE_CONCURRENCY"].includes(name) &&
+      laneConcurrency > providerHeavyLimit
+    ) {
+      errors.push(`${name} must be ${providerHeavyLimit} or lower so provider-heavy stages cannot monopolize production workers.`);
+    }
+  }
 }
 
 function value(name) {

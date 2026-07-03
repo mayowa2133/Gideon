@@ -22,6 +22,11 @@ const requiredEnv = [
   "GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT",
   "GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT",
   "GIDEON_BULLMQ_DEAD_LETTER_POLICY",
+  "GIDEON_ANALYSIS_QUEUE_CONCURRENCY",
+  "GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY",
+  "GIDEON_OCR_QUEUE_CONCURRENCY",
+  "GIDEON_TTS_QUEUE_CONCURRENCY",
+  "GIDEON_RENDER_QUEUE_CONCURRENCY",
   "GIDEON_WORKER_ID",
   "GIDEON_DATABASE_URL",
   "GIDEON_DATABASE_POOL_MAX",
@@ -179,6 +184,7 @@ validateRetentionWindow("GIDEON_VOICEOVER_RETENTION_DAYS", 1, 3650);
 validateRetentionWindow("GIDEON_STORAGE_EXPORT_RETENTION_DAYS", 1, 3650);
 validateRetentionWindow("GIDEON_STORAGE_DELETION_SLA_HOURS", 1, 168);
 validateRetentionWindow("GIDEON_SIGNED_URL_MAX_SECONDS", 60, 3600);
+validateStageLanePolicy();
 validateTtsPolicy();
 validatePromptRolloutPolicy();
 if (value("GIDEON_STORAGE_PUBLIC_BASE_URL") && value("GIDEON_ALLOW_PUBLIC_STORAGE_BASE_URL") !== "true") {
@@ -285,6 +291,35 @@ function validateObservabilityPolicy() {
   validateRetentionWindow("GIDEON_OBSERVABILITY_TERMINAL_FAILURES_PER_HOUR", 1, 100);
   validateRetentionWindow("GIDEON_OBSERVABILITY_PROVIDER_TTS_P95_MS", 1_000, 60_000);
   validateRetentionWindow("GIDEON_OBSERVABILITY_STORAGE_P95_MS", 100, 60_000);
+}
+
+function validateStageLanePolicy() {
+  const globalConcurrency = Number(value("GIDEON_BULLMQ_CONCURRENCY"));
+  const lanes = {
+    GIDEON_ANALYSIS_QUEUE_CONCURRENCY: validateRetentionWindow("GIDEON_ANALYSIS_QUEUE_CONCURRENCY", 1, 25),
+    GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY: validateRetentionWindow("GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY", 1, 25),
+    GIDEON_OCR_QUEUE_CONCURRENCY: validateRetentionWindow("GIDEON_OCR_QUEUE_CONCURRENCY", 1, 25),
+    GIDEON_TTS_QUEUE_CONCURRENCY: validateRetentionWindow("GIDEON_TTS_QUEUE_CONCURRENCY", 1, 25),
+    GIDEON_RENDER_QUEUE_CONCURRENCY: validateRetentionWindow("GIDEON_RENDER_QUEUE_CONCURRENCY", 1, 25)
+  };
+  if (!Number.isInteger(globalConcurrency)) {
+    return;
+  }
+  const providerHeavyLimit = Math.max(1, Math.floor(globalConcurrency / 2));
+  for (const [name, laneConcurrency] of Object.entries(lanes)) {
+    if (!Number.isInteger(laneConcurrency)) {
+      continue;
+    }
+    if (laneConcurrency > globalConcurrency) {
+      errors.push(`${name} must not exceed GIDEON_BULLMQ_CONCURRENCY.`);
+    }
+    if (
+      ["GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY", "GIDEON_OCR_QUEUE_CONCURRENCY", "GIDEON_TTS_QUEUE_CONCURRENCY"].includes(name) &&
+      laneConcurrency > providerHeavyLimit
+    ) {
+      errors.push(`${name} must be ${providerHeavyLimit} or lower so provider-heavy stages cannot monopolize live promotion workers.`);
+    }
+  }
 }
 
 function validateTtsPolicy() {

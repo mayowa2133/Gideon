@@ -15,6 +15,7 @@ describe("BullMQ production policy check", () => {
     expect(result.stdout).toContain("BullMQ production policy check dry-run:");
     expect(result.stdout).toContain("Validate retry attempts");
     expect(result.stdout).toContain("dead-letter policy");
+    expect(result.stdout).toContain("stage-lane concurrency");
   });
 
   it("passes with production-shaped BullMQ retry and retention policy", async () => {
@@ -56,6 +57,20 @@ describe("BullMQ production policy check", () => {
       stderr: expect.stringContaining("GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT must be greater than or equal")
     });
   });
+
+  it("rejects provider-heavy stage lanes that can monopolize workers", async () => {
+    await expect(
+      execFileAsync(process.execPath, [scriptPath], {
+        cwd: process.cwd(),
+        env: queuePolicyEnv({
+          GIDEON_BULLMQ_CONCURRENCY: "4",
+          GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY: "3"
+        })
+      })
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining("GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY must be 2 or lower")
+    });
+  });
 });
 
 function queuePolicyEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
@@ -72,6 +87,11 @@ function queuePolicyEnv(overrides: Record<string, string> = {}): NodeJS.ProcessE
     GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT: "1000",
     GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT: "5000",
     GIDEON_BULLMQ_DEAD_LETTER_POLICY: "retain_failed",
+    GIDEON_ANALYSIS_QUEUE_CONCURRENCY: "2",
+    GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY: "1",
+    GIDEON_OCR_QUEUE_CONCURRENCY: "1",
+    GIDEON_TTS_QUEUE_CONCURRENCY: "1",
+    GIDEON_RENDER_QUEUE_CONCURRENCY: "2",
     ...overrides
   };
 }

@@ -15,6 +15,7 @@ describe("live promotion environment check", () => {
     expect(result.stdout).toContain("Live promotion environment check dry-run:");
     expect(result.stdout).toContain("GIDEON_STAGING_MCP_SESSION_COOKIE");
     expect(result.stdout).toContain("GIDEON_BULLMQ_ATTEMPTS");
+    expect(result.stdout).toContain("GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY");
     expect(result.stdout).toContain("GIDEON_POSTGRES_PITR_ENABLED");
     expect(result.stdout).toContain("GIDEON_OBSERVABILITY_BACKEND");
     expect(result.stdout).toContain("GIDEON_PROVIDER_CANARY_ANALYSIS_MAX_COST_USD");
@@ -126,6 +127,22 @@ describe("live promotion environment check", () => {
       stderr: expect.stringContaining("GIDEON_MCP_SSO_PROVIDER must be one of")
     });
   });
+
+  it("rejects provider-heavy stage lanes that can monopolize live workers", async () => {
+    const env = liveEnv({
+      GIDEON_BULLMQ_CONCURRENCY: "4",
+      GIDEON_OCR_QUEUE_CONCURRENCY: "3"
+    });
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath], {
+        cwd: process.cwd(),
+        env
+      })
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining("GIDEON_OCR_QUEUE_CONCURRENCY must be 2 or lower")
+    });
+  });
 });
 
 function liveEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
@@ -144,6 +161,11 @@ function liveEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     GIDEON_BULLMQ_REMOVE_ON_COMPLETE_COUNT: "1000",
     GIDEON_BULLMQ_REMOVE_ON_FAIL_COUNT: "5000",
     GIDEON_BULLMQ_DEAD_LETTER_POLICY: "retain_failed",
+    GIDEON_ANALYSIS_QUEUE_CONCURRENCY: "2",
+    GIDEON_TRANSCRIPTION_QUEUE_CONCURRENCY: "1",
+    GIDEON_OCR_QUEUE_CONCURRENCY: "1",
+    GIDEON_TTS_QUEUE_CONCURRENCY: "1",
+    GIDEON_RENDER_QUEUE_CONCURRENCY: "2",
     GIDEON_WORKER_ID: "staging-worker-1",
     GIDEON_DATABASE_URL: "postgres://gideon:secret@db.example.test:5432/gideon?sslmode=require",
     GIDEON_DATABASE_POOL_MAX: "10",
