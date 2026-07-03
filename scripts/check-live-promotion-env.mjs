@@ -58,6 +58,15 @@ const requiredEnv = [
   "GIDEON_STAGING_MCP_SESSION_COOKIE",
   "GIDEON_STAGING_MCP_PROJECT_ID",
   "GIDEON_STAGING_MCP_METRIC_PROBE_URL",
+  "GIDEON_MCP_SSO_PROVIDER",
+  "GIDEON_MCP_SESSION_MAX_AGE_SECONDS",
+  "GIDEON_MCP_SESSION_ROTATION_HOURS",
+  "GIDEON_MCP_REQUIRE_CSRF",
+  "GIDEON_MCP_REQUIRE_REVISION_PRECONDITIONS",
+  "GIDEON_MCP_LOAD_CONCURRENCY",
+  "GIDEON_MCP_LOAD_REQUESTS",
+  "GIDEON_MCP_LOAD_P95_MS",
+  "GIDEON_MCP_LOAD_ERROR_RATE_MAX",
   "GIDEON_OBSERVABILITY_BACKEND",
   "GIDEON_OBSERVABILITY_METRIC_EXPORT_URL",
   "GIDEON_OBSERVABILITY_DASHBOARD_URL",
@@ -148,6 +157,7 @@ validateUrl("GIDEON_STORAGE_ENDPOINT", ["https:"], "GIDEON_STORAGE_ENDPOINT must
 validateUrl("GIDEON_STAGING_API_BASE_URL", ["https:"], "GIDEON_STAGING_API_BASE_URL must be an https:// URL.");
 validateUrl("GIDEON_STAGING_MCP_API_BASE_URL", ["https:"], "GIDEON_STAGING_MCP_API_BASE_URL must be an https:// URL.");
 validateUrl("GIDEON_STAGING_MCP_METRIC_PROBE_URL", ["https:"], "GIDEON_STAGING_MCP_METRIC_PROBE_URL must be an https:// URL.");
+validateMcpAccessPolicy();
 validateObservabilityPolicy();
 
 const storageProvider = value("GIDEON_STORAGE_PROVIDER");
@@ -289,6 +299,25 @@ function validateTtsPolicy() {
   validateRetentionWindow("GIDEON_VOICEOVER_DELETION_SLA_HOURS", 1, 168);
 }
 
+function validateMcpAccessPolicy() {
+  const provider = value("GIDEON_MCP_SSO_PROVIDER");
+  if (provider && !["oidc", "google", "github", "saml", "enterprise"].includes(provider)) {
+    errors.push("GIDEON_MCP_SSO_PROVIDER must be one of: oidc, google, github, saml, enterprise.");
+  }
+  validateRetentionWindow("GIDEON_MCP_SESSION_MAX_AGE_SECONDS", 300, 43_200);
+  validateRetentionWindow("GIDEON_MCP_SESSION_ROTATION_HOURS", 1, 24);
+  if (value("GIDEON_MCP_REQUIRE_CSRF") !== "true") {
+    errors.push("GIDEON_MCP_REQUIRE_CSRF must be true for hosted MCP production access.");
+  }
+  if (value("GIDEON_MCP_REQUIRE_REVISION_PRECONDITIONS") !== "true") {
+    errors.push("GIDEON_MCP_REQUIRE_REVISION_PRECONDITIONS must be true for hosted MCP production access.");
+  }
+  validateRetentionWindow("GIDEON_MCP_LOAD_CONCURRENCY", 1, 100);
+  validateRetentionWindow("GIDEON_MCP_LOAD_REQUESTS", 10, 100_000);
+  validateRetentionWindow("GIDEON_MCP_LOAD_P95_MS", 100, 10_000);
+  validateRate("GIDEON_MCP_LOAD_ERROR_RATE_MAX", 0, 0.05);
+}
+
 function validateSafeIdentifier(name, minLength, maxLength) {
   const raw = value(name);
   if (!raw) {
@@ -296,6 +325,14 @@ function validateSafeIdentifier(name, minLength, maxLength) {
   }
   if (raw.length < minLength || raw.length > maxLength || !/^[A-Za-z0-9._-]+$/.test(raw)) {
     errors.push(`${name} must be ${minLength}-${maxLength} characters using only letters, numbers, dots, underscores, and hyphens.`);
+  }
+}
+
+function validateRate(name, min, max) {
+  const raw = value(name);
+  const parsed = Number(raw);
+  if (!raw || !Number.isFinite(parsed) || parsed < min || parsed > max) {
+    errors.push(`${name} must be a number between ${min} and ${max}.`);
   }
 }
 

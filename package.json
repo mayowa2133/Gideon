@@ -33,6 +33,7 @@
     "production:github-promote:run": "node scripts/run-github-live-promotion.mjs",
     "production:live-env:check": "node scripts/check-live-promotion-env.mjs",
     "production:fixtures:materialize": "node scripts/materialize-live-promotion-fixtures.mjs",
+    "production:mcp:check": "node scripts/check-mcp-access-policy.mjs",
     "production:billing:check": "node scripts/check-billing-reconciliation.mjs",
     "production:db:check": "node scripts/check-postgres-policy.mjs",
     "production:queue:check": "node scripts/check-bullmq-policy.mjs",

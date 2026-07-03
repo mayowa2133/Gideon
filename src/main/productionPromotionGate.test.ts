@@ -17,6 +17,7 @@ describe("production promotion gate", () => {
     expect(result.stdout).toContain("Production promotion gate dry-run:");
     expect(result.stdout).toContain("local production readiness gate");
     expect(result.stdout).toContain("strict staging readiness gate");
+    expect(result.stdout).toContain("production MCP access policy");
     expect(result.stdout).toContain("production billing reconciliation");
     expect(result.stdout).toContain("production PostgreSQL policy");
     expect(result.stdout).toContain("production BullMQ policy");
@@ -84,10 +85,11 @@ describe("production promotion gate", () => {
       skipPackage: true,
       failedStep: null
     });
-    expect(evidence.steps).toHaveLength(13);
+    expect(evidence.steps).toHaveLength(14);
     expect(evidence.steps.every((step: { status: string }) => step.status === "succeeded")).toBe(true);
     expect(JSON.stringify(evidence)).not.toContain("gideon_session");
     expect(JSON.stringify(evidence)).not.toContain("OPENAI_API_KEY");
+    expect(invocations).toContain("production:mcp:check");
     expect(invocations).toContain("production:billing:check -- --live");
     expect(invocations).toContain("production:db:check");
     expect(invocations).toContain("production:queue:check");

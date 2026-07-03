@@ -64,6 +64,7 @@ function validateCommandContract() {
     "production:github-promote:run",
     "production:live-env:check",
     "production:fixtures:materialize",
+    "production:mcp:check",
     "production:billing:check",
     "production:db:check",
     "production:queue:check",

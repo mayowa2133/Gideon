@@ -20,6 +20,7 @@ const providerCanaryReportPath =
 const steps = [
   step("local production readiness gate", [pnpm, "production:check"]),
   step("strict staging readiness gate", [pnpm, "staging:check", "--", "--strict"]),
+  step("production MCP access policy", [pnpm, "production:mcp:check"]),
   step("production billing reconciliation", [pnpm, "production:billing:check", "--", "--live"]),
   step("production PostgreSQL policy", [pnpm, "production:db:check"]),
   step("production BullMQ policy", [pnpm, "production:queue:check"]),

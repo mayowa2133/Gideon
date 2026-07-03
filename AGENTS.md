@@ -74,12 +74,17 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm provider:canary
 - pnpm staging:check
 - pnpm staging:smoke
+- pnpm staging:mcp:smoke
 - pnpm production:check
 - pnpm production:promote:check
+- pnpm production:mcp:check
+- pnpm production:billing:check
 - pnpm production:db:check
 - pnpm production:queue:check
 - pnpm production:observability:check
 - pnpm production:storage:check
+- pnpm production:storage-download:smoke
+- pnpm production:tts:check
 - pnpm production:provider-canary-report:check
 - pnpm production:release-receipt:check
 - pnpm worker:hosted:check

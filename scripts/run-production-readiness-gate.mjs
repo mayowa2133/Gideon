@@ -30,6 +30,7 @@ const steps = [
   step("live promotion GitHub workflow runner dry-run", [pnpm, "production:github-promote:run", "--", "--dry-run"]),
   step("live promotion environment dry-run", [pnpm, "production:live-env:check", "--", "--dry-run"]),
   step("live promotion fixture materialization dry-run", [pnpm, "production:fixtures:materialize", "--", "--dry-run"]),
+  step("production MCP access policy dry-run", [pnpm, "production:mcp:check", "--", "--dry-run"]),
   step("production billing reconciliation dry-run", [pnpm, "production:billing:check", "--", "--dry-run"]),
   step("production PostgreSQL policy dry-run", [pnpm, "production:db:check", "--", "--dry-run"]),
   step("production BullMQ policy dry-run", [pnpm, "production:queue:check", "--", "--dry-run"]),

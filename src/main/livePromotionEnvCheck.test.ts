@@ -21,6 +21,7 @@ describe("live promotion environment check", () => {
     expect(result.stdout).toContain("GIDEON_STORAGE_TEMP_RETENTION_DAYS");
     expect(result.stdout).toContain("GIDEON_STORAGE_SIGNED_DOWNLOAD_SMOKE_KEY");
     expect(result.stdout).toContain("GIDEON_TTS_APPROVED_VOICES");
+    expect(result.stdout).toContain("GIDEON_MCP_SSO_PROVIDER");
     expect(result.stdout).toContain("Require Apple signing/notarization env");
   });
 
@@ -92,6 +93,22 @@ describe("live promotion environment check", () => {
       stderr: expect.stringContaining("GIDEON_OPENAI_TTS_VOICE must be included in GIDEON_TTS_APPROVED_VOICES")
     });
   });
+
+  it("rejects weak live MCP access policy", async () => {
+    const env = liveEnv({
+      GIDEON_MCP_SSO_PROVIDER: "local",
+      GIDEON_MCP_REQUIRE_CSRF: "false"
+    });
+
+    await expect(
+      execFileAsync(process.execPath, [scriptPath], {
+        cwd: process.cwd(),
+        env
+      })
+    ).rejects.toMatchObject({
+      stderr: expect.stringContaining("GIDEON_MCP_SSO_PROVIDER must be one of")
+    });
+  });
 });
 
 function liveEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
@@ -154,6 +171,15 @@ function liveEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
     GIDEON_STAGING_MCP_SESSION_COOKIE: "gideon_session=session-token",
     GIDEON_STAGING_MCP_PROJECT_ID: "project-staging-mcp",
     GIDEON_STAGING_MCP_METRIC_PROBE_URL: "https://metrics.gideon.example.test/hosted-mcp",
+    GIDEON_MCP_SSO_PROVIDER: "oidc",
+    GIDEON_MCP_SESSION_MAX_AGE_SECONDS: "3600",
+    GIDEON_MCP_SESSION_ROTATION_HOURS: "12",
+    GIDEON_MCP_REQUIRE_CSRF: "true",
+    GIDEON_MCP_REQUIRE_REVISION_PRECONDITIONS: "true",
+    GIDEON_MCP_LOAD_CONCURRENCY: "10",
+    GIDEON_MCP_LOAD_REQUESTS: "500",
+    GIDEON_MCP_LOAD_P95_MS: "1500",
+    GIDEON_MCP_LOAD_ERROR_RATE_MAX: "0.01",
     ...observabilityPolicyEnv(),
     APPLE_TEAM_ID: "TEAM123",
     APPLE_ID: "release@example.com",
