@@ -131,10 +131,18 @@ const fs = require("node:fs");
 const path = require("node:path");
 const args = process.argv.slice(2);
 if (args[0] === "secret" && args[1] === "list") {
+  if (args.includes("--limit")) {
+    console.error("portable gh secret list check must not use --limit");
+    process.exit(1);
+  }
   process.stdout.write(JSON.stringify(${JSON.stringify(secrets.map((name) => ({ name })))}));
   process.exit(0);
 }
 if (args[0] === "variable" && args[1] === "list") {
+  if (args.includes("--limit")) {
+    console.error("portable gh variable list check must not use --limit");
+    process.exit(1);
+  }
   process.stdout.write(JSON.stringify(${JSON.stringify(vars.map((name) => ({ name })))}));
   process.exit(0);
 }

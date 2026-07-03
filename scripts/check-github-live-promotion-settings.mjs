@@ -80,8 +80,8 @@ function readExpectedConfiguration() {
 function readGitHubNames(kind, targetRepo) {
   const commandArgs =
     kind === "secret"
-      ? ["secret", "list", "--repo", targetRepo, "--json", "name", "--limit", "200"]
-      : ["variable", "list", "--repo", targetRepo, "--json", "name", "--limit", "200"];
+      ? ["secret", "list", "--repo", targetRepo, "--json", "name"]
+      : ["variable", "list", "--repo", targetRepo, "--json", "name"];
   const result = runCommand("gh", commandArgs, { capture: true });
   let parsed;
   try {
