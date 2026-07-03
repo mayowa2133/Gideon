@@ -10,7 +10,7 @@ Gideon is no longer only a local deterministic desktop prototype. The repository
 
 The remaining production gap is narrower and mostly operational: replace local JSON-backed hosted state with production database-backed persistence, run Redis/BullMQ and object storage as managed production services, complete deployment/release operations, and execute a final end-to-end production smoke with real infrastructure. Social posting, scheduling, avatar generation, and voice cloning remain explicit post-MVP items.
 
-Current engineering estimate: **99.99999999987% complete** toward the full original product vision.
+Current engineering estimate: **99.99999999988% complete** toward the full original product vision.
 
 ## Capability audit
 
@@ -131,6 +131,8 @@ pnpm production:check
 ## Latest live-evidence attempt
 
 The 2026-07-03 live-evidence attempt is recorded in `docs/live-evidence-status.md`. The live promotion runner, strict staging check, live upload-to-export smoke, hosted MCP smoke, provider canaries, storage, database, queue, billing, observability, prompt, TTS, and release receipt checks all stopped before real live execution because required external staging infrastructure, GitHub Secrets/Variables, provider credentials, storage/database/queue configuration, hosted MCP session data, observability endpoints, Stripe settings, and Apple signing/notarization evidence are not configured yet. The guarded GitHub runner correctly stopped before dispatching a `workflow_dispatch` live promotion run.
+
+The local no-secrets core smoke now passes with `pnpm smoke:local-core`. It generated a synthetic 75-second screen recording, attached it as a private source recording, ran analysis into 5 moments, generated 10 concepts and 3 script drafts, applied a Codex/Claude-style MCP direct-store script edit with `mcp_agent` audit evidence, rendered a 1080×1920 H.264/AAC short-form video, and stored a private export artifact.
 
 ## Next engineering slice
 

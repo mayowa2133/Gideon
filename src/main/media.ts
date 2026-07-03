@@ -4,7 +4,7 @@ import { createWriteStream, existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import PImage from "pureimage";
+import * as PImage from "pureimage";
 import type {
   DetectedMoment,
   ProductProfile,

@@ -15,6 +15,13 @@ Latest known green CI on `main`:
 - Run: `28684721566`
 - Result: success
 
+Latest no-secrets local core proof:
+
+- Command: `pnpm smoke:local-core -- --keep-output`
+- Result: passed
+- Summary: generated a 75-second synthetic screen recording, produced 5 moments, 10 concepts, 3 scripts, applied an MCP direct-store script edit with `mcp_agent` audit evidence, rendered a 1080×1920 H.264/AAC short-form video, and created a private export artifact.
+- Last local summary path: `tmp/local-core-smoke/2026-07-03T22-07-23-002Z/summary.json`
+
 ## Commands run during this live-evidence attempt
 
 | Command | Result | Meaning |
@@ -35,6 +42,7 @@ Latest known green CI on `main`:
 | `pnpm production:prompt:check` | Failed before policy validation | Prompt/model rollout policy variables are absent. |
 | `pnpm production:tts:check` | Failed before policy validation | TTS model/voice/review/retention policy variables are absent. |
 | `pnpm production:billing:check` | Failed before reconciliation | Stripe billing provider, webhook trust, price mapping, and offline/live mode configuration are absent. |
+| `pnpm smoke:local-core -- --keep-output` | Passed locally without secrets | Proves the local core recording-to-short-form path and Codex/Claude-style MCP direct-store editing path work without hosted/live infrastructure. |
 
 ## GitHub Secrets required before live promotion can dispatch
 

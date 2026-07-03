@@ -31,6 +31,5 @@ declare module "pureimage" {
     encodePNGToStream(image: Bitmap, stream: NodeJS.WritableStream): Promise<void>;
   };
 
-  export default PImage;
+  export = PImage;
 }
-
