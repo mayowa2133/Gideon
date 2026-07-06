@@ -6,10 +6,20 @@ import {
   createDefaultProfile,
   createMoments,
   enforceSelectionLimit,
+  estimateScriptDurationMs,
   generateConcepts,
   generateScripts,
+  splitCaptionSegments,
   validateProfile
 } from "../shared/contentEngine";
+import {
+  buildEditDecisionList,
+  buildEvidenceClaims,
+  buildVisualBeatsForTemplate,
+  normalizeBrandKit,
+  scriptQualityWarnings,
+  templateForFormatFamily
+} from "../shared/renderTemplates";
 import type {
   AppState,
   AuditAction,
@@ -1206,7 +1216,7 @@ export class GideonStore {
     return this.updateProject(
       projectId,
       (project) => {
-        project.scripts = scripts.map((script) => ({ ...script, updatedAt: new Date().toISOString() }));
+        project.scripts = scripts.map((script) => normalizeScriptDraft(project, { ...script, updatedAt: new Date().toISOString() }));
         project.renders = [];
         project.status = "script_review";
         project.updatedAt = new Date().toISOString();
@@ -1272,6 +1282,8 @@ export class GideonStore {
       throw new Error("At least one script field is required.");
     }
     const now = new Date().toISOString();
+    const normalizedScript = normalizeScriptDraft(project, { ...script, updatedAt: now });
+    Object.assign(script, normalizedScript);
     script.updatedAt = now;
     project.renders = [];
     project.status = "script_review";
@@ -2541,21 +2553,31 @@ function normalizeAppState(state: AppState): AppState {
     activeUserId,
     activeWorkspaceId,
     activeProjectId: raw.activeProjectId ?? null,
-    projects: (raw.projects ?? []).map((project) => ({
-      ...project,
-      workspaceId: project.workspaceId ?? activeWorkspaceId,
-      moments: project.moments ?? [],
-      frameEvidence: project.frameEvidence ?? [],
-      concepts: project.concepts ?? [],
-      scripts: project.scripts ?? [],
-      renders: project.renders ?? [],
-      artifacts: project.artifacts ?? [],
-      uploadSessions: project.uploadSessions ?? [],
-      providerRuns: project.providerRuns ?? [],
-      jobs: project.jobs ?? [],
-      jobEvents: project.jobEvents ?? []
-    }))
+    projects: (raw.projects ?? []).map((project) => normalizeProject(project as Project, activeWorkspaceId))
   };
+}
+
+function normalizeProject(project: Project, activeWorkspaceId: string): Project {
+  const normalized: Project = {
+    ...project,
+    workspaceId: project.workspaceId ?? activeWorkspaceId,
+    profile: normalizeProfile(project.profile ?? createDefaultProfile()),
+    moments: project.moments ?? [],
+    frameEvidence: project.frameEvidence ?? [],
+    concepts: (project.concepts ?? []).map((concept, index) => ({
+      ...concept,
+      templateKey: concept.templateKey ?? templateForFormatFamily(concept.formatFamily, index)
+    })),
+    scripts: [],
+    renders: project.renders ?? [],
+    artifacts: project.artifacts ?? [],
+    uploadSessions: project.uploadSessions ?? [],
+    providerRuns: project.providerRuns ?? [],
+    jobs: project.jobs ?? [],
+    jobEvents: project.jobEvents ?? []
+  };
+  normalized.scripts = (project.scripts ?? []).map((script) => normalizeScriptDraft(normalized, script));
+  return normalized;
 }
 
 function createInitialAppState(): AppState {
@@ -2757,13 +2779,65 @@ export function newProjectTemplate(): CreateProjectInput {
 }
 
 function normalizeProfile(profile: ProductProfile): ProductProfile {
+  const productName = (profile.productName ?? "").trim();
   return {
-    productName: profile.productName.trim(),
-    targetCustomer: profile.targetCustomer.trim(),
-    productDescription: profile.productDescription.trim(),
-    preferredTone: profile.preferredTone,
-    toneGuidance: profile.toneGuidance.trim(),
-    platforms: [...new Set(profile.platforms)],
-    walkthroughNotes: profile.walkthroughNotes.trim()
+    productName,
+    targetCustomer: (profile.targetCustomer ?? "").trim(),
+    productDescription: (profile.productDescription ?? "").trim(),
+    preferredTone: profile.preferredTone ?? "direct",
+    toneGuidance: (profile.toneGuidance ?? "").trim(),
+    platforms: [
+      ...new Set<ProductProfile["platforms"][number]>(
+        profile.platforms?.length ? profile.platforms : ["tiktok", "instagram_reels", "youtube_shorts"]
+      )
+    ],
+    walkthroughNotes: (profile.walkthroughNotes ?? "").trim(),
+    defaultTemplateKey: profile.defaultTemplateKey ?? "problem_demo_payoff",
+    brandPresenterEnabled: Boolean(profile.brandPresenterEnabled),
+    brandKit: normalizeBrandKit(profile.brandKit, productName)
+  };
+}
+
+function normalizeScriptDraft(project: Project, script: ScriptDraft): ScriptDraft {
+  const concept = project.concepts.find((candidate) => candidate.id === script.conceptId);
+  const templateKey = script.templateKey ?? concept?.templateKey ?? templateForFormatFamily(concept?.formatFamily ?? "problem-solution");
+  const voiceoverText = script.voiceoverText.trim();
+  const durationMs = estimateScriptDurationMs({ voiceoverText });
+  const captions = script.captions?.length ? script.captions : splitCaptionSegments(voiceoverText, durationMs);
+  const momentIds = concept?.proofMomentIds?.length
+    ? concept.proofMomentIds
+    : script.visualBeats?.map((beat) => beat.momentId) ?? [];
+  const moments = momentIds
+    .map((momentId) => project.moments.find((moment) => moment.id === momentId))
+    .filter((moment): moment is DetectedMoment => Boolean(moment));
+  const visualBeats = script.visualBeats?.length
+    ? script.visualBeats
+    : buildVisualBeatsForTemplate({ moments, durationMs, templateKey });
+  const hook = script.hook.trim();
+  const cta = script.cta.trim();
+  const evidenceClaims = script.evidenceClaims?.length
+    ? script.evidenceClaims
+    : buildEvidenceClaims({ moments, hook, cta, voiceoverText });
+  const qualityWarnings = scriptQualityWarnings({ hook, voiceoverText, captions, evidenceClaims });
+  return {
+    ...script,
+    templateKey,
+    hook,
+    voiceoverText,
+    captions,
+    cta,
+    visualBeats,
+    editDecisionList: buildEditDecisionList({
+      profile: project.profile,
+      templateKey,
+      durationMs,
+      captions,
+      visualBeats,
+      hook,
+      cta,
+      moments
+    }),
+    evidenceClaims,
+    qualityWarnings
   };
 }

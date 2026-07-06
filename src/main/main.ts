@@ -1,5 +1,6 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell, type OpenDialogOptions } from "electron";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import {
@@ -141,7 +142,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("recording:choose", async (_event, projectId: string) => {
     await store.assertProjectPermission(projectId, "project:update");
-    const options = {
+    const options: OpenDialogOptions = {
       title: "Choose a product walkthrough recording",
       properties: ["openFile"],
       filters: [
@@ -302,6 +303,24 @@ function registerIpcHandlers(): void {
   ipcMain.handle("scripts:update", async (_event, projectId: string, scripts: ScriptDraft[]) =>
     store.updateScripts(projectId, scripts)
   );
+  ipcMain.handle("brand:choose-logo", async () => {
+    const options: OpenDialogOptions = {
+      title: "Choose brand logo",
+      properties: ["openFile"],
+      filters: [
+        { name: "Images", extensions: ["png", "jpg", "jpeg"] }
+      ]
+    };
+    const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
+    if (result.canceled || !result.filePaths[0]) {
+      return null;
+    }
+    const logoPath = result.filePaths[0];
+    return {
+      logoPath,
+      logoUrl: pathToFileURL(logoPath).toString()
+    };
+  });
 
   ipcMain.handle("render:selected", async (_event, projectId: string) => {
     return enqueueRenderFromControl(projectId);

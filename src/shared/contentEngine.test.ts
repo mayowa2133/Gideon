@@ -8,6 +8,7 @@ import {
   validateProfile
 } from "./contentEngine";
 import type { ProductProfile, RecordingMetadata } from "./types";
+import { createDefaultBrandKit } from "./renderTemplates";
 
 const profile: ProductProfile = {
   productName: "LeadPilot",
@@ -16,7 +17,13 @@ const profile: ProductProfile = {
   preferredTone: "direct",
   toneGuidance: "Plain founder voice.",
   platforms: ["tiktok", "instagram_reels", "youtube_shorts", "linkedin"],
-  walkthroughNotes: "Show setup, generated leads, personalized draft, and success state."
+  walkthroughNotes: "Show setup, generated leads, personalized draft, and success state.",
+  defaultTemplateKey: "hidden_feature_reveal",
+  brandPresenterEnabled: true,
+  brandKit: {
+    ...createDefaultBrandKit("LeadPilot"),
+    tagline: "Outbound proof in one workflow."
+  }
 };
 
 const recording: RecordingMetadata = {
@@ -57,6 +64,8 @@ describe("content engine", () => {
     expect(concepts).toHaveLength(10);
     expect(concepts.filter((concept) => concept.selected)).toHaveLength(3);
     expect(new Set(concepts.map((concept) => concept.formatFamily)).size).toBeGreaterThanOrEqual(4);
+    expect(concepts.every((concept) => concept.templateKey)).toBe(true);
+    expect(concepts[0]?.templateKey).toBe("hidden_feature_reveal");
   });
 
   it("enforces the three-concept selection limit", () => {
@@ -79,6 +88,10 @@ describe("content engine", () => {
     expect(scripts).toHaveLength(3);
     expect(scripts.every((script) => script.captions.length > 0)).toBe(true);
     expect(scripts.every((script) => script.visualBeats.length > 0)).toBe(true);
+    expect(scripts.every((script) => script.editDecisionList?.schemaVersion === "2")).toBe(true);
+    expect(scripts.every((script) => (script.editDecisionList?.zooms.length ?? 0) > 0)).toBe(true);
+    expect(scripts.every((script) => (script.editDecisionList?.callouts.length ?? 0) > 0)).toBe(true);
+    expect(scripts.every((script) => (script.evidenceClaims?.length ?? 0) > 0)).toBe(true);
     expect(
       scripts.some((script) => /revolutionary platform|game-changing solution/i.test(script.voiceoverText))
     ).toBe(false);
@@ -90,4 +103,3 @@ describe("content engine", () => {
     );
   });
 });
-

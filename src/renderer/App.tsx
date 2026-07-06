@@ -3,7 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import type {
   AppState,
   BillingStatus,
+  BrandKit,
+  CaptionStylePreset,
   ContentConcept,
+  CreatorTemplateKey,
+  CtaStylePreset,
   DetectedMoment,
   JobKind,
   Platform,
@@ -18,6 +22,7 @@ import type {
 } from "../shared/types";
 import { platformLabels, toneLabels } from "../shared/types";
 import { createDefaultProfile, splitCaptionSegments } from "../shared/contentEngine";
+import { createDefaultBrandKit, creatorTemplatePack } from "../shared/renderTemplates";
 import {
   createLocalUserWorkspace,
   entitlementLimit,
@@ -41,6 +46,8 @@ type BusyAction =
   | null;
 
 const platforms: Platform[] = ["tiktok", "instagram_reels", "youtube_shorts", "linkedin", "other"];
+const captionStyles: CaptionStylePreset[] = ["kinetic_bold", "clean_founder", "educational_stack"];
+const ctaStyles: CtaStylePreset[] = ["soft_try", "direct_signup", "learn_more"];
 
 function App(): JSX.Element {
   const [state, setState] = useState<AppState>(() => createEmptyAppState());
@@ -1136,6 +1143,24 @@ function ProfileForm({
     onChange({ ...profile, [key]: value });
   }
 
+  function brandKit(): BrandKit {
+    return profile.brandKit ?? createDefaultBrandKit(profile.productName);
+  }
+
+  function updateBrandKit(patch: Partial<BrandKit>): void {
+    update("brandKit", {
+      ...brandKit(),
+      ...patch
+    });
+  }
+
+  async function chooseLogo(): Promise<void> {
+    const selected = await window.gideon.chooseBrandLogo();
+    if (selected) {
+      updateBrandKit(selected);
+    }
+  }
+
   function togglePlatform(platform: Platform): void {
     const next = profile.platforms.includes(platform)
       ? profile.platforms.filter((candidate) => candidate !== platform)
@@ -1183,6 +1208,86 @@ function ProfileForm({
           rows={3}
         />
       </label>
+      <label>
+        Creator template
+        <select
+          value={profile.defaultTemplateKey ?? "problem_demo_payoff"}
+          onChange={(event) => update("defaultTemplateKey", event.target.value as CreatorTemplateKey)}
+        >
+          {creatorTemplatePack.map((template) => (
+            <option key={template.key} value={template.key}>
+              {template.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="checkbox-row">
+        <input
+          checked={Boolean(profile.brandPresenterEnabled)}
+          onChange={(event) => update("brandPresenterEnabled", event.target.checked)}
+          type="checkbox"
+        />
+        Brand presenter
+      </label>
+      <div className="brand-kit-controls">
+        <label>
+          Primary color
+          <input
+            type="color"
+            value={brandKit().primaryColor}
+            onChange={(event) => updateBrandKit({ primaryColor: event.target.value })}
+          />
+        </label>
+        <label>
+          Accent color
+          <input
+            type="color"
+            value={brandKit().accentColor}
+            onChange={(event) => updateBrandKit({ accentColor: event.target.value })}
+          />
+        </label>
+        <label>
+          Background
+          <input
+            type="color"
+            value={brandKit().backgroundColor}
+            onChange={(event) => updateBrandKit({ backgroundColor: event.target.value })}
+          />
+        </label>
+        <label>
+          Captions
+          <select
+            value={brandKit().captionStyle}
+            onChange={(event) => updateBrandKit({ captionStyle: event.target.value as CaptionStylePreset })}
+          >
+            {captionStyles.map((style) => (
+              <option key={style} value={style}>
+                {style.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          CTA style
+          <select value={brandKit().ctaStyle} onChange={(event) => updateBrandKit({ ctaStyle: event.target.value as CtaStylePreset })}>
+            {ctaStyles.map((style) => (
+              <option key={style} value={style}>
+                {style.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Tagline
+          <input value={brandKit().tagline ?? ""} onChange={(event) => updateBrandKit({ tagline: event.target.value })} />
+        </label>
+        <div className="logo-picker">
+          {brandKit().logoUrl ? <img src={brandKit().logoUrl} alt="" /> : <span>{initials(profile.productName || "G")}</span>}
+          <button className="secondary compact" onClick={() => void chooseLogo()} type="button">
+            Choose logo
+          </button>
+        </div>
+      </div>
       <div className="platform-picker" aria-label="Platforms">
         {platforms.map((platform) => (
           <button
@@ -1279,6 +1384,7 @@ function ConceptGrid({
         <article className={`concept-card ${concept.selected ? "selected" : ""}`} key={concept.id}>
           <div className="card-topline">
             <span>{concept.formatFamily}</span>
+            <span>{concept.templateKey?.replace(/_/g, " ") ?? "auto template"}</span>
             <label className="select-toggle">
               <input
                 type="checkbox"
@@ -1328,7 +1434,8 @@ function ScriptEditor({
         }
         const next = { ...script, ...patch };
         if (patch.voiceoverText) {
-          next.captions = splitCaptionSegments(patch.voiceoverText, Math.max(...script.captions.map((caption) => caption.endMs), 30_000));
+          const currentDuration = script.captions.length ? Math.max(...script.captions.map((caption) => caption.endMs)) : 30_000;
+          next.captions = splitCaptionSegments(patch.voiceoverText, Math.max(currentDuration, 30_000));
         }
         return next;
       })
@@ -1340,6 +1447,19 @@ function ScriptEditor({
       {scripts.map((script, index) => (
         <article className="script-card" key={script.id}>
           <p className="eyebrow">Draft {index + 1}</p>
+          <label>
+            Template
+            <select
+              value={script.templateKey ?? "problem_demo_payoff"}
+              onChange={(event) => updateScript(script.id, { templateKey: event.target.value as CreatorTemplateKey })}
+            >
+              {creatorTemplatePack.map((template) => (
+                <option key={template.key} value={template.key}>
+                  {template.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label>
             Hook
             <input value={script.hook} onChange={(event) => updateScript(script.id, { hook: event.target.value })} />
@@ -1361,6 +1481,18 @@ function ScriptEditor({
               <span key={`${script.id}-${caption.startMs}`}>{caption.text}</span>
             ))}
           </div>
+          <div className="render-plan-summary">
+            <span>{script.editDecisionList?.zooms.length ?? script.visualBeats.length} punch-ins</span>
+            <span>{script.editDecisionList?.callouts.length ?? script.visualBeats.length} callouts</span>
+            <span>{script.editDecisionList?.presenter.enabled ? "presenter on" : "presenter off"}</span>
+          </div>
+          {script.qualityWarnings && script.qualityWarnings.length > 0 ? (
+            <div className="quality-warning-list">
+              {script.qualityWarnings.map((warning) => (
+                <small key={`${script.id}-${warning.code}`}>{warning.message}</small>
+              ))}
+            </div>
+          ) : null}
         </article>
       ))}
     </div>
@@ -1444,6 +1576,14 @@ function formatMs(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function initials(value: string): string {
+  const words = value.split(/\s+/).filter(Boolean);
+  if (words.length === 0) {
+    return "G";
+  }
+  return words.slice(0, 2).map((word) => word[0]?.toUpperCase() ?? "").join("");
 }
 
 function formatBytes(bytes: number): string {

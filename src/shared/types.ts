@@ -275,6 +275,31 @@ export type TonePreset =
   | "professional"
   | "educational";
 
+export type CreatorTemplateKey =
+  | "hidden_feature_reveal"
+  | "problem_demo_payoff"
+  | "founder_demo"
+  | "three_reasons"
+  | "before_after_workflow"
+  | "brand_presenter";
+
+export type CaptionStylePreset = "kinetic_bold" | "clean_founder" | "educational_stack";
+
+export type CtaStylePreset = "soft_try" | "direct_signup" | "learn_more";
+
+export interface BrandKit {
+  productName: string;
+  logoPath?: string;
+  logoUrl?: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  backgroundColor: string;
+  captionStyle: CaptionStylePreset;
+  ctaStyle: CtaStylePreset;
+  tagline?: string;
+}
+
 export interface ProductProfile {
   productName: string;
   targetCustomer: string;
@@ -283,6 +308,9 @@ export interface ProductProfile {
   toneGuidance: string;
   platforms: Platform[];
   walkthroughNotes: string;
+  defaultTemplateKey?: CreatorTemplateKey;
+  brandPresenterEnabled?: boolean;
+  brandKit?: BrandKit;
 }
 
 export interface RecordingMetadata {
@@ -345,6 +373,12 @@ export interface FrameUiElement {
   text: string;
   role?: string;
   confidence?: number;
+  box?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 export interface ProviderRun {
@@ -380,6 +414,7 @@ export interface ContentConcept {
   id: string;
   title: string;
   formatFamily: string;
+  templateKey?: CreatorTemplateKey;
   targetPain: string;
   hookDirection: string;
   proofMomentIds: string[];
@@ -394,6 +429,17 @@ export interface CaptionSegment {
   startMs: number;
   endMs: number;
   text: string;
+  words?: Array<{
+    startMs: number;
+    endMs: number;
+    text: string;
+  }>;
+}
+
+export interface RenderFocusPoint {
+  x: number;
+  y: number;
+  scale: number;
 }
 
 export interface VisualBeat {
@@ -401,16 +447,113 @@ export interface VisualBeat {
   endMs: number;
   momentId: string;
   instruction: string;
+  purpose?: "hook" | "problem" | "demo" | "proof" | "payoff" | "cta";
+  callout?: string;
+  focus?: RenderFocusPoint;
+  evidenceIds?: string[];
 }
+
+export interface RenderSourceSegment {
+  momentId: string;
+  sourceStartMs: number;
+  sourceEndMs: number;
+  timelineStartMs: number;
+  timelineEndMs: number;
+  fit: "contain" | "cover";
+  focus: RenderFocusPoint;
+}
+
+export interface RenderZoomCue {
+  startMs: number;
+  endMs: number;
+  fromScale: number;
+  toScale: number;
+  focus: RenderFocusPoint;
+  easing: "standard" | "snap" | "spring";
+}
+
+export interface RenderOverlayCue {
+  id: string;
+  kind: "hook" | "proof_label" | "callout" | "cta" | "brand_badge";
+  startMs: number;
+  endMs: number;
+  text: string;
+  position: "top" | "center" | "bottom" | "left" | "right";
+  emphasis: "primary" | "secondary" | "accent";
+}
+
+export interface RenderCalloutCue {
+  id: string;
+  startMs: number;
+  endMs: number;
+  text: string;
+  anchor: RenderFocusPoint;
+  evidenceIds?: string[];
+}
+
+export interface BrandPresenterLayer {
+  enabled: boolean;
+  style: "logo_head";
+  startMs: number;
+  endMs: number;
+  position: "lower_left" | "lower_right";
+  logoPath?: string;
+  logoUrl?: string;
+  motion: "idle_bob" | "caption_sync";
+}
+
+export interface EditDecisionList {
+  schemaVersion: "2";
+  templateKey: CreatorTemplateKey;
+  templateVersion: number;
+  durationMs: number;
+  canvas: {
+    width: 1080;
+    height: 1920;
+    fps: 30;
+  };
+  brandKit: BrandKit;
+  sourceSegments: RenderSourceSegment[];
+  zooms: RenderZoomCue[];
+  captions: CaptionSegment[];
+  overlays: RenderOverlayCue[];
+  callouts: RenderCalloutCue[];
+  presenter: BrandPresenterLayer;
+  music: {
+    enabled: boolean;
+    mood: "none" | "clean_tech" | "upbeat";
+    gainDb: number;
+  };
+  qualityGates: {
+    requireEvidenceBackedClaims: boolean;
+    requireCaptionSafeArea: boolean;
+    requireAudioAlignment: boolean;
+  };
+}
+
+export interface EvidenceClaim {
+  text: string;
+  sourceEvidenceIds: string[];
+  momentIds: string[];
+}
+
+export interface ScriptQualityWarning {
+  code: "unsupported_claim" | "generic_phrase" | "long_line" | "missing_evidence" | "caption_overflow_risk";
+  message: string;
+ }
 
 export interface ScriptDraft {
   id: string;
   conceptId: string;
+  templateKey?: CreatorTemplateKey;
   hook: string;
   voiceoverText: string;
   captions: CaptionSegment[];
   cta: string;
   visualBeats: VisualBeat[];
+  editDecisionList?: EditDecisionList;
+  evidenceClaims?: EvidenceClaim[];
+  qualityWarnings?: ScriptQualityWarning[];
   approved: boolean;
   updatedAt: string;
 }

@@ -50,6 +50,7 @@ const api = {
   generateScripts: (projectId: string): Promise<Project> => ipcRenderer.invoke("scripts:generate", projectId),
   updateScripts: (projectId: string, scripts: ScriptDraft[]): Promise<Project> =>
     ipcRenderer.invoke("scripts:update", projectId, scripts),
+  chooseBrandLogo: (): Promise<{ logoPath: string; logoUrl: string } | null> => ipcRenderer.invoke("brand:choose-logo"),
   renderSelected: (projectId: string): Promise<Project> => ipcRenderer.invoke("render:selected", projectId),
   cancelJob: (projectId: string, jobId: string): Promise<Project> => ipcRenderer.invoke("job:cancel", projectId, jobId),
   retryJob: (projectId: string, jobId: string): Promise<Project> => ipcRenderer.invoke("job:retry", projectId, jobId),

@@ -1,13 +1,22 @@
 import type {
   CaptionSegment,
   ContentConcept,
+  CreatorTemplateKey,
   DetectedMoment,
   Platform,
   ProductProfile,
   RecordingMetadata,
-  ScriptDraft,
-  VisualBeat
+  ScriptDraft
 } from "./types";
+import {
+  buildEditDecisionList,
+  buildEvidenceClaims,
+  buildVisualBeatsForTemplate,
+  createDefaultBrandKit,
+  getCreatorTemplate,
+  scriptQualityWarnings,
+  templateForFormatFamily
+} from "./renderTemplates";
 
 const forbiddenPhrases = [
   "revolutionary platform",
@@ -20,6 +29,7 @@ const forbiddenPhrases = [
 const formatTemplates = [
   {
     family: "problem-solution",
+    templateKey: "problem_demo_payoff",
     title: "Stop losing time to the old workflow",
     pain: "manual work that slows down the target customer",
     hook: "Show the painful before-state, then the faster path",
@@ -27,6 +37,7 @@ const formatTemplates = [
   },
   {
     family: "before-after",
+    templateKey: "before_after_workflow",
     title: "Before and after using the product",
     pain: "the contrast between scattered work and a clean outcome",
     hook: "Open with the messy baseline, then show the improved result",
@@ -34,6 +45,7 @@ const formatTemplates = [
   },
   {
     family: "founder-demo",
+    templateKey: "founder_demo",
     title: "I built this because the existing way was too slow",
     pain: "a founder-facing frustration that triggered the build",
     hook: "Use a plain founder voice and show the core workflow quickly",
@@ -41,6 +53,7 @@ const formatTemplates = [
   },
   {
     family: "feature-highlight",
+    templateKey: "hidden_feature_reveal",
     title: "The one feature worth seeing first",
     pain: "unclear value from a key feature until the proof appears",
     hook: "Start at the payoff, then rewind into how it works",
@@ -48,6 +61,7 @@ const formatTemplates = [
   },
   {
     family: "how-it-works",
+    templateKey: "problem_demo_payoff",
     title: "How the workflow works in under a minute",
     pain: "uncertainty about what the product actually does",
     hook: "Walk through three visible steps with concrete labels",
@@ -55,6 +69,7 @@ const formatTemplates = [
   },
   {
     family: "launch-announcement",
+    templateKey: "brand_presenter",
     title: "Launch week demo for people who need the outcome",
     pain: "the audience has the problem but has not tried the product",
     hook: "Announce the product through a specific use case, not hype",
@@ -62,6 +77,7 @@ const formatTemplates = [
   },
   {
     family: "tutorial",
+    templateKey: "problem_demo_payoff",
     title: "Do this workflow once, then repeat it",
     pain: "users need a practical first action",
     hook: "Teach one narrow workflow and show the resulting state",
@@ -69,6 +85,7 @@ const formatTemplates = [
   },
   {
     family: "customer-pain",
+    templateKey: "problem_demo_payoff",
     title: "If this task is still manual, this is the fix",
     pain: "the recurring task that the target customer wants removed",
     hook: "Name the pain in the first sentence and prove the fix on screen",
@@ -76,6 +93,7 @@ const formatTemplates = [
   },
   {
     family: "three-reasons",
+    templateKey: "three_reasons",
     title: "Three reasons this workflow matters",
     pain: "the audience needs quick reasons to care",
     hook: "Stack three concrete benefits tied to visible moments",
@@ -83,6 +101,7 @@ const formatTemplates = [
   },
   {
     family: "linkedin-professional",
+    templateKey: "founder_demo",
     title: "A practical workflow breakdown for LinkedIn",
     pain: "buyers need a credible explanation before trying a new tool",
     hook: "Use a calm proof-first walkthrough with a work outcome",
@@ -91,14 +110,18 @@ const formatTemplates = [
 ];
 
 export function createDefaultProfile(): ProductProfile {
+  const productName = "";
   return {
-    productName: "",
+    productName,
     targetCustomer: "",
     productDescription: "",
     preferredTone: "direct",
     toneGuidance: "",
     platforms: ["tiktok", "instagram_reels", "youtube_shorts"],
-    walkthroughNotes: ""
+    walkthroughNotes: "",
+    defaultTemplateKey: "problem_demo_payoff",
+    brandPresenterEnabled: false,
+    brandKit: createDefaultBrandKit(productName)
   };
 }
 
@@ -116,10 +139,10 @@ export function validateProfile(profile: ProductProfile): string[] {
   ) {
     errors.push("Product description must be 10–600 characters.");
   }
-  if (profile.toneGuidance.length > 300) {
+  if ((profile.toneGuidance ?? "").length > 300) {
     errors.push("Tone guidance must be 300 characters or fewer.");
   }
-  if (profile.platforms.length < 1) {
+  if (!profile.platforms?.length) {
     errors.push("Choose at least one platform.");
   }
   return errors;
@@ -179,13 +202,20 @@ export function generateConcepts(
       .filter((moment): moment is DetectedMoment => Boolean(moment))
       .map((moment) => moment.id);
     const platformFit = choosePlatforms(platforms, template.family);
+    const templateKey = profile.defaultTemplateKey && index === 0
+      ? profile.defaultTemplateKey
+      : (template.templateKey as CreatorTemplateKey) ?? templateForFormatFamily(template.family, index);
+    const templateDefinition = getCreatorTemplate(templateKey);
 
     return {
       id: ids(),
       title: personalizeTitle(template.title, product, index),
       formatFamily: template.family,
+      templateKey,
       targetPain: `${customer} dealing with ${template.pain}`,
-      hookDirection: `${template.hook}. Keep it grounded in ${primary?.label ?? "the recording"}.`,
+      hookDirection: `${templateDefinition.hookPattern
+        .replace("{product}", product)
+        .replace("{customer}", customer)} Keep it grounded in ${primary?.label ?? "the recording"}.`,
       proofMomentIds,
       platformFit,
       estimatedDurationSec: template.duration,
@@ -270,50 +300,69 @@ function generateScript(
   const product = cleanPhrase(profile.productName || "this product");
   const customer = cleanPhrase(profile.targetCustomer || "the team");
   const outcome = shortSentence(profile.productDescription || "the workflow in the demo");
+  const templateKey = concept.templateKey ?? templateForFormatFamily(concept.formatFamily);
+  const template = getCreatorTemplate(templateKey);
   const selectedMoments = concept.proofMomentIds
     .map((id) => moments.find((moment) => moment.id === id))
     .filter((moment): moment is DetectedMoment => Boolean(moment));
   const primaryMoment = selectedMoments[0] ?? moments[0];
   const secondaryMoment = selectedMoments[1] ?? moments[1] ?? primaryMoment;
-  const hook = sanitizeMarketingCopy(`${product} turns this ${primaryMoment?.label.toLowerCase() ?? "workflow"} into a clear outcome.`);
+  const hook = sanitizeMarketingCopy(
+    template.hookPattern
+      .replace("{product}", product)
+      .replace("{customer}", customer)
+      .replace(/\.$/, "")
+  );
   const body = sanitizeMarketingCopy(
     [
-      `If you are ${customer}, this is the part of the workflow that matters.`,
-      `First, the walkthrough shows ${primaryMoment?.label.toLowerCase() ?? "the starting point"}.`,
-      `Then it moves into ${secondaryMoment?.label.toLowerCase() ?? "the product result"}, so the viewer can see the actual proof.`,
-      `The point is simple: ${outcome}.`,
-      `Use this when you need the audience to understand the product without a long demo.`
+      `If you are ${customer}, this is the part that matters.`,
+      `First, watch ${primaryMoment?.label.toLowerCase() ?? "the starting point"}.`,
+      `Then it moves into ${secondaryMoment?.label.toLowerCase() ?? "the product result"}, so the proof is on screen.`,
+      `That matters because ${outcome}.`,
+      `Use this when a long demo would lose the audience.`
     ].join(" ")
   );
   const voiceoverText = `${hook} ${body}`;
   const durationMs = estimateScriptDurationMs({ voiceoverText });
-  const visualBeats = buildVisualBeats(selectedMoments, durationMs);
+  const visualBeats = buildVisualBeatsForTemplate({
+    moments: selectedMoments,
+    durationMs,
+    templateKey
+  });
+  const captions = splitCaptionSegments(voiceoverText, durationMs);
+  const evidenceClaims = buildEvidenceClaims({
+    moments: selectedMoments,
+    hook,
+    cta: `Try ${product} with one workflow from your own team.`,
+    voiceoverText
+  });
+  const qualityWarnings = scriptQualityWarnings({ hook, voiceoverText, captions, evidenceClaims });
+  const cta = `Try ${product} with one workflow from your own team.`;
 
   return {
     id: ids(),
     conceptId: concept.id,
+    templateKey,
     hook,
     voiceoverText,
-    captions: splitCaptionSegments(voiceoverText, durationMs),
-    cta: `Try ${product} with one workflow from your own team.`,
+    captions,
+    cta,
     visualBeats,
+    editDecisionList: buildEditDecisionList({
+      profile,
+      templateKey,
+      durationMs,
+      captions,
+      visualBeats,
+      hook,
+      cta,
+      moments: selectedMoments
+    }),
+    evidenceClaims,
+    qualityWarnings,
     approved: true,
     updatedAt: now()
   };
-}
-
-function buildVisualBeats(moments: DetectedMoment[], durationMs: number): VisualBeat[] {
-  const usableMoments = moments.length > 0 ? moments : [];
-  if (usableMoments.length === 0) {
-    return [];
-  }
-  const beatDuration = Math.floor(durationMs / usableMoments.length);
-  return usableMoments.map((moment, index) => ({
-    startMs: index * beatDuration,
-    endMs: index === usableMoments.length - 1 ? durationMs : (index + 1) * beatDuration,
-    momentId: moment.id,
-    instruction: `Show ${moment.label.toLowerCase()} with readable framing.`
-  }));
 }
 
 function choosePlatforms(platforms: Platform[], family: string): Platform[] {

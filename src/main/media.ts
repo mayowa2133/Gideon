@@ -1,18 +1,21 @@
 import { pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
-import { createWriteStream, existsSync } from "node:fs";
+import { createReadStream, createWriteStream, existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import * as PImage from "pureimage";
 import type {
+  BrandKit,
   DetectedMoment,
+  EditDecisionList,
   ProductProfile,
   RecordingMetadata,
   RenderValidation,
   ScriptDraft
 } from "../shared/types";
 import { estimateScriptDurationMs } from "../shared/contentEngine";
+import { buildEditDecisionList, buildEvidenceClaims, buildVisualBeatsForTemplate, normalizeBrandKit } from "../shared/renderTemplates";
 
 const MAX_RECORDING_BYTES = 2 * 1024 * 1024 * 1024;
 const MAX_DURATION_MS = 30 * 60 * 1000;
@@ -151,15 +154,21 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   const overlayPath = path.join(renderDir, "overlay.png");
   const voicePath = path.join(renderDir, "voiceover.aiff");
   const audioPath = path.join(renderDir, "audio.m4a");
+  const editDecisionList = ensureEditDecisionList(input.profile, input.script, input.moment);
   const durationMs = Math.min(
-    estimateScriptDurationMs(input.script),
+    editDecisionList.durationMs,
     input.recording.durationMs,
     60_000
   );
-  const sourceStartMs = clamp(input.moment?.startMs ?? 0, 0, Math.max(input.recording.durationMs - 2_000, 0));
+  const sourceStartMs = clamp(
+    editDecisionList.sourceSegments[0]?.sourceStartMs ?? input.moment?.startMs ?? 0,
+    0,
+    Math.max(input.recording.durationMs - 2_000, 0)
+  );
   const sourceDurationSec = Math.max(8, durationMs / 1000);
 
-  await createCaptionOverlay(input.profile, input.script, overlayPath);
+  validateEditDecisionListForRender(editDecisionList);
+  await createCaptionOverlay(input.profile, input.script, editDecisionList, overlayPath);
   const voiceCreated = input.voiceoverPath ? true : await createVoiceover(input.script.voiceoverText, voicePath);
   if (!voiceCreated && !input.voiceoverPath) {
     await createSilentAudio(audioPath, sourceDurationSec);
@@ -167,7 +176,7 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
 
   const audioInput = input.voiceoverPath ?? (voiceCreated ? voicePath : audioPath);
   const filter = [
-    `[0:v]${videoFilter()}[base]`,
+    `[0:v]${videoFilter(editDecisionList)}[base]`,
     "[base][1:v]overlay=0:0:shortest=1[v]",
     `[2:a]apad,atrim=0:${sourceDurationSec.toFixed(3)},asetpts=N/SR/TB[a]`
   ].join(";");
@@ -332,36 +341,50 @@ async function createSilentAudio(outputPath: string, durationSec: number): Promi
   ]);
 }
 
-async function createCaptionOverlay(profile: ProductProfile, script: ScriptDraft, outputPath: string): Promise<void> {
+async function createCaptionOverlay(
+  profile: ProductProfile,
+  script: ScriptDraft,
+  editDecisionList: EditDecisionList,
+  outputPath: string
+): Promise<void> {
   loadOverlayFont();
   const image = PImage.make(1080, 1920);
   const context = image.getContext("2d");
+  const brandKit = editDecisionList.brandKit;
+  const isPresenterTemplate = editDecisionList.presenter.enabled || editDecisionList.templateKey === "brand_presenter";
 
   context.clearRect(0, 0, 1080, 1920);
-  drawFocusFrame(context);
-  drawPanel(context, 70, 105, 940, 285, "rgba(5, 7, 13, 0.72)");
-  drawPanel(context, 80, 1270, 920, 360, "rgba(5, 7, 13, 0.78)");
-  drawPanel(context, 150, 1680, 780, 130, "rgba(245, 209, 95, 0.92)");
+  drawFocusFrame(context, brandKit);
+  drawTemplateChrome(context, editDecisionList, script);
+  if (isPresenterTemplate) {
+    await drawBrandPresenter(context, brandKit, editDecisionList.presenter);
+  }
 
-  context.fillStyle = "#f5d15f";
+  context.fillStyle = brandKit.primaryColor;
   context.font = "34pt Arial";
-  context.fillText(profile.productName || "Gideon draft", 110, 165);
+  context.fillText(profile.productName || brandKit.productName || "Gideon draft", 110, 165);
+  if (brandKit.tagline) {
+    context.fillStyle = "#ffffff";
+    context.font = "18pt Arial";
+    drawWrappedText(context, brandKit.tagline, 110, 203, 760, 28, 1);
+  }
 
   context.fillStyle = "#ffffff";
-  context.font = "56pt Arial";
-  drawWrappedText(context, script.hook, 110, 245, 860, 68, 3);
+  context.font = editDecisionList.templateKey === "three_reasons" ? "50pt Arial" : "56pt Arial";
+  drawWrappedText(context, script.hook, 110, 260, 860, 66, 3);
 
-  drawVisualBeatCallouts(context, script);
+  drawVisualBeatCallouts(context, editDecisionList);
+  drawCursorEmphasis(context, editDecisionList);
 
   context.fillStyle = "#ffffff";
-  context.font = "46pt Arial";
-  const captionText = script.captions
-    .slice(0, 4)
+  context.font = brandKit.captionStyle === "educational_stack" ? "39pt Arial" : "46pt Arial";
+  const captionText = editDecisionList.captions
+    .slice(0, brandKit.captionStyle === "educational_stack" ? 5 : 4)
     .map((caption) => caption.text)
     .join(" ");
-  drawWrappedText(context, captionText, 130, 1360, 820, 60, 4);
+  drawWrappedText(context, captionText, 130, 1360, isPresenterTemplate ? 700 : 820, 58, 4);
 
-  context.fillStyle = "#10131d";
+  context.fillStyle = "#10131D";
   context.font = "38pt Arial";
   drawWrappedText(context, script.cta, 190, 1758, 700, 48, 2);
 
@@ -370,13 +393,13 @@ async function createCaptionOverlay(profile: ProductProfile, script: ScriptDraft
 
 type OverlayContext = ReturnType<ReturnType<typeof PImage.make>["getContext"]>;
 
-function drawFocusFrame(context: OverlayContext): void {
-  drawRectOutline(context, 54, 485, 972, 650, 7, "rgba(245, 209, 95, 0.72)");
+function drawFocusFrame(context: OverlayContext, brandKit: BrandKit): void {
+  drawRectOutline(context, 54, 485, 972, 650, 7, alpha(brandKit.primaryColor, 0.74));
   drawRectOutline(context, 74, 505, 932, 610, 2, "rgba(255, 255, 255, 0.28)");
-  drawPanel(context, 74, 1135, 280, 62, "rgba(245, 209, 95, 0.92)");
-  context.fillStyle = "#10131d";
+  drawPanel(context, 74, 1135, 280, 62, alpha(brandKit.primaryColor, 0.92));
+  context.fillStyle = "#10131D";
   context.font = "24pt Arial";
-  context.fillText("AUTO FOCUS", 112, 1176);
+  context.fillText("FOCUS PUNCH", 102, 1176);
 }
 
 function drawRectOutline(
@@ -412,9 +435,32 @@ function drawSolidRect(
   context.fill();
 }
 
-function drawVisualBeatCallouts(context: OverlayContext, script: ScriptDraft): void {
-  const beats = script.visualBeats.slice(0, 3);
-  if (beats.length === 0) {
+function drawTemplateChrome(context: OverlayContext, editDecisionList: EditDecisionList, script: ScriptDraft): void {
+  const brandKit = editDecisionList.brandKit;
+  const hookPanelHeight = editDecisionList.templateKey === "three_reasons" ? 310 : 285;
+  drawPanel(context, 70, 105, 940, hookPanelHeight, "rgba(5, 7, 13, 0.74)");
+  drawPanel(context, 80, 1270, editDecisionList.presenter.enabled ? 780 : 920, 360, "rgba(5, 7, 13, 0.80)");
+  drawPanel(context, 150, 1680, 780, 130, alpha(brandKit.primaryColor, 0.92));
+  if (editDecisionList.templateKey === "before_after_workflow") {
+    drawPanel(context, 90, 430, 250, 70, alpha(brandKit.accentColor, 0.9));
+    drawPanel(context, 740, 430, 250, 70, alpha(brandKit.primaryColor, 0.9));
+    context.fillStyle = "#FFFFFF";
+    context.font = "24pt Arial";
+    context.fillText("BEFORE", 144, 475);
+    context.fillStyle = "#10131D";
+    context.fillText("AFTER", 805, 475);
+  }
+  if (editDecisionList.templateKey === "brand_presenter") {
+    drawPanel(context, 690, 1180, 295, 70, "rgba(255,255,255,0.14)");
+    context.fillStyle = "#FFFFFF";
+    context.font = "20pt Arial";
+    drawWrappedText(context, script.hook, 720, 1224, 235, 26, 1);
+  }
+}
+
+function drawVisualBeatCallouts(context: OverlayContext, editDecisionList: EditDecisionList): void {
+  const callouts = editDecisionList.callouts.slice(0, 3);
+  if (callouts.length === 0) {
     return;
   }
   const positions = [
@@ -422,20 +468,65 @@ function drawVisualBeatCallouts(context: OverlayContext, script: ScriptDraft): v
     { x: 600, y: 690, width: 390 },
     { x: 90, y: 910, width: 390 }
   ];
-  beats.forEach((beat, index) => {
+  callouts.forEach((callout, index) => {
     const position = positions[index];
     if (!position) {
       return;
     }
     drawPanel(context, position.x, position.y, position.width, 118, "rgba(5, 7, 13, 0.82)");
-    drawPanel(context, position.x + 18, position.y + 21, 58, 58, "rgba(245, 209, 95, 0.92)");
-    context.fillStyle = "#10131d";
+    drawPanel(context, position.x + 18, position.y + 21, 58, 58, alpha(editDecisionList.brandKit.primaryColor, 0.92));
+    context.fillStyle = "#10131D";
     context.font = "28pt Arial";
     context.fillText(String(index + 1), position.x + 40, position.y + 61);
     context.fillStyle = "#ffffff";
     context.font = "24pt Arial";
-    drawWrappedText(context, calloutTextFromInstruction(beat.instruction), position.x + 96, position.y + 47, position.width - 125, 30, 2);
+    drawWrappedText(context, callout.text, position.x + 96, position.y + 47, position.width - 125, 30, 2);
   });
+}
+
+function drawCursorEmphasis(context: OverlayContext, editDecisionList: EditDecisionList): void {
+  const anchor = editDecisionList.callouts[0]?.anchor;
+  if (!anchor) {
+    return;
+  }
+  const x = 90 + anchor.x * 900;
+  const y = 500 + anchor.y * 600;
+  context.fillStyle = alpha(editDecisionList.brandKit.accentColor, 0.88);
+  context.beginPath();
+  context.arc(x, y, 28, 0, Math.PI * 2);
+  context.fill();
+  drawRectOutline(context, x - 44, y - 44, 88, 88, 3, "rgba(255,255,255,0.72)");
+}
+
+async function drawBrandPresenter(
+  context: OverlayContext,
+  brandKit: BrandKit,
+  presenter: EditDecisionList["presenter"]
+): Promise<void> {
+  if (!presenter.enabled) {
+    return;
+  }
+  const baseX = presenter.position === "lower_left" ? 82 : 795;
+  const baseY = 1425;
+  drawPanel(context, baseX + 36, baseY + 245, 170, 250, "rgba(247,248,243,0.92)");
+  drawPanel(context, baseX + 10, baseY + 398, 230, 160, alpha(brandKit.primaryColor, 0.9));
+  context.fillStyle = "rgba(255,255,255,0.18)";
+  context.beginPath();
+  context.arc(baseX + 122, baseY + 172, 118, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = brandKit.backgroundColor;
+  context.beginPath();
+  context.arc(baseX + 122, baseY + 158, 96, 0, Math.PI * 2);
+  context.fill();
+  const drewLogo = await drawLogoImage(context, brandKit.logoPath, baseX + 56, baseY + 92, 132);
+  if (!drewLogo) {
+    context.fillStyle = brandKit.primaryColor;
+    context.font = "44pt Arial";
+    context.fillText(initials(brandKit.productName), baseX + 78, baseY + 176);
+  }
+  context.fillStyle = "rgba(255,255,255,0.9)";
+  context.font = "18pt Arial";
+  context.fillText("brand presenter", baseX + 39, baseY + 585);
 }
 
 export function calloutTextFromInstruction(instruction: string): string {
@@ -444,6 +535,52 @@ export function calloutTextFromInstruction(instruction: string): string {
     .replace(/\s+with readable framing\.?$/i, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function ensureEditDecisionList(
+  profile: ProductProfile,
+  script: ScriptDraft,
+  moment: DetectedMoment | undefined
+): EditDecisionList {
+  if (script.editDecisionList?.schemaVersion === "2") {
+    return script.editDecisionList;
+  }
+  const durationMs = estimateScriptDurationMs(script);
+  const moments = moment ? [moment] : [];
+  const templateKey = script.templateKey ?? profile.defaultTemplateKey ?? "problem_demo_payoff";
+  const visualBeats = script.visualBeats.length
+    ? script.visualBeats
+    : buildVisualBeatsForTemplate({ moments, durationMs, templateKey });
+  const captions = script.captions.length ? script.captions : [];
+  const cta = script.cta || `Try ${profile.productName || "this workflow"}.`;
+  return buildEditDecisionList({
+    profile: {
+      ...profile,
+      brandKit: normalizeBrandKit(profile.brandKit, profile.productName)
+    },
+    templateKey,
+    durationMs,
+    captions,
+    visualBeats,
+    hook: script.hook,
+    cta,
+    moments
+  });
+}
+
+function validateEditDecisionListForRender(editDecisionList: EditDecisionList): void {
+  if (editDecisionList.durationMs < 1_000 || editDecisionList.durationMs > 60_000) {
+    throw new Error("Render manifest duration is outside the supported short-form range.");
+  }
+  if (editDecisionList.qualityGates.requireCaptionSafeArea) {
+    const overflowing = editDecisionList.captions.find((caption) => caption.text.length > 96);
+    if (overflowing) {
+      throw new Error("Caption text is too long for the selected safe-area preset.");
+    }
+  }
+  if (editDecisionList.qualityGates.requireEvidenceBackedClaims && editDecisionList.sourceSegments.length === 0) {
+    throw new Error("Render manifest has no source-backed visual moments.");
+  }
 }
 
 function drawPanel(
@@ -520,11 +657,76 @@ function loadOverlayFont(): void {
   }
 }
 
-function videoFilter(): string {
-  return [
+function videoFilter(editDecisionList: EditDecisionList): string {
+  const filters = [
     "scale=1080:1920:force_original_aspect_ratio=decrease",
-    "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=0x0B1020"
-  ].join(",");
+    `pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=${ffmpegColor(editDecisionList.brandKit.backgroundColor)}`
+  ];
+  const zoomExpression = zoomScaleExpression(editDecisionList);
+  if (zoomExpression !== "1") {
+    filters.push(`scale=w='1080*(${zoomExpression})':h='1920*(${zoomExpression})':eval=frame`);
+    filters.push("crop=1080:1920:(iw-1080)/2:(ih-1920)/2");
+  }
+  return filters.join(",");
+}
+
+function zoomScaleExpression(editDecisionList: EditDecisionList): string {
+  const parts = editDecisionList.zooms.slice(0, 6).map((zoom) => {
+    const start = (zoom.startMs / 1000).toFixed(3);
+    const end = (zoom.endMs / 1000).toFixed(3);
+    const delta = Math.max(0, zoom.toScale - 1).toFixed(3);
+    return `${delta}*between(t\\,${start}\\,${end})`;
+  });
+  return parts.length ? `1+${parts.join("+")}` : "1";
+}
+
+async function drawLogoImage(
+  context: OverlayContext,
+  logoPath: string | undefined,
+  x: number,
+  y: number,
+  size: number
+): Promise<boolean> {
+  if (!logoPath) {
+    return false;
+  }
+  try {
+    const extension = path.extname(logoPath).toLowerCase();
+    const stream = createReadStream(logoPath);
+    const image = extension === ".jpg" || extension === ".jpeg"
+      ? await PImage.decodeJPEGFromStream(stream)
+      : await PImage.decodePNGFromStream(stream);
+    context.drawImage(image, x, y, size, size);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function initials(productName: string): string {
+  const words = productName.split(/\s+/).filter(Boolean);
+  if (words.length === 0) {
+    return "G";
+  }
+  return words.slice(0, 2).map((word) => word[0]?.toUpperCase() ?? "").join("");
+}
+
+function alpha(hexColor: string, opacity: number): string {
+  const { r, g, b } = parseHexColor(hexColor);
+  return `rgba(${r}, ${g}, ${b}, ${clamp(opacity, 0, 1).toFixed(2)})`;
+}
+
+function ffmpegColor(hexColor: string): string {
+  return `0x${hexColor.replace("#", "").toUpperCase()}`;
+}
+
+function parseHexColor(hexColor: string): { r: number; g: number; b: number } {
+  const clean = /^#[0-9a-f]{6}$/i.test(hexColor) ? hexColor.slice(1) : "B8F34A";
+  return {
+    r: Number.parseInt(clean.slice(0, 2), 16),
+    g: Number.parseInt(clean.slice(2, 4), 16),
+    b: Number.parseInt(clean.slice(4, 6), 16)
+  };
 }
 
 function parseFrameRate(rate: string | undefined): number {

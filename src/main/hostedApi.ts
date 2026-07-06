@@ -1397,7 +1397,7 @@ function projectSummary(project: Project) {
 function projectResource(project: Project) {
   return {
     ...projectSummary(project),
-    profile: project.profile,
+    profile: profileResource(project.profile),
     hasRecording: Boolean(project.recording),
     transcriptStatus: project.transcript?.status ?? null,
     momentsCount: project.moments.length,
@@ -1407,6 +1407,18 @@ function projectResource(project: Project) {
     renders: project.renders.map(renderResource),
     artifactsCount: project.artifacts.length,
     jobsCount: project.jobs.length
+  };
+}
+
+function profileResource(profile: Project["profile"]): Project["profile"] {
+  return {
+    ...profile,
+    brandKit: profile.brandKit
+      ? {
+          ...profile.brandKit,
+          logoPath: undefined
+        }
+      : undefined
   };
 }
 
@@ -1468,11 +1480,32 @@ function mcpProjectContextResource(project: Project, state: AppState) {
       id: script.id,
       revision: script.updatedAt,
       conceptId: script.conceptId,
+      templateKey: script.templateKey,
       hook: script.hook,
       voiceoverText: script.voiceoverText,
       captions: script.captions,
       cta: script.cta,
       visualBeats: script.visualBeats,
+      editDecisionList: script.editDecisionList
+        ? {
+            schemaVersion: script.editDecisionList.schemaVersion,
+            templateKey: script.editDecisionList.templateKey,
+            templateVersion: script.editDecisionList.templateVersion,
+            durationMs: script.editDecisionList.durationMs,
+            canvas: script.editDecisionList.canvas,
+            zooms: script.editDecisionList.zooms,
+            overlays: script.editDecisionList.overlays,
+            callouts: script.editDecisionList.callouts,
+            presenter: {
+              ...script.editDecisionList.presenter,
+              logoPath: undefined,
+              logoUrl: script.editDecisionList.presenter.logoUrl
+            },
+            qualityGates: script.editDecisionList.qualityGates
+          }
+        : null,
+      evidenceClaims: script.evidenceClaims ?? [],
+      qualityWarnings: script.qualityWarnings ?? [],
       approved: script.approved,
       updatedAt: script.updatedAt
     })),
