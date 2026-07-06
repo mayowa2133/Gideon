@@ -2,7 +2,7 @@
 
 **Status:** Proposed MVP architecture
 
-**Last updated:** 2026-06-24
+**Last updated:** 2026-07-06
 
 ## Goals
 
@@ -15,7 +15,7 @@
 
 ## Non-goals
 
-- Native/extension recording, autonomous browser control, avatars, voice cloning, social posting, analytics, or a general multitrack editor.
+- Native/extension recording, autonomous browser control, AI avatar generation, voice cloning, social posting, analytics, or a general multitrack editor.
 - Executing LLM-generated code, JSX, FFmpeg command strings, SQL, URLs, or tool calls.
 - Synchronous analysis/render endpoints.
 - Multi-region active-active processing in MVP.
@@ -169,24 +169,43 @@ AI and user choices compile into a renderer-neutral, schema-validated `EditDecis
 
 ```ts
 type EditDecisionList = {
-  schemaVersion: "1";
+  schemaVersion: "2";
+  templateKey:
+    | "hidden_feature_reveal"
+    | "problem_demo_payoff"
+    | "founder_demo"
+    | "three_reasons"
+    | "before_after_workflow"
+    | "brand_presenter";
+  templateVersion: number;
   durationMs: number;
   canvas: { width: 1080; height: 1920; fps: 30 };
+  brandKit: {
+    productName: string;
+    primaryColor: string;
+    accentColor: string;
+    backgroundColor: string;
+    captionStyle: "kinetic_bold" | "clean_founder" | "educational_stack";
+    ctaStyle: "soft_try" | "direct_signup" | "learn_more";
+    tagline?: string;
+    logoPath?: string;
+  };
   sourceSegments: Array<{
-    recordingId: string;
+    momentId: string;
     sourceStartMs: number;
     sourceEndMs: number;
     timelineStartMs: number;
+    timelineEndMs: number;
     fit: "contain" | "cover";
     focus: { x: number; y: number; scale: number };
-    zooms: Array<{
-      startMs: number;
-      endMs: number;
-      x: number;
-      y: number;
-      scale: number;
-      easing: "standard" | "spring";
-    }>;
+  }>;
+  zooms: Array<{
+    startMs: number;
+    endMs: number;
+    fromScale: number;
+    toScale: number;
+    focus: { x: number; y: number; scale: number };
+    easing: "standard" | "snap" | "spring";
   }>;
   captions: Array<{
     startMs: number;
@@ -195,22 +214,44 @@ type EditDecisionList = {
     words?: Array<{ startMs: number; endMs: number; text: string }>;
   }>;
   overlays: Array<{
-    kind: "hook" | "label" | "cta" | "callout";
+    kind: "hook" | "proof_label" | "callout" | "cta" | "brand_badge";
     startMs: number;
     endMs: number;
     text: string;
-    position: "top" | "center" | "bottom";
+    position: "top" | "center" | "bottom" | "left" | "right";
+    emphasis: "primary" | "secondary" | "accent";
   }>;
-  audio: {
-    sourceGainDb: number;
-    voiceoverId?: string;
-    voiceoverGainDb?: number;
-    duckSource?: boolean;
+  callouts: Array<{
+    id: string;
+    startMs: number;
+    endMs: number;
+    text: string;
+    anchor: { x: number; y: number; scale: number };
+    evidenceIds?: string[];
+  }>;
+  presenter: {
+    enabled: boolean;
+    style: "logo_head";
+    startMs: number;
+    endMs: number;
+    position: "lower_left" | "lower_right";
+    logoPath?: string;
+    motion: "idle_bob" | "caption_sync";
+  };
+  music: {
+    enabled: boolean;
+    mood: "none" | "clean_tech" | "upbeat";
+    gainDb: number;
+  };
+  qualityGates: {
+    requireEvidenceBackedClaims: boolean;
+    requireCaptionSafeArea: boolean;
+    requireAudioAlignment: boolean;
   };
 };
 ```
 
-Validation enforces duration bounds, source ranges, normalized focus coordinates, safe scale limits, caption size/line policy, overlay count/timing, and referenced-object ownership. No arbitrary filter string, component name, URL, path, or command is allowed.
+Validation enforces duration bounds, source ranges, normalized focus coordinates, safe scale limits, caption/word timing, caption/hook/CTA fit against safe areas, overlay/callout/presenter timing, and referenced-object ownership. The current desktop implementation renders this EDL through FFmpeg plus generated transparent overlay frame sequences; no arbitrary filter string, component name, URL, path, or command is accepted from AI or user-controlled text.
 
 ### Render manifest
 

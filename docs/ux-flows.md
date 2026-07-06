@@ -1,6 +1,6 @@
 # Gideon UX flows
 
-**Last updated:** 2026-06-24
+**Last updated:** 2026-07-06
 
 **Primary device:** Desktop web; review pages remain usable on tablet
 
@@ -220,26 +220,29 @@ Page-level layout: selected concepts as tabs/left rail; structured editor center
 
 1. Hook.
 2. Voiceover/body.
-3. On-screen text cues.
-4. Caption preview derived from spoken text.
-5. CTA.
-6. Visual beats mapped to moments/time ranges.
+3. Creator template selection.
+4. Explicit `Approved for render` checkbox.
+5. On-screen text cues.
+6. Caption preview derived from spoken text.
+7. CTA.
+8. Visual beats mapped to moments/time ranges.
 
 ### Interaction
 
 - Inline editing with autosave and character/estimated-duration feedback.
+- Generated scripts start unapproved. A render job cannot start until at least one script tied to a selected concept is explicitly approved and saved.
 - Forbidden generic phrase warnings explain the issue and suggest a specific rewrite.
 - Unsupported claim warning links to evidence/context and blocks approval until edited or explicitly confirmed with added context.
 - `Regenerate section` opens a small instruction field and affects only that section.
 - `Preview voice` may synthesize a short sample subject to usage limits.
 - Voiceover toggle: AI voice, source audio only, or voiceover plus ducked source audio if supported.
-- `Approve & render drafts` summarizes the versions that will be used.
+- `Approve & render drafts` summarizes the approved script, template, brand kit, caption style, and evidence-backed visual plan versions that will be used.
 
 User edits are first-class versions. Regeneration never overwrites without an explicit replace/diff action.
 
 ## Render loading state
 
-- One card per selected concept, each with independent status and retry.
+- One card per approved selected script, each with independent status and retry.
 - Stages: preparing assets, generating voiceover, composing video, encoding MP4, checking output.
 - Completed cards become previewable while other renders continue.
 - User can leave; dashboard and optional in-app notification update.

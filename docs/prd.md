@@ -4,7 +4,7 @@
 
 **Owner:** Product/engineering
 
-**Last updated:** 2026-06-24
+**Last updated:** 2026-07-06
 
 **Promise:** Record your product once. Get weeks of short-form content.
 
@@ -82,7 +82,7 @@ For software builders who need to market consistently, Gideon converts an existi
 5. **Native, not corporate.** Short hooks, visual proof early, readable captions, tight pacing, and platform safe areas.
 6. **Async by default.** Upload, analysis, TTS, and rendering never block an HTTP request or freeze the UI.
 7. **Stage-level recovery.** Retry or regenerate a failed stage without restarting the project.
-8. **MVP discipline.** Uploaded screen recordings and MP4 export first; recorder, avatars, replay, scheduling, and analytics later.
+8. **MVP discipline.** Uploaded screen recordings and MP4 export first; recorder, AI avatars, replay, scheduling, and analytics later.
 9. **Deterministic execution.** AI proposes structured decisions; validated workers render them.
 10. **Private by default.** Source recordings and outputs are private, workspace-scoped objects.
 
@@ -108,9 +108,9 @@ For software builders who need to market consistently, Gideon converts an existi
 6. AI walkthrough summary and evidence-backed detected moments.
 7. Ten distinct video concepts covering several supported formats.
 8. Selection of up to three concepts per generation batch.
-9. Hook, short script, caption plan, voiceover text, and visual beat plan for selected concepts.
-10. User editing of hook, script/voiceover, captions, and basic crop/focus choices.
-11. Three 9:16 draft renders using the uploaded footage, captions, voiceover when enabled, and basic text overlays.
+9. Hook, short script, caption plan, voiceover text, creator template, and visual beat plan for selected concepts.
+10. User editing of hook, script/voiceover, captions, template, brand kit, presenter toggle, and basic crop/focus choices.
+11. Up to three 9:16 draft renders from explicitly approved scripts using the uploaded footage, captions, voiceover when enabled, timed overlays, focus punch-ins, callouts, and optional deterministic brand presenter.
 12. Preview, stage-level regeneration, final MP4 export, and deletion.
 13. Job progress, failure details safe for users, retry/cancel where supported, and persistent history.
 14. Usage events sufficient for limits and future billing; no checkout required.
@@ -138,7 +138,7 @@ For software builders who need to market consistently, Gideon converts an existi
 - Chrome extension or native recorder.
 - rrweb structured capture and Playwright replay.
 - Autonomous interaction with a customer’s product.
-- AI avatars or talking presenters.
+- AI avatars, synthetic talking presenters, or real-person impersonation beyond the deterministic logo-head brand presenter.
 - Founder voice cloning.
 - Multitrack general-purpose timeline editing.
 - Social posting, scheduling, analytics, or A/B delivery.
@@ -269,10 +269,12 @@ For software builders who need to market consistently, Gideon converts an existi
 - Specificity validator checks product name/outcome/audience and evidence citations.
 - Style validator detects prohibited phrases and unsupported superlatives.
 - Platform adaptation changes tone/pacing/CTA without inventing product claims.
+- Generated scripts start unapproved. Voiceover and render jobs require an approved script associated with a selected concept.
+- Script/profile edits rebuild the render plan and clear stale rendered outputs before another render can be exported.
 
 ### TTS and captions
 
-- Voiceover generation occurs only from an approved or explicitly auto-approved script version.
+- Voiceover generation occurs only from an approved script version.
 - TTS provider/voice/version and timing data are recorded.
 - Caption source remains editable structured text; burn-in is a render choice.
 - Users may disable voiceover and retain source audio/captions.
