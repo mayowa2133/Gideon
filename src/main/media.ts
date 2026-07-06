@@ -7,10 +7,12 @@ import os from "node:os";
 import * as PImage from "pureimage";
 import type {
   BrandKit,
+  CaptionSegment,
   DetectedMoment,
   EditDecisionList,
   ProductProfile,
   RecordingMetadata,
+  RenderOverlayCue,
   RenderValidation,
   ScriptDraft
 } from "../shared/types";
@@ -20,6 +22,9 @@ import { buildEditDecisionList, buildEvidenceClaims, buildVisualBeatsForTemplate
 const MAX_RECORDING_BYTES = 2 * 1024 * 1024 * 1024;
 const MAX_DURATION_MS = 30 * 60 * 1000;
 const SUPPORTED_EXTENSIONS = new Set([".mp4", ".mov", ".webm"]);
+const OUTPUT_WIDTH = 1080;
+const OUTPUT_HEIGHT = 1920;
+const OVERLAY_FRAME_RATE = 4;
 
 interface ProbeStream {
   codec_type?: string;
@@ -151,7 +156,7 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   const renderDir = path.join(input.projectDir, "renders", input.script.id);
   await fs.mkdir(renderDir, { recursive: true });
   const outputPath = path.join(renderDir, safeFileName(`${input.title}.mp4`));
-  const overlayPath = path.join(renderDir, "overlay.png");
+  const overlayDir = path.join(renderDir, "overlay-frames");
   const voicePath = path.join(renderDir, "voiceover.aiff");
   const audioPath = path.join(renderDir, "audio.m4a");
   const editDecisionList = ensureEditDecisionList(input.profile, input.script, input.moment);
@@ -164,7 +169,13 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   const sourceDurationSec = timeline.durationSec;
 
   validateEditDecisionListForRender(editDecisionList);
-  await createCaptionOverlay(input.profile, input.script, editDecisionList, overlayPath);
+  const overlaySequence = await createTimedOverlaySequence(
+    input.profile,
+    input.script,
+    editDecisionList,
+    overlayDir,
+    sourceDurationSec
+  );
   const voiceCreated = input.voiceoverPath ? true : await createVoiceover(input.script.voiceoverText, voicePath);
   if (!voiceCreated && !input.voiceoverPath) {
     await createSilentAudio(audioPath, sourceDurationSec);
@@ -173,7 +184,8 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   const audioInput = input.voiceoverPath ?? (voiceCreated ? voicePath : audioPath);
   const filter = [
     timeline.filter,
-    "[base][1:v]overlay=0:0:shortest=1[v]",
+    "[1:v]fps=30,format=rgba[overlay]",
+    "[base][overlay]overlay=0:0:shortest=1[v]",
     `[2:a]apad,atrim=0:${sourceDurationSec.toFixed(3)},asetpts=N/SR/TB[a]`
   ].join(";");
 
@@ -184,10 +196,12 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     "-y",
     "-i",
     input.recording.filePath,
-    "-loop",
-    "1",
+    "-framerate",
+    String(overlaySequence.frameRate),
+    "-start_number",
+    "0",
     "-i",
-    overlayPath,
+    overlaySequence.pattern,
     "-i",
     audioInput,
     "-filter_complex",
@@ -345,23 +359,70 @@ async function createSilentAudio(outputPath: string, durationSec: number): Promi
   ]);
 }
 
-async function createCaptionOverlay(
+interface OverlaySequence {
+  pattern: string;
+  frameRate: number;
+  frameCount: number;
+}
+
+async function createTimedOverlaySequence(
   profile: ProductProfile,
   script: ScriptDraft,
   editDecisionList: EditDecisionList,
+  outputDir: string,
+  durationSec: number
+): Promise<OverlaySequence> {
+  loadOverlayFont();
+  await fs.mkdir(outputDir, { recursive: true });
+  const durationMs = Math.max(1, Math.round(durationSec * 1000));
+  const frameCount = Math.max(1, Math.ceil(durationSec * OVERLAY_FRAME_RATE) + 2);
+  for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+    const timestampMs = Math.min(durationMs, Math.round((frameIndex / OVERLAY_FRAME_RATE) * 1000));
+    await createTimedOverlayFrame(
+      profile,
+      script,
+      editDecisionList,
+      timestampMs,
+      path.join(outputDir, overlayFrameName(frameIndex))
+    );
+  }
+  return {
+    pattern: path.join(outputDir, "overlay-%04d.png"),
+    frameRate: OVERLAY_FRAME_RATE,
+    frameCount
+  };
+}
+
+async function createTimedOverlayFrame(
+  profile: ProductProfile,
+  script: ScriptDraft,
+  editDecisionList: EditDecisionList,
+  timestampMs: number,
   outputPath: string
 ): Promise<void> {
-  loadOverlayFont();
-  const image = PImage.make(1080, 1920);
+  const image = PImage.make(OUTPUT_WIDTH, OUTPUT_HEIGHT);
   const context = image.getContext("2d");
   const brandKit = editDecisionList.brandKit;
   const isPresenterTemplate = editDecisionList.presenter.enabled || editDecisionList.templateKey === "brand_presenter";
+  const activeHook = activeOverlayCue(editDecisionList.overlays, "hook", timestampMs);
+  const activeCta = activeOverlayCue(editDecisionList.overlays, "cta", timestampMs);
+  const activeCaption = activeCaptionAt(editDecisionList.captions, timestampMs);
+  const activeWordIndex = activeCaption ? activeWordIndexAt(activeCaption, timestampMs) : -1;
 
-  context.clearRect(0, 0, 1080, 1920);
-  drawFocusFrame(context, brandKit);
-  drawTemplateChrome(context, editDecisionList, script);
+  context.clearRect(0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT);
+  drawFocusFrame(context, brandKit, timestampMs);
+  drawTemplateChrome(context, editDecisionList, script, {
+    showCta: Boolean(activeCta && activeCta.position !== "center"),
+    showPresenterHook: Boolean(activeHook)
+  });
   if (isPresenterTemplate) {
-    await drawBrandPresenter(context, brandKit, editDecisionList.presenter);
+    await drawBrandPresenter(
+      context,
+      brandKit,
+      editDecisionList.presenter,
+      timestampMs,
+      Boolean(activeCaption && activeWordIndex >= 0)
+    );
   }
 
   context.fillStyle = brandKit.primaryColor;
@@ -373,32 +434,44 @@ async function createCaptionOverlay(
     drawWrappedText(context, brandKit.tagline, 110, 203, 760, 28, 1);
   }
 
-  context.fillStyle = "#ffffff";
-  context.font = editDecisionList.templateKey === "three_reasons" ? "50pt Arial" : "56pt Arial";
-  drawWrappedText(context, script.hook, 110, 260, 860, 66, 3);
+  if (activeHook) {
+    drawHookOverlay(context, activeHook, editDecisionList, timestampMs);
+  }
 
-  drawVisualBeatCallouts(context, editDecisionList);
-  drawCursorEmphasis(context, editDecisionList);
+  drawVisualBeatCallouts(context, editDecisionList, timestampMs);
+  drawCursorEmphasis(context, editDecisionList, timestampMs);
 
-  context.fillStyle = "#ffffff";
-  context.font = brandKit.captionStyle === "educational_stack" ? "39pt Arial" : "46pt Arial";
-  const captionText = editDecisionList.captions
-    .slice(0, brandKit.captionStyle === "educational_stack" ? 5 : 4)
-    .map((caption) => caption.text)
-    .join(" ");
-  drawWrappedText(context, captionText, 130, 1360, isPresenterTemplate ? 700 : 820, 58, 4);
+  if (activeCaption) {
+    context.font = brandKit.captionStyle === "educational_stack" ? "39pt Arial" : "46pt Arial";
+    drawCaptionWithWordHighlight(
+      context,
+      activeCaption,
+      activeWordIndex,
+      130,
+      1360,
+      isPresenterTemplate ? 700 : 820,
+      58,
+      brandKit,
+      brandKit.captionStyle === "educational_stack" ? 3 : 2
+    );
+  }
 
-  context.fillStyle = "#10131D";
-  context.font = "38pt Arial";
-  drawWrappedText(context, script.cta, 190, 1758, 700, 48, 2);
+  if (activeCta) {
+    drawCtaOverlay(context, activeCta, brandKit);
+  }
 
   await PImage.encodePNGToStream(image, createWriteStream(outputPath));
 }
 
+function overlayFrameName(frameIndex: number): string {
+  return `overlay-${String(frameIndex).padStart(4, "0")}.png`;
+}
+
 type OverlayContext = ReturnType<ReturnType<typeof PImage.make>["getContext"]>;
 
-function drawFocusFrame(context: OverlayContext, brandKit: BrandKit): void {
-  drawRectOutline(context, 54, 485, 972, 650, 7, alpha(brandKit.primaryColor, 0.74));
+function drawFocusFrame(context: OverlayContext, brandKit: BrandKit, timestampMs: number): void {
+  const pulse = 0.66 + Math.sin(timestampMs / 240) * 0.08;
+  drawRectOutline(context, 54, 485, 972, 650, 7, alpha(brandKit.primaryColor, pulse));
   drawRectOutline(context, 74, 505, 932, 610, 2, "rgba(255, 255, 255, 0.28)");
   drawPanel(context, 74, 1135, 280, 62, alpha(brandKit.primaryColor, 0.92));
   context.fillStyle = "#10131D";
@@ -439,12 +512,19 @@ function drawSolidRect(
   context.fill();
 }
 
-function drawTemplateChrome(context: OverlayContext, editDecisionList: EditDecisionList, script: ScriptDraft): void {
+function drawTemplateChrome(
+  context: OverlayContext,
+  editDecisionList: EditDecisionList,
+  script: ScriptDraft,
+  options: { showCta: boolean; showPresenterHook: boolean }
+): void {
   const brandKit = editDecisionList.brandKit;
   const hookPanelHeight = editDecisionList.templateKey === "three_reasons" ? 310 : 285;
   drawPanel(context, 70, 105, 940, hookPanelHeight, "rgba(5, 7, 13, 0.74)");
   drawPanel(context, 80, 1270, editDecisionList.presenter.enabled ? 780 : 920, 360, "rgba(5, 7, 13, 0.80)");
-  drawPanel(context, 150, 1680, 780, 130, alpha(brandKit.primaryColor, 0.92));
+  if (options.showCta) {
+    drawPanel(context, 150, 1680, 780, 130, alpha(brandKit.primaryColor, 0.92));
+  }
   if (editDecisionList.templateKey === "before_after_workflow") {
     drawPanel(context, 90, 430, 250, 70, alpha(brandKit.accentColor, 0.9));
     drawPanel(context, 740, 430, 250, 70, alpha(brandKit.primaryColor, 0.9));
@@ -454,7 +534,7 @@ function drawTemplateChrome(context: OverlayContext, editDecisionList: EditDecis
     context.fillStyle = "#10131D";
     context.fillText("AFTER", 805, 475);
   }
-  if (editDecisionList.templateKey === "brand_presenter") {
+  if (editDecisionList.templateKey === "brand_presenter" && options.showPresenterHook) {
     drawPanel(context, 690, 1180, 295, 70, "rgba(255,255,255,0.14)");
     context.fillStyle = "#FFFFFF";
     context.font = "20pt Arial";
@@ -462,8 +542,12 @@ function drawTemplateChrome(context: OverlayContext, editDecisionList: EditDecis
   }
 }
 
-function drawVisualBeatCallouts(context: OverlayContext, editDecisionList: EditDecisionList): void {
-  const callouts = editDecisionList.callouts.slice(0, 3);
+function drawVisualBeatCallouts(
+  context: OverlayContext,
+  editDecisionList: EditDecisionList,
+  timestampMs: number
+): void {
+  const callouts = activeCalloutsAt(editDecisionList.callouts, timestampMs).slice(0, 3);
   if (callouts.length === 0) {
     return;
   }
@@ -488,16 +572,18 @@ function drawVisualBeatCallouts(context: OverlayContext, editDecisionList: EditD
   });
 }
 
-function drawCursorEmphasis(context: OverlayContext, editDecisionList: EditDecisionList): void {
-  const anchor = editDecisionList.callouts[0]?.anchor;
-  if (!anchor) {
+function drawCursorEmphasis(context: OverlayContext, editDecisionList: EditDecisionList, timestampMs: number): void {
+  const activeCallout = activeCalloutsAt(editDecisionList.callouts, timestampMs)[0];
+  if (!activeCallout?.anchor) {
     return;
   }
+  const anchor = activeCallout.anchor;
   const x = 90 + anchor.x * 900;
   const y = 500 + anchor.y * 600;
+  const radius = 24 + Math.sin(timestampMs / 130) * 7;
   context.fillStyle = alpha(editDecisionList.brandKit.accentColor, 0.88);
   context.beginPath();
-  context.arc(x, y, 28, 0, Math.PI * 2);
+  context.arc(x, y, radius, 0, Math.PI * 2);
   context.fill();
   drawRectOutline(context, x - 44, y - 44, 88, 88, 3, "rgba(255,255,255,0.72)");
 }
@@ -505,18 +591,24 @@ function drawCursorEmphasis(context: OverlayContext, editDecisionList: EditDecis
 async function drawBrandPresenter(
   context: OverlayContext,
   brandKit: BrandKit,
-  presenter: EditDecisionList["presenter"]
+  presenter: EditDecisionList["presenter"],
+  timestampMs: number,
+  speaking: boolean
 ): Promise<void> {
-  if (!presenter.enabled) {
+  if (!presenter.enabled || !isCueActive(presenter, timestampMs)) {
     return;
   }
   const baseX = presenter.position === "lower_left" ? 82 : 795;
-  const baseY = 1425;
+  const bob = presenter.motion === "caption_sync"
+    ? Math.sin(timestampMs / (speaking ? 115 : 320)) * (speaking ? 9 : 4)
+    : Math.sin(timestampMs / 360) * 4;
+  const baseY = 1425 + bob;
+  const ringPulse = speaking ? 1 + Math.sin(timestampMs / 90) * 0.04 : 1;
   drawPanel(context, baseX + 36, baseY + 245, 170, 250, "rgba(247,248,243,0.92)");
   drawPanel(context, baseX + 10, baseY + 398, 230, 160, alpha(brandKit.primaryColor, 0.9));
   context.fillStyle = "rgba(255,255,255,0.18)";
   context.beginPath();
-  context.arc(baseX + 122, baseY + 172, 118, 0, Math.PI * 2);
+  context.arc(baseX + 122, baseY + 172, 118 * ringPulse, 0, Math.PI * 2);
   context.fill();
   context.fillStyle = brandKit.backgroundColor;
   context.beginPath();
@@ -528,9 +620,114 @@ async function drawBrandPresenter(
     context.font = "44pt Arial";
     context.fillText(initials(brandKit.productName), baseX + 78, baseY + 176);
   }
+  drawSolidRect(
+    context,
+    baseX + 76,
+    baseY + 268,
+    92,
+    speaking ? 28 : 12,
+    speaking ? alpha(brandKit.accentColor, 0.88) : "rgba(16,19,29,0.32)"
+  );
   context.fillStyle = "rgba(255,255,255,0.9)";
   context.font = "18pt Arial";
   context.fillText("brand presenter", baseX + 39, baseY + 585);
+}
+
+function drawHookOverlay(
+  context: OverlayContext,
+  overlay: RenderOverlayCue,
+  editDecisionList: EditDecisionList,
+  timestampMs: number
+): void {
+  const entrance = clamp((timestampMs - overlay.startMs) / 320, 0, 1);
+  const y = 260 + (1 - entrance) * 24;
+  drawSolidRect(context, 110, 230, 220 + entrance * 560, 8, alpha(editDecisionList.brandKit.primaryColor, 0.92));
+  context.fillStyle = "#ffffff";
+  context.font = editDecisionList.templateKey === "three_reasons" ? "50pt Arial" : "56pt Arial";
+  drawWrappedText(context, overlay.text, 110, y, 860, 66, 3);
+}
+
+function drawCaptionWithWordHighlight(
+  context: OverlayContext,
+  caption: CaptionSegment,
+  activeWordIndex: number,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  brandKit: BrandKit,
+  maxLines: number
+): void {
+  const words = caption.text.split(/\s+/).filter(Boolean);
+  const spaceWidth = context.measureText(" ").width;
+  let cursorX = x;
+  let lineIndex = 0;
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index]!;
+    const wordWidth = context.measureText(word).width;
+    if (cursorX > x && cursorX + wordWidth > x + maxWidth) {
+      lineIndex += 1;
+      cursorX = x;
+    }
+    if (lineIndex >= maxLines) {
+      return;
+    }
+    const baselineY = y + lineIndex * lineHeight;
+    const isActive = index === activeWordIndex;
+    if (isActive) {
+      drawSolidRect(
+        context,
+        cursorX - 9,
+        baselineY - lineHeight + 9,
+        wordWidth + 18,
+        lineHeight - 1,
+        alpha(brandKit.primaryColor, 0.94)
+      );
+    }
+    context.fillStyle = isActive ? "#10131D" : "#ffffff";
+    context.fillText(word, cursorX, baselineY);
+    cursorX += wordWidth + spaceWidth;
+  }
+}
+
+function drawCtaOverlay(context: OverlayContext, overlay: RenderOverlayCue, brandKit: BrandKit): void {
+  const isCenter = overlay.position === "center";
+  const x = isCenter ? 130 : 190;
+  const y = isCenter ? 880 : 1758;
+  const width = isCenter ? 820 : 700;
+  if (isCenter) {
+    drawPanel(context, 110, 790, 860, 210, alpha(brandKit.primaryColor, 0.94));
+  }
+  context.fillStyle = "#10131D";
+  context.font = isCenter ? "44pt Arial" : "38pt Arial";
+  drawWrappedText(context, overlay.text, x, y, width, isCenter ? 54 : 48, isCenter ? 3 : 2);
+}
+
+function activeOverlayCue(
+  overlays: RenderOverlayCue[],
+  kind: RenderOverlayCue["kind"],
+  timestampMs: number
+): RenderOverlayCue | undefined {
+  return overlays.find((overlay) => overlay.kind === kind && isCueActive(overlay, timestampMs));
+}
+
+function activeCaptionAt(captions: CaptionSegment[], timestampMs: number): CaptionSegment | undefined {
+  return captions.find((caption) => isCueActive(caption, timestampMs));
+}
+
+function activeWordIndexAt(caption: CaptionSegment, timestampMs: number): number {
+  return caption.words?.findIndex((word) => isCueActive(word, timestampMs)) ?? -1;
+}
+
+function activeCalloutsAt(
+  callouts: EditDecisionList["callouts"],
+  timestampMs: number
+): EditDecisionList["callouts"] {
+  return callouts.filter((callout) => isCueActive(callout, timestampMs));
+}
+
+function isCueActive(cue: { startMs: number; endMs: number }, timestampMs: number): boolean {
+  return timestampMs >= cue.startMs && timestampMs < cue.endMs;
 }
 
 export function calloutTextFromInstruction(instruction: string): string {

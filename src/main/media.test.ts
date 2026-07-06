@@ -79,6 +79,8 @@ describe("media pipeline", () => {
     expect(rendered.validation.height).toBe(1920);
     expect(rendered.validation.videoCodec).toBe("h264");
     expect(rendered.validation.audioCodec).toBe("aac");
+    const overlayFrames = await fs.readdir(path.join(tempDir, "renders", script!.id, "overlay-frames"));
+    expect(overlayFrames.filter((fileName) => fileName.endsWith(".png")).length).toBeGreaterThan(1);
     await expect(fs.access(rendered.outputPath)).resolves.toBeUndefined();
   }, 120_000);
 });
