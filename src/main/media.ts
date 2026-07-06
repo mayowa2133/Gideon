@@ -168,7 +168,7 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   const timeline = buildVideoTimelineFilter(editDecisionList, input.recording.durationMs, durationMs);
   const sourceDurationSec = timeline.durationSec;
 
-  validateEditDecisionListForRender(editDecisionList);
+  validateRenderManifest(editDecisionList);
   const overlaySequence = await createTimedOverlaySequence(
     input.profile,
     input.script,
@@ -176,6 +176,7 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     overlayDir,
     sourceDurationSec
   );
+  validateOverlaySequenceForRender(overlaySequence, sourceDurationSec);
   const voiceCreated = input.voiceoverPath ? true : await createVoiceover(input.script.voiceoverText, voicePath);
   if (!voiceCreated && !input.voiceoverPath) {
     await createSilentAudio(audioPath, sourceDurationSec);
@@ -769,19 +770,113 @@ function ensureEditDecisionList(
   });
 }
 
-function validateEditDecisionListForRender(editDecisionList: EditDecisionList): void {
+export function validateRenderManifest(editDecisionList: EditDecisionList): void {
   if (editDecisionList.durationMs < 1_000 || editDecisionList.durationMs > 60_000) {
     throw new Error("Render manifest duration is outside the supported short-form range.");
   }
+  validateTimedCueCollection("Caption", editDecisionList.captions, editDecisionList.durationMs);
+  validateTimedCueCollection("Overlay", editDecisionList.overlays, editDecisionList.durationMs);
+  validateTimedCueCollection("Callout", editDecisionList.callouts, editDecisionList.durationMs);
+  validatePresenterTiming(editDecisionList.presenter, editDecisionList.durationMs);
+  validateCaptionWordTimings(editDecisionList.captions);
   if (editDecisionList.qualityGates.requireCaptionSafeArea) {
-    const overflowing = editDecisionList.captions.find((caption) => caption.text.length > 96);
-    if (overflowing) {
-      throw new Error("Caption text is too long for the selected safe-area preset.");
-    }
+    validateCaptionSafeAreas(editDecisionList);
   }
   if (editDecisionList.qualityGates.requireEvidenceBackedClaims && editDecisionList.sourceSegments.length === 0) {
     throw new Error("Render manifest has no source-backed visual moments.");
   }
+}
+
+function validateOverlaySequenceForRender(overlaySequence: OverlaySequence, expectedDurationSec: number): void {
+  const minimumFrameCount = Math.ceil(expectedDurationSec * overlaySequence.frameRate);
+  if (overlaySequence.frameCount < minimumFrameCount) {
+    throw new Error("Overlay frame sequence does not cover the render timeline.");
+  }
+}
+
+function validateTimedCueCollection(
+  label: string,
+  cues: Array<{ startMs: number; endMs: number }>,
+  durationMs: number
+): void {
+  cues.forEach((cue, index) => {
+    if (cue.startMs < 0 || cue.endMs <= cue.startMs || cue.endMs > durationMs) {
+      throw new Error(`${label} cue ${index + 1} has timings outside the render timeline.`);
+    }
+  });
+}
+
+function validatePresenterTiming(presenter: EditDecisionList["presenter"], durationMs: number): void {
+  if (!presenter.enabled) {
+    return;
+  }
+  if (presenter.startMs < 0 || presenter.endMs <= presenter.startMs || presenter.endMs > durationMs) {
+    throw new Error("Brand presenter timing is outside the render timeline.");
+  }
+}
+
+function validateCaptionWordTimings(captions: CaptionSegment[]): void {
+  captions.forEach((caption, captionIndex) => {
+    caption.words?.forEach((word, wordIndex) => {
+      if (
+        word.startMs < caption.startMs ||
+        word.endMs > caption.endMs ||
+        word.endMs <= word.startMs ||
+        word.text.trim().length === 0
+      ) {
+        throw new Error(`Caption ${captionIndex + 1} word ${wordIndex + 1} has invalid timing.`);
+      }
+    });
+  });
+}
+
+function validateCaptionSafeAreas(editDecisionList: EditDecisionList): void {
+  if (editDecisionList.captions.length === 0) {
+    throw new Error("Render manifest needs caption segments for the selected template.");
+  }
+  loadOverlayFont();
+  const context = PImage.make(OUTPUT_WIDTH, OUTPUT_HEIGHT).getContext("2d");
+  const isPresenterTemplate = editDecisionList.presenter.enabled || editDecisionList.templateKey === "brand_presenter";
+  const captionMaxWidth = isPresenterTemplate ? 700 : 820;
+  const captionMaxLines = editDecisionList.brandKit.captionStyle === "educational_stack" ? 3 : 2;
+  context.font = editDecisionList.brandKit.captionStyle === "educational_stack" ? "39pt Arial" : "46pt Arial";
+  const overflowingCaption = editDecisionList.captions.find(
+    (caption) => !textFitsWithinLines(context, caption.text, captionMaxWidth, captionMaxLines)
+  );
+  if (overflowingCaption) {
+    throw new Error("Caption text is too long for the selected safe-area preset.");
+  }
+
+  const hook = editDecisionList.overlays.find((overlay) => overlay.kind === "hook");
+  if (hook) {
+    context.font = editDecisionList.templateKey === "three_reasons" ? "50pt Arial" : "56pt Arial";
+    if (!textFitsWithinLines(context, hook.text, 860, 3)) {
+      throw new Error("Hook text is too long for the selected safe-area preset.");
+    }
+  }
+
+  const cta = editDecisionList.overlays.find((overlay) => overlay.kind === "cta");
+  if (cta) {
+    const isCenter = cta.position === "center";
+    context.font = isCenter ? "44pt Arial" : "38pt Arial";
+    if (!textFitsWithinLines(context, cta.text, isCenter ? 820 : 700, isCenter ? 3 : 2)) {
+      throw new Error("CTA text is too long for the selected safe-area preset.");
+    }
+  }
+}
+
+function textFitsWithinLines(
+  context: OverlayContext,
+  text: string,
+  maxWidth: number,
+  maxLines: number
+): boolean {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) {
+    return false;
+  }
+  const hasOversizedWord = words.some((word) => context.measureText(word).width > maxWidth);
+  return !hasOversizedWord && wrapText(context, text, maxWidth).length <= maxLines;
 }
 
 function drawPanel(

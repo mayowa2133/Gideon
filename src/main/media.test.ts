@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { createMoments, generateConcepts, generateScripts } from "../shared/contentEngine";
 import type { ProductProfile } from "../shared/types";
-import { calloutTextFromInstruction, probeRecording, renderDraft } from "./media";
+import { calloutTextFromInstruction, probeRecording, renderDraft, validateRenderManifest } from "./media";
 
 const run = promisify(execFile);
 const ffmpeg = findFfmpegForTest();
@@ -27,6 +27,44 @@ describe("media pipeline", () => {
     expect(calloutTextFromInstruction("Show Core action in the walkthrough with readable framing.")).toBe(
       "Core action in the walkthrough"
     );
+  });
+
+  it("rejects render manifests with unsafe timed caption layout", () => {
+    const script = draftScript();
+    expect(() => validateRenderManifest(script.editDecisionList!)).not.toThrow();
+
+    expect(() => validateRenderManifest({
+      ...script.editDecisionList!,
+      captions: [
+        {
+          startMs: 0,
+          endMs: 2_000,
+          text: "ThisCaptionSegmentIsIntentionallyTooWideForTheVerticalSafeAreaBecauseItNeverBreaks",
+          words: []
+        }
+      ]
+    })).toThrow("Caption text is too long");
+  });
+
+  it("rejects render manifests with invalid caption word timing", () => {
+    const script = draftScript();
+    const caption = script.editDecisionList!.captions[0]!;
+
+    expect(() => validateRenderManifest({
+      ...script.editDecisionList!,
+      captions: [
+        {
+          ...caption,
+          words: [
+            {
+              startMs: caption.startMs - 100,
+              endMs: caption.startMs + 100,
+              text: "bad"
+            }
+          ]
+        }
+      ]
+    })).toThrow("invalid timing");
   });
 
   it.runIf(Boolean(ffmpeg))("probes and renders a vertical H.264/AAC draft from a local recording", async () => {
@@ -84,6 +122,31 @@ describe("media pipeline", () => {
     await expect(fs.access(rendered.outputPath)).resolves.toBeUndefined();
   }, 120_000);
 });
+
+function draftScript() {
+  const recording = {
+    filePath: "/tmp/source.mp4",
+    fileUrl: "file:///tmp/source.mp4",
+    fileName: "source.mp4",
+    sizeBytes: 1024,
+    durationMs: 18_000,
+    width: 1280,
+    height: 720,
+    fps: 30,
+    videoCodec: "h264",
+    audioCodec: "aac",
+    hasAudio: true,
+    validatedAt: "2026-06-24T00:00:00.000Z"
+  };
+  let counter = 0;
+  const moments = createMoments(profile, recording, () => `qa-moment-${++counter}`);
+  const concepts = generateConcepts(profile, moments, () => `qa-concept-${++counter}`);
+  const [script] = generateScripts(profile, concepts, moments, () => `qa-script-${++counter}`, () => "2026-06-24T00:00:00.000Z");
+  if (!script) {
+    throw new Error("Test setup did not generate a script.");
+  }
+  return script;
+}
 
 function findFfmpegForTest(): string | null {
   const candidates = [
