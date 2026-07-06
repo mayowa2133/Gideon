@@ -87,6 +87,7 @@ describe("content engine", () => {
     const scripts = generateScripts(profile, concepts, moments, () => `script-${++counter}`, () => "2026-06-24T00:00:00.000Z");
     expect(scripts).toHaveLength(3);
     expect(scripts.every((script) => script.captions.length > 0)).toBe(true);
+    expect(scripts.every((script) => script.captions.every((caption) => caption.words && caption.words.length > 0))).toBe(true);
     expect(scripts.every((script) => script.visualBeats.length > 0)).toBe(true);
     expect(scripts.every((script) => script.editDecisionList?.schemaVersion === "2")).toBe(true);
     expect(scripts.every((script) => (script.editDecisionList?.zooms.length ?? 0) > 0)).toBe(true);

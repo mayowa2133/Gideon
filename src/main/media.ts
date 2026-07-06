@@ -160,12 +160,8 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     input.recording.durationMs,
     60_000
   );
-  const sourceStartMs = clamp(
-    editDecisionList.sourceSegments[0]?.sourceStartMs ?? input.moment?.startMs ?? 0,
-    0,
-    Math.max(input.recording.durationMs - 2_000, 0)
-  );
-  const sourceDurationSec = Math.max(8, durationMs / 1000);
+  const timeline = buildVideoTimelineFilter(editDecisionList, input.recording.durationMs, durationMs);
+  const sourceDurationSec = timeline.durationSec;
 
   validateEditDecisionListForRender(editDecisionList);
   await createCaptionOverlay(input.profile, input.script, editDecisionList, overlayPath);
@@ -176,7 +172,7 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
 
   const audioInput = input.voiceoverPath ?? (voiceCreated ? voicePath : audioPath);
   const filter = [
-    `[0:v]${videoFilter(editDecisionList)}[base]`,
+    timeline.filter,
     "[base][1:v]overlay=0:0:shortest=1[v]",
     `[2:a]apad,atrim=0:${sourceDurationSec.toFixed(3)},asetpts=N/SR/TB[a]`
   ].join(";");
@@ -186,10 +182,6 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     "-loglevel",
     "error",
     "-y",
-    "-ss",
-    (sourceStartMs / 1000).toFixed(3),
-    "-t",
-    sourceDurationSec.toFixed(3),
     "-i",
     input.recording.filePath,
     "-loop",
@@ -226,11 +218,23 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   ], 180_000);
 
   const validation = await validateRenderedVideo(outputPath);
+  validateRenderedTimeline(validation, sourceDurationSec);
   return {
     outputPath,
     outputUrl: pathToFileURL(outputPath).toString(),
     validation
   };
+}
+
+function validateRenderedTimeline(validation: RenderValidation, expectedDurationSec: number): void {
+  const expectedDurationMs = Math.round(expectedDurationSec * 1000);
+  const driftMs = Math.abs(validation.durationMs - expectedDurationMs);
+  if (driftMs > 1_500) {
+    throw new Error("Rendered video duration does not match the manifest timeline.");
+  }
+  if (!validation.audioCodec) {
+    throw new Error("Rendered video is missing audio for caption alignment.");
+  }
 }
 
 export async function validateRenderedVideo(outputPath: string): Promise<RenderValidation> {
@@ -657,25 +661,103 @@ function loadOverlayFont(): void {
   }
 }
 
-function videoFilter(editDecisionList: EditDecisionList): string {
+function buildVideoTimelineFilter(
+  editDecisionList: EditDecisionList,
+  recordingDurationMs: number,
+  fallbackDurationMs: number
+): { filter: string; durationSec: number } {
+  const segments = normalizedSourceSegments(editDecisionList, recordingDurationMs, fallbackDurationMs);
+  const segmentFilters = segments.map((segment, index) => {
+    const sourceStartSec = (segment.sourceStartMs / 1000).toFixed(3);
+    const sourceEndSec = (segment.sourceEndMs / 1000).toFixed(3);
+    const actualDurationMs = Math.max(1, segment.sourceEndMs - segment.sourceStartMs);
+    const desiredDurationMs = Math.max(1, segment.timelineEndMs - segment.timelineStartMs);
+    const setptsFactor = (desiredDurationMs / actualDurationMs).toFixed(6);
+    return `[0:v]trim=start=${sourceStartSec}:end=${sourceEndSec},setpts=(PTS-STARTPTS)*${setptsFactor},${videoFilter(
+      editDecisionList,
+      segment.timelineStartMs,
+      desiredDurationMs
+    )}[seg${index}]`;
+  });
+  const concat =
+    segments.length === 1
+      ? "[seg0]null[base]"
+      : `${segments.map((_segment, index) => `[seg${index}]`).join("")}concat=n=${segments.length}:v=1:a=0[base]`;
+  const durationMs = segments.reduce((total, segment) => total + Math.max(1, segment.timelineEndMs - segment.timelineStartMs), 0);
+  return {
+    filter: [...segmentFilters, concat].join(";"),
+    durationSec: Math.max(8, Math.min(60, durationMs / 1000))
+  };
+}
+
+function normalizedSourceSegments(
+  editDecisionList: EditDecisionList,
+  recordingDurationMs: number,
+  fallbackDurationMs: number
+): EditDecisionList["sourceSegments"] {
+  const sourceSegments = editDecisionList.sourceSegments.length
+    ? editDecisionList.sourceSegments
+    : [
+        {
+          momentId: "source",
+          sourceStartMs: 0,
+          sourceEndMs: Math.min(recordingDurationMs, fallbackDurationMs),
+          timelineStartMs: 0,
+          timelineEndMs: Math.min(recordingDurationMs, fallbackDurationMs),
+          fit: "contain" as const,
+          focus: { x: 0.5, y: 0.5, scale: 1.1 }
+        }
+      ];
+  let timelineCursorMs = 0;
+  return sourceSegments.slice(0, 8).map((segment) => {
+    const desiredDurationMs = Math.max(750, segment.timelineEndMs - segment.timelineStartMs);
+    const maxSourceStartMs = Math.max(0, recordingDurationMs - 500);
+    const sourceStartMs = clamp(segment.sourceStartMs, 0, maxSourceStartMs);
+    const sourceEndMs = clamp(
+      Math.max(segment.sourceEndMs, sourceStartMs + 500),
+      sourceStartMs + 500,
+      recordingDurationMs
+    );
+    const normalized = {
+      ...segment,
+      sourceStartMs,
+      sourceEndMs,
+      timelineStartMs: timelineCursorMs,
+      timelineEndMs: timelineCursorMs + desiredDurationMs
+    };
+    timelineCursorMs = normalized.timelineEndMs;
+    return normalized;
+  });
+}
+
+function videoFilter(editDecisionList: EditDecisionList, timelineOffsetMs: number, durationMs: number): string {
   const filters = [
     "scale=1080:1920:force_original_aspect_ratio=decrease",
-    `pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=${ffmpegColor(editDecisionList.brandKit.backgroundColor)}`
+    `pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=${ffmpegColor(editDecisionList.brandKit.backgroundColor)}`,
+    "setsar=1"
   ];
-  const zoomExpression = zoomScaleExpression(editDecisionList);
+  const zoomExpression = zoomScaleExpression(editDecisionList, timelineOffsetMs, durationMs);
   if (zoomExpression !== "1") {
     filters.push(`scale=w='1080*(${zoomExpression})':h='1920*(${zoomExpression})':eval=frame`);
     filters.push("crop=1080:1920:(iw-1080)/2:(ih-1920)/2");
+    filters.push("setsar=1");
   }
   return filters.join(",");
 }
 
-function zoomScaleExpression(editDecisionList: EditDecisionList): string {
-  const parts = editDecisionList.zooms.slice(0, 6).map((zoom) => {
-    const start = (zoom.startMs / 1000).toFixed(3);
-    const end = (zoom.endMs / 1000).toFixed(3);
+function zoomScaleExpression(editDecisionList: EditDecisionList, timelineOffsetMs: number, durationMs: number): string {
+  const segmentStartMs = timelineOffsetMs;
+  const segmentEndMs = timelineOffsetMs + durationMs;
+  const parts = editDecisionList.zooms.slice(0, 8).flatMap((zoom) => {
+    const localStartMs = Math.max(0, zoom.startMs - segmentStartMs);
+    const localEndMs = Math.min(durationMs, zoom.endMs - segmentStartMs);
+    if (zoom.endMs <= segmentStartMs || zoom.startMs >= segmentEndMs || localEndMs <= localStartMs) {
+      return [];
+    }
+    const start = (localStartMs / 1000).toFixed(3);
+    const end = (localEndMs / 1000).toFixed(3);
     const delta = Math.max(0, zoom.toScale - 1).toFixed(3);
-    return `${delta}*between(t\\,${start}\\,${end})`;
+    return [`${delta}*between(t\\,${start}\\,${end})`];
   });
   return parts.length ? `1+${parts.join("+")}` : "1";
 }

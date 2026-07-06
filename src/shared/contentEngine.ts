@@ -279,16 +279,26 @@ export function splitCaptionSegments(text: string, durationMs: number): CaptionS
     return [];
   }
   const chunkSize = 7;
-  const chunks: string[] = [];
+  const chunks: string[][] = [];
   for (let index = 0; index < words.length; index += chunkSize) {
-    chunks.push(words.slice(index, index + chunkSize).join(" "));
+    chunks.push(words.slice(index, index + chunkSize));
   }
   const segmentDuration = Math.max(1_500, Math.floor(durationMs / chunks.length));
-  return chunks.map((chunk, index) => ({
-    startMs: index * segmentDuration,
-    endMs: index === chunks.length - 1 ? durationMs : Math.min((index + 1) * segmentDuration, durationMs),
-    text: chunk
-  }));
+  return chunks.map((chunkWords, index) => {
+    const startMs = index * segmentDuration;
+    const endMs = index === chunks.length - 1 ? durationMs : Math.min((index + 1) * segmentDuration, durationMs);
+    const wordDuration = Math.max(1, Math.floor((endMs - startMs) / chunkWords.length));
+    return {
+      startMs,
+      endMs,
+      text: chunkWords.join(" "),
+      words: chunkWords.map((word, wordIndex) => ({
+        startMs: startMs + wordIndex * wordDuration,
+        endMs: wordIndex === chunkWords.length - 1 ? endMs : Math.min(startMs + (wordIndex + 1) * wordDuration, endMs),
+        text: word
+      }))
+    };
+  });
 }
 
 export function estimateScriptDurationMs(script: Pick<ScriptDraft, "voiceoverText">): number {

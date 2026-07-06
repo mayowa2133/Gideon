@@ -81,6 +81,8 @@ describe("creator render templates", () => {
     expect(editDecisionList.schemaVersion).toBe("2");
     expect(editDecisionList.brandKit.productName).toBe("LeadPilot");
     expect(editDecisionList.presenter.enabled).toBe(true);
+    expect(editDecisionList.sourceSegments).toHaveLength(2);
+    expect(editDecisionList.sourceSegments[1]?.timelineStartMs).toBeGreaterThan(0);
     expect(editDecisionList.zooms).toHaveLength(2);
     expect(editDecisionList.callouts).toHaveLength(2);
     expect(editDecisionList.qualityGates.requireEvidenceBackedClaims).toBe(true);
