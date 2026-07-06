@@ -690,6 +690,22 @@ video {
   line-height: 1.45;
 }
 
+.focus-control-grid {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.focus-control-grid label {
+  gap: 0.25rem;
+  color: #9ba8c2;
+  font-size: 0.76rem;
+}
+
+.focus-control-grid input {
+  min-height: 24px;
+  padding: 0;
+}
+
 .concept-card.selected {
   border-color: rgba(245, 209, 95, 0.75);
   background: rgba(245, 209, 95, 0.08);

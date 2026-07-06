@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { DetectedMoment, FrameEvidence, Project, ProviderRun, TranscriptArtifact } from "../shared/types";
+import type { DetectedMoment, FrameEvidence, Project, ProviderRun, RenderFocusPoint, TranscriptArtifact } from "../shared/types";
 import { extractAudioForTranscription, enrichMomentThumbnails } from "./media";
 import type { OpenAiProviderConfig } from "./providers/config";
 import { loadProviderConfig } from "./providers/config";
@@ -141,6 +141,7 @@ export async function runAnalysisPipeline(
       error: "OpenAI OCR is not configured."
     });
   }
+  frameEvidence = rankFrameEvidence(frameEvidence, seededMoments, project.recording.durationMs);
 
   if (openai.isConfigured()) {
     const startedAt = new Date().toISOString();
@@ -153,16 +154,22 @@ export async function runAnalysisPipeline(
         frameEvidence
       });
       analysisSummary = analysis.summary;
-      moments = analysis.moments.map((moment, index) => ({
-        id: seededMoments[index]?.id ?? randomUUID(),
-        label: moment.label,
-        startMs: moment.startMs,
-        endMs: moment.endMs,
-        evidence: moment.evidence,
-        sourceEvidenceIds: moment.sourceEvidenceIds,
-        confidence: moment.confidence,
-        enabled: true
-      }));
+      moments = analysis.moments.map((moment, index) => {
+        const fallback = seededMoments[index];
+        return {
+          id: fallback?.id ?? randomUUID(),
+          label: moment.label,
+          startMs: moment.startMs,
+          endMs: moment.endMs,
+          evidence: moment.evidence,
+          sourceEvidenceIds: moment.sourceEvidenceIds,
+          proofScore: fallback?.proofScore,
+          visualRole: fallback?.visualRole,
+          focus: fallback?.focus,
+          confidence: moment.confidence,
+          enabled: true
+        };
+      });
       providerRuns.push({
         id: randomUUID(),
         kind: "analysis",
@@ -200,7 +207,8 @@ export async function runAnalysisPipeline(
     });
   }
 
-  const enrichedMoments = moments === seededMoments ? seededMoments : await enrichMomentThumbnails(project.recording, moments, projectDir);
+  const rankedMoments = annotateMomentsWithFrameEvidence(moments, frameEvidence);
+  const enrichedMoments = rankedMoments === seededMoments ? seededMoments : await enrichMomentThumbnails(project.recording, rankedMoments, projectDir);
   return {
     moments: enrichedMoments,
     transcript,
@@ -231,13 +239,129 @@ function analysisPromptProvenance(config: OpenAiProviderConfig): Pick<
 }
 
 function createFrameEvidence(moments: DetectedMoment[], createdAt: string): FrameEvidence[] {
-  return moments.map((moment) => ({
+  return moments.map((moment, index) => ({
     id: `frame-${moment.id}`,
     momentId: moment.id,
     timestampMs: moment.startMs,
     imagePath: moment.thumbnailPath,
     imageUrl: moment.thumbnailUrl,
+    changeScore: Number((0.35 + Math.min(index, 4) * 0.12).toFixed(3)),
+    proofScore: moment.proofScore,
+    visualRole: moment.visualRole,
+    focus: moment.focus,
     ocrProvider: "none",
     createdAt
   }));
+}
+
+function rankFrameEvidence(frames: FrameEvidence[], moments: DetectedMoment[], durationMs: number): FrameEvidence[] {
+  return frames.map((frame, index) => {
+    const moment = moments.find((candidate) => candidate.id === frame.momentId);
+    const uiElements = frame.uiElements ?? [];
+    const actionSignals = uiElements.filter((element) => element.kind === "button" || element.kind === "input").length;
+    const proofSignals = uiElements.filter((element) => element.kind === "status" || element.kind === "table" || /success|done|generated|ready|sent|created/i.test(element.text)).length;
+    const readableTextScore = Math.min(0.2, (frame.ocrText?.length ?? 0) / 800);
+    const timelineProgress = durationMs > 0 ? frame.timestampMs / durationMs : index / Math.max(frames.length, 1);
+    const visualRole = inferVisualRole(index, frames.length, actionSignals, proofSignals, timelineProgress);
+    const focus = focusFromUiElements(uiElements) ?? moment?.focus ?? focusForRole(visualRole);
+    const proofScore = clamp(
+      0.38 +
+        (moment?.confidence ?? 0.6) * 0.25 +
+        actionSignals * 0.06 +
+        proofSignals * 0.12 +
+        readableTextScore +
+        (frame.changeScore ?? 0) * 0.12,
+      0,
+      1
+    );
+    return {
+      ...frame,
+      proofScore: Number(proofScore.toFixed(3)),
+      visualRole,
+      focus
+    };
+  });
+}
+
+function annotateMomentsWithFrameEvidence(moments: DetectedMoment[], frames: FrameEvidence[]): DetectedMoment[] {
+  return moments.map((moment) => {
+    const frame = frames
+      .filter((candidate) => candidate.momentId === moment.id || moment.sourceEvidenceIds?.includes(`frame:${candidate.id}`))
+      .sort((left, right) => (right.proofScore ?? 0) - (left.proofScore ?? 0))[0];
+    if (!frame) {
+      return moment;
+    }
+    return {
+      ...moment,
+      proofScore: Math.max(moment.proofScore ?? 0, frame.proofScore ?? 0),
+      visualRole: frame.visualRole ?? moment.visualRole,
+      focus: frame.focus ?? moment.focus
+    };
+  });
+}
+
+function inferVisualRole(
+  index: number,
+  total: number,
+  actionSignals: number,
+  proofSignals: number,
+  timelineProgress: number
+): NonNullable<FrameEvidence["visualRole"]> {
+  if (proofSignals > 0 || index === total - 1 || timelineProgress > 0.72) {
+    return "payoff";
+  }
+  if (actionSignals > 0) {
+    return "action";
+  }
+  if (index === 0 || timelineProgress < 0.25) {
+    return "before";
+  }
+  return "proof";
+}
+
+function focusFromUiElements(uiElements: FrameEvidence["uiElements"]): RenderFocusPoint | undefined {
+  const element = (uiElements ?? [])
+    .filter((candidate) => candidate.box)
+    .sort((left, right) => elementPriority(right.kind) - elementPriority(left.kind))[0];
+  if (!element?.box) {
+    return undefined;
+  }
+  return {
+    x: clamp(element.box.x + element.box.width / 2, 0.15, 0.85),
+    y: clamp(element.box.y + element.box.height / 2, 0.18, 0.82),
+    scale: clamp(1.1 + (1 - Math.max(element.box.width, element.box.height)) * 0.18, 1.12, 1.36)
+  };
+}
+
+function elementPriority(kind: string): number {
+  if (kind === "status") {
+    return 5;
+  }
+  if (kind === "button") {
+    return 4;
+  }
+  if (kind === "table") {
+    return 3;
+  }
+  if (kind === "heading") {
+    return 2;
+  }
+  return 1;
+}
+
+function focusForRole(role: NonNullable<FrameEvidence["visualRole"]>): RenderFocusPoint {
+  if (role === "before") {
+    return { x: 0.45, y: 0.42, scale: 1.12 };
+  }
+  if (role === "action") {
+    return { x: 0.55, y: 0.5, scale: 1.22 };
+  }
+  if (role === "payoff") {
+    return { x: 0.5, y: 0.56, scale: 1.28 };
+  }
+  return { x: 0.5, y: 0.48, scale: 1.18 };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }

@@ -136,7 +136,7 @@ export class OpenAiProvider {
                 type: "input_text",
                 text: `Extract concise visible UI text and up to 12 important UI elements from this frame at ${input.timestampMs}ms${
                   input.momentLabel ? ` for moment "${input.momentLabel}"` : ""
-                }. Classify elements as heading, button, input, navigation, status, table, copy, or other. If there is no readable text, return an empty text string and an empty uiElements array.`
+                }. Classify elements as heading, button, input, navigation, status, table, copy, or other. Include a normalized box with x, y, width, and height from 0 to 1 when the element location is visually clear. If there is no readable text, return an empty text string and an empty uiElements array.`
               },
               {
                 type: "input_image",
@@ -436,8 +436,12 @@ function buildEvidencePayload(input: WalkthroughAnalysisInput): Record<string, u
         kind: element.kind,
         text: element.text,
         role: element.role,
-        confidence: element.confidence
+        confidence: element.confidence,
+        box: element.box
       })),
+      proofScore: frame.proofScore,
+      visualRole: frame.visualRole,
+      focus: frame.focus,
       confidence: frame.confidence
     })) ?? [];
   const fallbackMoments = input.moments.map((moment) => ({
@@ -561,6 +565,17 @@ const frameOcrSchema = {
             type: "number",
             minimum: 0,
             maximum: 1
+          },
+          box: {
+            type: "object",
+            additionalProperties: false,
+            required: ["x", "y", "width", "height"],
+            properties: {
+              x: { type: "number", minimum: 0, maximum: 1 },
+              y: { type: "number", minimum: 0, maximum: 1 },
+              width: { type: "number", minimum: 0, maximum: 1 },
+              height: { type: "number", minimum: 0, maximum: 1 }
+            }
           }
         }
       }
@@ -617,14 +632,32 @@ function parseFrameUiElements(value: unknown): FrameUiElement[] {
     if (!text) {
       throw new Error(`Structured OCR output has invalid uiElement ${index + 1} text.`);
     }
+    const box = parseOptionalUiBox(item.box);
     return {
       id: `ui-${index + 1}`,
       kind,
       text: text.slice(0, 160),
       role: typeof item.role === "string" && item.role.trim() ? item.role.replace(/\s+/g, " ").trim().slice(0, 80) : undefined,
-      confidence: Math.max(0, Math.min(1, requireNumber(item.confidence, `uiElement ${index + 1} confidence`)))
+      confidence: Math.max(0, Math.min(1, requireNumber(item.confidence, `uiElement ${index + 1} confidence`))),
+      ...(box ? { box } : {})
     };
   });
+}
+
+function parseOptionalUiBox(value: unknown): FrameUiElement["box"] | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Structured OCR output has invalid uiElement box.");
+  }
+  const item = value as Record<string, unknown>;
+  return {
+    x: Math.max(0, Math.min(1, requireNumber(item.x, "uiElement box x"))),
+    y: Math.max(0, Math.min(1, requireNumber(item.y, "uiElement box y"))),
+    width: Math.max(0, Math.min(1, requireNumber(item.width, "uiElement box width"))),
+    height: Math.max(0, Math.min(1, requireNumber(item.height, "uiElement box height")))
+  };
 }
 
 function parseSourceEvidenceIds(

@@ -69,6 +69,11 @@ describe("analysis pipeline", () => {
     expect(result.transcript?.status).toBe("skipped");
     expect(result.frameEvidence).toHaveLength(baseMoments.length);
     expect(result.frameEvidence.every((frame) => frame.ocrProvider === "none")).toBe(true);
+    expect(result.frameEvidence.every((frame) => typeof frame.proofScore === "number")).toBe(true);
+    expect(result.frameEvidence.every((frame) => Boolean(frame.visualRole))).toBe(true);
+    expect(result.frameEvidence.every((frame) => Boolean(frame.focus))).toBe(true);
+    expect(result.moments.every((moment) => typeof moment.proofScore === "number")).toBe(true);
+    expect(result.moments.every((moment) => Boolean(moment.focus))).toBe(true);
     expect(result.providerRuns.some((run) => run.kind === "analysis" && run.status === "skipped")).toBe(true);
     expect(result.providerRuns.some((run) => run.kind === "ocr" && run.status === "skipped")).toBe(true);
 

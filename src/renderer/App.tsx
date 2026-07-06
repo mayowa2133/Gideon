@@ -1350,7 +1350,70 @@ function MomentGrid({
             }
           />
           <p>{formatMs(moment.startMs)}–{formatMs(moment.endMs)}</p>
+          <small>
+            {moment.visualRole ? `${moment.visualRole} · ` : ""}
+            {typeof moment.proofScore === "number" ? `${Math.round(moment.proofScore * 100)}% proof` : "proof pending"}
+          </small>
           <small>{moment.evidence}</small>
+          <div className="focus-control-grid">
+            <label>
+              Focus X
+              <input
+                max="1"
+                min="0"
+                onChange={(event) =>
+                  onChange(
+                    moments.map((candidate) =>
+                      candidate.id === moment.id
+                        ? { ...candidate, focus: { ...(candidate.focus ?? { x: 0.5, y: 0.5, scale: 1.16 }), x: Number(event.target.value) } }
+                        : candidate
+                    )
+                  )
+                }
+                step="0.01"
+                type="range"
+                value={moment.focus?.x ?? 0.5}
+              />
+            </label>
+            <label>
+              Focus Y
+              <input
+                max="1"
+                min="0"
+                onChange={(event) =>
+                  onChange(
+                    moments.map((candidate) =>
+                      candidate.id === moment.id
+                        ? { ...candidate, focus: { ...(candidate.focus ?? { x: 0.5, y: 0.5, scale: 1.16 }), y: Number(event.target.value) } }
+                        : candidate
+                    )
+                  )
+                }
+                step="0.01"
+                type="range"
+                value={moment.focus?.y ?? 0.5}
+              />
+            </label>
+            <label>
+              Zoom
+              <input
+                max="1.45"
+                min="1"
+                onChange={(event) =>
+                  onChange(
+                    moments.map((candidate) =>
+                      candidate.id === moment.id
+                        ? { ...candidate, focus: { ...(candidate.focus ?? { x: 0.5, y: 0.5, scale: 1.16 }), scale: Number(event.target.value) } }
+                        : candidate
+                    )
+                  )
+                }
+                step="0.01"
+                type="range"
+                value={moment.focus?.scale ?? 1.16}
+              />
+            </label>
+          </div>
           <button
             className="chip"
             onClick={() =>

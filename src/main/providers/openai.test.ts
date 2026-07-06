@@ -215,7 +215,7 @@ describe("OpenAI frame OCR parsing", () => {
         text: "Create campaign\nGenerate scripts",
         uiElements: [
           { kind: "heading", text: "Create campaign", confidence: 0.82 },
-          { kind: "button", text: "Generate scripts", role: "primary action", confidence: 1.4 }
+          { kind: "button", text: "Generate scripts", role: "primary action", confidence: 1.4, box: { x: 0.2, y: 0.3, width: 0.4, height: 0.1 } }
         ],
         confidence: 1.4
       })
@@ -225,7 +225,7 @@ describe("OpenAI frame OCR parsing", () => {
       confidence: 1,
       uiElements: [
         { id: "ui-1", kind: "heading", text: "Create campaign", role: undefined, confidence: 0.82 },
-        { id: "ui-2", kind: "button", text: "Generate scripts", role: "primary action", confidence: 1 }
+        { id: "ui-2", kind: "button", text: "Generate scripts", role: "primary action", confidence: 1, box: { x: 0.2, y: 0.3, width: 0.4, height: 0.1 } }
       ]
     });
   });
@@ -400,7 +400,15 @@ describe("OpenAI provider requests", () => {
           JSON.stringify({
             output_text: JSON.stringify({
               text: "Generate scripts",
-              uiElements: [{ kind: "button", text: "Generate scripts", role: "primary action", confidence: 0.74 }],
+              uiElements: [
+                {
+                  kind: "button",
+                  text: "Generate scripts",
+                  role: "primary action",
+                  confidence: 0.74,
+                  box: { x: 0.4, y: 0.5, width: 0.2, height: 0.08 }
+                }
+              ],
               confidence: 0.74
             })
           }),
@@ -421,7 +429,8 @@ describe("OpenAI provider requests", () => {
         kind: "button",
         text: "Generate scripts",
         role: "primary action",
-        confidence: 0.74
+        confidence: 0.74,
+        box: { x: 0.4, y: 0.5, width: 0.2, height: 0.08 }
       }
     ]);
     expect(requests[0]?.url).toBe("https://api.example.test/v1/responses");

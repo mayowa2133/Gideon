@@ -178,6 +178,13 @@ export function createMoments(
       endMs,
       evidence: evidenceForMoment(index, product, outcome, recording),
       confidence: Number((0.68 + Math.min(index, 3) * 0.05).toFixed(2)),
+      proofScore: Number((0.58 + Math.min(index, 4) * 0.08).toFixed(2)),
+      visualRole: index === 0 ? "before" : index === segmentCount - 1 ? "payoff" : index === 2 ? "proof" : "action",
+      focus: {
+        x: index % 2 === 0 ? 0.48 : 0.56,
+        y: index < 2 ? 0.42 : 0.54,
+        scale: 1.12 + Math.min(index, 3) * 0.04
+      },
       enabled: true
     };
   });
@@ -188,7 +195,7 @@ export function generateConcepts(
   moments: DetectedMoment[],
   ids: () => string
 ): ContentConcept[] {
-  const enabledMoments = moments.filter((moment) => moment.enabled);
+  const enabledMoments = rankMomentsForProof(moments.filter((moment) => moment.enabled));
   const proofMoments = enabledMoments.length > 0 ? enabledMoments : moments;
   const product = cleanPhrase(profile.productName || "your product");
   const customer = cleanPhrase(profile.targetCustomer || "your target customer");
@@ -373,6 +380,16 @@ function choosePlatforms(platforms: Platform[], family: string): Platform[] {
     return platforms.filter((platform) => platform !== "other").slice(0, 3);
   }
   return platforms.slice(0, 3);
+}
+
+function rankMomentsForProof(moments: DetectedMoment[]): DetectedMoment[] {
+  return [...moments].sort((left, right) => {
+    const scoreDelta = (right.proofScore ?? right.confidence) - (left.proofScore ?? left.confidence);
+    if (Math.abs(scoreDelta) > 0.001) {
+      return scoreDelta;
+    }
+    return left.startMs - right.startMs;
+  });
 }
 
 function personalizeTitle(title: string, product: string, index: number): string {

@@ -169,7 +169,7 @@ export function buildVisualBeatsForTemplate(input: {
   const beatDuration = Math.max(1800, Math.floor(input.durationMs / moments.length));
   return moments.map((moment, index) => {
     const purpose = purposes[index % purposes.length] ?? "demo";
-    const focus = focusForBeat(index, input.templateKey);
+    const focus = moment.focus ?? focusForBeat(index, input.templateKey);
     return {
       startMs: index * beatDuration,
       endMs: index === moments.length - 1 ? input.durationMs : Math.min((index + 1) * beatDuration, input.durationMs),

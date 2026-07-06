@@ -362,6 +362,10 @@ export interface FrameEvidence {
   uiElements?: FrameUiElement[];
   ocrProvider?: "openai" | "local" | "none";
   confidence?: number;
+  changeScore?: number;
+  proofScore?: number;
+  visualRole?: "before" | "action" | "proof" | "payoff";
+  focus?: RenderFocusPoint;
   createdAt: string;
 }
 
@@ -406,6 +410,9 @@ export interface DetectedMoment {
   sourceEvidenceIds?: string[];
   confidence: number;
   enabled: boolean;
+  proofScore?: number;
+  visualRole?: "before" | "action" | "proof" | "payoff";
+  focus?: RenderFocusPoint;
   thumbnailPath?: string;
   thumbnailUrl?: string;
 }
