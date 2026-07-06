@@ -702,9 +702,7 @@ export class GideonStore {
     if (!project) {
       throw new Error("Project not found.");
     }
-    project.profile = normalized;
-    project.name = project.name.trim() || normalized.productName;
-    project.updatedAt = new Date().toISOString();
+    applyProfileUpdate(project, normalized);
     this.appendAuditToState(state, {
       workspaceId: input.workspaceId,
       projectId: project.id,
@@ -724,9 +722,7 @@ export class GideonStore {
     return this.updateProject(
       projectId,
       (project) => {
-        project.profile = normalized;
-        project.name = project.name.trim() || project.profile.productName;
-        project.updatedAt = new Date().toISOString();
+        applyProfileUpdate(project, normalized);
       },
       {
         audit: {
@@ -2830,6 +2826,19 @@ function normalizeProfile(profile: ProductProfile): ProductProfile {
     brandPresenterEnabled: Boolean(profile.brandPresenterEnabled),
     brandKit: normalizeBrandKit(profile.brandKit, productName)
   };
+}
+
+function applyProfileUpdate(project: Project, profile: ProductProfile): void {
+  project.profile = profile;
+  project.name = project.name.trim() || project.profile.productName;
+  if (project.scripts.length > 0) {
+    project.scripts = project.scripts.map((script) => normalizeScriptDraft(project, script));
+    project.renders = [];
+    project.status = "script_review";
+  } else if (project.renders.length > 0) {
+    project.renders = [];
+  }
+  project.updatedAt = new Date().toISOString();
 }
 
 function normalizeScriptDraft(project: Project, script: ScriptDraft): ScriptDraft {

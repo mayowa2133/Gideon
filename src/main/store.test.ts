@@ -855,6 +855,46 @@ describe("GideonStore billing reconciliation", () => {
     expect(updated.renders).toEqual([]);
   });
 
+  it("refreshes script render manifests and clears renders after profile brand changes", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProject({
+      name: "Brand refresh",
+      profile: profileFixture()
+    });
+    await store.updateMoments(project.id, [
+      {
+        id: "moment-1",
+        label: "Upload proof",
+        startMs: 0,
+        endMs: 3_000,
+        evidence: "The screen shows the upload proof.",
+        confidence: 0.86,
+        proofScore: 0.9,
+        visualRole: "proof",
+        focus: { x: 0.55, y: 0.5, scale: 1.22 },
+        enabled: true
+      }
+    ]);
+    await store.generateConcepts(project.id);
+    const scripted = await store.generateScripts(project.id);
+    await store.replaceRenders(project.id, [renderFixture({ id: "render-1", scriptId: scripted.scripts[0]!.id })]);
+
+    const updated = await store.updateProfile(project.id, {
+      ...scripted.profile,
+      brandPresenterEnabled: true,
+      brandKit: {
+        ...scripted.profile.brandKit!,
+        primaryColor: "#123456"
+      }
+    });
+
+    expect(updated.renders).toEqual([]);
+    expect(updated.status).toBe("script_review");
+    expect(updated.scripts[0]?.editDecisionList?.brandKit.primaryColor).toBe("#123456");
+    expect(updated.scripts[0]?.editDecisionList?.presenter.enabled).toBe(true);
+  });
+
   it("creates exports with explicit hosted session scope", async () => {
     const store = new GideonStore();
     await store.load();
