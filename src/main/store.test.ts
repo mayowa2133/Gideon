@@ -643,6 +643,25 @@ describe("GideonStore billing reconciliation", () => {
         fileName: artifact.originalFileName
       })
     });
+    await store.updateConcepts(
+      project.id,
+      [
+        {
+          id: "concept-1",
+          title: "Fast export",
+          formatFamily: "demo",
+          targetPain: "Manual clipping",
+          hookDirection: "show outcome",
+          proofMomentIds: [],
+          platformFit: ["youtube_shorts"],
+          estimatedDurationSec: 30,
+          rationale: "Good proof",
+          selected: true,
+          brief: "Show fast export"
+        }
+      ],
+      "concept-1"
+    );
     await store.updateScripts(project.id, [scriptFixture()]);
 
     const created = await store.createRenderJobForSession({

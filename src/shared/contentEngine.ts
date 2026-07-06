@@ -377,7 +377,7 @@ export function generateScriptDraft(
     }),
     evidenceClaims,
     qualityWarnings,
-    approved: true,
+    approved: false,
     updatedAt: now()
   };
 }

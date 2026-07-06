@@ -1780,6 +1780,12 @@ export class GideonStore {
     if ((project.scripts ?? []).length === 0) {
       throw new Error("Generate scripts before rendering.");
     }
+    const selectedConceptIds = new Set(
+      (project.concepts ?? []).filter((concept) => concept.selected).map((concept) => concept.id)
+    );
+    if (!(project.scripts ?? []).some((script) => script.approved && selectedConceptIds.has(script.conceptId))) {
+      throw new Error("Approve at least one selected script before rendering.");
+    }
     const activeJob = findActiveJob(project.jobs ?? [], "render");
     if (activeJob) {
       return { project, job: activeJob, reused: true };

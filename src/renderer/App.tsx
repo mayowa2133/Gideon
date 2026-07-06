@@ -827,6 +827,10 @@ function ProjectWorkspace({
   }
 
   const selectedConceptCount = project.concepts.filter((concept) => concept.selected).length;
+  const selectedConceptIds = new Set(project.concepts.filter((concept) => concept.selected).map((concept) => concept.id));
+  const approvedSelectedScriptCount = project.scripts.filter(
+    (script) => script.approved && selectedConceptIds.has(script.conceptId)
+  ).length;
 
   return (
     <div className="project-workspace">
@@ -987,13 +991,20 @@ function ProjectWorkspace({
         <div className="action-row">
           <button
             className="primary"
-            disabled={project.scripts.length === 0 || busy === "rendering"}
+            disabled={project.scripts.length === 0 || approvedSelectedScriptCount === 0 || busy === "rendering"}
             onClick={() => void runAction("rendering", () => window.gideon.renderSelected(project.id))}
             type="button"
           >
-            {busy === "rendering" ? "Rendering MP4 drafts…" : "Render selected drafts"}
+            {busy === "rendering"
+              ? "Rendering MP4 drafts…"
+              : approvedSelectedScriptCount === 0
+                ? "Approve drafts before render"
+                : "Render selected drafts"}
           </button>
-          <p className="muted">Render jobs run through the local worker queue and output 1080×1920 H.264/AAC MP4 files.</p>
+          <p className="muted">
+            {approvedSelectedScriptCount} approved selected draft{approvedSelectedScriptCount === 1 ? "" : "s"} ready
+            for local 1080×1920 H.264/AAC rendering.
+          </p>
         </div>
         <RenderGallery
           project={project}
@@ -1523,6 +1534,14 @@ function ScriptEditor({
               Regenerate script
             </button>
           </div>
+          <label className="checkbox-row">
+            <input
+              checked={script.approved}
+              onChange={(event) => updateScript(script.id, { approved: event.target.checked })}
+              type="checkbox"
+            />
+            Approved for render
+          </label>
           <label>
             Template
             <select
@@ -1561,6 +1580,7 @@ function ScriptEditor({
             <span>{script.editDecisionList?.zooms.length ?? script.visualBeats.length} punch-ins</span>
             <span>{script.editDecisionList?.callouts.length ?? script.visualBeats.length} callouts</span>
             <span>{script.editDecisionList?.presenter.enabled ? "presenter on" : "presenter off"}</span>
+            <span>{script.approved ? "approved" : "needs approval"}</span>
           </div>
           {script.qualityWarnings && script.qualityWarnings.length > 0 ? (
             <div className="quality-warning-list">

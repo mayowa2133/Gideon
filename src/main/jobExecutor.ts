@@ -275,10 +275,10 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
     }
     const selectedConcepts = project.concepts.filter((concept) => concept.selected);
     const scripts = project.scripts.filter((script) =>
-      selectedConcepts.some((concept) => concept.id === script.conceptId)
+      script.approved && selectedConcepts.some((concept) => concept.id === script.conceptId)
     );
     if (scripts.length === 0) {
-      throw new Error("Generate scripts before rendering.");
+      throw new Error("Approve at least one selected script before rendering.");
     }
     let job = await store.getJob(projectId, jobId);
     if (job.status === "canceled") {

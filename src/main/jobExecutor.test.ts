@@ -199,6 +199,39 @@ describe("Gideon job executor", () => {
     ]);
   });
 
+  it("requires an approved selected script before rendering", async () => {
+    const project = projectFixture({
+      concepts: [
+        {
+          id: "concept-1",
+          title: "Fast export",
+          formatFamily: "demo",
+          targetPain: "Manual clipping",
+          hookDirection: "show outcome",
+          proofMomentIds: ["moment-1"],
+          platformFit: ["youtube_shorts"],
+          estimatedDurationSec: 30,
+          rationale: "Good proof",
+          selected: true,
+          brief: "Show fast export"
+        }
+      ],
+      moments: [momentFixture()],
+      scripts: [scriptFixture({ approved: false })]
+    });
+    const store = new FakeExecutorStore(project);
+    store.project.jobs = [createJob({ id: "job-1", projectId: store.project.id, kind: "render", now: "2026-06-25T12:00:00.000Z" })];
+    const executor = createGideonJobExecutor({
+      store,
+      now: clock(),
+      loadProviderConfig: () => providerConfig(false)
+    });
+
+    await expect(executor.runRenderJob(store.project.id, "job-1")).rejects.toThrow(
+      "Approve at least one selected script before rendering."
+    );
+  });
+
   it("rejects invalid provider voiceover audio before private storage import", async () => {
     const project = projectFixture({
       concepts: [
@@ -467,7 +500,7 @@ function momentFixture(): DetectedMoment {
   };
 }
 
-function scriptFixture(): ScriptDraft {
+function scriptFixture(overrides: Partial<ScriptDraft> = {}): ScriptDraft {
   return {
     id: "script-1",
     conceptId: "concept-1",
@@ -477,7 +510,8 @@ function scriptFixture(): ScriptDraft {
     cta: "Try Gideon",
     visualBeats: [{ startMs: 0, endMs: 2_000, momentId: "moment-1", instruction: "Show upload." }],
     approved: true,
-    updatedAt: "2026-06-25T12:00:00.000Z"
+    updatedAt: "2026-06-25T12:00:00.000Z",
+    ...overrides
   };
 }
 

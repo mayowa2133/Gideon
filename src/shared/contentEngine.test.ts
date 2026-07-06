@@ -93,6 +93,7 @@ describe("content engine", () => {
     expect(scripts.every((script) => (script.editDecisionList?.zooms.length ?? 0) > 0)).toBe(true);
     expect(scripts.every((script) => (script.editDecisionList?.callouts.length ?? 0) > 0)).toBe(true);
     expect(scripts.every((script) => (script.evidenceClaims?.length ?? 0) > 0)).toBe(true);
+    expect(scripts.every((script) => script.approved === false)).toBe(true);
     expect(
       scripts.some((script) => /revolutionary platform|game-changing solution/i.test(script.voiceoverText))
     ).toBe(false);
