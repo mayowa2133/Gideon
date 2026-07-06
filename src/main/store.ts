@@ -8,6 +8,7 @@ import {
   enforceSelectionLimit,
   estimateScriptDurationMs,
   generateConcepts,
+  generateScriptDraft,
   generateScripts,
   splitCaptionSegments,
   validateProfile
@@ -1207,6 +1208,39 @@ export class GideonStore {
           action: "scripts.generate",
           targetType: "script",
           summary: "Generated script drafts."
+        }
+      }
+    );
+  }
+
+  async regenerateScript(projectId: string, scriptId: string): Promise<Project> {
+    return this.updateProject(
+      projectId,
+      (project) => {
+        const existing = project.scripts.find((script) => script.id === scriptId);
+        if (!existing) {
+          throw new Error("Script not found.");
+        }
+        const concept = project.concepts.find((candidate) => candidate.id === existing.conceptId);
+        if (!concept) {
+          throw new Error("Concept not found for script.");
+        }
+        const regenerated = {
+          ...generateScriptDraft(project.profile, concept, project.moments, randomUUID, () => new Date().toISOString()),
+          id: existing.id
+        };
+        project.scripts = project.scripts.map((script) => (script.id === scriptId ? regenerated : script));
+        project.renders = [];
+        project.status = "script_review";
+        project.updatedAt = new Date().toISOString();
+      },
+      {
+        audit: {
+          action: "scripts.generate",
+          targetType: "script",
+          targetId: scriptId,
+          summary: "Regenerated one script draft.",
+          metadata: { scriptId }
         }
       }
     );

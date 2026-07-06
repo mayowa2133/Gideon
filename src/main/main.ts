@@ -300,6 +300,9 @@ function registerIpcHandlers(): void {
       store.updateConcepts(projectId, concepts, changedId)
   );
   ipcMain.handle("scripts:generate", async (_event, projectId: string) => store.generateScripts(projectId));
+  ipcMain.handle("scripts:regenerate", async (_event, projectId: string, scriptId: string) =>
+    store.regenerateScript(projectId, scriptId)
+  );
   ipcMain.handle("scripts:update", async (_event, projectId: string, scripts: ScriptDraft[]) =>
     store.updateScripts(projectId, scripts)
   );

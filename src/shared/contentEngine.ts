@@ -261,7 +261,7 @@ export function generateScripts(
   now: () => string
 ): ScriptDraft[] {
   const selected = concepts.filter((concept) => concept.selected).slice(0, 3);
-  return selected.map((concept) => generateScript(profile, concept, moments, ids, now));
+  return selected.map((concept) => generateScriptDraft(profile, concept, moments, ids, now));
 }
 
 export function sanitizeMarketingCopy(text: string): string {
@@ -297,7 +297,7 @@ export function estimateScriptDurationMs(script: Pick<ScriptDraft, "voiceoverTex
   return clamp(spokenMs + 2_500, 15_000, 60_000);
 }
 
-function generateScript(
+export function generateScriptDraft(
   profile: ProductProfile,
   concept: ContentConcept,
   moments: DetectedMoment[],

@@ -974,7 +974,13 @@ function ProjectWorkspace({
             Save script edits
           </button>
         </div>
-        <ScriptEditor scripts={scripts} setScripts={setScripts} />
+        <ScriptEditor
+          scripts={scripts}
+          setScripts={setScripts}
+          onRegenerate={(scriptId) =>
+            void runAction("scripts", () => window.gideon.regenerateScript(project.id, scriptId))
+          }
+        />
       </Panel>
 
       <Panel title="6. Render and export" eyebrow="Downloadable MP4">
@@ -1480,10 +1486,12 @@ function ConceptGrid({
 
 function ScriptEditor({
   scripts,
-  setScripts
+  setScripts,
+  onRegenerate
 }: {
   scripts: ScriptDraft[];
   setScripts: (scripts: ScriptDraft[]) => void;
+  onRegenerate: (scriptId: string) => void;
 }): JSX.Element {
   if (scripts.length === 0) {
     return <div className="empty-inline">Generate scripts from selected concepts, then edit voiceover and CTA before render.</div>;
@@ -1510,6 +1518,11 @@ function ScriptEditor({
       {scripts.map((script, index) => (
         <article className="script-card" key={script.id}>
           <p className="eyebrow">Draft {index + 1}</p>
+          <div className="action-row">
+            <button className="secondary compact" onClick={() => onRegenerate(script.id)} type="button">
+              Regenerate script
+            </button>
+          </div>
           <label>
             Template
             <select

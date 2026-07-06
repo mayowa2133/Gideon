@@ -753,6 +753,53 @@ describe("GideonStore billing reconciliation", () => {
     ).toBe(true);
   });
 
+  it("regenerates one script without replacing the whole script set", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProject({
+      name: "Script regeneration",
+      profile: profileFixture()
+    });
+    await store.updateMoments(project.id, [
+      {
+        id: "moment-1",
+        label: "Upload proof",
+        startMs: 0,
+        endMs: 3_000,
+        evidence: "The screen shows the upload proof.",
+        confidence: 0.86,
+        proofScore: 0.9,
+        visualRole: "proof",
+        focus: { x: 0.55, y: 0.5, scale: 1.22 },
+        enabled: true
+      },
+      {
+        id: "moment-2",
+        label: "Export payoff",
+        startMs: 3_000,
+        endMs: 7_000,
+        evidence: "The screen shows the final export.",
+        confidence: 0.9,
+        proofScore: 0.94,
+        visualRole: "payoff",
+        focus: { x: 0.5, y: 0.56, scale: 1.28 },
+        enabled: true
+      }
+    ]);
+    await store.generateConcepts(project.id);
+    const scripted = await store.generateScripts(project.id);
+    const firstScript = scripted.scripts[0]!;
+    await store.updateScripts(project.id, [{ ...firstScript, hook: "Manual rewrite" }]);
+
+    const regenerated = await store.regenerateScript(project.id, firstScript.id);
+
+    expect(regenerated.scripts).toHaveLength(scripted.scripts.length);
+    expect(regenerated.scripts[0]?.id).toBe(firstScript.id);
+    expect(regenerated.scripts[0]?.hook).not.toBe("Manual rewrite");
+    expect(regenerated.scripts[0]?.editDecisionList?.schemaVersion).toBe("2");
+    expect(regenerated.renders).toEqual([]);
+  });
+
   it("creates exports with explicit hosted session scope", async () => {
     const store = new GideonStore();
     await store.load();

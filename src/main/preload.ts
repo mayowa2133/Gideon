@@ -48,6 +48,8 @@ const api = {
   updateConcepts: (projectId: string, concepts: ContentConcept[], changedId: string): Promise<Project> =>
     ipcRenderer.invoke("concepts:update", projectId, concepts, changedId),
   generateScripts: (projectId: string): Promise<Project> => ipcRenderer.invoke("scripts:generate", projectId),
+  regenerateScript: (projectId: string, scriptId: string): Promise<Project> =>
+    ipcRenderer.invoke("scripts:regenerate", projectId, scriptId),
   updateScripts: (projectId: string, scripts: ScriptDraft[]): Promise<Project> =>
     ipcRenderer.invoke("scripts:update", projectId, scripts),
   chooseBrandLogo: (): Promise<{ logoPath: string; logoUrl: string } | null> => ipcRenderer.invoke("brand:choose-logo"),
