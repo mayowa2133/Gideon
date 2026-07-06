@@ -800,6 +800,61 @@ describe("GideonStore billing reconciliation", () => {
     expect(regenerated.renders).toEqual([]);
   });
 
+  it("rebuilds captions and render plans from reviewed script edits", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProject({
+      name: "Reviewed script edits",
+      profile: profileFixture()
+    });
+    await store.updateMoments(project.id, [
+      {
+        id: "moment-1",
+        label: "Upload proof",
+        startMs: 0,
+        endMs: 3_000,
+        evidence: "The screen shows the upload proof.",
+        confidence: 0.86,
+        proofScore: 0.9,
+        visualRole: "proof",
+        focus: { x: 0.55, y: 0.5, scale: 1.22 },
+        enabled: true
+      },
+      {
+        id: "moment-2",
+        label: "Export payoff",
+        startMs: 3_000,
+        endMs: 7_000,
+        evidence: "The screen shows the final export.",
+        confidence: 0.9,
+        proofScore: 0.94,
+        visualRole: "payoff",
+        focus: { x: 0.5, y: 0.56, scale: 1.28 },
+        enabled: true
+      }
+    ]);
+    await store.generateConcepts(project.id);
+    const scripted = await store.generateScripts(project.id);
+    const firstScript = scripted.scripts[0]!;
+    const reviewedVoiceover = `${firstScript.voiceoverText} ${Array(80).fill("reviewed proof line").join(" ")}.`;
+
+    const updated = await store.updateScripts(project.id, [
+      {
+        ...firstScript,
+        templateKey: "brand_presenter",
+        voiceoverText: reviewedVoiceover
+      }
+    ]);
+    const saved = updated.scripts[0]!;
+
+    expect(saved.templateKey).toBe("brand_presenter");
+    expect(saved.editDecisionList?.templateKey).toBe("brand_presenter");
+    expect(saved.captions.map((caption) => caption.text).join(" ")).toContain("reviewed proof line");
+    expect(saved.editDecisionList?.captions.map((caption) => caption.text).join(" ")).toContain("reviewed proof line");
+    expect(saved.visualBeats[0]?.endMs).not.toBe(firstScript.visualBeats[0]?.endMs);
+    expect(updated.renders).toEqual([]);
+  });
+
   it("creates exports with explicit hosted session scope", async () => {
     const store = new GideonStore();
     await store.load();

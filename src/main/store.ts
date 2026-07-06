@@ -2837,21 +2837,24 @@ function normalizeScriptDraft(project: Project, script: ScriptDraft): ScriptDraf
   const templateKey = script.templateKey ?? concept?.templateKey ?? templateForFormatFamily(concept?.formatFamily ?? "problem-solution");
   const voiceoverText = script.voiceoverText.trim();
   const durationMs = estimateScriptDurationMs({ voiceoverText });
-  const captions = script.captions?.length ? script.captions : splitCaptionSegments(voiceoverText, durationMs);
+  const captions = splitCaptionSegments(voiceoverText, durationMs);
   const momentIds = concept?.proofMomentIds?.length
     ? concept.proofMomentIds
     : script.visualBeats?.map((beat) => beat.momentId) ?? [];
   const moments = momentIds
     .map((momentId) => project.moments.find((moment) => moment.id === momentId))
     .filter((moment): moment is DetectedMoment => Boolean(moment));
-  const visualBeats = script.visualBeats?.length
-    ? script.visualBeats
-    : buildVisualBeatsForTemplate({ moments, durationMs, templateKey });
+  const previousRenderDurationMs = script.editDecisionList?.durationMs ?? durationMs;
+  const shouldRebuildVisualBeats =
+    !script.visualBeats?.length ||
+    (script.editDecisionList?.schemaVersion === "2" &&
+      (script.editDecisionList.templateKey !== templateKey || Math.abs(previousRenderDurationMs - durationMs) > 1_000));
+  const visualBeats = shouldRebuildVisualBeats
+    ? buildVisualBeatsForTemplate({ moments, durationMs, templateKey })
+    : script.visualBeats;
   const hook = script.hook.trim();
   const cta = script.cta.trim();
-  const evidenceClaims = script.evidenceClaims?.length
-    ? script.evidenceClaims
-    : buildEvidenceClaims({ moments, hook, cta, voiceoverText });
+  const evidenceClaims = buildEvidenceClaims({ moments, hook, cta, voiceoverText });
   const qualityWarnings = scriptQualityWarnings({ hook, voiceoverText, captions, evidenceClaims });
   return {
     ...script,
