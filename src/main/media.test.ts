@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { createMoments, generateConcepts, generateScripts } from "../shared/contentEngine";
 import type { ProductProfile } from "../shared/types";
 import {
+  buildAudioMixFilter,
   calloutTextFromInstruction,
   probeRecording,
   renderDraft,
@@ -25,7 +26,9 @@ const profile: ProductProfile = {
   preferredTone: "direct",
   toneGuidance: "No hype.",
   platforms: ["tiktok", "youtube_shorts"],
-  walkthroughNotes: "Show setup, result, and final outreach."
+  walkthroughNotes: "Show setup, result, and final outreach.",
+  soundDesignEnabled: true,
+  musicMood: "clean_tech"
 };
 
 describe("media pipeline", () => {
@@ -110,6 +113,17 @@ describe("media pipeline", () => {
     expect(expressions.scale).toContain("0.400");
     expect(expressions.cropX).toContain("0.5+(between(t\\,0.000\\,1.800))*0.300");
     expect(expressions.cropY).toContain("0.5+(between(t\\,0.000\\,1.800))*-0.300");
+  });
+
+  it("builds optional music and SFX audio mix filters from the render manifest", () => {
+    const script = draftScript();
+    const filter = buildAudioMixFilter(script.editDecisionList!, 12);
+
+    expect(script.editDecisionList!.music.enabled).toBe(true);
+    expect(script.editDecisionList!.sfx.length).toBeGreaterThan(0);
+    expect(filter).toContain("sine=frequency=220");
+    expect(filter).toContain("adelay=");
+    expect(filter).toContain("amix=inputs=");
   });
 
   it.runIf(Boolean(ffmpeg))("probes and renders a vertical H.264/AAC draft from a local recording", async () => {

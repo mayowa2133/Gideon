@@ -2830,6 +2830,8 @@ function normalizeProfile(profile: ProductProfile): ProductProfile {
     walkthroughNotes: (profile.walkthroughNotes ?? "").trim(),
     defaultTemplateKey: profile.defaultTemplateKey ?? "problem_demo_payoff",
     brandPresenterEnabled: Boolean(profile.brandPresenterEnabled),
+    soundDesignEnabled: Boolean(profile.soundDesignEnabled),
+    musicMood: profile.musicMood ?? "none",
     brandKit: normalizeBrandKit(profile.brandKit, productName)
   };
 }

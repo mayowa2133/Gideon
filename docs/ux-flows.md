@@ -222,10 +222,11 @@ Page-level layout: selected concepts as tabs/left rail; structured editor center
 2. Voiceover/body.
 3. Creator template selection.
 4. Explicit `Approved for render` checkbox.
-5. On-screen text cues.
-6. Caption preview derived from spoken text.
-7. CTA.
-8. Visual beats mapped to moments/time ranges.
+5. Sound design toggle and music mood.
+6. On-screen text cues.
+7. Caption preview derived from spoken text.
+8. CTA.
+9. Visual beats mapped to moments/time ranges.
 
 ### Interaction
 
@@ -236,7 +237,7 @@ Page-level layout: selected concepts as tabs/left rail; structured editor center
 - `Regenerate section` opens a small instruction field and affects only that section.
 - `Preview voice` may synthesize a short sample subject to usage limits.
 - Voiceover toggle: AI voice, source audio only, or voiceover plus ducked source audio if supported.
-- `Approve & render drafts` summarizes the approved script, template, brand kit, caption style, and evidence-backed visual plan versions that will be used.
+- `Approve & render drafts` summarizes the approved script, template, brand kit, sound-design setting, caption style, and evidence-backed visual plan versions that will be used.
 
 User edits are first-class versions. Regeneration never overwrites without an explicit replace/diff action.
 

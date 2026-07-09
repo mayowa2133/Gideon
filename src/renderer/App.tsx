@@ -10,6 +10,7 @@ import type {
   CtaStylePreset,
   DetectedMoment,
   JobKind,
+  MusicMood,
   Platform,
   PlatformInfo,
   ProductProfile,
@@ -48,6 +49,7 @@ type BusyAction =
 const platforms: Platform[] = ["tiktok", "instagram_reels", "youtube_shorts", "linkedin", "other"];
 const captionStyles: CaptionStylePreset[] = ["kinetic_bold", "clean_founder", "educational_stack"];
 const ctaStyles: CtaStylePreset[] = ["soft_try", "direct_signup", "learn_more"];
+const musicMoods: MusicMood[] = ["none", "clean_tech", "upbeat"];
 
 function App(): JSX.Element {
   const [state, setState] = useState<AppState>(() => createEmptyAppState());
@@ -1245,6 +1247,28 @@ function ProfileForm({
           type="checkbox"
         />
         Brand presenter
+      </label>
+      <label className="checkbox-row">
+        <input
+          checked={Boolean(profile.soundDesignEnabled)}
+          onChange={(event) => update("soundDesignEnabled", event.target.checked)}
+          type="checkbox"
+        />
+        Sound design
+      </label>
+      <label>
+        Music mood
+        <select
+          disabled={!profile.soundDesignEnabled}
+          value={profile.musicMood ?? "none"}
+          onChange={(event) => update("musicMood", event.target.value as MusicMood)}
+        >
+          {musicMoods.map((mood) => (
+            <option key={mood} value={mood}>
+              {mood.replace(/_/g, " ")}
+            </option>
+          ))}
+        </select>
       </label>
       <div className="brand-kit-controls">
         <label>

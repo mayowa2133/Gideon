@@ -196,6 +196,8 @@ export function buildEditDecisionList(input: {
   const template = getCreatorTemplate(input.templateKey);
   const brandKit = normalizeBrandKit(input.profile.brandKit, input.profile.productName);
   const durationMs = clamp(Math.round(input.durationMs), 15_000, 60_000);
+  const soundDesignEnabled = Boolean(input.profile.soundDesignEnabled);
+  const musicMood = input.profile.musicMood ?? "none";
   const sourceSegments = input.visualBeats.map((beat) => {
     const moment = input.moments.find((candidate) => candidate.id === beat.momentId);
     return {
@@ -267,6 +269,7 @@ export function buildEditDecisionList(input: {
       anchor: beat.focus ?? focusForBeat(index, input.templateKey),
       evidenceIds: beat.evidenceIds
     })),
+    sfx: soundDesignEnabled ? buildSfxCues({ zooms, visualBeats: input.visualBeats, durationMs }) : [],
     presenter: {
       enabled: Boolean(input.profile.brandPresenterEnabled) && template.presenterCompatible,
       style: "logo_head",
@@ -278,9 +281,9 @@ export function buildEditDecisionList(input: {
       motion: "caption_sync"
     },
     music: {
-      enabled: false,
-      mood: "none",
-      gainDb: -18
+      enabled: soundDesignEnabled && musicMood !== "none",
+      mood: soundDesignEnabled ? musicMood : "none",
+      gainDb: -30
     },
     qualityGates: {
       requireEvidenceBackedClaims: true,
@@ -288,6 +291,29 @@ export function buildEditDecisionList(input: {
       requireAudioAlignment: true
     }
   };
+}
+
+function buildSfxCues(input: {
+  zooms: EditDecisionList["zooms"];
+  visualBeats: VisualBeat[];
+  durationMs: number;
+}): EditDecisionList["sfx"] {
+  return [
+    ...input.zooms.slice(0, 5).map((zoom, index) => ({
+      id: `sfx-zoom-${index + 1}`,
+      kind: "whoosh" as const,
+      startMs: zoom.startMs,
+      gainDb: -28
+    })),
+    ...input.visualBeats.slice(0, 5).map((beat, index) => ({
+      id: `sfx-callout-${index + 1}`,
+      kind: index === 0 ? "pop" as const : "click" as const,
+      startMs: Math.min(beat.endMs - 300, beat.startMs + 550),
+      gainDb: -24
+    }))
+  ]
+    .filter((cue) => cue.startMs >= 0 && cue.startMs < input.durationMs)
+    .slice(0, 10);
 }
 
 export function buildEvidenceClaims(input: {

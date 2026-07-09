@@ -287,6 +287,8 @@ export type CaptionStylePreset = "kinetic_bold" | "clean_founder" | "educational
 
 export type CtaStylePreset = "soft_try" | "direct_signup" | "learn_more";
 
+export type MusicMood = "none" | "clean_tech" | "upbeat";
+
 export interface BrandKit {
   productName: string;
   logoPath?: string;
@@ -310,6 +312,8 @@ export interface ProductProfile {
   walkthroughNotes: string;
   defaultTemplateKey?: CreatorTemplateKey;
   brandPresenterEnabled?: boolean;
+  soundDesignEnabled?: boolean;
+  musicMood?: MusicMood;
   brandKit?: BrandKit;
 }
 
@@ -498,6 +502,13 @@ export interface RenderCalloutCue {
   evidenceIds?: string[];
 }
 
+export interface RenderSfxCue {
+  id: string;
+  kind: "click" | "pop" | "whoosh";
+  startMs: number;
+  gainDb: number;
+}
+
 export interface BrandPresenterLayer {
   enabled: boolean;
   style: "logo_head";
@@ -525,10 +536,11 @@ export interface EditDecisionList {
   captions: CaptionSegment[];
   overlays: RenderOverlayCue[];
   callouts: RenderCalloutCue[];
+  sfx: RenderSfxCue[];
   presenter: BrandPresenterLayer;
   music: {
     enabled: boolean;
-    mood: "none" | "clean_tech" | "upbeat";
+    mood: MusicMood;
     gainDb: number;
   };
   qualityGates: {

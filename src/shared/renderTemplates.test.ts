@@ -85,6 +85,39 @@ describe("creator render templates", () => {
     expect(editDecisionList.sourceSegments[1]?.timelineStartMs).toBeGreaterThan(0);
     expect(editDecisionList.zooms).toHaveLength(2);
     expect(editDecisionList.callouts).toHaveLength(2);
+    expect(editDecisionList.music.enabled).toBe(false);
+    expect(editDecisionList.sfx).toHaveLength(0);
     expect(editDecisionList.qualityGates.requireEvidenceBackedClaims).toBe(true);
+  });
+
+  it("adds deterministic music and SFX cues when sound design is enabled", () => {
+    const profile = {
+      ...createDefaultProfile(),
+      productName: "LeadPilot",
+      soundDesignEnabled: true,
+      musicMood: "upbeat" as const
+    };
+    const voiceover = "Most people miss this part of LeadPilot. Watch the result appear on screen.";
+    const captions = splitCaptionSegments(voiceover, 18_000);
+    const visualBeats = buildVisualBeatsForTemplate({
+      moments,
+      durationMs: 18_000,
+      templateKey: "hidden_feature_reveal"
+    });
+
+    const editDecisionList = buildEditDecisionList({
+      profile,
+      templateKey: "hidden_feature_reveal",
+      durationMs: 18_000,
+      captions,
+      visualBeats,
+      hook: "Most people miss this part of LeadPilot",
+      cta: "Try LeadPilot with one workflow.",
+      moments
+    });
+
+    expect(editDecisionList.music).toMatchObject({ enabled: true, mood: "upbeat" });
+    expect(editDecisionList.sfx.length).toBeGreaterThan(0);
+    expect(editDecisionList.sfx.every((cue) => cue.startMs >= 0 && cue.startMs < editDecisionList.durationMs)).toBe(true);
   });
 });

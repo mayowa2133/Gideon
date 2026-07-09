@@ -188,7 +188,7 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     timeline.filter,
     "[1:v]fps=30,format=rgba[overlay]",
     "[base][overlay]overlay=0:0:shortest=1[v]",
-    `[2:a]apad,atrim=0:${sourceDurationSec.toFixed(3)},asetpts=N/SR/TB[a]`
+    buildAudioMixFilter(editDecisionList, sourceDurationSec)
   ].join(";");
 
   await runCommand(resolveFfmpeg(), [
@@ -359,6 +359,54 @@ async function createSilentAudio(outputPath: string, durationSec: number): Promi
     "aac",
     outputPath
   ]);
+}
+
+export function buildAudioMixFilter(editDecisionList: EditDecisionList, durationSec: number): string {
+  const duration = durationSec.toFixed(3);
+  const filters = [
+    `[2:a]apad,atrim=0:${duration},asetpts=N/SR/TB,aresample=44100,aformat=channel_layouts=stereo[voice]`
+  ];
+  const layerLabels = ["[voice]"];
+  if (editDecisionList.music.enabled && editDecisionList.music.mood !== "none") {
+    filters.push(
+      `sine=frequency=${musicFrequency(editDecisionList.music.mood)}:duration=${duration}:sample_rate=44100,` +
+      `volume=${editDecisionList.music.gainDb}dB,aformat=channel_layouts=stereo[music]`
+    );
+    layerLabels.push("[music]");
+  }
+  editDecisionList.sfx.slice(0, 12).forEach((cue, index) => {
+    const tone = sfxTone(cue.kind);
+    const delayMs = Math.max(0, Math.round(cue.startMs));
+    filters.push(
+      `sine=frequency=${tone.frequency}:duration=${tone.durationSec.toFixed(3)}:sample_rate=44100,` +
+      `volume=${cue.gainDb}dB,adelay=${delayMs}|${delayMs},apad,atrim=0:${duration},` +
+      `aformat=channel_layouts=stereo[sfx${index}]`
+    );
+    layerLabels.push(`[sfx${index}]`);
+  });
+  if (layerLabels.length === 1) {
+    filters.push("[voice]anull[a]");
+  } else {
+    filters.push(`${layerLabels.join("")}amix=inputs=${layerLabels.length}:duration=first:dropout_transition=0,atrim=0:${duration},asetpts=N/SR/TB[a]`);
+  }
+  return filters.join(";");
+}
+
+function musicFrequency(mood: EditDecisionList["music"]["mood"]): number {
+  if (mood === "upbeat") {
+    return 330;
+  }
+  return 220;
+}
+
+function sfxTone(kind: EditDecisionList["sfx"][number]["kind"]): { frequency: number; durationSec: number } {
+  if (kind === "pop") {
+    return { frequency: 660, durationSec: 0.09 };
+  }
+  if (kind === "whoosh") {
+    return { frequency: 440, durationSec: 0.16 };
+  }
+  return { frequency: 980, durationSec: 0.055 };
 }
 
 interface OverlaySequence {
@@ -752,7 +800,15 @@ function ensureEditDecisionList(
   moment: DetectedMoment | undefined
 ): EditDecisionList {
   if (script.editDecisionList?.schemaVersion === "2") {
-    return script.editDecisionList;
+    const manifest = script.editDecisionList as EditDecisionList & {
+      sfx?: EditDecisionList["sfx"];
+      music?: EditDecisionList["music"];
+    };
+    return {
+      ...manifest,
+      sfx: manifest.sfx ?? [],
+      music: manifest.music ?? { enabled: false, mood: "none", gainDb: -30 }
+    };
   }
   const durationMs = estimateScriptDurationMs(script);
   const moments = moment ? [moment] : [];
@@ -786,6 +842,7 @@ export function validateRenderManifest(editDecisionList: EditDecisionList): void
   validateTimedCueCollection("Caption", editDecisionList.captions, editDecisionList.durationMs);
   validateTimedCueCollection("Overlay", editDecisionList.overlays, editDecisionList.durationMs);
   validateTimedCueCollection("Callout", editDecisionList.callouts, editDecisionList.durationMs);
+  validateSfxCueTimings(editDecisionList.sfx, editDecisionList.durationMs);
   validatePresenterTiming(editDecisionList.presenter, editDecisionList.durationMs);
   editDecisionList.sourceSegments.forEach((segment, index) => {
     validateFocusPoint(`Source segment ${index + 1}`, segment.focus);
@@ -837,6 +894,14 @@ function validateTimedCueCollection(
   cues.forEach((cue, index) => {
     if (cue.startMs < 0 || cue.endMs <= cue.startMs || cue.endMs > durationMs) {
       throw new Error(`${label} cue ${index + 1} has timings outside the render timeline.`);
+    }
+  });
+}
+
+function validateSfxCueTimings(sfx: EditDecisionList["sfx"], durationMs: number): void {
+  sfx.forEach((cue, index) => {
+    if (cue.startMs < 0 || cue.startMs >= durationMs || cue.gainDb < -60 || cue.gainDb > 0) {
+      throw new Error(`SFX cue ${index + 1} is outside the supported render range.`);
     }
   });
 }
