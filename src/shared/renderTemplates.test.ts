@@ -57,6 +57,16 @@ describe("creator render templates", () => {
     expect(templateForFormatFamily("before-after")).toBe("before_after_workflow");
   });
 
+  it("normalizes stable brand kit identifiers for render lineage", () => {
+    expect(createDefaultProfile().brandKit?.id).toBe("brand-kit:product");
+    expect(normalizeBrandKit({ id: "brand-kit:custom", primaryColor: "#112233" }, "LeadPilot")).toMatchObject({
+      id: "brand-kit:custom",
+      productName: "LeadPilot",
+      primaryColor: "#112233"
+    });
+    expect(normalizeBrandKit(undefined, "Lead Pilot").id).toBe("brand-kit:lead-pilot");
+  });
+
   it("classifies only claim and render-fit warnings as blocking", () => {
     expect(hasBlockingScriptWarnings(undefined)).toBe(false);
     expect(hasBlockingScriptWarnings([{ code: "generic_phrase", message: "Use a more specific phrase." }])).toBe(false);
@@ -92,7 +102,10 @@ describe("creator render templates", () => {
     });
 
     expect(editDecisionList.schemaVersion).toBe("2");
+    expect(editDecisionList.templateId).toBe("creator-template:brand_presenter:v1");
+    expect(editDecisionList.brandKitId).toBe("brand-kit:leadpilot");
     expect(editDecisionList.brandKit.productName).toBe("LeadPilot");
+    expect(editDecisionList.brandKit.id).toBe("brand-kit:leadpilot");
     expect(editDecisionList.presenter.enabled).toBe(true);
     expect(editDecisionList.sourceSegments.length).toBeGreaterThanOrEqual(5);
     expect(editDecisionList.sourceSegments[1]?.timelineStartMs).toBeGreaterThan(0);

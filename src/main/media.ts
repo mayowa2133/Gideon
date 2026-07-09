@@ -18,7 +18,14 @@ import type {
   ScriptDraft
 } from "../shared/types";
 import { estimateScriptDurationMs } from "../shared/contentEngine";
-import { buildEditDecisionList, buildEvidenceClaims, buildVisualBeatsForTemplate, normalizeBrandKit } from "../shared/renderTemplates";
+import {
+  brandKitIdForProductName,
+  buildEditDecisionList,
+  buildEvidenceClaims,
+  buildVisualBeatsForTemplate,
+  normalizeBrandKit,
+  templateManifestId
+} from "../shared/renderTemplates";
 
 const MAX_RECORDING_BYTES = 2 * 1024 * 1024 * 1024;
 const MAX_DURATION_MS = 30 * 60 * 1000;
@@ -921,6 +928,8 @@ function ensureEditDecisionList(
     };
     return {
       ...manifest,
+      templateId: manifest.templateId ?? templateManifestId(manifest.templateKey, manifest.templateVersion),
+      brandKitId: manifest.brandKitId ?? manifest.brandKit.id ?? brandKitIdForProductName(manifest.brandKit.productName),
       sfx: manifest.sfx ?? [],
       music: manifest.music ?? { enabled: false, mood: "none", gainDb: -30 }
     };

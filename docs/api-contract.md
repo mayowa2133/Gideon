@@ -597,7 +597,7 @@ Generate scripts for one to three selected angles.
 
 - **Auth:** Active member.
 - **Query:** optional `contentAngleId`, `status`, `latestOnly=true`.
-- **Response 200:** Script resources including hook, voiceover, CTA, caption cues, visual beats, validation warnings, revision.
+- **Response 200:** Script resources including hook, voiceover, CTA, caption cues, visual beats, validation warnings, revision, and sanitized EDL projections with `templateId`, `templateVersion`, and `brandKitId`.
 - **Errors:** 404 project.
 - **Rate limit:** 120/min.
 

@@ -1489,8 +1489,10 @@ function mcpProjectContextResource(project: Project, state: AppState) {
       editDecisionList: script.editDecisionList
         ? {
             schemaVersion: script.editDecisionList.schemaVersion,
+            templateId: script.editDecisionList.templateId,
             templateKey: script.editDecisionList.templateKey,
             templateVersion: script.editDecisionList.templateVersion,
+            brandKitId: script.editDecisionList.brandKitId,
             durationMs: script.editDecisionList.durationMs,
             canvas: script.editDecisionList.canvas,
             zooms: script.editDecisionList.zooms,

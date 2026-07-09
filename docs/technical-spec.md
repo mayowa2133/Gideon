@@ -178,6 +178,7 @@ AI and user choices compile into a renderer-neutral, schema-validated `EditDecis
 ```ts
 type EditDecisionList = {
   schemaVersion: "2";
+  templateId: string;
   templateKey:
     | "hidden_feature_reveal"
     | "saves_you_time"
@@ -187,9 +188,11 @@ type EditDecisionList = {
     | "before_after_workflow"
     | "brand_presenter";
   templateVersion: number;
+  brandKitId: string;
   durationMs: number;
   canvas: { width: 1080; height: 1920; fps: 30 };
   brandKit: {
+    id?: string;
     productName: string;
     primaryColor: string;
     accentColor: string;

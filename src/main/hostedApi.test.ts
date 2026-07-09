@@ -28,6 +28,7 @@ import type {
   SyncAuthenticatedUserInput,
   Workspace
 } from "../shared/types";
+import { buildEditDecisionList } from "../shared/renderTemplates";
 import { createLocalUserWorkspace } from "../shared/usage";
 
 function defaultBullMqJobOptions() {
@@ -416,25 +417,39 @@ describe("hosted API foundation", () => {
   it("serves hosted MCP context and applies CSRF-protected script and moment edits", async () => {
     const metrics: HostedApiMetricEvent[] = [];
     const api = testApi({ onMetric: (event) => metrics.push(event) });
+    const moment: DetectedMoment = {
+      id: "moment-1",
+      label: "Old proof",
+      startMs: 0,
+      endMs: 2_000,
+      evidence: "Old evidence",
+      confidence: 0.9,
+      enabled: true,
+      thumbnailPath: "/private/frame.png",
+      thumbnailUrl: "https://cdn.example.test/frame.png"
+    };
+    const script = scriptFixture({ id: "script-1", hook: "Old hook", cta: "Old CTA" });
     api.store.state.projects = [
       projectFixture({
         id: "project-1",
         workspaceId: "local-workspace",
         name: "Visible project",
-        moments: [
+        moments: [moment],
+        scripts: [
           {
-            id: "moment-1",
-            label: "Old proof",
-            startMs: 0,
-            endMs: 2_000,
-            evidence: "Old evidence",
-            confidence: 0.9,
-            enabled: true,
-            thumbnailPath: "/private/frame.png",
-            thumbnailUrl: "https://cdn.example.test/frame.png"
+            ...script,
+            editDecisionList: buildEditDecisionList({
+              profile: profileFixture(),
+              templateKey: "problem_demo_payoff",
+              durationMs: 15_000,
+              captions: script.captions,
+              visualBeats: script.visualBeats,
+              hook: script.hook,
+              cta: script.cta,
+              moments: [moment]
+            })
           }
-        ],
-        scripts: [scriptFixture({ id: "script-1", hook: "Old hook", cta: "Old CTA" })]
+        ]
       })
     ];
     const created = createSignedSession({
@@ -458,6 +473,8 @@ describe("hosted API foundation", () => {
 
     expect(context.status).toBe(200);
     expect(JSON.stringify(context.body)).toContain("Old hook");
+    expect(JSON.stringify(context.body)).toContain("creator-template:problem_demo_payoff:v1");
+    expect(JSON.stringify(context.body)).toContain("brand-kit:gideon");
     expect(JSON.stringify(context.body)).toContain("https://cdn.example.test/frame.png");
     expect(JSON.stringify(context.body)).not.toContain("/private/frame.png");
 

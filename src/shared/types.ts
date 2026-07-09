@@ -291,6 +291,7 @@ export type CtaStylePreset = "soft_try" | "direct_signup" | "learn_more";
 export type MusicMood = "none" | "clean_tech" | "upbeat";
 
 export interface BrandKit {
+  id?: string;
   productName: string;
   logoPath?: string;
   logoUrl?: string;
@@ -533,8 +534,10 @@ export interface BrandPresenterLayer {
 
 export interface EditDecisionList {
   schemaVersion: "2";
+  templateId: string;
   templateKey: CreatorTemplateKey;
   templateVersion: number;
+  brandKitId: string;
   durationMs: number;
   canvas: {
     width: 1080;

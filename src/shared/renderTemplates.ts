@@ -134,8 +134,10 @@ export function templateForFormatFamily(formatFamily: string, index = 0): Creato
 }
 
 export function createDefaultBrandKit(productName: string): BrandKit {
+  const normalizedProductName = cleanText(productName || "Product");
   return {
-    productName: cleanText(productName || "Product"),
+    id: brandKitIdForProductName(normalizedProductName),
+    productName: normalizedProductName,
     primaryColor: "#B8F34A",
     secondaryColor: "#F7F8F3",
     accentColor: "#4F7CFF",
@@ -151,6 +153,7 @@ export function normalizeBrandKit(brandKit: Partial<BrandKit> | undefined, produ
   return {
     ...defaults,
     ...brandKit,
+    id: cleanOptionalText(brandKit?.id) ?? defaults.id,
     productName: cleanText(brandKit?.productName || productName || defaults.productName).slice(0, 80),
     logoPath: cleanOptionalText(brandKit?.logoPath),
     logoUrl: cleanOptionalText(brandKit?.logoUrl),
@@ -179,11 +182,11 @@ export function buildVisualBeatsForTemplate(input: {
       ? ["hook", "proof", "proof", "proof", "cta"]
       : template.key === "saves_you_time"
         ? ["hook", "problem", "demo", "proof", "payoff", "cta"]
-      : template.key === "before_after_workflow"
-        ? ["hook", "problem", "demo", "payoff", "cta"]
-        : template.key === "founder_demo"
-          ? ["hook", "problem", "demo", "proof", "payoff", "cta"]
-          : ["hook", "problem", "demo", "proof", "payoff"];
+        : template.key === "before_after_workflow"
+          ? ["hook", "problem", "demo", "payoff", "cta"]
+          : template.key === "founder_demo"
+            ? ["hook", "problem", "demo", "proof", "payoff", "cta"]
+            : ["hook", "problem", "demo", "proof", "payoff"];
   const beatCount = Math.max(purposes.length, Math.min(6, moments.length + 2));
   const beatDuration = Math.max(1200, Math.floor(input.durationMs / beatCount));
   return Array.from({ length: beatCount }, (_unused, index) => {
@@ -272,8 +275,10 @@ export function buildEditDecisionList(input: {
   ];
   return {
     schemaVersion: "2",
+    templateId: templateManifestId(input.templateKey, 1),
     templateKey: input.templateKey,
     templateVersion: 1,
+    brandKitId: brandKit.id ?? brandKitIdForProductName(brandKit.productName),
     durationMs,
     canvas: { width: 1080, height: 1920, fps: 30 },
     brandKit,
@@ -486,6 +491,19 @@ function cleanOptionalText(value: string | undefined): string | undefined {
 
 function cleanText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
+}
+
+export function templateManifestId(templateKey: CreatorTemplateKey, templateVersion: number): string {
+  return `creator-template:${templateKey}:v${templateVersion}`;
+}
+
+export function brandKitIdForProductName(productName: string): string {
+  const slug = cleanText(productName || "product")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+  return `brand-kit:${slug || "product"}`;
 }
 
 function clamp(value: number, min: number, max: number): number {
