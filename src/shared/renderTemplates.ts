@@ -162,17 +162,21 @@ export function buildVisualBeatsForTemplate(input: {
   }
   const purposes: NonNullable<VisualBeat["purpose"]>[] =
     template.key === "three_reasons"
-      ? ["proof", "proof", "proof"]
+      ? ["hook", "proof", "proof", "proof", "cta"]
       : template.key === "before_after_workflow"
-        ? ["problem", "payoff", "proof"]
-        : ["hook", "demo", "payoff"];
-  const beatDuration = Math.max(1800, Math.floor(input.durationMs / moments.length));
-  return moments.map((moment, index) => {
+        ? ["hook", "problem", "demo", "payoff", "cta"]
+        : template.key === "founder_demo"
+          ? ["hook", "problem", "demo", "proof", "payoff", "cta"]
+          : ["hook", "problem", "demo", "proof", "payoff"];
+  const beatCount = Math.max(purposes.length, Math.min(6, moments.length + 2));
+  const beatDuration = Math.max(1200, Math.floor(input.durationMs / beatCount));
+  return Array.from({ length: beatCount }, (_unused, index) => {
+    const moment = momentForBeat(moments, index, purposes[index] ?? "demo");
     const purpose = purposes[index % purposes.length] ?? "demo";
     const focus = moment.focus ?? focusForBeat(index, input.templateKey);
     return {
       startMs: index * beatDuration,
-      endMs: index === moments.length - 1 ? input.durationMs : Math.min((index + 1) * beatDuration, input.durationMs),
+      endMs: index === beatCount - 1 ? input.durationMs : Math.min((index + 1) * beatDuration, input.durationMs),
       momentId: moment.id,
       purpose,
       instruction: instructionForPurpose(purpose, moment.label),
@@ -383,6 +387,29 @@ function instructionForPurpose(purpose: NonNullable<VisualBeat["purpose"]>, labe
     return `Return to ${label.toLowerCase()} and make the next action clear.`;
   }
   return `Show ${label.toLowerCase()} with readable framing.`;
+}
+
+function momentForBeat(
+  moments: DetectedMoment[],
+  index: number,
+  purpose: NonNullable<VisualBeat["purpose"]>
+): DetectedMoment {
+  const byRole = moments.find((moment) => {
+    if (purpose === "problem") {
+      return moment.visualRole === "before";
+    }
+    if (purpose === "payoff" || purpose === "cta") {
+      return moment.visualRole === "payoff";
+    }
+    if (purpose === "proof") {
+      return moment.visualRole === "proof" || (moment.proofScore ?? 0) >= 0.75;
+    }
+    if (purpose === "demo") {
+      return moment.visualRole === "action";
+    }
+    return false;
+  });
+  return byRole ?? moments[index % moments.length]!;
 }
 
 function calloutForPurpose(purpose: NonNullable<VisualBeat["purpose"]>, label: string): string {

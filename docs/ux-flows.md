@@ -226,7 +226,7 @@ Page-level layout: selected concepts as tabs/left rail; structured editor center
 6. On-screen text cues.
 7. Caption preview derived from spoken text.
 8. CTA.
-9. Visual beats mapped to moments/time ranges.
+9. Dense visual beats mapped to moments/time ranges, with repeated proof moments allowed for quick-cut pacing.
 
 ### Interaction
 

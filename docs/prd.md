@@ -269,6 +269,7 @@ For software builders who need to market consistently, Gideon converts an existi
 - Specificity validator checks product name/outcome/audience and evidence citations.
 - Style validator detects prohibited phrases and unsupported superlatives.
 - Platform adaptation changes tone/pacing/CTA without inventing product claims.
+- Script drafts use short spoken lines and compile into dense visual beat plans that cycle proof moments for quick-cut pacing.
 - Generated scripts start unapproved. Voiceover and render jobs require an approved script associated with a selected concept.
 - Script/profile edits rebuild the render plan and clear stale rendered outputs before another render can be exported.
 

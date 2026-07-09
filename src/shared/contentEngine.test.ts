@@ -89,6 +89,8 @@ describe("content engine", () => {
     expect(scripts.every((script) => script.captions.length > 0)).toBe(true);
     expect(scripts.every((script) => script.captions.every((caption) => caption.words && caption.words.length > 0))).toBe(true);
     expect(scripts.every((script) => script.visualBeats.length > 0)).toBe(true);
+    expect(scripts.every((script) => script.visualBeats.length >= 4)).toBe(true);
+    expect(scripts.every((script) => script.voiceoverText.split(".").filter(Boolean).every((line) => line.trim().split(/\s+/).length <= 16))).toBe(true);
     expect(scripts.every((script) => script.editDecisionList?.schemaVersion === "2")).toBe(true);
     expect(scripts.every((script) => (script.editDecisionList?.zooms.length ?? 0) > 0)).toBe(true);
     expect(scripts.every((script) => (script.editDecisionList?.callouts.length ?? 0) > 0)).toBe(true);

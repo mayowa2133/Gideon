@@ -332,16 +332,15 @@ export function generateScriptDraft(
       .replace("{customer}", customer)
       .replace(/\.$/, "")
   );
-  const body = sanitizeMarketingCopy(
-    [
-      `If you are ${customer}, this is the part that matters.`,
-      `First, watch ${primaryMoment?.label.toLowerCase() ?? "the starting point"}.`,
-      `Then it moves into ${secondaryMoment?.label.toLowerCase() ?? "the product result"}, so the proof is on screen.`,
-      `That matters because ${outcome}.`,
-      `Use this when a long demo would lose the audience.`
-    ].join(" ")
-  );
-  const voiceoverText = `${hook} ${body}`;
+  const bodyLines = creatorVoiceoverLines({
+    customer,
+    outcome,
+    primaryLabel: primaryMoment?.label,
+    secondaryLabel: secondaryMoment?.label,
+    templateKey
+  });
+  const body = sanitizeMarketingCopy(bodyLines.join(" "));
+  const voiceoverText = `${hook}. ${body}`;
   const durationMs = estimateScriptDurationMs({ voiceoverText });
   const visualBeats = buildVisualBeatsForTemplate({
     moments: selectedMoments,
@@ -382,6 +381,55 @@ export function generateScriptDraft(
     approved: false,
     updatedAt: now()
   };
+}
+
+function creatorVoiceoverLines(input: {
+  customer: string;
+  outcome: string;
+  primaryLabel: string | undefined;
+  secondaryLabel: string | undefined;
+  templateKey: CreatorTemplateKey;
+}): string[] {
+  const primary = input.primaryLabel?.toLowerCase() ?? "the first proof moment";
+  const secondary = input.secondaryLabel?.toLowerCase() ?? "the result";
+  if (input.templateKey === "three_reasons") {
+    return [
+      `Reason one: ${primary} removes the slow part.`,
+      `Reason two: ${secondary} makes the outcome visible.`,
+      `Reason three: ${input.customer} can repeat it without a long demo.`,
+      `That matters because ${input.outcome}.`
+    ];
+  }
+  if (input.templateKey === "before_after_workflow") {
+    return [
+      `Before, ${input.customer} has to watch the slow step happen.`,
+      `Then ${primary} shows the product taking over.`,
+      `After that, ${secondary} proves the result.`,
+      `That matters because ${input.outcome}.`
+    ];
+  }
+  if (input.templateKey === "founder_demo") {
+    return [
+      `The old way made ${input.customer} explain this manually.`,
+      `So the first screen to watch is ${primary}.`,
+      `Then ${secondary} shows the part that saves the time.`,
+      `That matters because ${input.outcome}.`
+    ];
+  }
+  if (input.templateKey === "hidden_feature_reveal") {
+    return [
+      `Watch ${primary} first.`,
+      `This is the part most viewers miss.`,
+      `Then ${secondary} makes the benefit obvious.`,
+      `That matters because ${input.outcome}.`
+    ];
+  }
+  return [
+    `If you are ${input.customer}, this is the part that matters.`,
+    `First, watch ${primary}.`,
+    `Then it moves into ${secondary}, so the proof is on screen.`,
+    `That matters because ${input.outcome}.`
+  ];
 }
 
 function choosePlatforms(platforms: Platform[], family: string): Platform[] {

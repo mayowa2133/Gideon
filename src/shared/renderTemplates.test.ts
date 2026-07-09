@@ -81,10 +81,13 @@ describe("creator render templates", () => {
     expect(editDecisionList.schemaVersion).toBe("2");
     expect(editDecisionList.brandKit.productName).toBe("LeadPilot");
     expect(editDecisionList.presenter.enabled).toBe(true);
-    expect(editDecisionList.sourceSegments).toHaveLength(2);
+    expect(editDecisionList.sourceSegments.length).toBeGreaterThanOrEqual(5);
     expect(editDecisionList.sourceSegments[1]?.timelineStartMs).toBeGreaterThan(0);
-    expect(editDecisionList.zooms).toHaveLength(2);
-    expect(editDecisionList.callouts).toHaveLength(2);
+    expect(editDecisionList.zooms.length).toBe(editDecisionList.sourceSegments.length);
+    expect(editDecisionList.callouts.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(editDecisionList.sourceSegments.map((segment) => segment.momentId)).size).toBeLessThan(
+      editDecisionList.sourceSegments.length
+    );
     expect(editDecisionList.music.enabled).toBe(false);
     expect(editDecisionList.sfx).toHaveLength(0);
     expect(editDecisionList.qualityGates.requireEvidenceBackedClaims).toBe(true);
