@@ -706,6 +706,37 @@ video {
   padding: 0;
 }
 
+.visual-beat-focus-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.visual-beat-focus {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.visual-beat-focus > div:first-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.visual-beat-focus span {
+  color: #f7f8f3;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.visual-beat-focus small {
+  color: #9ba8c2;
+  line-height: 1.35;
+}
+
 .concept-card.selected {
   border-color: rgba(245, 209, 95, 0.75);
   background: rgba(245, 209, 95, 0.08);

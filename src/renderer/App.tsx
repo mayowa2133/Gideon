@@ -16,6 +16,7 @@ import type {
   ProductProfile,
   Project,
   RecordingUploadSession,
+  RenderFocusPoint,
   ScriptDraft,
   UsageMetric,
   WorkspacePlan,
@@ -1553,6 +1554,36 @@ function ScriptEditor({
     );
   }
 
+  function updateVisualBeatFocus(
+    scriptId: string,
+    beatIndex: number,
+    axis: keyof RenderFocusPoint,
+    value: number
+  ): void {
+    const normalizedValue = axis === "scale" ? clamp(value, 1, 2.2) : clamp(value, 0, 1);
+    setScripts(
+      scripts.map((script) => {
+        if (script.id !== scriptId) {
+          return script;
+        }
+        return {
+          ...script,
+          visualBeats: script.visualBeats.map((beat, index) =>
+            index === beatIndex
+              ? {
+                  ...beat,
+                  focus: {
+                    ...(beat.focus ?? { x: 0.5, y: 0.5, scale: 1.16 }),
+                    [axis]: normalizedValue
+                  }
+                }
+              : beat
+          )
+        };
+      })
+    );
+  }
+
   return (
     <div className="script-stack">
       {scripts.map((script, index) => {
@@ -1614,6 +1645,56 @@ function ScriptEditor({
               <span>{script.editDecisionList?.presenter.enabled ? "presenter on" : "presenter off"}</span>
               <span>{script.approved ? "approved" : "needs approval"}</span>
             </div>
+            {script.visualBeats.length > 0 ? (
+              <div className="visual-beat-focus-list">
+                {script.visualBeats.slice(0, 6).map((beat, beatIndex) => {
+                  const focus = beat.focus ?? { x: 0.5, y: 0.5, scale: 1.16 };
+                  return (
+                    <div className="visual-beat-focus" key={`${script.id}-${beat.momentId}-${beat.startMs}`}>
+                      <div>
+                        <span>{beat.purpose ?? "beat"}</span>
+                        <small>{beat.callout ?? beat.instruction}</small>
+                      </div>
+                      <div className="focus-control-grid">
+                        <label>
+                          X
+                          <input
+                            max="1"
+                            min="0"
+                            onChange={(event) => updateVisualBeatFocus(script.id, beatIndex, "x", Number(event.target.value))}
+                            step="0.01"
+                            type="range"
+                            value={focus.x}
+                          />
+                        </label>
+                        <label>
+                          Y
+                          <input
+                            max="1"
+                            min="0"
+                            onChange={(event) => updateVisualBeatFocus(script.id, beatIndex, "y", Number(event.target.value))}
+                            step="0.01"
+                            type="range"
+                            value={focus.y}
+                          />
+                        </label>
+                        <label>
+                          Zoom
+                          <input
+                            max="2.2"
+                            min="1"
+                            onChange={(event) => updateVisualBeatFocus(script.id, beatIndex, "scale", Number(event.target.value))}
+                            step="0.01"
+                            type="range"
+                            value={focus.scale}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
             {script.qualityWarnings && script.qualityWarnings.length > 0 ? (
               <div className="quality-warning-list">
                 {script.qualityWarnings.map((warning) => (
@@ -1734,6 +1815,13 @@ function formatQueueKinds(counts: Partial<Record<JobKind, number>>): string {
     .filter(([, value]) => value && value > 0)
     .map(([kind, value]) => `${kind.replace(/_/g, " ")} ${value}`)
     .join(", ");
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.max(min, Math.min(max, value));
 }
 
 function messageFromError(error: unknown): string {

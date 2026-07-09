@@ -953,6 +953,49 @@ describe("GideonStore billing reconciliation", () => {
     expect(updated.renders).toEqual([]);
   });
 
+  it("preserves user-edited visual beat focus in rebuilt render manifests", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProject({
+      name: "Focus review",
+      profile: profileFixture()
+    });
+    await store.updateMoments(project.id, [
+      {
+        id: "moment-1",
+        label: "Upload proof",
+        startMs: 0,
+        endMs: 3_000,
+        evidence: "The screen shows the upload proof.",
+        confidence: 0.86,
+        proofScore: 0.9,
+        visualRole: "proof",
+        focus: { x: 0.55, y: 0.5, scale: 1.22 },
+        enabled: true
+      }
+    ]);
+    await store.generateConcepts(project.id);
+    const scripted = await store.generateScripts(project.id);
+    const firstScript = scripted.scripts[0]!;
+    const editedFocus = { x: 0.31, y: 0.62, scale: 1.44 };
+
+    const updated = await store.updateScripts(project.id, [
+      {
+        ...firstScript,
+        visualBeats: firstScript.visualBeats.map((beat, index) =>
+          index === 0 ? { ...beat, focus: editedFocus } : beat
+        )
+      }
+    ]);
+    const saved = updated.scripts[0]!;
+
+    expect(saved.visualBeats[0]?.focus).toEqual(editedFocus);
+    expect(saved.editDecisionList?.sourceSegments[0]?.focus).toEqual(editedFocus);
+    expect(saved.editDecisionList?.zooms[0]?.focus).toEqual(editedFocus);
+    expect(saved.editDecisionList?.callouts[0]?.anchor).toEqual(editedFocus);
+    expect(updated.renders).toEqual([]);
+  });
+
   it("refreshes script render manifests and clears renders after profile brand changes", async () => {
     const store = new GideonStore();
     await store.load();

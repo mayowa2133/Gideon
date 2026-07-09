@@ -235,7 +235,7 @@ For software builders who need to market consistently, Gideon converts an existi
 **As a user, I want control over the final draft and a private export.**
 
 - Preview can seek and show current captions/overlays.
-- User can edit hook, script, caption text, caption style preset, source in/out, and focus point.
+- User can edit hook, script, caption text, caption style preset, source in/out, moment focus, and per-beat script focus/zoom.
 - A change marks the prior render stale and clearly shows what must be regenerated.
 - Export uses an expiring signed URL after workspace authorization.
 - Export has no Gideon watermark by default.

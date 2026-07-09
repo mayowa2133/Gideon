@@ -264,7 +264,7 @@ Page-level layout: large 9:16 player left; controls right; filmstrip/beat strip 
 - Right panel tabs: Text, Captions, Framing, Audio.
 - Text: hook/CTA copy and overlay timing.
 - Captions: text, line breaks, style preset, position preset.
-- Framing: source in/out and normalized focus point/zoom intensity; no arbitrary keyframe editor in MVP.
+- Framing: source in/out plus per-beat normalized focus point and zoom intensity; no arbitrary keyframe editor in MVP.
 - Audio: voice/source balance and voice selection where supported.
 - `Save changes` creates a new manifest and marks current render stale.
 - `Render updated draft` is explicit; old render remains accessible as prior version until retention cleanup.
