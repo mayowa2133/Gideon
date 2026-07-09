@@ -197,6 +197,8 @@ export function buildVisualBeatsForTemplate(input: {
       startMs: index * beatDuration,
       endMs: index === beatCount - 1 ? input.durationMs : Math.min((index + 1) * beatDuration, input.durationMs),
       momentId: moment.id,
+      sourceStartMs: moment.startMs,
+      sourceEndMs: moment.endMs,
       purpose,
       instruction: instructionForPurpose(purpose, moment.label),
       callout: calloutForPurpose(purpose, moment.label),
@@ -223,10 +225,13 @@ export function buildEditDecisionList(input: {
   const musicMood = input.profile.musicMood ?? "none";
   const sourceSegments = input.visualBeats.map((beat) => {
     const moment = input.moments.find((candidate) => candidate.id === beat.momentId);
+    const sourceStartMs = Math.max(0, beat.sourceStartMs ?? moment?.startMs ?? 0);
+    const fallbackSourceEndMs = Math.max(moment?.endMs ?? durationMs, sourceStartMs + 1000);
+    const sourceEndMs = Math.max(beat.sourceEndMs ?? fallbackSourceEndMs, sourceStartMs + 500);
     return {
       momentId: beat.momentId,
-      sourceStartMs: Math.max(0, moment?.startMs ?? 0),
-      sourceEndMs: Math.max(moment?.endMs ?? durationMs, (moment?.startMs ?? 0) + 1000),
+      sourceStartMs,
+      sourceEndMs,
       timelineStartMs: beat.startMs,
       timelineEndMs: beat.endMs,
       fit: "contain" as const,

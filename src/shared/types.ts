@@ -469,6 +469,8 @@ export interface VisualBeat {
   startMs: number;
   endMs: number;
   momentId: string;
+  sourceStartMs?: number;
+  sourceEndMs?: number;
   instruction: string;
   purpose?: "hook" | "problem" | "demo" | "proof" | "payoff" | "cta";
   callout?: string;

@@ -90,6 +90,7 @@ describe("creator render templates", () => {
       durationMs: 18_000,
       templateKey: "brand_presenter"
     });
+    expect(visualBeats[0]).toMatchObject({ sourceStartMs: moments[0]?.startMs, sourceEndMs: moments[0]?.endMs });
     const editDecisionList = buildEditDecisionList({
       profile,
       templateKey: "brand_presenter",
@@ -108,6 +109,10 @@ describe("creator render templates", () => {
     expect(editDecisionList.brandKit.id).toBe("brand-kit:leadpilot");
     expect(editDecisionList.presenter.enabled).toBe(true);
     expect(editDecisionList.sourceSegments.length).toBeGreaterThanOrEqual(5);
+    expect(editDecisionList.sourceSegments[0]).toMatchObject({
+      sourceStartMs: visualBeats[0]?.sourceStartMs,
+      sourceEndMs: visualBeats[0]?.sourceEndMs
+    });
     expect(editDecisionList.sourceSegments[1]?.timelineStartMs).toBeGreaterThan(0);
     expect(editDecisionList.zooms.length).toBe(editDecisionList.sourceSegments.length);
     expect(editDecisionList.callouts.length).toBeGreaterThanOrEqual(4);

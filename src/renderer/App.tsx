@@ -1584,6 +1584,39 @@ function ScriptEditor({
     );
   }
 
+  function updateVisualBeatSource(scriptId: string, beatIndex: number, key: "sourceStartMs" | "sourceEndMs", valueSec: number): void {
+    const nextValueMs = Math.round(clamp(valueSec, 0, 600) * 1000);
+    setScripts(
+      scripts.map((script) => {
+        if (script.id !== scriptId) {
+          return script;
+        }
+        return {
+          ...script,
+          visualBeats: script.visualBeats.map((beat, index) => {
+            if (index !== beatIndex) {
+              return beat;
+            }
+            const currentStartMs = beat.sourceStartMs ?? 0;
+            const currentEndMs = beat.sourceEndMs ?? Math.max(currentStartMs + 1000, currentStartMs);
+            if (key === "sourceStartMs") {
+              return {
+                ...beat,
+                sourceStartMs: Math.min(nextValueMs, currentEndMs - 500),
+                sourceEndMs: currentEndMs
+              };
+            }
+            return {
+              ...beat,
+              sourceStartMs: currentStartMs,
+              sourceEndMs: Math.max(nextValueMs, currentStartMs + 500)
+            };
+          })
+        };
+      })
+    );
+  }
+
   return (
     <div className="script-stack">
       {scripts.map((script, index) => {
@@ -1656,6 +1689,26 @@ function ScriptEditor({
                         <small>{beat.callout ?? beat.instruction}</small>
                       </div>
                       <div className="focus-control-grid">
+                        <label>
+                          In
+                          <input
+                            min="0"
+                            onChange={(event) => updateVisualBeatSource(script.id, beatIndex, "sourceStartMs", Number(event.target.value))}
+                            step="0.1"
+                            type="number"
+                            value={((beat.sourceStartMs ?? 0) / 1000).toFixed(1)}
+                          />
+                        </label>
+                        <label>
+                          Out
+                          <input
+                            min="0"
+                            onChange={(event) => updateVisualBeatSource(script.id, beatIndex, "sourceEndMs", Number(event.target.value))}
+                            step="0.1"
+                            type="number"
+                            value={((beat.sourceEndMs ?? beat.endMs) / 1000).toFixed(1)}
+                          />
+                        </label>
                         <label>
                           X
                           <input
