@@ -12,6 +12,7 @@ import type {
   EditDecisionList,
   ProductProfile,
   RecordingMetadata,
+  RenderFocusPoint,
   RenderOverlayCue,
   RenderValidation,
   ScriptDraft
@@ -364,6 +365,12 @@ interface OverlaySequence {
   pattern: string;
   frameRate: number;
   frameCount: number;
+}
+
+interface ZoomFilterExpressions {
+  scale: string;
+  cropX: string;
+  cropY: string;
 }
 
 async function createTimedOverlaySequence(
@@ -774,10 +781,24 @@ export function validateRenderManifest(editDecisionList: EditDecisionList): void
   if (editDecisionList.durationMs < 1_000 || editDecisionList.durationMs > 60_000) {
     throw new Error("Render manifest duration is outside the supported short-form range.");
   }
+  validateSourceSegmentTimings(editDecisionList.sourceSegments, editDecisionList.durationMs);
+  validateTimedCueCollection("Zoom", editDecisionList.zooms, editDecisionList.durationMs);
   validateTimedCueCollection("Caption", editDecisionList.captions, editDecisionList.durationMs);
   validateTimedCueCollection("Overlay", editDecisionList.overlays, editDecisionList.durationMs);
   validateTimedCueCollection("Callout", editDecisionList.callouts, editDecisionList.durationMs);
   validatePresenterTiming(editDecisionList.presenter, editDecisionList.durationMs);
+  editDecisionList.sourceSegments.forEach((segment, index) => {
+    validateFocusPoint(`Source segment ${index + 1}`, segment.focus);
+  });
+  editDecisionList.zooms.forEach((zoom, index) => {
+    validateFocusPoint(`Zoom cue ${index + 1}`, zoom.focus);
+    if (zoom.fromScale < 1 || zoom.toScale < zoom.fromScale || zoom.toScale > 2.5) {
+      throw new Error(`Zoom cue ${index + 1} has an unsupported scale range.`);
+    }
+  });
+  editDecisionList.callouts.forEach((callout, index) => {
+    validateFocusPoint(`Callout ${index + 1}`, callout.anchor);
+  });
   validateCaptionWordTimings(editDecisionList.captions);
   if (editDecisionList.qualityGates.requireCaptionSafeArea) {
     validateCaptionSafeAreas(editDecisionList);
@@ -785,6 +806,20 @@ export function validateRenderManifest(editDecisionList: EditDecisionList): void
   if (editDecisionList.qualityGates.requireEvidenceBackedClaims && editDecisionList.sourceSegments.length === 0) {
     throw new Error("Render manifest has no source-backed visual moments.");
   }
+}
+
+function validateSourceSegmentTimings(segments: EditDecisionList["sourceSegments"], durationMs: number): void {
+  segments.forEach((segment, index) => {
+    if (
+      segment.sourceStartMs < 0 ||
+      segment.sourceEndMs <= segment.sourceStartMs ||
+      segment.timelineStartMs < 0 ||
+      segment.timelineEndMs <= segment.timelineStartMs ||
+      segment.timelineEndMs > durationMs
+    ) {
+      throw new Error(`Source segment ${index + 1} has timings outside the render timeline.`);
+    }
+  });
 }
 
 function validateOverlaySequenceForRender(overlaySequence: OverlaySequence, expectedDurationSec: number): void {
@@ -804,6 +839,19 @@ function validateTimedCueCollection(
       throw new Error(`${label} cue ${index + 1} has timings outside the render timeline.`);
     }
   });
+}
+
+function validateFocusPoint(label: string, focus: RenderFocusPoint): void {
+  if (
+    focus.x < 0 ||
+    focus.x > 1 ||
+    focus.y < 0 ||
+    focus.y > 1 ||
+    focus.scale < 1 ||
+    focus.scale > 2.5
+  ) {
+    throw new Error(`${label} focus is outside the supported render range.`);
+  }
 }
 
 function validatePresenterTiming(presenter: EditDecisionList["presenter"], durationMs: number): void {
@@ -1028,30 +1076,72 @@ function videoFilter(editDecisionList: EditDecisionList, timelineOffsetMs: numbe
     `pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=${ffmpegColor(editDecisionList.brandKit.backgroundColor)}`,
     "setsar=1"
   ];
-  const zoomExpression = zoomScaleExpression(editDecisionList, timelineOffsetMs, durationMs);
-  if (zoomExpression !== "1") {
-    filters.push(`scale=w='1080*(${zoomExpression})':h='1920*(${zoomExpression})':eval=frame`);
-    filters.push("crop=1080:1920:(iw-1080)/2:(ih-1920)/2");
+  const zoomExpressions = zoomFilterExpressions(editDecisionList, timelineOffsetMs, durationMs);
+  if (zoomExpressions.scale !== "1") {
+    filters.push(`scale=w='1080*(${zoomExpressions.scale})':h='1920*(${zoomExpressions.scale})':eval=frame`);
+    filters.push(`crop=w=1080:h=1920:x='${zoomExpressions.cropX}':y='${zoomExpressions.cropY}'`);
     filters.push("setsar=1");
   }
   return filters.join(",");
 }
 
-function zoomScaleExpression(editDecisionList: EditDecisionList, timelineOffsetMs: number, durationMs: number): string {
+export function zoomFilterExpressions(
+  editDecisionList: EditDecisionList,
+  timelineOffsetMs: number,
+  durationMs: number
+): ZoomFilterExpressions {
   const segmentStartMs = timelineOffsetMs;
   const segmentEndMs = timelineOffsetMs + durationMs;
-  const parts = editDecisionList.zooms.slice(0, 8).flatMap((zoom) => {
+  const activeZooms = editDecisionList.zooms.slice(0, 8).flatMap((zoom) => {
     const localStartMs = Math.max(0, zoom.startMs - segmentStartMs);
     const localEndMs = Math.min(durationMs, zoom.endMs - segmentStartMs);
     if (zoom.endMs <= segmentStartMs || zoom.startMs >= segmentEndMs || localEndMs <= localStartMs) {
       return [];
     }
-    const start = (localStartMs / 1000).toFixed(3);
-    const end = (localEndMs / 1000).toFixed(3);
-    const delta = Math.max(0, zoom.toScale - 1).toFixed(3);
-    return [`${delta}*between(t\\,${start}\\,${end})`];
+    return [{ zoom, localStartMs, localEndMs }];
   });
-  return parts.length ? `1+${parts.join("+")}` : "1";
+  if (activeZooms.length === 0) {
+    return {
+      scale: "1",
+      cropX: "0",
+      cropY: "0"
+    };
+  }
+  const scaleParts: string[] = [];
+  const focusXParts: string[] = [];
+  const focusYParts: string[] = [];
+  for (const { zoom, localStartMs, localEndMs } of activeZooms) {
+    const active = activeWindowExpression(localStartMs, localEndMs);
+    const ease = easingProgressExpression(localStartMs, localEndMs, zoom.easing);
+    const fromDelta = Math.max(0, zoom.fromScale - 1);
+    const scaleDelta = Math.max(0, zoom.toScale - zoom.fromScale);
+    scaleParts.push(`(${active})*(${fromDelta.toFixed(3)}+${scaleDelta.toFixed(3)}*(${ease}))`);
+    focusXParts.push(`(${active})*${(zoom.focus.x - 0.5).toFixed(3)}`);
+    focusYParts.push(`(${active})*${(zoom.focus.y - 0.5).toFixed(3)}`);
+  }
+  const focusXExpression = focusXParts.length ? `0.5+${focusXParts.join("+")}` : "0.5";
+  const focusYExpression = focusYParts.length ? `0.5+${focusYParts.join("+")}` : "0.5";
+  return {
+    scale: `1+${scaleParts.join("+")}`,
+    cropX: `(iw-1080)*(${focusXExpression})`,
+    cropY: `(ih-1920)*(${focusYExpression})`
+  };
+}
+
+function activeWindowExpression(startMs: number, endMs: number): string {
+  const start = (startMs / 1000).toFixed(3);
+  const end = (endMs / 1000).toFixed(3);
+  return `between(t\\,${start}\\,${end})`;
+}
+
+function easingProgressExpression(startMs: number, endMs: number, easing: EditDecisionList["zooms"][number]["easing"]): string {
+  if (easing === "snap") {
+    return "1";
+  }
+  const start = (startMs / 1000).toFixed(3);
+  const duration = Math.max(0.001, (endMs - startMs) / 1000).toFixed(3);
+  const progress = `clip((t-${start})/${duration}\\,0\\,1)`;
+  return `(${progress})*(${progress})*(3-2*(${progress}))`;
 }
 
 async function drawLogoImage(

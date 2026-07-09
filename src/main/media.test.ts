@@ -7,7 +7,13 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { createMoments, generateConcepts, generateScripts } from "../shared/contentEngine";
 import type { ProductProfile } from "../shared/types";
-import { calloutTextFromInstruction, probeRecording, renderDraft, validateRenderManifest } from "./media";
+import {
+  calloutTextFromInstruction,
+  probeRecording,
+  renderDraft,
+  validateRenderManifest,
+  zoomFilterExpressions
+} from "./media";
 
 const run = promisify(execFile);
 const ffmpeg = findFfmpegForTest();
@@ -65,6 +71,45 @@ describe("media pipeline", () => {
         }
       ]
     })).toThrow("invalid timing");
+  });
+
+  it("rejects render manifests with invalid zoom focus", () => {
+    const script = draftScript();
+    const zoom = script.editDecisionList!.zooms[0]!;
+
+    expect(() => validateRenderManifest({
+      ...script.editDecisionList!,
+      zooms: [
+        {
+          ...zoom,
+          focus: { x: 1.4, y: 0.5, scale: 1.2 }
+        }
+      ]
+    })).toThrow("Zoom cue 1 focus is outside the supported render range");
+  });
+
+  it("builds smooth focus-aware zoom filter expressions", () => {
+    const script = draftScript();
+    const manifest = {
+      ...script.editDecisionList!,
+      zooms: [
+        {
+          startMs: 0,
+          endMs: 1_800,
+          fromScale: 1,
+          toScale: 1.4,
+          focus: { x: 0.8, y: 0.2, scale: 1.4 },
+          easing: "standard" as const
+        }
+      ]
+    };
+
+    const expressions = zoomFilterExpressions(manifest, 0, 2_000);
+
+    expect(expressions.scale).toContain("clip((t-0.000)/1.800\\,0\\,1)");
+    expect(expressions.scale).toContain("0.400");
+    expect(expressions.cropX).toContain("0.5+(between(t\\,0.000\\,1.800))*0.300");
+    expect(expressions.cropY).toContain("0.5+(between(t\\,0.000\\,1.800))*-0.300");
   });
 
   it.runIf(Boolean(ffmpeg))("probes and renders a vertical H.264/AAC draft from a local recording", async () => {
