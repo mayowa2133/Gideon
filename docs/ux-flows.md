@@ -171,7 +171,7 @@ Avoid invented pseudo-progress such as “98% done” without a measurable basis
 Page-level layout: summary at top; synchronized video and moments list beneath.
 
 1. `What Gideon saw` summary with a small `AI-generated—review before continuing` label.
-2. `Product flow` ordered moments; each card has thumbnail, timestamp range, label, observed description, transcript excerpt if present, and confidence indicator.
+2. `Product flow` ordered moments; each card has thumbnail, timestamp range, label, observed description, transcript excerpt if present, confidence indicator, focus controls, and inferred interaction target when available.
 3. Selecting a card seeks the video and outlines the active evidence range.
 4. User can rename, adjust start/end, hide, or mark `Key proof`.
 5. `Missing something? Add moment` lets user scrub and define a range/label.

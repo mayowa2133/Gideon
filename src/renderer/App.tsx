@@ -1395,6 +1395,11 @@ function MomentGrid({
             {moment.visualRole ? `${moment.visualRole} · ` : ""}
             {typeof moment.proofScore === "number" ? `${Math.round(moment.proofScore * 100)}% proof` : "proof pending"}
           </small>
+          {moment.interactionHint ? (
+            <small>
+              {moment.interactionHint.kind.replace(/_/g, " ")} · {Math.round(moment.interactionHint.confidence * 100)}%
+            </small>
+          ) : null}
           <small>{moment.evidence}</small>
           <div className="focus-control-grid">
             <label>

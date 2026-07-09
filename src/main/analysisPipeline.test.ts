@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { createMoments } from "../shared/contentEngine";
 import type { ProductProfile, Project, RecordingMetadata } from "../shared/types";
-import { runAnalysisPipeline } from "./analysisPipeline";
+import { rankFrameEvidence, runAnalysisPipeline } from "./analysisPipeline";
 
 const profile: ProductProfile = {
   productName: "LeadPilot",
@@ -83,6 +83,42 @@ describe("analysis pipeline", () => {
     if (oldGideonKey) {
       process.env.GIDEON_OPENAI_API_KEY = oldGideonKey;
     }
+  });
+
+  it("derives click-target interaction hints from boxed UI evidence", () => {
+    const moments = createMoments(profile, recording, randomUUID);
+    const [ranked] = rankFrameEvidence(
+      [
+        {
+          id: "frame-1",
+          momentId: moments[0]!.id,
+          timestampMs: 1_000,
+          ocrProvider: "openai",
+          ocrText: "Generate campaigns",
+          uiElements: [
+            {
+              id: "ui-1",
+              kind: "button",
+              text: "Generate campaigns",
+              confidence: 0.92,
+              box: { x: 0.34, y: 0.42, width: 0.22, height: 0.08 }
+            }
+          ],
+          changeScore: 0.74,
+          createdAt: "2026-07-09T00:00:00.000Z"
+        }
+      ],
+      moments,
+      recording.durationMs
+    );
+
+    expect(ranked?.interactionHints?.[0]).toMatchObject({
+      kind: "click_target",
+      label: "Generate campaigns"
+    });
+    expect(ranked?.interactionHints?.[0]?.x).toBeCloseTo(0.45);
+    expect(ranked?.focus?.x).toBeCloseTo(0.45);
+    expect(ranked?.visualRole).toBe("action");
   });
 
   it("records prompt provenance on provider-backed semantic analysis runs", async () => {

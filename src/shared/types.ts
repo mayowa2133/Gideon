@@ -370,6 +370,7 @@ export interface FrameEvidence {
   proofScore?: number;
   visualRole?: "before" | "action" | "proof" | "payoff";
   focus?: RenderFocusPoint;
+  interactionHints?: InteractionHint[];
   createdAt: string;
 }
 
@@ -387,6 +388,14 @@ export interface FrameUiElement {
     width: number;
     height: number;
   };
+}
+
+export interface InteractionHint {
+  kind: "click_target" | "cursor_candidate";
+  x: number;
+  y: number;
+  confidence: number;
+  label?: string;
 }
 
 export interface ProviderRun {
@@ -417,6 +426,7 @@ export interface DetectedMoment {
   proofScore?: number;
   visualRole?: "before" | "action" | "proof" | "payoff";
   focus?: RenderFocusPoint;
+  interactionHint?: InteractionHint;
   thumbnailPath?: string;
   thumbnailUrl?: string;
 }

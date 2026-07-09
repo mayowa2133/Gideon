@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
-import type { DetectedMoment, FrameEvidence, Project, ProviderRun, RenderFocusPoint, TranscriptArtifact } from "../shared/types";
+import type {
+  DetectedMoment,
+  FrameEvidence,
+  InteractionHint,
+  Project,
+  ProviderRun,
+  RenderFocusPoint,
+  TranscriptArtifact
+} from "../shared/types";
 import { extractAudioForTranscription, enrichMomentThumbnails } from "./media";
 import type { OpenAiProviderConfig } from "./providers/config";
 import { loadProviderConfig } from "./providers/config";
@@ -254,21 +262,23 @@ function createFrameEvidence(moments: DetectedMoment[], createdAt: string): Fram
   }));
 }
 
-function rankFrameEvidence(frames: FrameEvidence[], moments: DetectedMoment[], durationMs: number): FrameEvidence[] {
+export function rankFrameEvidence(frames: FrameEvidence[], moments: DetectedMoment[], durationMs: number): FrameEvidence[] {
   return frames.map((frame, index) => {
     const moment = moments.find((candidate) => candidate.id === frame.momentId);
     const uiElements = frame.uiElements ?? [];
     const actionSignals = uiElements.filter((element) => element.kind === "button" || element.kind === "input").length;
     const proofSignals = uiElements.filter((element) => element.kind === "status" || element.kind === "table" || /success|done|generated|ready|sent|created/i.test(element.text)).length;
+    const interactionHints = interactionHintsFromUiElements(uiElements, frame.changeScore);
     const readableTextScore = Math.min(0.2, (frame.ocrText?.length ?? 0) / 800);
     const timelineProgress = durationMs > 0 ? frame.timestampMs / durationMs : index / Math.max(frames.length, 1);
     const visualRole = inferVisualRole(index, frames.length, actionSignals, proofSignals, timelineProgress);
-    const focus = focusFromUiElements(uiElements) ?? moment?.focus ?? focusForRole(visualRole);
+    const focus = focusFromInteractionHints(interactionHints) ?? focusFromUiElements(uiElements) ?? moment?.focus ?? focusForRole(visualRole);
     const proofScore = clamp(
       0.38 +
         (moment?.confidence ?? 0.6) * 0.25 +
         actionSignals * 0.06 +
         proofSignals * 0.12 +
+        interactionHints.length * 0.04 +
         readableTextScore +
         (frame.changeScore ?? 0) * 0.12,
       0,
@@ -278,7 +288,8 @@ function rankFrameEvidence(frames: FrameEvidence[], moments: DetectedMoment[], d
       ...frame,
       proofScore: Number(proofScore.toFixed(3)),
       visualRole,
-      focus
+      focus,
+      interactionHints
     };
   });
 }
@@ -295,7 +306,8 @@ function annotateMomentsWithFrameEvidence(moments: DetectedMoment[], frames: Fra
       ...moment,
       proofScore: Math.max(moment.proofScore ?? 0, frame.proofScore ?? 0),
       visualRole: frame.visualRole ?? moment.visualRole,
-      focus: frame.focus ?? moment.focus
+      focus: frame.focus ?? moment.focus,
+      interactionHint: frame.interactionHints?.[0] ?? moment.interactionHint
     };
   });
 }
@@ -307,7 +319,7 @@ function inferVisualRole(
   proofSignals: number,
   timelineProgress: number
 ): NonNullable<FrameEvidence["visualRole"]> {
-  if (proofSignals > 0 || index === total - 1 || timelineProgress > 0.72) {
+  if (proofSignals > 0 || (actionSignals === 0 && (index === total - 1 || timelineProgress > 0.72))) {
     return "payoff";
   }
   if (actionSignals > 0) {
@@ -331,6 +343,46 @@ function focusFromUiElements(uiElements: FrameEvidence["uiElements"]): RenderFoc
     y: clamp(element.box.y + element.box.height / 2, 0.18, 0.82),
     scale: clamp(1.1 + (1 - Math.max(element.box.width, element.box.height)) * 0.18, 1.12, 1.36)
   };
+}
+
+function focusFromInteractionHints(interactionHints: InteractionHint[]): RenderFocusPoint | undefined {
+  const hint = interactionHints[0];
+  if (!hint) {
+    return undefined;
+  }
+  return {
+    x: clamp(hint.x, 0.15, 0.85),
+    y: clamp(hint.y, 0.18, 0.82),
+    scale: clamp(1.14 + hint.confidence * 0.18, 1.14, 1.36)
+  };
+}
+
+function interactionHintsFromUiElements(
+  uiElements: FrameEvidence["uiElements"],
+  changeScore: number | undefined
+): InteractionHint[] {
+  return (uiElements ?? [])
+    .filter((element) => element.box)
+    .map((element) => {
+      const box = element.box!;
+      const isClickTarget = element.kind === "button" || element.kind === "input";
+      const baseConfidence = isClickTarget ? 0.72 : 0.52;
+      return {
+        kind: isClickTarget ? "click_target" as const : "cursor_candidate" as const,
+        x: clamp(box.x + box.width / 2, 0, 1),
+        y: clamp(box.y + box.height / 2, 0, 1),
+        confidence: Number(
+          clamp(
+            baseConfidence + (element.confidence ?? 0.65) * 0.18 + (changeScore ?? 0.3) * 0.1 + elementPriority(element.kind) * 0.015,
+            0,
+            1
+          ).toFixed(3)
+        ),
+        label: element.text
+      };
+    })
+    .sort((left, right) => right.confidence - left.confidence)
+    .slice(0, 3);
 }
 
 function elementPriority(kind: string): number {

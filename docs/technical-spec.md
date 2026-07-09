@@ -149,8 +149,16 @@ type WalkthroughEvidenceBundle = {
       text: string;
       role?: string;
       confidence?: number;
+      box?: { x: number; y: number; width: number; height: number };
     }>;
     changeScore?: number;
+    interactionHints?: Array<{
+      kind: "click_target" | "cursor_candidate";
+      x: number;
+      y: number;
+      confidence: number;
+      label?: string;
+    }>;
   }>;
   userMoments?: Array<{
     startMs: number;

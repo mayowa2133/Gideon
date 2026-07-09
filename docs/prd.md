@@ -192,7 +192,7 @@ For software builders who need to market consistently, Gideon converts an existi
 
 - Status advances through upload validation, media inspection, transcription, frame extraction, walkthrough analysis, and ready.
 - Summary states the observed flow and differentiates observation from inference.
-- Each detected moment has a time range, label, evidence thumbnail, confidence, and optional transcript excerpt.
+- Each detected moment has a time range, label, evidence thumbnail, confidence, optional transcript excerpt, inferred focus point, and inferred interaction target when screen evidence supports one.
 - User can rename, hide, or adjust a moment before concept generation.
 - Silent recordings are supported using visual evidence and supplied context; UI explains lower semantic confidence.
 

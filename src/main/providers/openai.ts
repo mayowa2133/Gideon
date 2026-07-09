@@ -442,6 +442,7 @@ function buildEvidencePayload(input: WalkthroughAnalysisInput): Record<string, u
       proofScore: frame.proofScore,
       visualRole: frame.visualRole,
       focus: frame.focus,
+      interactionHints: frame.interactionHints,
       confidence: frame.confidence
     })) ?? [];
   const fallbackMoments = input.moments.map((moment) => ({
