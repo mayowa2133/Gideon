@@ -7,6 +7,7 @@ import { createPrivateObjectStorage as defaultCreatePrivateObjectStorage, type P
 import { loadProviderConfig as defaultLoadProviderConfig, type ProviderConfig } from "./providers/config";
 import { OpenAiProvider, validateWavAudioFile as defaultValidateWavAudioFile } from "./providers/openai";
 import { failJob, startJob, succeedJob, updateJobStage } from "../shared/jobState";
+import { hasBlockingScriptWarnings } from "../shared/renderTemplates";
 import type {
   ArtifactRecord,
   DetectedMoment,
@@ -275,10 +276,12 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
     }
     const selectedConcepts = project.concepts.filter((concept) => concept.selected);
     const scripts = project.scripts.filter((script) =>
-      script.approved && selectedConcepts.some((concept) => concept.id === script.conceptId)
+      script.approved &&
+      selectedConcepts.some((concept) => concept.id === script.conceptId) &&
+      !hasBlockingScriptWarnings(script.qualityWarnings)
     );
     if (scripts.length === 0) {
-      throw new Error("Approve at least one selected script before rendering.");
+      throw new Error("Approve at least one selected script without blocking warnings before rendering.");
     }
     let job = await store.getJob(projectId, jobId);
     if (job.status === "canceled") {

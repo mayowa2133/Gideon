@@ -16,6 +16,7 @@ import { GideonStore } from "./store";
 import type {
   AppState,
   ArtifactRecord,
+  DetectedMoment,
   ProductProfile,
   Project,
   RecordingMetadata,
@@ -643,6 +644,7 @@ describe("GideonStore billing reconciliation", () => {
         fileName: artifact.originalFileName
       })
     });
+    await store.updateMoments(project.id, [momentFixture()]);
     await store.updateConcepts(
       project.id,
       [
@@ -652,7 +654,7 @@ describe("GideonStore billing reconciliation", () => {
           formatFamily: "demo",
           targetPain: "Manual clipping",
           hookDirection: "show outcome",
-          proofMomentIds: [],
+          proofMomentIds: ["moment-1"],
           platformFit: ["youtube_shorts"],
           estimatedDurationSec: 30,
           rationale: "Good proof",
@@ -689,6 +691,83 @@ describe("GideonStore billing reconciliation", () => {
           event.metadata?.jobKind === "render"
       )
     ).toBe(true);
+  });
+
+  it("requires approved selected scripts to be free of blocking warnings before creating render jobs", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProjectForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      name: "Hosted project",
+      profile: profileFixture()
+    });
+    const session = uploadSessionFixture({
+      id: "upload-blocked-1",
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      sha256: "sha-render-blocked"
+    });
+    await store.createRecordingUploadSessionRecordForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      session
+    });
+    const artifact = artifactFixture({
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      storageKey: session.storageKey,
+      contentType: session.contentType,
+      byteSize: session.byteSize,
+      originalFileName: session.originalFileName
+    });
+    await store.completeRecordingUploadForSession({
+      userId: DEFAULT_LOCAL_USER_ID,
+      workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+      projectId: project.id,
+      sessionId: session.id,
+      artifact,
+      recording: recordingFixture({
+        artifactId: artifact.id,
+        storageKey: artifact.storageKey,
+        sha256: artifact.sha256,
+        sizeBytes: artifact.byteSize,
+        fileName: artifact.originalFileName
+      })
+    });
+    await store.updateConcepts(
+      project.id,
+      [
+        {
+          id: "concept-1",
+          title: "Fast export",
+          formatFamily: "demo",
+          targetPain: "Manual clipping",
+          hookDirection: "show outcome",
+          proofMomentIds: [],
+          platformFit: ["youtube_shorts"],
+          estimatedDurationSec: 30,
+          rationale: "Good proof",
+          selected: true,
+          brief: "Show fast export"
+        }
+      ],
+      "concept-1"
+    );
+    await store.updateScripts(project.id, [
+      scriptFixture({
+        qualityWarnings: [{ code: "caption_overflow_risk", message: "Caption may overflow safe areas." }]
+      })
+    ]);
+
+    await expect(
+      store.createRenderJobForSession({
+        userId: DEFAULT_LOCAL_USER_ID,
+        workspaceId: DEFAULT_LOCAL_WORKSPACE_ID,
+        projectId: project.id
+      })
+    ).rejects.toThrow("Approve at least one selected script without blocking warnings before rendering.");
   });
 
   it("applies hosted MCP script and moment edits through explicit session scope", async () => {
@@ -1347,6 +1426,20 @@ function scriptFixture(overrides: Partial<ScriptDraft> = {}): ScriptDraft {
     ],
     approved: true,
     updatedAt: "2026-06-25T12:00:00.000Z",
+    ...overrides
+  };
+}
+
+function momentFixture(overrides: Partial<DetectedMoment> = {}): DetectedMoment {
+  return {
+    id: "moment-1",
+    label: "Fast export proof",
+    startMs: 0,
+    endMs: 2_000,
+    evidence: "Export workflow appears on screen.",
+    sourceEvidenceIds: ["frame-1"],
+    confidence: 0.9,
+    enabled: true,
     ...overrides
   };
 }

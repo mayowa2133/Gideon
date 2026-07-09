@@ -365,6 +365,14 @@ export function scriptQualityWarnings(input: {
   return warnings;
 }
 
+export function hasBlockingScriptWarnings(warnings: ScriptQualityWarning[] | undefined): boolean {
+  return (warnings ?? []).some((warning) =>
+    warning.code === "unsupported_claim" ||
+    warning.code === "missing_evidence" ||
+    warning.code === "caption_overflow_risk"
+  );
+}
+
 export function templateLabel(key: CreatorTemplateKey): string {
   return getCreatorTemplate(key).name;
 }

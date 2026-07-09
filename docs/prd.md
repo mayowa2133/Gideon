@@ -16,6 +16,8 @@ Gideon is not a screen recorder, general AI video generator, or autonomous socia
 
 `upload → understand → propose 10 angles → select 3 → edit scripts → render 3 drafts → review → export`
 
+Creative reference: the target explanation style is creator-led product education in the spirit of Nick Saraev and nivedan.ai, where fast cuts, visible product proof, plain-language benefit framing, and a human-presenter feel make software features understandable and marketable quickly. The MVP approximates this with scripted voiceover, dynamic product footage, captions, overlays, focus moves, and deterministic brand-presenter elements; AI human avatars or imported user likenesses are a future capability, not part of the initial reliable upload-to-export loop.
+
 ## Problem statement
 
 Software founders and small product teams understand their products but struggle to turn releases and features into a reliable stream of social content. Each post requires repeated work: recording, finding useful moments, deciding what story to tell, writing a hook, editing, reframing, captioning, narrating, and adapting for a platform. Existing demo tools optimize for one polished walkthrough; generic AI video tools do not understand the product flow or the proof visible on screen.
@@ -270,7 +272,8 @@ For software builders who need to market consistently, Gideon converts an existi
 - Style validator detects prohibited phrases and unsupported superlatives.
 - Platform adaptation changes tone/pacing/CTA without inventing product claims.
 - Script drafts use short spoken lines and compile into dense visual beat plans that cycle proof moments for quick-cut pacing.
-- Generated scripts start unapproved. Voiceover and render jobs require an approved script associated with a selected concept.
+- Generated scripts start unapproved. Voiceover and render jobs require an approved script associated with a selected concept and no blocking quality warnings.
+- Blocking quality warnings include unsupported claims, missing evidence, and caption safe-area overflow risk; advisory copy warnings can remain visible without blocking render.
 - Script/profile edits rebuild the render plan and clear stale rendered outputs before another render can be exported.
 
 ### TTS and captions
@@ -412,6 +415,12 @@ Validate that useful, evidence-backed concepts and editable vertical drafts save
 
 - Social scheduling/posting after platform/security review.
 - Performance analytics and hook A/B testing.
+
+### Future: human presenter and avatar marketing
+
+- Optional AI avatar or imported user likeness that can take the role of a creator-style presenter, subject to consent, likeness rights, and safety review.
+- Company-logo presenter variants for brands that want a stylized host without using a real person.
+- Presenter scripts and gestures aligned to the same evidence-backed product moments, so the avatar explains visible product proof instead of inventing claims.
 - Content calendar and campaign planning.
 - Team workspaces, approval policies, agency client portals.
 - Optional consent-gated founder voice and avatar templates.

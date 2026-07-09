@@ -23,7 +23,7 @@ import type {
 } from "../shared/types";
 import { platformLabels, toneLabels } from "../shared/types";
 import { createDefaultProfile, splitCaptionSegments } from "../shared/contentEngine";
-import { createDefaultBrandKit, creatorTemplatePack } from "../shared/renderTemplates";
+import { createDefaultBrandKit, creatorTemplatePack, hasBlockingScriptWarnings } from "../shared/renderTemplates";
 import {
   createLocalUserWorkspace,
   entitlementLimit,
@@ -831,7 +831,7 @@ function ProjectWorkspace({
   const selectedConceptCount = project.concepts.filter((concept) => concept.selected).length;
   const selectedConceptIds = new Set(project.concepts.filter((concept) => concept.selected).map((concept) => concept.id));
   const approvedSelectedScriptCount = project.scripts.filter(
-    (script) => script.approved && selectedConceptIds.has(script.conceptId)
+    (script) => script.approved && selectedConceptIds.has(script.conceptId) && !hasBlockingScriptWarnings(script.qualityWarnings)
   ).length;
 
   return (
@@ -1555,71 +1555,75 @@ function ScriptEditor({
 
   return (
     <div className="script-stack">
-      {scripts.map((script, index) => (
-        <article className="script-card" key={script.id}>
-          <p className="eyebrow">Draft {index + 1}</p>
-          <div className="action-row">
-            <button className="secondary compact" onClick={() => onRegenerate(script.id)} type="button">
-              Regenerate script
-            </button>
-          </div>
-          <label className="checkbox-row">
-            <input
-              checked={script.approved}
-              onChange={(event) => updateScript(script.id, { approved: event.target.checked })}
-              type="checkbox"
-            />
-            Approved for render
-          </label>
-          <label>
-            Template
-            <select
-              value={script.templateKey ?? "problem_demo_payoff"}
-              onChange={(event) => updateScript(script.id, { templateKey: event.target.value as CreatorTemplateKey })}
-            >
-              {creatorTemplatePack.map((template) => (
-                <option key={template.key} value={template.key}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Hook
-            <input value={script.hook} onChange={(event) => updateScript(script.id, { hook: event.target.value })} />
-          </label>
-          <label>
-            Voiceover
-            <textarea
-              value={script.voiceoverText}
-              onChange={(event) => updateScript(script.id, { voiceoverText: event.target.value })}
-              rows={6}
-            />
-          </label>
-          <label>
-            CTA
-            <input value={script.cta} onChange={(event) => updateScript(script.id, { cta: event.target.value })} />
-          </label>
-          <div className="caption-preview">
-            {script.captions.slice(0, 4).map((caption) => (
-              <span key={`${script.id}-${caption.startMs}`}>{caption.text}</span>
-            ))}
-          </div>
-          <div className="render-plan-summary">
-            <span>{script.editDecisionList?.zooms.length ?? script.visualBeats.length} punch-ins</span>
-            <span>{script.editDecisionList?.callouts.length ?? script.visualBeats.length} callouts</span>
-            <span>{script.editDecisionList?.presenter.enabled ? "presenter on" : "presenter off"}</span>
-            <span>{script.approved ? "approved" : "needs approval"}</span>
-          </div>
-          {script.qualityWarnings && script.qualityWarnings.length > 0 ? (
-            <div className="quality-warning-list">
-              {script.qualityWarnings.map((warning) => (
-                <small key={`${script.id}-${warning.code}`}>{warning.message}</small>
+      {scripts.map((script, index) => {
+        const hasBlockingWarnings = hasBlockingScriptWarnings(script.qualityWarnings);
+        return (
+          <article className="script-card" key={script.id}>
+            <p className="eyebrow">Draft {index + 1}</p>
+            <div className="action-row">
+              <button className="secondary compact" onClick={() => onRegenerate(script.id)} type="button">
+                Regenerate script
+              </button>
+            </div>
+            <label className="checkbox-row">
+              <input
+                checked={script.approved && !hasBlockingWarnings}
+                disabled={hasBlockingWarnings}
+                onChange={(event) => updateScript(script.id, { approved: event.target.checked })}
+                type="checkbox"
+              />
+              {hasBlockingWarnings ? "Fix blocking warnings before render" : "Approved for render"}
+            </label>
+            <label>
+              Template
+              <select
+                value={script.templateKey ?? "problem_demo_payoff"}
+                onChange={(event) => updateScript(script.id, { templateKey: event.target.value as CreatorTemplateKey })}
+              >
+                {creatorTemplatePack.map((template) => (
+                  <option key={template.key} value={template.key}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Hook
+              <input value={script.hook} onChange={(event) => updateScript(script.id, { hook: event.target.value })} />
+            </label>
+            <label>
+              Voiceover
+              <textarea
+                value={script.voiceoverText}
+                onChange={(event) => updateScript(script.id, { voiceoverText: event.target.value })}
+                rows={6}
+              />
+            </label>
+            <label>
+              CTA
+              <input value={script.cta} onChange={(event) => updateScript(script.id, { cta: event.target.value })} />
+            </label>
+            <div className="caption-preview">
+              {script.captions.slice(0, 4).map((caption) => (
+                <span key={`${script.id}-${caption.startMs}`}>{caption.text}</span>
               ))}
             </div>
-          ) : null}
-        </article>
-      ))}
+            <div className="render-plan-summary">
+              <span>{script.editDecisionList?.zooms.length ?? script.visualBeats.length} punch-ins</span>
+              <span>{script.editDecisionList?.callouts.length ?? script.visualBeats.length} callouts</span>
+              <span>{script.editDecisionList?.presenter.enabled ? "presenter on" : "presenter off"}</span>
+              <span>{script.approved ? "approved" : "needs approval"}</span>
+            </div>
+            {script.qualityWarnings && script.qualityWarnings.length > 0 ? (
+              <div className="quality-warning-list">
+                {script.qualityWarnings.map((warning) => (
+                  <small key={`${script.id}-${warning.code}`}>{warning.message}</small>
+                ))}
+              </div>
+            ) : null}
+          </article>
+        );
+      })}
     </div>
   );
 }

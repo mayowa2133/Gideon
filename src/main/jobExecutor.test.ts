@@ -228,7 +228,44 @@ describe("Gideon job executor", () => {
     });
 
     await expect(executor.runRenderJob(store.project.id, "job-1")).rejects.toThrow(
-      "Approve at least one selected script before rendering."
+      "Approve at least one selected script without blocking warnings before rendering."
+    );
+  });
+
+  it("requires approved selected scripts to be free of blocking warnings before rendering", async () => {
+    const project = projectFixture({
+      concepts: [
+        {
+          id: "concept-1",
+          title: "Fast export",
+          formatFamily: "demo",
+          targetPain: "Manual clipping",
+          hookDirection: "show outcome",
+          proofMomentIds: ["moment-1"],
+          platformFit: ["youtube_shorts"],
+          estimatedDurationSec: 30,
+          rationale: "Good proof",
+          selected: true,
+          brief: "Show fast export"
+        }
+      ],
+      moments: [momentFixture()],
+      scripts: [
+        scriptFixture({
+          qualityWarnings: [{ code: "missing_evidence", message: "Add evidence before rendering." }]
+        })
+      ]
+    });
+    const store = new FakeExecutorStore(project);
+    store.project.jobs = [createJob({ id: "job-1", projectId: store.project.id, kind: "render", now: "2026-06-25T12:00:00.000Z" })];
+    const executor = createGideonJobExecutor({
+      store,
+      now: clock(),
+      loadProviderConfig: () => providerConfig(false)
+    });
+
+    await expect(executor.runRenderJob(store.project.id, "job-1")).rejects.toThrow(
+      "Approve at least one selected script without blocking warnings before rendering."
     );
   });
 

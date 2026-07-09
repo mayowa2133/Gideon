@@ -17,6 +17,7 @@ import {
   buildEditDecisionList,
   buildEvidenceClaims,
   buildVisualBeatsForTemplate,
+  hasBlockingScriptWarnings,
   normalizeBrandKit,
   scriptQualityWarnings,
   templateForFormatFamily
@@ -1783,8 +1784,15 @@ export class GideonStore {
     const selectedConceptIds = new Set(
       (project.concepts ?? []).filter((concept) => concept.selected).map((concept) => concept.id)
     );
-    if (!(project.scripts ?? []).some((script) => script.approved && selectedConceptIds.has(script.conceptId))) {
-      throw new Error("Approve at least one selected script before rendering.");
+    if (
+      !(project.scripts ?? []).some(
+        (script) =>
+          script.approved &&
+          selectedConceptIds.has(script.conceptId) &&
+          !hasBlockingScriptWarnings(script.qualityWarnings)
+      )
+    ) {
+      throw new Error("Approve at least one selected script without blocking warnings before rendering.");
     }
     const activeJob = findActiveJob(project.jobs ?? [], "render");
     if (activeJob) {

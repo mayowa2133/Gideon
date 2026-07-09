@@ -231,9 +231,9 @@ Page-level layout: selected concepts as tabs/left rail; structured editor center
 ### Interaction
 
 - Inline editing with autosave and character/estimated-duration feedback.
-- Generated scripts start unapproved. A render job cannot start until at least one script tied to a selected concept is explicitly approved and saved.
+- Generated scripts start unapproved. A render job cannot start until at least one script tied to a selected concept is explicitly approved, saved, and free of blocking quality warnings.
 - Forbidden generic phrase warnings explain the issue and suggest a specific rewrite.
-- Unsupported claim warning links to evidence/context and blocks approval until edited or explicitly confirmed with added context.
+- Unsupported claim, missing evidence, and caption safe-area overflow warnings block approval until edited or explicitly confirmed with added context.
 - `Regenerate section` opens a small instruction field and affects only that section.
 - `Preview voice` may synthesize a short sample subject to usage limits.
 - Voiceover toggle: AI voice, source audio only, or voiceover plus ducked source audio if supported.

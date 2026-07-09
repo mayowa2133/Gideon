@@ -4,6 +4,7 @@ import {
   buildEditDecisionList,
   buildVisualBeatsForTemplate,
   creatorTemplatePack,
+  hasBlockingScriptWarnings,
   normalizeBrandKit,
   templateForFormatFamily
 } from "./renderTemplates";
@@ -51,6 +52,15 @@ describe("creator render templates", () => {
     expect(templateForFormatFamily("founder-demo")).toBe("founder_demo");
     expect(templateForFormatFamily("three-reasons")).toBe("three_reasons");
     expect(templateForFormatFamily("before-after")).toBe("before_after_workflow");
+  });
+
+  it("classifies only claim and render-fit warnings as blocking", () => {
+    expect(hasBlockingScriptWarnings(undefined)).toBe(false);
+    expect(hasBlockingScriptWarnings([{ code: "generic_phrase", message: "Use a more specific phrase." }])).toBe(false);
+    expect(hasBlockingScriptWarnings([{ code: "long_line", message: "Shorten this caption line." }])).toBe(false);
+    expect(hasBlockingScriptWarnings([{ code: "missing_evidence", message: "Add product evidence." }])).toBe(true);
+    expect(hasBlockingScriptWarnings([{ code: "caption_overflow_risk", message: "Caption may overflow." }])).toBe(true);
+    expect(hasBlockingScriptWarnings([{ code: "unsupported_claim", message: "Claim is not supported." }])).toBe(true);
   });
 
   it("builds a renderable edit decision list with zooms, callouts, presenter, and brand kit", () => {
