@@ -52,6 +52,14 @@ const formatTemplates = [
     duration: 36
   },
   {
+    family: "time-saver",
+    templateKey: "saves_you_time",
+    title: "This saves you from the slow part",
+    pain: "time lost to repetitive manual steps",
+    hook: "Open with the repeated task, then show the time-saving product path",
+    duration: 26
+  },
+  {
     family: "feature-highlight",
     templateKey: "hidden_feature_reveal",
     title: "The one feature worth seeing first",
@@ -82,14 +90,6 @@ const formatTemplates = [
     pain: "users need a practical first action",
     hook: "Teach one narrow workflow and show the resulting state",
     duration: 45
-  },
-  {
-    family: "customer-pain",
-    templateKey: "problem_demo_payoff",
-    title: "If this task is still manual, this is the fix",
-    pain: "the recurring task that the target customer wants removed",
-    hook: "Name the pain in the first sentence and prove the fix on screen",
-    duration: 26
   },
   {
     family: "three-reasons",
@@ -397,6 +397,14 @@ function creatorVoiceoverLines(input: {
       `Reason one: ${primary} removes the slow part.`,
       `Reason two: ${secondary} makes the outcome visible.`,
       `Reason three: ${input.customer} can repeat it without a long demo.`,
+      `That matters because ${input.outcome}.`
+    ];
+  }
+  if (input.templateKey === "saves_you_time") {
+    return [
+      `This is the slow step ${input.customer} usually repeats.`,
+      `Now watch ${primary} take over that part.`,
+      `${secondary} shows the saved time turning into a visible result.`,
       `That matters because ${input.outcome}.`
     ];
   }

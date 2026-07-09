@@ -661,7 +661,7 @@ Central enum values include:
 
 - `job_status`: queued, processing, waiting_for_user, completed, failed, canceled.
 - `platform`: tiktok, instagram_reels, youtube_shorts, linkedin, other.
-- `content_format`: product_walkthrough, problem_solution, before_after, founder_demo, how_it_works, feature_highlight, launch_announcement, tutorial, customer_pain, pov, three_reasons, built_this_because, linkedin_professional, tiktok_casual, youtube_educational.
+- `content_format`: product_walkthrough, problem_solution, before_after, founder_demo, how_it_works, feature_highlight, time_saver, launch_announcement, tutorial, customer_pain, pov, three_reasons, built_this_because, linkedin_professional, tiktok_casual, youtube_educational.
 - `render_profile`: preview_v1, short_vertical_v1.
 - `project_status`, `recording_status`, `script_status`, and other lifecycle enums as defined in tables.
 

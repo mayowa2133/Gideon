@@ -121,6 +121,7 @@ For software builders who need to market consistently, Gideon converts an existi
 
 - Product walkthrough.
 - Problem/solution.
+- Time-saver / “this saves you X”.
 - Before/after.
 - Founder demo.
 - How it works.

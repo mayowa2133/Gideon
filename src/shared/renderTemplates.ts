@@ -37,6 +37,17 @@ export const creatorTemplatePack: CreatorTemplateDefinition[] = [
     presenterCompatible: true
   },
   {
+    key: "saves_you_time",
+    name: "This saves you time",
+    formatFamily: "time-saver",
+    hookPattern: "This saves {customer} from doing the slow part manually.",
+    captionStyle: "kinetic_bold",
+    visualRhythm: "snap",
+    defaultDurationSec: 26,
+    ctaPosition: "bottom",
+    presenterCompatible: true
+  },
+  {
     key: "problem_demo_payoff",
     name: "Problem to demo to payoff",
     formatFamily: "problem-solution",
@@ -104,6 +115,9 @@ export function templateForFormatFamily(formatFamily: string, index = 0): Creato
   if (normalized.includes("feature")) {
     return "hidden_feature_reveal";
   }
+  if (normalized.includes("save") || normalized.includes("time")) {
+    return "saves_you_time";
+  }
   if (normalized.includes("founder")) {
     return "founder_demo";
   }
@@ -163,6 +177,8 @@ export function buildVisualBeatsForTemplate(input: {
   const purposes: NonNullable<VisualBeat["purpose"]>[] =
     template.key === "three_reasons"
       ? ["hook", "proof", "proof", "proof", "cta"]
+      : template.key === "saves_you_time"
+        ? ["hook", "problem", "demo", "proof", "payoff", "cta"]
       : template.key === "before_after_workflow"
         ? ["hook", "problem", "demo", "payoff", "cta"]
         : template.key === "founder_demo"
@@ -438,7 +454,10 @@ function calloutForPurpose(purpose: NonNullable<VisualBeat["purpose"]>, label: s
 }
 
 function focusForBeat(index: number, templateKey: CreatorTemplateKey): RenderFocusPoint {
-  const scaleBase = templateKey === "hidden_feature_reveal" || templateKey === "brand_presenter" ? 1.18 : 1.12;
+  const scaleBase =
+    templateKey === "hidden_feature_reveal" || templateKey === "brand_presenter" || templateKey === "saves_you_time"
+      ? 1.18
+      : 1.12;
   const focusPoints: RenderFocusPoint[] = [
     { x: 0.5, y: 0.42, scale: scaleBase },
     { x: 0.58, y: 0.5, scale: scaleBase + 0.06 },

@@ -277,6 +277,7 @@ export type TonePreset =
 
 export type CreatorTemplateKey =
   | "hidden_feature_reveal"
+  | "saves_you_time"
   | "problem_demo_payoff"
   | "founder_demo"
   | "three_reasons"

@@ -180,6 +180,7 @@ type EditDecisionList = {
   schemaVersion: "2";
   templateKey:
     | "hidden_feature_reveal"
+    | "saves_you_time"
     | "problem_demo_payoff"
     | "founder_demo"
     | "three_reasons"

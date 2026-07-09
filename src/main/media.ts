@@ -696,6 +696,15 @@ function drawTemplateChrome(
     context.fillStyle = "#10131D";
     context.fillText("AFTER", 805, 475);
   }
+  if (editDecisionList.templateKey === "saves_you_time") {
+    drawPanel(context, 90, 430, 330, 74, alpha(brandKit.primaryColor, 0.92));
+    drawPanel(context, 430, 430, 455, 74, "rgba(255,255,255,0.16)");
+    context.fillStyle = "#10131D";
+    context.font = "24pt Arial";
+    context.fillText("SAVES TIME", 132, 477);
+    drawSolidRect(context, 460, 464, 330, 8, alpha(brandKit.accentColor, 0.9));
+    drawSolidRect(context, 460, 464, 112, 8, alpha(brandKit.primaryColor, 0.95));
+  }
   if (editDecisionList.templateKey === "brand_presenter" && options.showPresenterHook) {
     drawPanel(context, 690, 1180, 295, 70, "rgba(255,255,255,0.14)");
     context.fillStyle = "#FFFFFF";

@@ -38,6 +38,7 @@ describe("creator render templates", () => {
     expect(creatorTemplatePack.map((template) => template.key)).toEqual(
       expect.arrayContaining([
         "hidden_feature_reveal",
+        "saves_you_time",
         "problem_demo_payoff",
         "founder_demo",
         "three_reasons",
@@ -49,6 +50,8 @@ describe("creator render templates", () => {
 
   it("maps common concept families to deterministic templates", () => {
     expect(templateForFormatFamily("feature-highlight")).toBe("hidden_feature_reveal");
+    expect(templateForFormatFamily("time-saver")).toBe("saves_you_time");
+    expect(templateForFormatFamily("save-time-demo")).toBe("saves_you_time");
     expect(templateForFormatFamily("founder-demo")).toBe("founder_demo");
     expect(templateForFormatFamily("three-reasons")).toBe("three_reasons");
     expect(templateForFormatFamily("before-after")).toBe("before_after_workflow");

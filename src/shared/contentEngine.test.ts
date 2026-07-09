@@ -66,6 +66,8 @@ describe("content engine", () => {
     expect(new Set(concepts.map((concept) => concept.formatFamily)).size).toBeGreaterThanOrEqual(4);
     expect(concepts.every((concept) => concept.templateKey)).toBe(true);
     expect(concepts[0]?.templateKey).toBe("hidden_feature_reveal");
+    expect(concepts.some((concept) => concept.templateKey === "saves_you_time")).toBe(true);
+    expect(concepts.find((concept) => concept.templateKey === "saves_you_time")?.hookDirection).toContain("slow part");
   });
 
   it("enforces the three-concept selection limit", () => {
@@ -99,6 +101,30 @@ describe("content engine", () => {
     expect(
       scripts.some((script) => /revolutionary platform|game-changing solution/i.test(script.voiceoverText))
     ).toBe(false);
+  });
+
+  it("generates creator-native time-savings scripts from the saves-you-time template", () => {
+    let counter = 0;
+    const moments = createMoments(profile, recording, () => `moment-${++counter}`);
+    const [concept] = generateConcepts(profile, moments, () => `concept-${++counter}`)
+      .filter((candidate) => candidate.templateKey === "saves_you_time")
+      .map((candidate) => ({ ...candidate, selected: true }));
+    expect(concept).toBeDefined();
+
+    const [script] = generateScripts(
+      profile,
+      [concept!],
+      moments,
+      () => `script-${++counter}`,
+      () => "2026-06-24T00:00:00.000Z"
+    );
+
+    expect(script?.templateKey).toBe("saves_you_time");
+    expect(script?.hook).toContain("slow part");
+    expect(script?.voiceoverText).toMatch(/slow step|saved time/i);
+    expect(script?.visualBeats.map((beat) => beat.purpose)).toEqual(
+      expect.arrayContaining(["hook", "problem", "demo", "proof", "payoff", "cta"])
+    );
   });
 
   it("replaces forbidden generic marketing phrases", () => {
