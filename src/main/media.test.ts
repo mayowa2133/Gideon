@@ -145,6 +145,21 @@ describe("media pipeline", () => {
     })).toThrow("Zoom cue 1 focus is outside the supported render range");
   });
 
+  it("rejects render manifests with unsupported callout arrow directions", () => {
+    const script = draftScript();
+    const callout = script.editDecisionList!.callouts[0]!;
+
+    expect(() => validateRenderManifest({
+      ...script.editDecisionList!,
+      callouts: [
+        {
+          ...callout,
+          arrow: { enabled: true, direction: "diagonal" as never }
+        }
+      ]
+    })).toThrow("Callout 1 arrow direction is unsupported");
+  });
+
   it("rejects render manifests with invalid cursor emphasis cues", () => {
     const script = draftScript();
 

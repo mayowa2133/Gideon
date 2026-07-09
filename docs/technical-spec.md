@@ -239,6 +239,10 @@ type EditDecisionList = {
     endMs: number;
     text: string;
     anchor: { x: number; y: number; scale: number };
+    arrow: {
+      enabled: boolean;
+      direction: "auto" | "left" | "right" | "up" | "down";
+    };
     evidenceIds?: string[];
   }>;
   cursorCues: Array<{

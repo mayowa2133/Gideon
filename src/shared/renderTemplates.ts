@@ -319,6 +319,10 @@ export function buildEditDecisionList(input: {
       endMs: Math.min(beat.endMs, beat.startMs + 2600),
       text: beat.callout ?? calloutForPurpose(beat.purpose ?? "demo", momentLabel(input.moments, beat.momentId)),
       anchor: beat.focus ?? focusForBeat(index, input.templateKey),
+      arrow: {
+        enabled: true,
+        direction: "auto" as const
+      },
       evidenceIds: beat.evidenceIds
     })),
     cursorCues,

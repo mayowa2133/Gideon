@@ -513,6 +513,10 @@ export interface RenderCalloutCue {
   endMs: number;
   text: string;
   anchor: RenderFocusPoint;
+  arrow: {
+    enabled: boolean;
+    direction: "auto" | "left" | "right" | "up" | "down";
+  };
   evidenceIds?: string[];
 }
 

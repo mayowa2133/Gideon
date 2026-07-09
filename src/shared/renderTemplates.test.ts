@@ -123,6 +123,7 @@ describe("creator render templates", () => {
     expect(editDecisionList.sourceSegments[1]?.timelineStartMs).toBeGreaterThan(0);
     expect(editDecisionList.zooms.length).toBe(editDecisionList.sourceSegments.length);
     expect(editDecisionList.callouts.length).toBeGreaterThanOrEqual(4);
+    expect(editDecisionList.callouts[0]?.arrow).toEqual({ enabled: true, direction: "auto" });
     expect(editDecisionList.cursorCues[0]).toMatchObject({
       kind: "click_target",
       anchor: { x: 0.62, y: 0.44 },

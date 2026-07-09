@@ -747,7 +747,67 @@ function drawVisualBeatCallouts(
     context.fillStyle = "#ffffff";
     context.font = "24pt Arial";
     drawWrappedText(context, callout.text, position.x + 96, position.y + 47, position.width - 125, 30, 2);
+    if ((callout.arrow?.enabled ?? true) && callout.anchor) {
+      drawCalloutArrow(context, editDecisionList.brandKit, position, callout.anchor);
+    }
   });
+}
+
+function drawCalloutArrow(
+  context: OverlayContext,
+  brandKit: BrandKit,
+  position: { x: number; y: number; width: number },
+  anchor: RenderFocusPoint
+): void {
+  const startX = position.x + position.width - 22;
+  const startY = position.y + 59;
+  const targetX = 90 + anchor.x * 900;
+  const targetY = 500 + anchor.y * 600;
+  const midX = startX + (targetX - startX) * 0.62;
+  const midY = startY + (targetY - startY) * 0.62;
+  drawDottedLine(context, brandKit, startX, startY, midX, midY);
+  drawDottedLine(context, brandKit, midX, midY, targetX, targetY);
+  drawArrowHead(context, brandKit, midX, midY, targetX, targetY);
+}
+
+function drawDottedLine(
+  context: OverlayContext,
+  brandKit: BrandKit,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number
+): void {
+  const distance = Math.max(1, Math.hypot(toX - fromX, toY - fromY));
+  const steps = Math.max(2, Math.floor(distance / 24));
+  context.fillStyle = alpha(brandKit.accentColor, 0.78);
+  for (let index = 0; index <= steps; index += 1) {
+    const progress = index / steps;
+    const x = fromX + (toX - fromX) * progress;
+    const y = fromY + (toY - fromY) * progress;
+    context.beginPath();
+    context.arc(x, y, 4, 0, Math.PI * 2);
+    context.fill();
+  }
+}
+
+function drawArrowHead(
+  context: OverlayContext,
+  brandKit: BrandKit,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number
+): void {
+  const angle = Math.atan2(toY - fromY, toX - fromX);
+  const size = 22;
+  context.fillStyle = alpha(brandKit.accentColor, 0.92);
+  context.beginPath();
+  context.moveTo(toX, toY);
+  context.lineTo(toX - size * Math.cos(angle - Math.PI / 6), toY - size * Math.sin(angle - Math.PI / 6));
+  context.lineTo(toX - size * Math.cos(angle + Math.PI / 6), toY - size * Math.sin(angle + Math.PI / 6));
+  context.closePath();
+  context.fill();
 }
 
 function drawCursorEmphasis(context: OverlayContext, editDecisionList: EditDecisionList, timestampMs: number): void {
@@ -961,6 +1021,10 @@ function ensureEditDecisionList(
       ...manifest,
       templateId: manifest.templateId ?? templateManifestId(manifest.templateKey, manifest.templateVersion),
       brandKitId: manifest.brandKitId ?? manifest.brandKit.id ?? brandKitIdForProductName(manifest.brandKit.productName),
+      callouts: manifest.callouts.map((callout) => ({
+        ...callout,
+        arrow: callout.arrow ?? { enabled: true, direction: "auto" as const }
+      })),
       cursorCues: manifest.cursorCues ?? [],
       sfx: manifest.sfx ?? [],
       music: manifest.music ?? { enabled: false, mood: "none", gainDb: -30 }
@@ -1013,6 +1077,9 @@ export function validateRenderManifest(editDecisionList: EditDecisionList): void
   });
   editDecisionList.callouts.forEach((callout, index) => {
     validateFocusPoint(`Callout ${index + 1}`, callout.anchor);
+    if (callout.arrow && !["auto", "left", "right", "up", "down"].includes(callout.arrow.direction)) {
+      throw new Error(`Callout ${index + 1} arrow direction is unsupported.`);
+    }
   });
   cursorCues.forEach((cue, index) => {
     validateFocusPoint(`Cursor cue ${index + 1}`, cue.anchor);
