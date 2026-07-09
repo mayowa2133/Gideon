@@ -372,6 +372,7 @@ Every job also has stage, progress percent where meaningful, attempt, heartbeat,
 | Fewer than ten credible ideas | Ask for more context rather than fill with duplicates |
 | TTS duration exceeds visual plan | Re-time within bounds or return to script review |
 | Caption overflows | Block render completion or use deterministic fit rules; never silently clip |
+| Blank or visually empty render | Sample completed MP4 frames and fail render QA before export |
 | User deletes during job | Cancel/deny downstream commits; revoke URLs; schedule object purge |
 | Workspace quota reached | Stop before expensive work; show usage and upgrade-ready action |
 

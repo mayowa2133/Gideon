@@ -273,14 +273,120 @@ export async function validateRenderedVideo(outputPath: string): Promise<RenderV
   if (!Number.isFinite(durationMs) || durationMs <= 0) {
     throw new Error("Rendered video duration is invalid.");
   }
+  const frameQa = await inspectRenderedFrameQa(outputPath, durationMs);
   return {
     width: videoStream.width,
     height: videoStream.height,
     durationMs,
     videoCodec: videoStream.codec_name ?? "unknown",
     audioCodec: audioStream?.codec_name ?? null,
-    fastStart: true
+    fastStart: true,
+    frameQa
   };
+}
+
+interface RenderFrameLumaSample {
+  averageLuma: number;
+  minLuma: number;
+  maxLuma: number;
+  lumaStandardDeviation: number;
+}
+
+export function summarizeRenderFrameQa(samples: RenderFrameLumaSample[]): NonNullable<RenderValidation["frameQa"]> {
+  if (samples.length === 0) {
+    throw new Error("Rendered video QA could not sample output frames.");
+  }
+  const sampledFrames = samples.length;
+  const informativeFrames = samples.filter(isInformativeFrameSample).length;
+  const averageLuma = samples.reduce((total, sample) => total + sample.averageLuma, 0) / sampledFrames;
+  return {
+    sampledFrames,
+    informativeFrames,
+    averageLuma: roundMetric(averageLuma),
+    minLuma: roundMetric(Math.min(...samples.map((sample) => sample.minLuma))),
+    maxLuma: roundMetric(Math.max(...samples.map((sample) => sample.maxLuma))),
+    minLumaStandardDeviation: roundMetric(Math.min(...samples.map((sample) => sample.lumaStandardDeviation)))
+  };
+}
+
+export function validateRenderFrameQa(frameQa: NonNullable<RenderValidation["frameQa"]>): void {
+  if (frameQa.sampledFrames < 1) {
+    throw new Error("Rendered video QA could not sample output frames.");
+  }
+  if (frameQa.informativeFrames < 1) {
+    throw new Error("Rendered video appears blank or visually empty.");
+  }
+}
+
+async function inspectRenderedFrameQa(outputPath: string, durationMs: number): Promise<NonNullable<RenderValidation["frameQa"]>> {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-render-qa-"));
+  try {
+    const timestampsSec = sampleTimestampsSec(durationMs);
+    const samples: RenderFrameLumaSample[] = [];
+    for (const [index, timestampSec] of timestampsSec.entries()) {
+      const framePath = path.join(tempDir, `frame-${index + 1}.png`);
+      await runCommand(resolveFfmpeg(), [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-ss",
+        timestampSec.toFixed(3),
+        "-i",
+        outputPath,
+        "-frames:v",
+        "1",
+        "-vf",
+        "scale=32:32:force_original_aspect_ratio=decrease,pad=32:32:(ow-iw)/2:(oh-ih)/2,format=rgba",
+        framePath
+      ]);
+      samples.push(await readPngLumaSample(framePath));
+    }
+    const frameQa = summarizeRenderFrameQa(samples);
+    validateRenderFrameQa(frameQa);
+    return frameQa;
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+function sampleTimestampsSec(durationMs: number): number[] {
+  const durationSec = Math.max(0.1, durationMs / 1000);
+  return [0.12, 0.5, 0.88].map((ratio) => Math.max(0, Math.min(durationSec - 0.05, durationSec * ratio)));
+}
+
+async function readPngLumaSample(framePath: string): Promise<RenderFrameLumaSample> {
+  const image = await PImage.decodePNGFromStream(createReadStream(framePath));
+  const bitmap = image as unknown as { data: Uint8Array; width: number; height: number };
+  let total = 0;
+  let squaredTotal = 0;
+  let minLuma = 255;
+  let maxLuma = 0;
+  const pixels = bitmap.width * bitmap.height;
+  for (let offset = 0; offset < bitmap.data.length; offset += 4) {
+    const luma = 0.2126 * bitmap.data[offset]! + 0.7152 * bitmap.data[offset + 1]! + 0.0722 * bitmap.data[offset + 2]!;
+    total += luma;
+    squaredTotal += luma * luma;
+    minLuma = Math.min(minLuma, luma);
+    maxLuma = Math.max(maxLuma, luma);
+  }
+  const averageLuma = pixels > 0 ? total / pixels : 0;
+  const variance = pixels > 0 ? Math.max(0, squaredTotal / pixels - averageLuma * averageLuma) : 0;
+  return {
+    averageLuma,
+    minLuma,
+    maxLuma,
+    lumaStandardDeviation: Math.sqrt(variance)
+  };
+}
+
+function isInformativeFrameSample(sample: RenderFrameLumaSample): boolean {
+  const lumaRange = sample.maxLuma - sample.minLuma;
+  return lumaRange >= 24 && sample.lumaStandardDeviation >= 4 && sample.averageLuma > 3 && sample.averageLuma < 252;
+}
+
+function roundMetric(value: number): number {
+  return Number(value.toFixed(2));
 }
 
 export async function extractAudioForTranscription(recording: RecordingMetadata, projectDir: string): Promise<string> {

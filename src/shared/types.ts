@@ -594,6 +594,14 @@ export interface RenderValidation {
   videoCodec: string;
   audioCodec: string | null;
   fastStart: boolean;
+  frameQa?: {
+    sampledFrames: number;
+    informativeFrames: number;
+    averageLuma: number;
+    minLuma: number;
+    maxLuma: number;
+    minLumaStandardDeviation: number;
+  };
 }
 
 export interface RenderedVideo {

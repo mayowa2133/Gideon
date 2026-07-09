@@ -781,6 +781,7 @@ The current implementation evidence, remaining go-live blockers, and original-ga
 | Risk | Spike before commitment | Success condition |
 |---|---|---|
 | 9:16 desktop UI readability | Render five real 1080p/4K walkthroughs with focus zooms | Key text legible on phone-size preview |
+| Blank-frame render regressions | Sample completed MP4 frames after muxing | At least one sampled frame has non-empty visual information before export |
 | Remotion performance/license | Benchmark 15/30/60s compositions; legal review | Meets target cost/p95; license plan accepted |
 | ASR deployment | Benchmark faster-whisper models on 10 golden recordings | Chosen model meets WER/timing/latency/cost |
 | Multimodal evidence limits | Compare sparse/dense frame bundles and contact sheets | Useful moments without excessive tokens/cost |
@@ -796,7 +797,7 @@ The current implementation evidence, remaining go-live blockers, and original-ga
 - Invalid/corrupt/oversized media fails before unsafe processing.
 - Cross-workspace authorization and signed URL tests pass.
 - Worker crash, provider timeout, retry, cancel, stale edit, and deletion paths pass.
-- Golden render QA passes in the production image.
+- Golden render QA passes in the production image, including codec/audio/duration checks, caption safe-area validation, and nonblank sampled-frame validation.
 - Metrics, redacted logs, traces, and alerts cover every long stage.
 - Backup/restore and operator runbooks are exercised.
 - No critical/high security findings remain.

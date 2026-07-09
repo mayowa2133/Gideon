@@ -12,6 +12,8 @@ import {
   calloutTextFromInstruction,
   probeRecording,
   renderDraft,
+  summarizeRenderFrameQa,
+  validateRenderFrameQa,
   validateRenderManifest,
   zoomFilterExpressions
 } from "./media";
@@ -126,6 +128,27 @@ describe("media pipeline", () => {
     expect(filter).toContain("amix=inputs=");
   });
 
+  it("rejects render QA samples when every sampled frame is visually empty", () => {
+    const frameQa = summarizeRenderFrameQa([
+      { averageLuma: 0, minLuma: 0, maxLuma: 0, lumaStandardDeviation: 0 },
+      { averageLuma: 1, minLuma: 1, maxLuma: 1, lumaStandardDeviation: 0 },
+      { averageLuma: 255, minLuma: 255, maxLuma: 255, lumaStandardDeviation: 0 }
+    ]);
+
+    expect(frameQa).toMatchObject({ sampledFrames: 3, informativeFrames: 0 });
+    expect(() => validateRenderFrameQa(frameQa)).toThrow("Rendered video appears blank");
+  });
+
+  it("accepts render QA samples with at least one informative frame", () => {
+    const frameQa = summarizeRenderFrameQa([
+      { averageLuma: 8, minLuma: 8, maxLuma: 8, lumaStandardDeviation: 0 },
+      { averageLuma: 120, minLuma: 8, maxLuma: 242, lumaStandardDeviation: 48 }
+    ]);
+
+    expect(frameQa).toMatchObject({ sampledFrames: 2, informativeFrames: 1 });
+    expect(() => validateRenderFrameQa(frameQa)).not.toThrow();
+  });
+
   it.runIf(Boolean(ffmpeg))("probes and renders a vertical H.264/AAC draft from a local recording", async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-media-"));
     const sourcePath = path.join(tempDir, "source.mp4");
@@ -176,6 +199,8 @@ describe("media pipeline", () => {
     expect(rendered.validation.height).toBe(1920);
     expect(rendered.validation.videoCodec).toBe("h264");
     expect(rendered.validation.audioCodec).toBe("aac");
+    expect(rendered.validation.frameQa).toMatchObject({ sampledFrames: 3 });
+    expect(rendered.validation.frameQa?.informativeFrames).toBeGreaterThan(0);
     const overlayFrames = await fs.readdir(path.join(tempDir, "renders", script!.id, "overlay-frames"));
     expect(overlayFrames.filter((fileName) => fileName.endsWith(".png")).length).toBeGreaterThan(1);
     await expect(fs.access(rendered.outputPath)).resolves.toBeUndefined();
