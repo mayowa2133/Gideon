@@ -801,7 +801,7 @@ The current implementation evidence, remaining go-live blockers, and original-ga
 - Invalid/corrupt/oversized media fails before unsafe processing.
 - Cross-workspace authorization and signed URL tests pass.
 - Worker crash, provider timeout, retry, cancel, stale edit, and deletion paths pass.
-- Golden render QA passes in the production image, including codec/audio/duration checks, caption safe-area validation, and nonblank sampled-frame validation.
+- Golden render QA passes in the production image, including codec/audio/duration checks, caption safe-area validation, caption/audio timeline alignment, and nonblank sampled-frame validation.
 - Metrics, redacted logs, traces, and alerts cover every long stage.
 - Backup/restore and operator runbooks are exercised.
 - No critical/high security findings remain.

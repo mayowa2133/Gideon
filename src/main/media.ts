@@ -984,6 +984,9 @@ export function validateRenderManifest(editDecisionList: EditDecisionList): void
   if (editDecisionList.qualityGates.requireCaptionSafeArea) {
     validateCaptionSafeAreas(editDecisionList);
   }
+  if (editDecisionList.qualityGates.requireAudioAlignment) {
+    validateCaptionAudioAlignment(editDecisionList.captions, editDecisionList.durationMs);
+  }
   if (editDecisionList.qualityGates.requireEvidenceBackedClaims && editDecisionList.sourceSegments.length === 0) {
     throw new Error("Render manifest has no source-backed visual moments.");
   }
@@ -1065,6 +1068,31 @@ function validateCaptionWordTimings(captions: CaptionSegment[]): void {
       }
     });
   });
+}
+
+function validateCaptionAudioAlignment(captions: CaptionSegment[], durationMs: number): void {
+  if (captions.length === 0) {
+    throw new Error("Render manifest needs caption timing for audio alignment.");
+  }
+  const sorted = [...captions].sort((left, right) => left.startMs - right.startMs);
+  const firstCaption = sorted[0]!;
+  const lastCaption = sorted[sorted.length - 1]!;
+  const maxLeadInMs = 1_500;
+  const maxTrailingSilenceMs = Math.min(3_000, Math.max(1_500, Math.round(durationMs * 0.18)));
+  const maxCaptionGapMs = 3_000;
+  if (firstCaption.startMs > maxLeadInMs) {
+    throw new Error("Caption timing starts too late for voiceover alignment.");
+  }
+  if (durationMs - lastCaption.endMs > maxTrailingSilenceMs) {
+    throw new Error("Caption timing ends too early for voiceover alignment.");
+  }
+  for (let index = 1; index < sorted.length; index += 1) {
+    const previous = sorted[index - 1]!;
+    const current = sorted[index]!;
+    if (current.startMs - previous.endMs > maxCaptionGapMs) {
+      throw new Error(`Caption ${index + 1} has a gap too large for voiceover alignment.`);
+    }
+  }
 }
 
 function validateCaptionSafeAreas(editDecisionList: EditDecisionList): void {

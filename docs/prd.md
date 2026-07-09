@@ -288,6 +288,7 @@ For software builders who need to market consistently, Gideon converts an existi
 ### Render and export
 
 - Immutable render manifest identifies all input versions, template ID/version, and brand-kit ID.
+- Caption timing must align to the approved voiceover/render timeline before a render can be exported.
 - Render jobs are idempotent by manifest hash.
 - Preview and final exports are separate quality profiles but share composition logic.
 - Final file is retained under configurable lifecycle policy; access is private and signed.

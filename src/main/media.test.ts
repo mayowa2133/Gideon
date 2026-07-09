@@ -78,6 +78,58 @@ describe("media pipeline", () => {
     })).toThrow("invalid timing");
   });
 
+  it("rejects render manifests with caption timing that cannot align to audio", () => {
+    const script = draftScript();
+    const firstCaption = script.editDecisionList!.captions[0]!;
+    const lastCaption = script.editDecisionList!.captions[script.editDecisionList!.captions.length - 1]!;
+
+    expect(() => validateRenderManifest({
+      ...script.editDecisionList!,
+      captions: [
+        {
+          ...firstCaption,
+          startMs: 2_200,
+          endMs: 4_000,
+          words: undefined
+        },
+        {
+          ...lastCaption,
+          startMs: 4_000,
+          endMs: script.editDecisionList!.durationMs
+        }
+      ]
+    })).toThrow("starts too late");
+
+    expect(() => validateRenderManifest({
+      ...script.editDecisionList!,
+      captions: [
+        {
+          ...firstCaption,
+          startMs: 0,
+          endMs: 2_000,
+          words: undefined
+        }
+      ]
+    })).toThrow("ends too early");
+
+    expect(() => validateRenderManifest({
+      ...script.editDecisionList!,
+      captions: [
+        {
+          ...firstCaption,
+          startMs: 0,
+          endMs: 1_500,
+          words: undefined
+        },
+        {
+          ...lastCaption,
+          startMs: 5_200,
+          endMs: script.editDecisionList!.durationMs
+        }
+      ]
+    })).toThrow("gap too large");
+  });
+
   it("rejects render manifests with invalid zoom focus", () => {
     const script = draftScript();
     const zoom = script.editDecisionList!.zooms[0]!;

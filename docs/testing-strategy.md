@@ -314,6 +314,7 @@ Test:
 - Required source asset exists.
 - Clip timestamps are valid.
 - Captions fit within duration.
+- Caption timing starts near the voiceover, ends near the render timeline, and has no large silent gaps.
 - Voiceover belongs to the approved script version.
 - Export profile is supported.
 - Referenced fonts and overlays exist.
