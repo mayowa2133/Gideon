@@ -1498,6 +1498,7 @@ function mcpProjectContextResource(project: Project, state: AppState) {
             zooms: script.editDecisionList.zooms,
             overlays: script.editDecisionList.overlays,
             callouts: script.editDecisionList.callouts,
+            cursorCues: script.editDecisionList.cursorCues,
             presenter: {
               ...script.editDecisionList.presenter,
               logoPath: undefined,

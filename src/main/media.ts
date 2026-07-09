@@ -751,6 +751,29 @@ function drawVisualBeatCallouts(
 }
 
 function drawCursorEmphasis(context: OverlayContext, editDecisionList: EditDecisionList, timestampMs: number): void {
+  const activeCursorCue = activeCursorCuesAt(editDecisionList.cursorCues ?? [], timestampMs)[0];
+  if (activeCursorCue) {
+    const anchor = activeCursorCue.anchor;
+    const x = 90 + anchor.x * 900;
+    const y = 500 + anchor.y * 600;
+    const entrance = clamp((timestampMs - activeCursorCue.startMs) / 180, 0, 1);
+    const radius = activeCursorCue.kind === "click_target"
+      ? 22 + Math.sin(timestampMs / 110) * 8
+      : 16 + Math.sin(timestampMs / 150) * 5;
+    context.fillStyle = alpha(editDecisionList.brandKit.accentColor, 0.36 + entrance * 0.42);
+    context.beginPath();
+    context.arc(x, y, radius + 22 * entrance, 0, Math.PI * 2);
+    context.fill();
+    drawRectOutline(context, x - 42, y - 42, 84, 84, activeCursorCue.kind === "click_target" ? 4 : 2, "rgba(255,255,255,0.72)");
+    if (activeCursorCue.label) {
+      drawPanel(context, x + 28, y - 54, 260, 56, "rgba(5, 7, 13, 0.82)");
+      context.fillStyle = "#ffffff";
+      context.font = "20pt Arial";
+      drawWrappedText(context, activeCursorCue.label, x + 48, y - 19, 220, 24, 1);
+    }
+    return;
+  }
+
   const activeCallout = activeCalloutsAt(editDecisionList.callouts, timestampMs)[0];
   if (!activeCallout?.anchor) {
     return;
@@ -904,6 +927,13 @@ function activeCalloutsAt(
   return callouts.filter((callout) => isCueActive(callout, timestampMs));
 }
 
+function activeCursorCuesAt(
+  cursorCues: EditDecisionList["cursorCues"],
+  timestampMs: number
+): EditDecisionList["cursorCues"] {
+  return cursorCues.filter((cue) => isCueActive(cue, timestampMs));
+}
+
 function isCueActive(cue: { startMs: number; endMs: number }, timestampMs: number): boolean {
   return timestampMs >= cue.startMs && timestampMs < cue.endMs;
 }
@@ -923,6 +953,7 @@ function ensureEditDecisionList(
 ): EditDecisionList {
   if (script.editDecisionList?.schemaVersion === "2") {
     const manifest = script.editDecisionList as EditDecisionList & {
+      cursorCues?: EditDecisionList["cursorCues"];
       sfx?: EditDecisionList["sfx"];
       music?: EditDecisionList["music"];
     };
@@ -930,6 +961,7 @@ function ensureEditDecisionList(
       ...manifest,
       templateId: manifest.templateId ?? templateManifestId(manifest.templateKey, manifest.templateVersion),
       brandKitId: manifest.brandKitId ?? manifest.brandKit.id ?? brandKitIdForProductName(manifest.brandKit.productName),
+      cursorCues: manifest.cursorCues ?? [],
       sfx: manifest.sfx ?? [],
       music: manifest.music ?? { enabled: false, mood: "none", gainDb: -30 }
     };
@@ -961,11 +993,13 @@ export function validateRenderManifest(editDecisionList: EditDecisionList): void
   if (editDecisionList.durationMs < 1_000 || editDecisionList.durationMs > 60_000) {
     throw new Error("Render manifest duration is outside the supported short-form range.");
   }
+  const cursorCues = editDecisionList.cursorCues ?? [];
   validateSourceSegmentTimings(editDecisionList.sourceSegments, editDecisionList.durationMs);
   validateTimedCueCollection("Zoom", editDecisionList.zooms, editDecisionList.durationMs);
   validateTimedCueCollection("Caption", editDecisionList.captions, editDecisionList.durationMs);
   validateTimedCueCollection("Overlay", editDecisionList.overlays, editDecisionList.durationMs);
   validateTimedCueCollection("Callout", editDecisionList.callouts, editDecisionList.durationMs);
+  validateTimedCueCollection("Cursor", cursorCues, editDecisionList.durationMs);
   validateSfxCueTimings(editDecisionList.sfx, editDecisionList.durationMs);
   validatePresenterTiming(editDecisionList.presenter, editDecisionList.durationMs);
   editDecisionList.sourceSegments.forEach((segment, index) => {
@@ -979,6 +1013,12 @@ export function validateRenderManifest(editDecisionList: EditDecisionList): void
   });
   editDecisionList.callouts.forEach((callout, index) => {
     validateFocusPoint(`Callout ${index + 1}`, callout.anchor);
+  });
+  cursorCues.forEach((cue, index) => {
+    validateFocusPoint(`Cursor cue ${index + 1}`, cue.anchor);
+    if (cue.confidence < 0 || cue.confidence > 1) {
+      throw new Error(`Cursor cue ${index + 1} confidence is outside the supported render range.`);
+    }
   });
   validateCaptionWordTimings(editDecisionList.captions);
   if (editDecisionList.qualityGates.requireCaptionSafeArea) {

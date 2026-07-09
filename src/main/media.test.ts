@@ -145,6 +145,38 @@ describe("media pipeline", () => {
     })).toThrow("Zoom cue 1 focus is outside the supported render range");
   });
 
+  it("rejects render manifests with invalid cursor emphasis cues", () => {
+    const script = draftScript();
+
+    expect(() => validateRenderManifest({
+      ...script.editDecisionList!,
+      cursorCues: [
+        {
+          id: "cursor-bad",
+          kind: "click_target",
+          startMs: 0,
+          endMs: 1_000,
+          anchor: { x: 0.45, y: 1.2, scale: 1.1 },
+          confidence: 0.8
+        }
+      ]
+    })).toThrow("Cursor cue 1 focus is outside the supported render range");
+
+    expect(() => validateRenderManifest({
+      ...script.editDecisionList!,
+      cursorCues: [
+        {
+          id: "cursor-bad-confidence",
+          kind: "cursor_candidate",
+          startMs: 0,
+          endMs: 1_000,
+          anchor: { x: 0.45, y: 0.52, scale: 1.1 },
+          confidence: 1.4
+        }
+      ]
+    })).toThrow("Cursor cue 1 confidence is outside the supported render range");
+  });
+
   it("builds smooth focus-aware zoom filter expressions", () => {
     const script = draftScript();
     const manifest = {

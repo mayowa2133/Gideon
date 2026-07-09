@@ -241,6 +241,15 @@ type EditDecisionList = {
     anchor: { x: number; y: number; scale: number };
     evidenceIds?: string[];
   }>;
+  cursorCues: Array<{
+    id: string;
+    kind: "click_target" | "cursor_candidate";
+    startMs: number;
+    endMs: number;
+    anchor: { x: number; y: number; scale: number };
+    label?: string;
+    confidence: number;
+  }>;
   sfx: Array<{
     id: string;
     kind: "click" | "pop" | "whoosh";

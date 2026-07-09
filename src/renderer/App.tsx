@@ -1675,6 +1675,7 @@ function ScriptEditor({
             <div className="render-plan-summary">
               <span>{script.editDecisionList?.zooms.length ?? script.visualBeats.length} punch-ins</span>
               <span>{script.editDecisionList?.callouts.length ?? script.visualBeats.length} callouts</span>
+              <span>{script.editDecisionList?.cursorCues.length ?? 0} cursor cues</span>
               <span>{script.editDecisionList?.presenter.enabled ? "presenter on" : "presenter off"}</span>
               <span>{script.approved ? "approved" : "needs approval"}</span>
             </div>

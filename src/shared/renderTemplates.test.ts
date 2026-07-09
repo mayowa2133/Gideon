@@ -19,6 +19,13 @@ const moments: DetectedMoment[] = [
     evidence: "Frame shows the lead research setup.",
     sourceEvidenceIds: ["frame:1"],
     confidence: 0.9,
+    interactionHint: {
+      kind: "click_target",
+      x: 0.62,
+      y: 0.44,
+      confidence: 0.91,
+      label: "Generate draft"
+    },
     enabled: true
   },
   {
@@ -116,6 +123,13 @@ describe("creator render templates", () => {
     expect(editDecisionList.sourceSegments[1]?.timelineStartMs).toBeGreaterThan(0);
     expect(editDecisionList.zooms.length).toBe(editDecisionList.sourceSegments.length);
     expect(editDecisionList.callouts.length).toBeGreaterThanOrEqual(4);
+    expect(editDecisionList.cursorCues[0]).toMatchObject({
+      kind: "click_target",
+      anchor: { x: 0.62, y: 0.44 },
+      label: "Generate draft",
+      confidence: 0.91
+    });
+    expect(editDecisionList.cursorCues[0]?.startMs).toBeGreaterThanOrEqual(visualBeats[0]!.startMs);
     expect(new Set(editDecisionList.sourceSegments.map((segment) => segment.momentId)).size).toBeLessThan(
       editDecisionList.sourceSegments.length
     );

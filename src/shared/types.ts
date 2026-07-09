@@ -516,6 +516,16 @@ export interface RenderCalloutCue {
   evidenceIds?: string[];
 }
 
+export interface RenderCursorCue {
+  id: string;
+  kind: InteractionHint["kind"];
+  startMs: number;
+  endMs: number;
+  anchor: RenderFocusPoint;
+  label?: string;
+  confidence: number;
+}
+
 export interface RenderSfxCue {
   id: string;
   kind: "click" | "pop" | "whoosh";
@@ -552,6 +562,7 @@ export interface EditDecisionList {
   captions: CaptionSegment[];
   overlays: RenderOverlayCue[];
   callouts: RenderCalloutCue[];
+  cursorCues: RenderCursorCue[];
   sfx: RenderSfxCue[];
   presenter: BrandPresenterLayer;
   music: {

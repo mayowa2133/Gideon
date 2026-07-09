@@ -278,6 +278,28 @@ export function buildEditDecisionList(input: {
       emphasis: "primary" as const
     }
   ];
+  const cursorCues = input.visualBeats.flatMap((beat, index) => {
+    const moment = input.moments.find((candidate) => candidate.id === beat.momentId);
+    if (!moment?.interactionHint) {
+      return [];
+    }
+    const focus = {
+      x: clamp(moment.interactionHint.x, 0, 1),
+      y: clamp(moment.interactionHint.y, 0, 1),
+      scale: beat.focus?.scale ?? focusForBeat(index, input.templateKey).scale
+    };
+    return [
+      {
+        id: `cursor-${index + 1}`,
+        kind: moment.interactionHint.kind,
+        startMs: Math.min(beat.endMs - 500, beat.startMs + 180),
+        endMs: Math.min(beat.endMs, beat.startMs + 1450),
+        anchor: focus,
+        label: cleanOptionalText(moment.interactionHint.label)?.slice(0, 64),
+        confidence: Number(clamp(moment.interactionHint.confidence, 0, 1).toFixed(3))
+      }
+    ];
+  });
   return {
     schemaVersion: "2",
     templateId: templateManifestId(input.templateKey, 1),
@@ -299,6 +321,7 @@ export function buildEditDecisionList(input: {
       anchor: beat.focus ?? focusForBeat(index, input.templateKey),
       evidenceIds: beat.evidenceIds
     })),
+    cursorCues,
     sfx: soundDesignEnabled ? buildSfxCues({ zooms, visualBeats: input.visualBeats, durationMs }) : [],
     presenter: {
       enabled: Boolean(input.profile.brandPresenterEnabled) && template.presenterCompatible,
