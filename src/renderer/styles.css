@@ -402,6 +402,40 @@ video {
   object-fit: cover;
 }
 
+.avatar-preview {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  min-height: 72px;
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.avatar-preview img,
+.avatar-preview > span {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  object-fit: cover;
+  border-radius: 50%;
+  background: #f5d15f;
+  color: #10131d;
+  font-weight: 900;
+}
+
+.avatar-preview strong,
+.avatar-preview small {
+  display: block;
+}
+
+.avatar-preview small {
+  margin-top: 0.2rem;
+  color: var(--muted);
+}
+
 .platform-picker,
 .action-row,
 .header-metrics {

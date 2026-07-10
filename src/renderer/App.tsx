@@ -58,6 +58,10 @@ const ctaStyles: CtaStylePreset[] = ["soft_try", "direct_signup", "learn_more"];
 const musicMoods: MusicMood[] = ["none", "clean_tech", "upbeat"];
 const presenterPositions = ["lower_right", "lower_left"] as const;
 const presenterMotions = ["caption_sync", "idle_bob"] as const;
+const fictionalAvatarPreviewUrls: Partial<Record<NonNullable<ProductProfile["avatarPresenterId"]>, string>> = {
+  orbit: new URL("../../assets/avatar-catalog/orbit.png", import.meta.url).toString(),
+  nova: new URL("../../assets/avatar-catalog/nova.png", import.meta.url).toString()
+};
 
 function App(): JSX.Element {
   const [state, setState] = useState<AppState>(() => createEmptyAppState());
@@ -1201,6 +1205,10 @@ function ProfileForm({
     update("platforms", next);
   }
 
+  const selectedAvatarId = profile.avatarPresenterId ?? "logo_head";
+  const selectedAvatar = fictionalAvatarPresenterCatalog.find((avatar) => avatar.id === selectedAvatarId);
+  const avatarPreviewUrl = fictionalAvatarPreviewUrls[selectedAvatarId];
+
   return (
     <form className="profile-form">
       <label>
@@ -1276,6 +1284,13 @@ function ProfileForm({
           ))}
         </select>
       </label>
+      <div className="avatar-preview" aria-label="Selected fictional presenter">
+        {avatarPreviewUrl ? <img src={avatarPreviewUrl} alt="" /> : <span>{initials(profile.productName || "G")}</span>}
+        <div>
+          <strong>{selectedAvatar?.displayName ?? "Brand logo host"}</strong>
+          <small>AI-generated brand presenter</small>
+        </div>
+      </div>
       <label>
         Presenter side
         <select
