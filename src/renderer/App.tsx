@@ -1617,6 +1617,28 @@ function ScriptEditor({
     );
   }
 
+  function updateVisualBeatCallout(scriptId: string, beatIndex: number, callout: string): void {
+    const normalizedCallout = callout.replace(/\s+/g, " ").trimStart().slice(0, 72);
+    setScripts(
+      scripts.map((script) => {
+        if (script.id !== scriptId) {
+          return script;
+        }
+        return {
+          ...script,
+          visualBeats: script.visualBeats.map((beat, index) =>
+            index === beatIndex
+              ? {
+                  ...beat,
+                  callout: normalizedCallout
+                }
+              : beat
+          )
+        };
+      })
+    );
+  }
+
   return (
     <div className="script-stack">
       {scripts.map((script, index) => {
@@ -1687,9 +1709,17 @@ function ScriptEditor({
                     <div className="visual-beat-focus" key={`${script.id}-${beat.momentId}-${beat.startMs}`}>
                       <div>
                         <span>{beat.purpose ?? "beat"}</span>
-                        <small>{beat.callout ?? beat.instruction}</small>
+                        <small>{beat.instruction}</small>
                       </div>
                       <div className="focus-control-grid">
+                        <label className="wide-control">
+                          Callout
+                          <input
+                            maxLength={72}
+                            onChange={(event) => updateVisualBeatCallout(script.id, beatIndex, event.target.value)}
+                            value={beat.callout ?? ""}
+                          />
+                        </label>
                         <label>
                           In
                           <input

@@ -706,6 +706,11 @@ video {
   padding: 0;
 }
 
+.focus-control-grid .wide-control input {
+  min-height: 34px;
+  padding: 0 0.65rem;
+}
+
 .visual-beat-focus-list {
   display: grid;
   gap: 0.7rem;

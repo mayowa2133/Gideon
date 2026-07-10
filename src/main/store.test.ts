@@ -953,7 +953,7 @@ describe("GideonStore billing reconciliation", () => {
     expect(updated.renders).toEqual([]);
   });
 
-  it("preserves user-edited visual beat source range and focus in rebuilt render manifests", async () => {
+  it("preserves user-edited visual beat source range, focus, and callout in rebuilt render manifests", async () => {
     const store = new GideonStore();
     await store.load();
     const project = await store.createProject({
@@ -979,23 +979,27 @@ describe("GideonStore billing reconciliation", () => {
     const firstScript = scripted.scripts[0]!;
     const editedFocus = { x: 0.31, y: 0.62, scale: 1.44 };
     const editedSource = { sourceStartMs: 500, sourceEndMs: 2_400 };
+    const editedCallout = "Proof: CSV imported in seconds";
 
     const updated = await store.updateScripts(project.id, [
       {
         ...firstScript,
         visualBeats: firstScript.visualBeats.map((beat, index) =>
-          index === 0 ? { ...beat, ...editedSource, focus: editedFocus } : beat
+          index === 0 ? { ...beat, ...editedSource, callout: editedCallout, focus: editedFocus } : beat
         )
       }
     ]);
     const saved = updated.scripts[0]!;
 
     expect(saved.visualBeats[0]).toMatchObject(editedSource);
+    expect(saved.visualBeats[0]?.callout).toBe(editedCallout);
     expect(saved.visualBeats[0]?.focus).toEqual(editedFocus);
     expect(saved.editDecisionList?.sourceSegments[0]).toMatchObject(editedSource);
     expect(saved.editDecisionList?.sourceSegments[0]?.focus).toEqual(editedFocus);
     expect(saved.editDecisionList?.zooms[0]?.focus).toEqual(editedFocus);
     expect(saved.editDecisionList?.callouts[0]?.anchor).toEqual(editedFocus);
+    expect(saved.editDecisionList?.callouts[0]?.text).toBe(editedCallout);
+    expect(saved.editDecisionList?.overlays.find((overlay) => overlay.id === "proof-1")?.text).toBe(editedCallout);
     expect(updated.renders).toEqual([]);
   });
 
