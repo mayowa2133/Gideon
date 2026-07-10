@@ -1496,6 +1496,7 @@ function mcpProjectContextResource(project: Project, state: AppState) {
             durationMs: script.editDecisionList.durationMs,
             canvas: script.editDecisionList.canvas,
             zooms: script.editDecisionList.zooms,
+            transitions: script.editDecisionList.transitions,
             overlays: script.editDecisionList.overlays,
             callouts: script.editDecisionList.callouts,
             cursorCues: script.editDecisionList.cursorCues,

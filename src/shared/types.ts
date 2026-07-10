@@ -497,6 +497,14 @@ export interface RenderZoomCue {
   easing: "standard" | "snap" | "spring";
 }
 
+export interface RenderTransitionCue {
+  id: string;
+  kind: "snap_cut" | "match_cut" | "wipe";
+  startMs: number;
+  endMs: number;
+  emphasis: "primary" | "accent";
+}
+
 export interface RenderOverlayCue {
   id: string;
   kind: "hook" | "proof_label" | "callout" | "cta" | "brand_badge";
@@ -563,6 +571,7 @@ export interface EditDecisionList {
   brandKit: BrandKit;
   sourceSegments: RenderSourceSegment[];
   zooms: RenderZoomCue[];
+  transitions: RenderTransitionCue[];
   captions: CaptionSegment[];
   overlays: RenderOverlayCue[];
   callouts: RenderCalloutCue[];

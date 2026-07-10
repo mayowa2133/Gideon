@@ -607,6 +607,7 @@ async function createTimedOverlayFrame(
     drawHookOverlay(context, activeHook, editDecisionList, timestampMs);
   }
 
+  drawTransitionCue(context, editDecisionList, timestampMs);
   drawVisualBeatCallouts(context, editDecisionList, timestampMs);
   drawCursorEmphasis(context, editDecisionList, timestampMs);
 
@@ -751,6 +752,26 @@ function drawVisualBeatCallouts(
       drawCalloutArrow(context, editDecisionList.brandKit, position, callout.anchor);
     }
   });
+}
+
+function drawTransitionCue(context: OverlayContext, editDecisionList: EditDecisionList, timestampMs: number): void {
+  const transition = activeTransitionCuesAt(editDecisionList.transitions ?? [], timestampMs)[0];
+  if (!transition) {
+    return;
+  }
+  const progress = clamp((timestampMs - transition.startMs) / Math.max(1, transition.endMs - transition.startMs), 0, 1);
+  const color = transition.emphasis === "primary" ? editDecisionList.brandKit.primaryColor : editDecisionList.brandKit.accentColor;
+  if (transition.kind === "wipe") {
+    drawSolidRect(context, 0, 420, OUTPUT_WIDTH * progress, 14, alpha(color, 0.84));
+    drawSolidRect(context, OUTPUT_WIDTH * (1 - progress), 1180, OUTPUT_WIDTH * progress, 14, alpha(color, 0.84));
+    return;
+  }
+  const flashAlpha = transition.kind === "snap_cut" ? 0.18 * (1 - progress) : 0.1 * (1 - progress);
+  drawSolidRect(context, 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT, alpha(color, flashAlpha));
+  drawPanel(context, 74, 438, 214, 58, alpha(color, transition.kind === "snap_cut" ? 0.88 : 0.72));
+  context.fillStyle = transition.emphasis === "primary" ? "#10131D" : "#FFFFFF";
+  context.font = "22pt Arial";
+  context.fillText(transition.kind === "match_cut" ? "MATCH CUT" : "QUICK CUT", 104, 476);
 }
 
 function drawCalloutArrow(
@@ -987,6 +1008,13 @@ function activeCalloutsAt(
   return callouts.filter((callout) => isCueActive(callout, timestampMs));
 }
 
+function activeTransitionCuesAt(
+  transitions: EditDecisionList["transitions"],
+  timestampMs: number
+): EditDecisionList["transitions"] {
+  return transitions.filter((transition) => isCueActive(transition, timestampMs));
+}
+
 function activeCursorCuesAt(
   cursorCues: EditDecisionList["cursorCues"],
   timestampMs: number
@@ -1013,6 +1041,7 @@ function ensureEditDecisionList(
 ): EditDecisionList {
   if (script.editDecisionList?.schemaVersion === "2") {
     const manifest = script.editDecisionList as EditDecisionList & {
+      transitions?: EditDecisionList["transitions"];
       cursorCues?: EditDecisionList["cursorCues"];
       sfx?: EditDecisionList["sfx"];
       music?: EditDecisionList["music"];
@@ -1025,6 +1054,7 @@ function ensureEditDecisionList(
         ...callout,
         arrow: callout.arrow ?? { enabled: true, direction: "auto" as const }
       })),
+      transitions: manifest.transitions ?? [],
       cursorCues: manifest.cursorCues ?? [],
       sfx: manifest.sfx ?? [],
       music: manifest.music ?? { enabled: false, mood: "none", gainDb: -30 }
@@ -1063,6 +1093,7 @@ export function validateRenderManifest(editDecisionList: EditDecisionList): void
   validateTimedCueCollection("Caption", editDecisionList.captions, editDecisionList.durationMs);
   validateTimedCueCollection("Overlay", editDecisionList.overlays, editDecisionList.durationMs);
   validateTimedCueCollection("Callout", editDecisionList.callouts, editDecisionList.durationMs);
+  validateTimedCueCollection("Transition", editDecisionList.transitions ?? [], editDecisionList.durationMs);
   validateTimedCueCollection("Cursor", cursorCues, editDecisionList.durationMs);
   validateSfxCueTimings(editDecisionList.sfx, editDecisionList.durationMs);
   validatePresenterTiming(editDecisionList.presenter, editDecisionList.durationMs);
@@ -1079,6 +1110,11 @@ export function validateRenderManifest(editDecisionList: EditDecisionList): void
     validateFocusPoint(`Callout ${index + 1}`, callout.anchor);
     if (callout.arrow && !["auto", "left", "right", "up", "down"].includes(callout.arrow.direction)) {
       throw new Error(`Callout ${index + 1} arrow direction is unsupported.`);
+    }
+  });
+  (editDecisionList.transitions ?? []).forEach((transition, index) => {
+    if (!["snap_cut", "match_cut", "wipe"].includes(transition.kind)) {
+      throw new Error(`Transition cue ${index + 1} kind is unsupported.`);
     }
   });
   cursorCues.forEach((cue, index) => {

@@ -160,6 +160,23 @@ describe("media pipeline", () => {
     })).toThrow("Callout 1 arrow direction is unsupported");
   });
 
+  it("rejects render manifests with unsupported transition cues", () => {
+    const script = draftScript();
+
+    expect(() => validateRenderManifest({
+      ...script.editDecisionList!,
+      transitions: [
+        {
+          id: "transition-bad",
+          kind: "spin" as never,
+          startMs: 1_000,
+          endMs: 1_200,
+          emphasis: "accent"
+        }
+      ]
+    })).toThrow("Transition cue 1 kind is unsupported");
+  });
+
   it("rejects render manifests with invalid cursor emphasis cues", () => {
     const script = draftScript();
 

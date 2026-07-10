@@ -249,6 +249,13 @@ export function buildEditDecisionList(input: {
       easing: template.visualRhythm === "snap" ? "snap" as const : "standard" as const
     };
   });
+  const transitions = input.visualBeats.slice(1).map((beat, index) => ({
+    id: `cut-${index + 1}`,
+    kind: template.visualRhythm === "contrast" ? "wipe" as const : template.visualRhythm === "steady" ? "match_cut" as const : "snap_cut" as const,
+    startMs: Math.max(0, beat.startMs - 90),
+    endMs: Math.min(durationMs, beat.startMs + 230),
+    emphasis: index % 2 === 0 ? "accent" as const : "primary" as const
+  }));
   const overlays = [
     {
       id: "hook",
@@ -311,6 +318,7 @@ export function buildEditDecisionList(input: {
     brandKit,
     sourceSegments,
     zooms,
+    transitions,
     captions: input.captions,
     overlays,
     callouts: input.visualBeats.slice(0, 4).map((beat, index) => ({

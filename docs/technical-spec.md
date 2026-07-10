@@ -219,6 +219,13 @@ type EditDecisionList = {
     focus: { x: number; y: number; scale: number };
     easing: "standard" | "snap" | "spring";
   }>;
+  transitions: Array<{
+    id: string;
+    kind: "snap_cut" | "match_cut" | "wipe";
+    startMs: number;
+    endMs: number;
+    emphasis: "primary" | "accent";
+  }>;
   captions: Array<{
     startMs: number;
     endMs: number;
