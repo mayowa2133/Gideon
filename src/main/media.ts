@@ -886,8 +886,12 @@ async function drawBrandPresenter(
     : Math.sin(timestampMs / 360) * 4;
   const baseY = 1425 + bob;
   const ringPulse = speaking ? 1 + Math.sin(timestampMs / 90) * 0.04 : 1;
-  drawPanel(context, baseX + 36, baseY + 245, 170, 250, "rgba(247,248,243,0.92)");
+  const gesture = presenter.motion === "caption_sync" && speaking ? Math.sin(timestampMs / 105) * 34 : 0;
+  drawSolidRect(context, baseX + 96, baseY + 246, 52, 70, "rgba(247,248,243,0.92)");
+  drawPanel(context, baseX + 36, baseY + 304, 170, 176, "rgba(247,248,243,0.92)");
   drawPanel(context, baseX + 10, baseY + 398, 230, 160, alpha(brandKit.primaryColor, 0.9));
+  drawPanel(context, baseX + 12, baseY + 386 - gesture * 0.2, 34, 108, alpha(brandKit.primaryColor, 0.9));
+  drawPanel(context, baseX + 196, baseY + 386 + gesture * 0.28, 34, 108, alpha(brandKit.primaryColor, 0.9));
   context.fillStyle = "rgba(255,255,255,0.18)";
   context.beginPath();
   context.arc(baseX + 122, baseY + 172, 118 * ringPulse, 0, Math.PI * 2);

@@ -422,7 +422,7 @@ Validate that useful, evidence-backed concepts and editable vertical drafts save
 ### Future: human presenter and avatar marketing
 
 - Optional AI avatar or imported user likeness that can take the role of a creator-style presenter, subject to consent, likeness rights, and safety review.
-- Company-logo presenter variants for brands that want a stylized host without using a real person.
+- Company-logo presenter variants for brands that want a stylized host without using a real person. The MVP illustration uses a generic torso, shoulders, neck, logo head, motion, and an on-frame `brand presenter` disclosure; it does not model a real individual.
 - Presenter scripts and gestures aligned to the same evidence-backed product moments, so the avatar explains visible product proof instead of inventing claims.
 - Content calendar and campaign planning.
 - Team workspaces, approval policies, agency client portals.
