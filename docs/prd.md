@@ -112,7 +112,7 @@ For software builders who need to market consistently, Gideon converts an existi
 8. Selection of up to three concepts per generation batch.
 9. Hook, short script, caption plan, voiceover text, creator template, and visual beat plan for selected concepts.
 10. User editing of hook, script/voiceover, captions, template, brand kit, sound design, presenter toggle, and basic crop/focus choices.
-11. Up to three 9:16 draft renders from explicitly approved scripts using the uploaded footage, captions, voiceover when enabled, timed overlays, focus punch-ins, callouts, optional generated music/SFX, and optional deterministic brand presenter.
+11. Up to three 9:16 draft renders from explicitly approved scripts using the uploaded footage, captions, voiceover when enabled, template-driven pacing, timed overlays, focus punch-ins, quick cuts, callouts, optional generated music/SFX, and optional deterministic brand presenter.
 12. Preview, stage-level regeneration, final MP4 export, and deletion.
 13. Job progress, failure details safe for users, retry/cancel where supported, and persistent history.
 14. Usage events sufficient for limits and future billing; no checkout required.

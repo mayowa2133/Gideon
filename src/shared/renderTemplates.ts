@@ -17,11 +17,23 @@ export interface CreatorTemplateDefinition {
   name: string;
   formatFamily: string;
   hookPattern: string;
+  pacingRules: CreatorTemplateBeatRule[];
   captionStyle: BrandKit["captionStyle"];
   visualRhythm: "snap" | "steady" | "stacked" | "contrast";
+  zoomIntensity: "subtle" | "medium" | "strong";
+  hookOverlayMs: number;
+  proofOverlayMs: number;
+  ctaLeadMs: number;
   defaultDurationSec: number;
   ctaPosition: "bottom" | "center";
   presenterCompatible: boolean;
+}
+
+export interface CreatorTemplateBeatRule {
+  purpose: NonNullable<VisualBeat["purpose"]>;
+  weight: number;
+  minMs: number;
+  maxMs: number;
 }
 
 export const creatorTemplatePack: CreatorTemplateDefinition[] = [
@@ -30,8 +42,19 @@ export const creatorTemplatePack: CreatorTemplateDefinition[] = [
     name: "Hidden feature reveal",
     formatFamily: "feature-highlight",
     hookPattern: "Most people miss this part of {product}.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.16, minMs: 1700, maxMs: 2800 },
+      { purpose: "problem", weight: 0.16, minMs: 1600, maxMs: 3200 },
+      { purpose: "demo", weight: 0.24, minMs: 2200, maxMs: 5200 },
+      { purpose: "proof", weight: 0.24, minMs: 2200, maxMs: 5200 },
+      { purpose: "payoff", weight: 0.2, minMs: 1800, maxMs: 4200 }
+    ],
     captionStyle: "kinetic_bold",
     visualRhythm: "snap",
+    zoomIntensity: "strong",
+    hookOverlayMs: 2600,
+    proofOverlayMs: 2100,
+    ctaLeadMs: 4200,
     defaultDurationSec: 24,
     ctaPosition: "bottom",
     presenterCompatible: true
@@ -41,8 +64,20 @@ export const creatorTemplatePack: CreatorTemplateDefinition[] = [
     name: "This saves you time",
     formatFamily: "time-saver",
     hookPattern: "This saves {customer} from doing the slow part manually.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.14, minMs: 1600, maxMs: 2600 },
+      { purpose: "problem", weight: 0.18, minMs: 1800, maxMs: 3600 },
+      { purpose: "demo", weight: 0.22, minMs: 2200, maxMs: 4800 },
+      { purpose: "proof", weight: 0.18, minMs: 1900, maxMs: 4200 },
+      { purpose: "payoff", weight: 0.18, minMs: 1800, maxMs: 4200 },
+      { purpose: "cta", weight: 0.1, minMs: 1400, maxMs: 3000 }
+    ],
     captionStyle: "kinetic_bold",
     visualRhythm: "snap",
+    zoomIntensity: "strong",
+    hookOverlayMs: 2500,
+    proofOverlayMs: 2200,
+    ctaLeadMs: 4600,
     defaultDurationSec: 26,
     ctaPosition: "bottom",
     presenterCompatible: true
@@ -52,8 +87,19 @@ export const creatorTemplatePack: CreatorTemplateDefinition[] = [
     name: "Problem to demo to payoff",
     formatFamily: "problem-solution",
     hookPattern: "If {customer} still does this manually, show this.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.14, minMs: 1800, maxMs: 3200 },
+      { purpose: "problem", weight: 0.22, minMs: 2200, maxMs: 5200 },
+      { purpose: "demo", weight: 0.26, minMs: 2600, maxMs: 6200 },
+      { purpose: "proof", weight: 0.2, minMs: 2200, maxMs: 5200 },
+      { purpose: "payoff", weight: 0.18, minMs: 2000, maxMs: 4800 }
+    ],
     captionStyle: "clean_founder",
     visualRhythm: "steady",
+    zoomIntensity: "medium",
+    hookOverlayMs: 3300,
+    proofOverlayMs: 2600,
+    ctaLeadMs: 5200,
     defaultDurationSec: 30,
     ctaPosition: "bottom",
     presenterCompatible: true
@@ -63,8 +109,20 @@ export const creatorTemplatePack: CreatorTemplateDefinition[] = [
     name: "Founder product demo",
     formatFamily: "founder-demo",
     hookPattern: "I built {product} because this workflow was too slow.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.16, minMs: 2200, maxMs: 4200 },
+      { purpose: "problem", weight: 0.18, minMs: 2200, maxMs: 5200 },
+      { purpose: "demo", weight: 0.26, minMs: 2800, maxMs: 7200 },
+      { purpose: "proof", weight: 0.18, minMs: 2200, maxMs: 5200 },
+      { purpose: "payoff", weight: 0.14, minMs: 1800, maxMs: 4200 },
+      { purpose: "cta", weight: 0.08, minMs: 1400, maxMs: 3200 }
+    ],
     captionStyle: "clean_founder",
     visualRhythm: "steady",
+    zoomIntensity: "subtle",
+    hookOverlayMs: 3600,
+    proofOverlayMs: 2800,
+    ctaLeadMs: 5600,
     defaultDurationSec: 36,
     ctaPosition: "bottom",
     presenterCompatible: true
@@ -74,8 +132,19 @@ export const creatorTemplatePack: CreatorTemplateDefinition[] = [
     name: "Three reasons",
     formatFamily: "three-reasons",
     hookPattern: "Three reasons {customer} should care about this workflow.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.16, minMs: 2200, maxMs: 4200 },
+      { purpose: "proof", weight: 0.22, minMs: 2600, maxMs: 6200 },
+      { purpose: "proof", weight: 0.22, minMs: 2600, maxMs: 6200 },
+      { purpose: "proof", weight: 0.22, minMs: 2600, maxMs: 6200 },
+      { purpose: "cta", weight: 0.18, minMs: 1800, maxMs: 4400 }
+    ],
     captionStyle: "educational_stack",
     visualRhythm: "stacked",
+    zoomIntensity: "medium",
+    hookOverlayMs: 3900,
+    proofOverlayMs: 3100,
+    ctaLeadMs: 5800,
     defaultDurationSec: 38,
     ctaPosition: "bottom",
     presenterCompatible: true
@@ -85,8 +154,19 @@ export const creatorTemplatePack: CreatorTemplateDefinition[] = [
     name: "Before and after workflow",
     formatFamily: "before-after",
     hookPattern: "Here is the before and after inside {product}.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.14, minMs: 1800, maxMs: 3200 },
+      { purpose: "problem", weight: 0.28, minMs: 2600, maxMs: 6800 },
+      { purpose: "demo", weight: 0.24, minMs: 2400, maxMs: 5800 },
+      { purpose: "payoff", weight: 0.24, minMs: 2400, maxMs: 5800 },
+      { purpose: "cta", weight: 0.1, minMs: 1400, maxMs: 3200 }
+    ],
     captionStyle: "kinetic_bold",
     visualRhythm: "contrast",
+    zoomIntensity: "medium",
+    hookOverlayMs: 3000,
+    proofOverlayMs: 2600,
+    ctaLeadMs: 5000,
     defaultDurationSec: 32,
     ctaPosition: "bottom",
     presenterCompatible: false
@@ -96,8 +176,20 @@ export const creatorTemplatePack: CreatorTemplateDefinition[] = [
     name: "Brand presenter",
     formatFamily: "brand-presenter",
     hookPattern: "Let {product} explain the workflow in under a minute.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.16, minMs: 2000, maxMs: 3600 },
+      { purpose: "problem", weight: 0.16, minMs: 1800, maxMs: 4200 },
+      { purpose: "demo", weight: 0.24, minMs: 2400, maxMs: 6200 },
+      { purpose: "proof", weight: 0.2, minMs: 2200, maxMs: 5200 },
+      { purpose: "payoff", weight: 0.16, minMs: 1800, maxMs: 4200 },
+      { purpose: "cta", weight: 0.08, minMs: 1400, maxMs: 3000 }
+    ],
     captionStyle: "clean_founder",
     visualRhythm: "snap",
+    zoomIntensity: "medium",
+    hookOverlayMs: 3000,
+    proofOverlayMs: 2400,
+    ctaLeadMs: 5200,
     defaultDurationSec: 34,
     ctaPosition: "bottom",
     presenterCompatible: true
@@ -177,25 +269,14 @@ export function buildVisualBeatsForTemplate(input: {
   if (moments.length === 0) {
     return [];
   }
-  const purposes: NonNullable<VisualBeat["purpose"]>[] =
-    template.key === "three_reasons"
-      ? ["hook", "proof", "proof", "proof", "cta"]
-      : template.key === "saves_you_time"
-        ? ["hook", "problem", "demo", "proof", "payoff", "cta"]
-        : template.key === "before_after_workflow"
-          ? ["hook", "problem", "demo", "payoff", "cta"]
-          : template.key === "founder_demo"
-            ? ["hook", "problem", "demo", "proof", "payoff", "cta"]
-            : ["hook", "problem", "demo", "proof", "payoff"];
-  const beatCount = Math.max(purposes.length, Math.min(6, moments.length + 2));
-  const beatDuration = Math.max(1200, Math.floor(input.durationMs / beatCount));
-  return Array.from({ length: beatCount }, (_unused, index) => {
-    const moment = momentForBeat(moments, index, purposes[index] ?? "demo");
-    const purpose = purposes[index % purposes.length] ?? "demo";
+  const beatTimings = templateBeatTimings(template, input.durationMs);
+  return beatTimings.map((timing, index) => {
+    const purpose = timing.rule.purpose;
+    const moment = momentForBeat(moments, index, purpose);
     const focus = moment.focus ?? focusForBeat(index, input.templateKey);
     return {
-      startMs: index * beatDuration,
-      endMs: index === beatCount - 1 ? input.durationMs : Math.min((index + 1) * beatDuration, input.durationMs),
+      startMs: timing.startMs,
+      endMs: timing.endMs,
       momentId: moment.id,
       sourceStartMs: moment.startMs,
       sourceEndMs: moment.endMs,
@@ -240,11 +321,13 @@ export function buildEditDecisionList(input: {
   });
   const zooms = input.visualBeats.map((beat, index) => {
     const focus = beat.focus ?? focusForBeat(index, input.templateKey);
+    const zoomDurationMs = template.zoomIntensity === "strong" ? 1500 : template.zoomIntensity === "medium" ? 1800 : 2200;
+    const fromScale = template.zoomIntensity === "strong" && index > 0 ? 1.06 : index === 0 ? 1 : 1.03;
     return {
       startMs: beat.startMs,
-      endMs: Math.min(beat.endMs, beat.startMs + 1800),
-      fromScale: index === 0 ? 1 : 1.03,
-      toScale: focus.scale,
+      endMs: Math.min(beat.endMs, beat.startMs + zoomDurationMs),
+      fromScale,
+      toScale: zoomScaleForTemplate(focus.scale, template.zoomIntensity),
       focus,
       easing: template.visualRhythm === "snap" ? "snap" as const : "standard" as const
     };
@@ -261,7 +344,7 @@ export function buildEditDecisionList(input: {
       id: "hook",
       kind: "hook" as const,
       startMs: 0,
-      endMs: Math.min(4200, durationMs),
+      endMs: Math.min(template.hookOverlayMs, durationMs),
       text: input.hook,
       position: "top" as const,
       emphasis: "primary" as const
@@ -270,7 +353,7 @@ export function buildEditDecisionList(input: {
       id: `proof-${index + 1}`,
       kind: "proof_label" as const,
       startMs: beat.startMs,
-      endMs: Math.min(beat.endMs, beat.startMs + 2600),
+      endMs: Math.min(beat.endMs, beat.startMs + template.proofOverlayMs),
       text: beat.callout ?? calloutForPurpose(beat.purpose ?? "demo", momentLabel(input.moments, beat.momentId)),
       position: index % 2 === 0 ? "left" as const : "right" as const,
       emphasis: "accent" as const
@@ -278,7 +361,7 @@ export function buildEditDecisionList(input: {
     {
       id: "cta",
       kind: "cta" as const,
-      startMs: Math.max(0, durationMs - 5200),
+      startMs: Math.max(0, durationMs - template.ctaLeadMs),
       endMs: durationMs,
       text: input.cta,
       position: template.ctaPosition,
@@ -324,7 +407,7 @@ export function buildEditDecisionList(input: {
     callouts: input.visualBeats.slice(0, 4).map((beat, index) => ({
       id: `callout-${index + 1}`,
       startMs: beat.startMs,
-      endMs: Math.min(beat.endMs, beat.startMs + 2600),
+      endMs: Math.min(beat.endMs, beat.startMs + template.proofOverlayMs),
       text: beat.callout ?? calloutForPurpose(beat.purpose ?? "demo", momentLabel(input.moments, beat.momentId)),
       anchor: beat.focus ?? focusForBeat(index, input.templateKey),
       arrow: {
@@ -356,6 +439,43 @@ export function buildEditDecisionList(input: {
       requireAudioAlignment: true
     }
   };
+}
+
+function templateBeatTimings(
+  template: CreatorTemplateDefinition,
+  durationMs: number
+): Array<{ rule: CreatorTemplateBeatRule; startMs: number; endMs: number }> {
+  const rules = template.pacingRules.length
+    ? template.pacingRules
+    : [{ purpose: "demo" as const, weight: 1, minMs: 1200, maxMs: durationMs }];
+  const weightTotal = rules.reduce((total, rule) => total + Math.max(0.01, rule.weight), 0);
+  let cursorMs = 0;
+  return rules.map((rule, index) => {
+    const isLast = index === rules.length - 1;
+    const weightedDurationMs = Math.round((durationMs * Math.max(0.01, rule.weight)) / weightTotal);
+    const desiredDurationMs = Math.max(rule.minMs, Math.min(rule.maxMs, weightedDurationMs));
+    const remainingRules = rules.length - index - 1;
+    const remainingMinimumMs = rules.slice(index + 1).reduce((total, candidate) => total + candidate.minMs, 0);
+    const maxEndMs = Math.max(cursorMs + 500, durationMs - remainingMinimumMs);
+    const endMs = isLast ? durationMs : Math.min(cursorMs + desiredDurationMs, maxEndMs);
+    const timing = {
+      rule,
+      startMs: cursorMs,
+      endMs: Math.min(durationMs, Math.max(cursorMs + 500, endMs))
+    };
+    cursorMs = Math.min(durationMs - remainingRules * 500, timing.endMs);
+    return timing;
+  });
+}
+
+function zoomScaleForTemplate(scale: number, intensity: CreatorTemplateDefinition["zoomIntensity"]): number {
+  if (intensity === "strong") {
+    return clamp(scale + 0.08, 1, 2.5);
+  }
+  if (intensity === "subtle") {
+    return clamp(scale - 0.04, 1, 2.5);
+  }
+  return clamp(scale, 1, 2.5);
 }
 
 function buildSfxCues(input: {

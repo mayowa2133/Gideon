@@ -171,6 +171,18 @@ type WalkthroughEvidenceBundle = {
 The model sees only bounded media inputs or provider-uploaded ephemeral assets. Signed references are not persisted in prompts/logs. OCR/transcript text is wrapped as untrusted evidence and cannot supply instructions.
 Provider semantic-analysis outputs must carry `sourceEvidenceIds` copied from the evidence catalog. The server rejects missing or unknown source IDs before accepting AI-detected moments, so generated claims stay tied to transcript segments, OCR frames, or deterministic fallback moments.
 
+### Creator templates
+
+Creator templates are versioned render recipes, not just labels. Each template declares:
+
+- `hookPattern` for the first 1-2 seconds.
+- `pacingRules` with ordered beat purpose, duration weight, and min/max duration.
+- `captionStyle`, `visualRhythm`, and `zoomIntensity`.
+- `hookOverlayMs`, `proofOverlayMs`, and `ctaLeadMs`.
+- CTA placement and brand-presenter compatibility.
+
+The script compiler turns these rules into visual beat timings, source segment timing, zoom cues, transition cues, callouts, and hook/CTA overlays. Template changes therefore alter the EDL deterministically while keeping all renderer inputs schema-validated.
+
 ### Edit decision list
 
 AI and user choices compile into a renderer-neutral, schema-validated `EditDecisionList` (EDL):

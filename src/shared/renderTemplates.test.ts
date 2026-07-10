@@ -53,6 +53,18 @@ describe("creator render templates", () => {
         "brand_presenter"
       ])
     );
+    expect(
+      creatorTemplatePack.every(
+        (template) =>
+          template.pacingRules.length >= 5 &&
+          template.pacingRules[0]?.purpose === "hook" &&
+          template.hookOverlayMs >= 2_000 &&
+          template.proofOverlayMs >= 2_000 &&
+          template.ctaLeadMs >= 4_000
+      )
+    ).toBe(true);
+    expect(creatorTemplatePack.find((template) => template.key === "hidden_feature_reveal")?.zoomIntensity).toBe("strong");
+    expect(creatorTemplatePack.find((template) => template.key === "founder_demo")?.zoomIntensity).toBe("subtle");
   });
 
   it("maps common concept families to deterministic templates", () => {
@@ -98,6 +110,8 @@ describe("creator render templates", () => {
       templateKey: "brand_presenter"
     });
     expect(visualBeats[0]).toMatchObject({ sourceStartMs: moments[0]?.startMs, sourceEndMs: moments[0]?.endMs });
+    expect(visualBeats[0]?.endMs).toBeLessThan(3_600);
+    expect(visualBeats.at(-1)?.endMs).toBe(18_000);
     const editDecisionList = buildEditDecisionList({
       profile,
       templateKey: "brand_presenter",
@@ -124,6 +138,8 @@ describe("creator render templates", () => {
     expect(editDecisionList.zooms.length).toBe(editDecisionList.sourceSegments.length);
     expect(editDecisionList.transitions).toHaveLength(visualBeats.length - 1);
     expect(editDecisionList.transitions[0]).toMatchObject({ kind: "snap_cut", startMs: visualBeats[1]!.startMs - 90 });
+    expect(editDecisionList.overlays.find((overlay) => overlay.kind === "hook")?.endMs).toBe(3_000);
+    expect(editDecisionList.overlays.find((overlay) => overlay.kind === "cta")?.startMs).toBe(12_800);
     expect(editDecisionList.callouts.length).toBeGreaterThanOrEqual(4);
     expect(editDecisionList.callouts[0]?.arrow).toEqual({ enabled: true, direction: "auto" });
     expect(editDecisionList.cursorCues[0]).toMatchObject({
