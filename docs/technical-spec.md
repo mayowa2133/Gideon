@@ -186,6 +186,7 @@ Creator templates are versioned render recipes, not just labels. Each template d
 The script compiler turns these rules into visual beat timings, source segment timing, zoom cues, transition cues, callouts, and hook/CTA overlays. Template changes therefore alter the EDL deterministically while keeping all renderer inputs schema-validated.
 
 Render jobs may persist an optional script-ID scope and a voiceover mode. Scoped retries retain unrelated completed renders, while `reuse` validates the prior private local voiceover before rendering and falls back to normal synthesis only when no usable voiceover exists.
+Local voice-only regeneration is a separate recoverable `tts` job scoped to one approved script; it stores a fresh private voiceover artifact and never replaces a render.
 
 ### Edit decision list
 

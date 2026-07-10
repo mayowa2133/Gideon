@@ -150,6 +150,7 @@ export interface GideonJobExecutorStore {
 
 export interface GideonJobExecutor {
   runAnalysisJob(projectId: string, jobId: string): Promise<Project>;
+  runVoiceoverJob(projectId: string, jobId: string): Promise<Project>;
   runRenderJob(projectId: string, jobId: string): Promise<Project>;
 }
 
@@ -451,6 +452,47 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
     }
   }
 
+  async function runVoiceoverJob(projectId: string, jobId: string): Promise<Project> {
+    const project = await store.getProject(projectId);
+    const job = await store.getJob(projectId, jobId);
+    const scriptId = job.renderScope?.scriptIds?.[0];
+    const script = scriptId ? project.scripts.find((candidate) => candidate.id === scriptId) : undefined;
+    if (!script || !script.approved || hasBlockingScriptWarnings(script.qualityWarnings)) {
+      throw new Error("Choose one approved script without blocking warnings before regenerating voiceover.");
+    }
+    let activeJob = startJob(job, now(), "Generating a fresh voiceover.");
+    await store.updateJob(projectId, activeJob);
+    await store.appendJobEvent(projectId, {
+      jobId,
+      kind: "started",
+      stage: "queued",
+      message: "Voiceover job started.",
+      progress: activeJob.progress,
+      metadata: jobAttemptMetadata(activeJob)
+    });
+    try {
+      activeJob = await advanceJobStage(projectId, jobId, "quota", 1, 3, "Checking voiceover quota.");
+      activeJob = await advanceJobStage(projectId, jobId, "tts", 2, 3, "Generating a fresh voiceover.");
+      const voiceoverPath = await createProviderVoiceover(projectId, script);
+      if (!voiceoverPath) {
+        throw new Error("Voiceover generation is not configured for this workspace.");
+      }
+      activeJob = await store.getJob(projectId, jobId);
+      activeJob = succeedJob(activeJob, now(), "Voiceover regenerated.");
+      await store.appendJobEvent(projectId, {
+        jobId,
+        kind: "succeeded",
+        stage: "finalize",
+        message: activeJob.userMessage,
+        progress: { current: 3, total: 3, unit: "stage" },
+        metadata: jobAttemptMetadata(activeJob)
+      });
+      return store.updateJob(projectId, activeJob);
+    } catch (error) {
+      return failOrCancelJob(projectId, jobId, error);
+    }
+  }
+
   async function advanceJobStage(
     projectId: string,
     jobId: string,
@@ -737,6 +779,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
 
   return {
     runAnalysisJob,
+    runVoiceoverJob,
     runRenderJob
   };
 }

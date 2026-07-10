@@ -39,6 +39,7 @@ import type {
 } from "../shared/types";
 import { loadProviderConfig } from "./providers/config";
 import { createJob, findActiveJob } from "../shared/jobState";
+import { hasBlockingScriptWarnings } from "../shared/renderTemplates";
 
 const store = new GideonStore();
 const workerQueue = new LocalWorkerQueue(loadLocalWorkerQueueOptions());
@@ -299,6 +300,9 @@ function registerIpcHandlers(): void {
     "concepts:update",
     async (_event, projectId: string, concepts: ContentConcept[], changedId: string) =>
       store.updateConcepts(projectId, concepts, changedId)
+  );
+  ipcMain.handle("voiceover:regenerate", async (_event, projectId: string, scriptId: string) =>
+    enqueueVoiceoverFromControl(projectId, scriptId)
   );
   ipcMain.handle("scripts:generate", async (_event, projectId: string) => store.generateScripts(projectId));
   ipcMain.handle("scripts:regenerate", async (_event, projectId: string, scriptId: string) =>
@@ -563,6 +567,10 @@ async function recoverInterruptedJobsAtStartup(): Promise<void> {
       enqueueRenderJob(job.projectId, job.id);
       continue;
     }
+    if (job.kind === "tts") {
+      enqueueVoiceoverJob(job.projectId, job.id);
+      continue;
+    }
     console.warn(`Recovered queued ${job.kind} job ${job.id}, but no local runner is wired for that job kind.`);
   }
 }
@@ -586,6 +594,39 @@ function enqueueRenderJob(projectId: string, jobId: string): void {
         return;
       }
       console.error(`Render job ${jobId} failed outside normal job handling.`, error);
+    });
+}
+
+async function enqueueVoiceoverFromControl(projectId: string, scriptId: string): Promise<Project> {
+  const project = await store.getProject(projectId);
+  const script = project.scripts.find((candidate) => candidate.id === scriptId);
+  if (!script?.approved || hasBlockingScriptWarnings(script.qualityWarnings)) {
+    throw new Error("Choose one approved script without blocking warnings before regenerating voiceover.");
+  }
+  const activeJob = findActiveJob(project.jobs, "tts");
+  if (activeJob) {
+    return project;
+  }
+  const job = createJob({
+    id: randomUUID(),
+    projectId,
+    kind: "tts",
+    now: new Date().toISOString(),
+    userMessage: "Waiting to regenerate voiceover.",
+    renderScope: { scriptIds: [scriptId], voiceoverMode: "regenerate" }
+  });
+  await store.appendJob(projectId, job);
+  enqueueVoiceoverJob(projectId, job.id);
+  return store.getProject(projectId);
+}
+
+function enqueueVoiceoverJob(projectId: string, jobId: string): void {
+  void workerQueue
+    .enqueue(createExecutorWorkerQueueTask(jobExecutor, { kind: "tts", projectId, jobId }))
+    .catch((error) => {
+      if (!isWorkerQueueCanceledError(error)) {
+        console.error(`Voiceover job ${jobId} failed outside normal job handling.`, error);
+      }
     });
 }
 

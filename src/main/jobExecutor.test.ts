@@ -467,6 +467,46 @@ describe("Gideon job executor", () => {
     );
   });
 
+  it("regenerates a voiceover without rendering a video", async () => {
+    const projectDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-tts-"));
+    const project = projectFixture({ scripts: [scriptFixture()] });
+    const store = new FakeExecutorStore(project, projectDir);
+    store.project.jobs = [createJob({
+      id: "job-tts-1",
+      projectId: store.project.id,
+      kind: "tts",
+      now: "2026-06-25T12:00:00.000Z",
+      renderScope: { scriptIds: ["script-1"], voiceoverMode: "regenerate" }
+    })];
+    const executor = createGideonJobExecutor({
+      store,
+      now: clock(),
+      loadProviderConfig: () => providerConfig(true),
+      createSpeechProvider: () => ({
+        isConfigured: () => true,
+        synthesizeSpeech: async ({ outputPath }) => {
+          await fs.mkdir(path.dirname(outputPath), { recursive: true });
+          await fs.writeFile(outputPath, "fixture-audio");
+          return { outputPath, provider: "openai", model: "tts-test" };
+        }
+      }),
+      validateVoiceoverAudio: async () => ({ byteSize: 13, dataBytes: 13 }),
+      statFile: async () => ({ size: 13 }),
+      createPrivateObjectStorage: () => ({
+        async putFile() {
+          return { filePath: "/private/storage/voiceover.wav", fileUrl: "file:///private/storage/voiceover.wav", artifact: artifactFixture({ id: "artifact-voice-1", kind: "voiceover", byteSize: 13 }) };
+        }
+      })
+    });
+
+    const completed = await executor.runVoiceoverJob(store.project.id, "job-tts-1");
+
+    expect(completed.jobs[0]).toMatchObject({ status: "succeeded", userMessage: "Voiceover regenerated." });
+    expect(completed.renders).toEqual([]);
+    expect(completed.artifacts).toEqual([expect.objectContaining({ id: "artifact-voice-1", kind: "voiceover" })]);
+    expect(store.usage).toEqual(expect.arrayContaining([expect.objectContaining({ metric: "tts_characters", source: "tts" })]));
+  });
+
   it("rounds media durations up to billable minutes", () => {
     expect(minutesForDuration(1)).toBe(1);
     expect(minutesForDuration(60_000)).toBe(1);

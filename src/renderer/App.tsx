@@ -992,6 +992,9 @@ function ProjectWorkspace({
           onRenderScript={(scriptId, voiceoverMode) =>
             void runAction("rendering", () => window.gideon.renderScript(project.id, scriptId, voiceoverMode))
           }
+          onRegenerateVoiceover={(scriptId) =>
+            void runAction("rendering", () => window.gideon.regenerateVoiceover(project.id, scriptId))
+          }
         />
       </Panel>
 
@@ -1562,12 +1565,14 @@ function ScriptEditor({
   scripts,
   setScripts,
   onRegenerate,
-  onRenderScript
+  onRenderScript,
+  onRegenerateVoiceover
 }: {
   scripts: ScriptDraft[];
   setScripts: (scripts: ScriptDraft[]) => void;
   onRegenerate: (scriptId: string) => void;
   onRenderScript: (scriptId: string, voiceoverMode: "regenerate" | "reuse") => void;
+  onRegenerateVoiceover: (scriptId: string) => void;
 }): JSX.Element {
   if (scripts.length === 0) {
     return <div className="empty-inline">Generate scripts from selected concepts, then edit voiceover and CTA before render.</div>;
@@ -1763,6 +1768,14 @@ function ScriptEditor({
             <div className="action-row">
               <button className="secondary compact" onClick={() => onRegenerate(script.id)} type="button">
                 Regenerate script
+              </button>
+              <button
+                className="secondary compact"
+                disabled={!script.approved || hasBlockingWarnings}
+                onClick={() => onRegenerateVoiceover(script.id)}
+                type="button"
+              >
+                Regenerate voice
               </button>
               <button
                 className="secondary compact"

@@ -236,7 +236,7 @@ Page-level layout: selected concepts as tabs/left rail; structured editor center
 - Unsupported claim, missing evidence, and caption safe-area overflow warnings block approval until edited or explicitly confirmed with added context.
 - `Regenerate section` opens a small instruction field and affects only that section.
 - `Preview voice` may synthesize a short sample subject to usage limits.
-- Each approved draft can be re-rendered on its own with its validated prior voiceover, or rendered with a fresh voiceover, without replacing other completed drafts.
+- Each approved draft can regenerate only its private voiceover, re-render on its own with its validated prior voiceover, or render with a fresh voiceover, without replacing other completed drafts.
 - Voiceover toggle: AI voice, source audio only, or voiceover plus ducked source audio if supported.
 - `Approve & render drafts` summarizes the approved script, template, brand kit, sound-design setting, caption style, and evidence-backed visual plan versions that will be used.
 
