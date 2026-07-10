@@ -1512,9 +1512,15 @@ function mcpProjectContextResource(project: Project, state: AppState) {
             callouts: script.editDecisionList.callouts,
             cursorCues: script.editDecisionList.cursorCues,
             presenter: {
-              ...script.editDecisionList.presenter,
-              logoPath: undefined,
-              logoUrl: script.editDecisionList.presenter.logoUrl
+              enabled: script.editDecisionList.presenter.enabled,
+              style: script.editDecisionList.presenter.style,
+              avatarId: script.editDecisionList.presenter.avatarId,
+              provenance: script.editDecisionList.presenter.provenance,
+              disclosure: script.editDecisionList.presenter.disclosure,
+              startMs: script.editDecisionList.presenter.startMs,
+              endMs: script.editDecisionList.presenter.endMs,
+              position: script.editDecisionList.presenter.position,
+              motion: script.editDecisionList.presenter.motion
             },
             qualityGates: script.editDecisionList.qualityGates
           }
