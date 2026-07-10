@@ -14,7 +14,8 @@ const request = {
   audioPath: "/private/project/voice.wav",
   outputPath: "/private/project/avatar.mp4",
   durationMs: 12_000,
-  disclosure: "AI-generated brand presenter" as const
+  disclosure: "AI-generated brand presenter" as const,
+  consent: { assetType: "fictional_catalog" as const, status: "not_required" as const }
 };
 
 describe("avatar worker boundary", () => {
@@ -33,6 +34,10 @@ describe("avatar worker boundary", () => {
     expect(() => validateAvatarWorkerRequest(request, config)).not.toThrow();
     expect(() => validateAvatarWorkerRequest({ ...request, avatarId: "logo_head" }, config)).toThrow("fictional catalog");
     expect(() => validateAvatarWorkerRequest({ ...request, audioPath: "https://example.com/voice.wav" }, config)).toThrow("private local");
+    expect(() => validateAvatarWorkerRequest({
+      ...request,
+      consent: { assetType: "reference_voice", status: "granted", consentVerifiedAt: "2026-07-10T00:00:00.000Z" }
+    }, config)).toThrow("blocks likeness");
   });
 
   it("does not silently execute an uninstalled provider", async () => {

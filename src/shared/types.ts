@@ -604,6 +604,14 @@ export interface AvatarModelReceipt {
   generatedAt: string;
 }
 
+export interface AvatarConsentRecord {
+  assetType: "fictional_catalog" | "real_likeness" | "reference_voice";
+  status: "not_required" | "granted" | "revoked" | "denied";
+  consentVerifiedAt?: string;
+  expiresAt?: string;
+  sourceArtifactId?: string;
+}
+
 export interface EditDecisionList {
   schemaVersion: "2";
   templateId: string;

@@ -2,7 +2,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { fictionalAvatarPresenterCatalog } from "../shared/renderTemplates";
-import type { AvatarModelReceipt, FictionalAvatarPresenterId } from "../shared/types";
+import type { AvatarConsentRecord, AvatarModelReceipt, FictionalAvatarPresenterId } from "../shared/types";
 
 export type AvatarWorkerProvider = "disabled" | "sadtalker" | "musetalk";
 
@@ -20,6 +20,7 @@ export interface AvatarWorkerRequest {
   outputPath: string;
   durationMs: number;
   disclosure: "AI-generated brand presenter";
+  consent: AvatarConsentRecord;
 }
 
 export interface AvatarWorkerResult {
@@ -57,6 +58,12 @@ export function validateAvatarWorkerRequest(input: AvatarWorkerRequest, config: 
   }
   if (input.disclosure !== "AI-generated brand presenter") {
     throw new Error("Avatar worker disclosure is required.");
+  }
+  if (input.consent.assetType !== "fictional_catalog" || input.consent.status !== "not_required") {
+    throw new Error("Avatar worker blocks likeness and reference-voice generation until consent-gated support is enabled.");
+  }
+  if (input.consent.sourceArtifactId || input.consent.consentVerifiedAt || input.consent.expiresAt) {
+    throw new Error("Fictional avatar worker requests must not carry likeness or voice reference artifacts.");
   }
   if (!path.isAbsolute(input.audioPath) || !path.isAbsolute(input.outputPath)) {
     throw new Error("Avatar worker requires private local artifact paths.");
