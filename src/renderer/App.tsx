@@ -24,7 +24,12 @@ import type {
 } from "../shared/types";
 import { platformLabels, toneLabels } from "../shared/types";
 import { createDefaultProfile, splitCaptionSegments } from "../shared/contentEngine";
-import { createDefaultBrandKit, creatorTemplatePack, hasBlockingScriptWarnings } from "../shared/renderTemplates";
+import {
+  createDefaultBrandKit,
+  creatorTemplatePack,
+  fictionalAvatarPresenterCatalog,
+  hasBlockingScriptWarnings
+} from "../shared/renderTemplates";
 import {
   createLocalUserWorkspace,
   entitlementLimit,
@@ -1256,6 +1261,20 @@ function ProfileForm({
           type="checkbox"
         />
         Brand presenter
+      </label>
+      <label>
+        Presenter avatar
+        <select
+          disabled={!profile.brandPresenterEnabled}
+          value={profile.avatarPresenterId ?? "logo_head"}
+          onChange={(event) => update("avatarPresenterId", event.target.value as ProductProfile["avatarPresenterId"])}
+        >
+          {fictionalAvatarPresenterCatalog.map((avatar) => (
+            <option key={avatar.id} value={avatar.id}>
+              {avatar.displayName}
+            </option>
+          ))}
+        </select>
       </label>
       <label>
         Presenter side

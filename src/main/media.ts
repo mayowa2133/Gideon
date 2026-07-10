@@ -23,6 +23,7 @@ import {
   buildEditDecisionList,
   buildEvidenceClaims,
   buildVisualBeatsForTemplate,
+  fictionalAvatarPresenterCatalog,
   normalizeBrandKit,
   templateManifestId
 } from "../shared/renderTemplates";
@@ -900,11 +901,14 @@ async function drawBrandPresenter(
   context.beginPath();
   context.arc(baseX + 122, baseY + 158, 96, 0, Math.PI * 2);
   context.fill();
-  const drewLogo = await drawLogoImage(context, brandKit.logoPath, baseX + 56, baseY + 92, 132);
-  if (!drewLogo) {
+  const drewLogo = presenter.style === "logo_head" && await drawLogoImage(context, brandKit.logoPath, baseX + 56, baseY + 92, 132);
+  if (presenter.style === "logo_head" && !drewLogo) {
     context.fillStyle = brandKit.primaryColor;
     context.font = "44pt Arial";
     context.fillText(initials(brandKit.productName), baseX + 78, baseY + 176);
+  }
+  if (presenter.style !== "logo_head") {
+    drawFictionalAvatarFace(context, presenter.avatarId, baseX, baseY, brandKit, speaking);
   }
   drawSolidRect(
     context,
@@ -916,7 +920,33 @@ async function drawBrandPresenter(
   );
   context.fillStyle = "rgba(255,255,255,0.9)";
   context.font = "18pt Arial";
-  context.fillText("brand presenter", baseX + 39, baseY + 585);
+  context.fillText(presenter.disclosure.toLowerCase(), baseX + 39, baseY + 585);
+}
+
+function drawFictionalAvatarFace(
+  context: OverlayContext,
+  avatarId: EditDecisionList["presenter"]["avatarId"],
+  baseX: number,
+  baseY: number,
+  brandKit: BrandKit,
+  speaking: boolean
+): void {
+  const skin = avatarId === "nova" ? "#B6D8FF" : "#F6C99C";
+  const hair = avatarId === "nova" ? brandKit.accentColor : "#2B1A32";
+  context.fillStyle = skin;
+  context.beginPath();
+  context.arc(baseX + 122, baseY + 158, 76, 0, Math.PI * 2);
+  context.fill();
+  context.fillStyle = hair;
+  context.beginPath();
+  context.arc(baseX + 122, baseY + 111, 73, Math.PI, Math.PI * 2);
+  context.fill();
+  context.fillStyle = "#10131D";
+  context.beginPath();
+  context.arc(baseX + 94, baseY + 154, 7, 0, Math.PI * 2);
+  context.arc(baseX + 150, baseY + 154, 7, 0, Math.PI * 2);
+  context.fill();
+  drawSolidRect(context, baseX + 101, baseY + 193, 42, speaking ? 14 : 7, alpha(brandKit.primaryColor, 0.8));
 }
 
 function drawHookOverlay(
@@ -1049,6 +1079,7 @@ function ensureEditDecisionList(
       cursorCues?: EditDecisionList["cursorCues"];
       sfx?: EditDecisionList["sfx"];
       music?: EditDecisionList["music"];
+      presenter: EditDecisionList["presenter"] & Partial<Pick<EditDecisionList["presenter"], "avatarId" | "provenance" | "disclosure">>;
     };
     return {
       ...manifest,
@@ -1061,7 +1092,13 @@ function ensureEditDecisionList(
       transitions: manifest.transitions ?? [],
       cursorCues: manifest.cursorCues ?? [],
       sfx: manifest.sfx ?? [],
-      music: manifest.music ?? { enabled: false, mood: "none", gainDb: -30 }
+      music: manifest.music ?? { enabled: false, mood: "none", gainDb: -30 },
+      presenter: {
+        ...manifest.presenter,
+        avatarId: manifest.presenter.avatarId ?? "logo_head",
+        provenance: manifest.presenter.provenance ?? "brand_logo",
+        disclosure: manifest.presenter.disclosure ?? "AI-generated brand presenter"
+      }
     };
   }
   const durationMs = estimateScriptDurationMs(script);
@@ -1199,6 +1236,13 @@ function validatePresenterTiming(presenter: EditDecisionList["presenter"], durat
   }
   if (presenter.startMs < 0 || presenter.endMs <= presenter.startMs || presenter.endMs > durationMs) {
     throw new Error("Brand presenter timing is outside the render timeline.");
+  }
+  const avatar = fictionalAvatarPresenterCatalog.find((candidate) => candidate.id === presenter.avatarId);
+  if (!avatar || !avatar.commercialApproved || avatar.style !== presenter.style || avatar.provenance !== presenter.provenance) {
+    throw new Error("Brand presenter must reference an approved fictional avatar.");
+  }
+  if (presenter.disclosure !== "AI-generated brand presenter") {
+    throw new Error("Brand presenter disclosure is required.");
   }
 }
 

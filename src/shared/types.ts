@@ -319,6 +319,7 @@ export interface ProductProfile {
   walkthroughNotes: string;
   defaultTemplateKey?: CreatorTemplateKey;
   brandPresenterEnabled?: boolean;
+  avatarPresenterId?: FictionalAvatarPresenterId;
   brandPresenterPosition?: BrandPresenterLayer["position"];
   brandPresenterMotion?: BrandPresenterLayer["motion"];
   soundDesignEnabled?: boolean;
@@ -565,13 +566,30 @@ export interface RenderSfxCue {
 
 export interface BrandPresenterLayer {
   enabled: boolean;
-  style: "logo_head";
+  style: "logo_head" | "fictional_illustrated" | "fictional_3d";
+  avatarId: FictionalAvatarPresenterId;
+  provenance: "brand_logo" | "gideon_fictional_catalog";
+  disclosure: "AI-generated brand presenter";
   startMs: number;
   endMs: number;
   position: "lower_left" | "lower_right";
   logoPath?: string;
   logoUrl?: string;
   motion: "idle_bob" | "caption_sync";
+}
+
+export type FictionalAvatarPresenterId = "logo_head" | "orbit" | "nova";
+
+export interface FictionalAvatarPresenter {
+  id: FictionalAvatarPresenterId;
+  displayName: string;
+  style: BrandPresenterLayer["style"];
+  provenance: BrandPresenterLayer["provenance"];
+  commercialApproved: boolean;
+  allowsVoiceCloning: false;
+  allowsRealLikeness: false;
+  disclosure: BrandPresenterLayer["disclosure"];
+  supportedMotions: Array<BrandPresenterLayer["motion"]>;
 }
 
 export interface EditDecisionList {

@@ -2840,6 +2840,9 @@ function normalizeProfile(profile: ProductProfile): ProductProfile {
     walkthroughNotes: (profile.walkthroughNotes ?? "").trim(),
     defaultTemplateKey: profile.defaultTemplateKey ?? "problem_demo_payoff",
     brandPresenterEnabled: Boolean(profile.brandPresenterEnabled),
+    avatarPresenterId: ["logo_head", "orbit", "nova"].includes(profile.avatarPresenterId ?? "")
+      ? profile.avatarPresenterId
+      : "logo_head",
     brandPresenterPosition,
     brandPresenterMotion,
     soundDesignEnabled: Boolean(profile.soundDesignEnabled),

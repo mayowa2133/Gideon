@@ -121,6 +121,7 @@ export function createDefaultProfile(): ProductProfile {
     walkthroughNotes: "",
     defaultTemplateKey: "problem_demo_payoff",
     brandPresenterEnabled: false,
+    avatarPresenterId: "logo_head",
     brandPresenterPosition: "lower_right",
     brandPresenterMotion: "caption_sync",
     soundDesignEnabled: false,

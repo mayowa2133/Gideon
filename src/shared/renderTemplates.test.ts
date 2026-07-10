@@ -100,6 +100,7 @@ describe("creator render templates", () => {
       ...createDefaultProfile(),
       productName: "LeadPilot",
       brandPresenterEnabled: true,
+      avatarPresenterId: "orbit",
       brandPresenterPosition: "lower_left",
       brandPresenterMotion: "idle_bob",
       brandKit: normalizeBrandKit({ primaryColor: "#112233", accentColor: "#445566" }, "LeadPilot")
@@ -134,6 +135,12 @@ describe("creator render templates", () => {
     expect(editDecisionList.brandKit.productName).toBe("LeadPilot");
     expect(editDecisionList.brandKit.id).toBe("brand-kit:leadpilot");
     expect(editDecisionList.presenter.enabled).toBe(true);
+    expect(editDecisionList.presenter).toMatchObject({
+      avatarId: "orbit",
+      style: "fictional_illustrated",
+      provenance: "gideon_fictional_catalog",
+      disclosure: "AI-generated brand presenter"
+    });
     expect(editDecisionList.presenter.position).toBe("lower_left");
     expect(editDecisionList.presenter.motion).toBe("idle_bob");
     expect(editDecisionList.sourceSegments.length).toBeGreaterThanOrEqual(5);

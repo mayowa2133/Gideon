@@ -4,6 +4,7 @@ import type {
   CreatorTemplateKey,
   DetectedMoment,
   EditDecisionList,
+  FictionalAvatarPresenter,
   EvidenceClaim,
   Platform,
   ProductProfile,
@@ -11,6 +12,42 @@ import type {
   ScriptQualityWarning,
   VisualBeat
 } from "./types";
+
+export const fictionalAvatarPresenterCatalog: FictionalAvatarPresenter[] = [
+  {
+    id: "logo_head",
+    displayName: "Brand logo host",
+    style: "logo_head",
+    provenance: "brand_logo",
+    commercialApproved: true,
+    allowsVoiceCloning: false,
+    allowsRealLikeness: false,
+    disclosure: "AI-generated brand presenter",
+    supportedMotions: ["idle_bob", "caption_sync"]
+  },
+  {
+    id: "orbit",
+    displayName: "Orbit",
+    style: "fictional_illustrated",
+    provenance: "gideon_fictional_catalog",
+    commercialApproved: true,
+    allowsVoiceCloning: false,
+    allowsRealLikeness: false,
+    disclosure: "AI-generated brand presenter",
+    supportedMotions: ["idle_bob", "caption_sync"]
+  },
+  {
+    id: "nova",
+    displayName: "Nova",
+    style: "fictional_3d",
+    provenance: "gideon_fictional_catalog",
+    commercialApproved: true,
+    allowsVoiceCloning: false,
+    allowsRealLikeness: false,
+    disclosure: "AI-generated brand presenter",
+    supportedMotions: ["idle_bob", "caption_sync"]
+  }
+];
 
 export interface CreatorTemplateDefinition {
   key: CreatorTemplateKey;
@@ -311,6 +348,7 @@ export function buildEditDecisionList(input: {
   const durationMs = clamp(Math.round(input.durationMs), 15_000, 60_000);
   const soundDesignEnabled = Boolean(input.profile.soundDesignEnabled);
   const musicMood = input.profile.musicMood ?? "none";
+  const avatar = fictionalAvatarPresenterCatalog.find((candidate) => candidate.id === input.profile.avatarPresenterId) ?? fictionalAvatarPresenterCatalog[0]!;
   const sourceSegments = input.visualBeats.map((beat) => {
     const moment = input.moments.find((candidate) => candidate.id === beat.momentId);
     const sourceStartMs = Math.max(0, beat.sourceStartMs ?? moment?.startMs ?? 0);
@@ -442,7 +480,10 @@ export function buildEditDecisionList(input: {
     sfx: soundDesignEnabled ? buildSfxCues({ zooms, visualBeats: input.visualBeats, durationMs }) : [],
     presenter: {
       enabled: Boolean(input.profile.brandPresenterEnabled) && template.presenterCompatible,
-      style: "logo_head",
+      style: avatar.style,
+      avatarId: avatar.id,
+      provenance: avatar.provenance,
+      disclosure: avatar.disclosure,
       startMs: 600,
       endMs: Math.max(600, durationMs - 700),
       position: input.profile.brandPresenterPosition ?? "lower_right",

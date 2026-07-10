@@ -142,6 +142,8 @@ For software builders who need to market consistently, Gideon converts an existi
 - rrweb structured capture and Playwright replay.
 - Autonomous interaction with a customer’s product.
 - AI avatars, synthetic talking presenters, or real-person impersonation beyond the deterministic logo-head brand presenter.
+
+The fictional-avatar experiment is limited to Gideon-owned catalog entries with commercial approval and an `AI-generated brand presenter` disclosure. It does not accept real-person likenesses, face uploads, or voice references.
 - Founder voice cloning.
 - Multitrack general-purpose timeline editing.
 - Social posting, scheduling, analytics, or A/B delivery.
