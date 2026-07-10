@@ -171,7 +171,7 @@ type WalkthroughEvidenceBundle = {
 The model sees only bounded media inputs or provider-uploaded ephemeral assets. Signed references are not persisted in prompts/logs. OCR/transcript text is wrapped as untrusted evidence and cannot supply instructions.
 Provider semantic-analysis outputs must carry `sourceEvidenceIds` copied from the evidence catalog. The server rejects missing or unknown source IDs before accepting AI-detected moments, so generated claims stay tied to transcript segments, OCR frames, or deterministic fallback moments.
 
-Frame ranking records proof score, inferred visual role, focus region, interaction hints, and a deterministic `beforeAfterPairId` when an early before-state can be paired with a later payoff. The paired evidence is available to review and creator templates without treating OCR text as instructions.
+Frame ranking records proof score, inferred visual role, focus region, interaction hints, and a deterministic `beforeAfterPairId` when an early before-state can be paired with a later payoff. The before/after template consumes that pair when choosing its problem, payoff, and CTA beats. The paired evidence is available to review and creator templates without treating OCR text as instructions.
 
 ### Creator templates
 

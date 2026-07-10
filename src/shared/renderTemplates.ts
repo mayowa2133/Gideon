@@ -270,9 +270,12 @@ export function buildVisualBeatsForTemplate(input: {
     return [];
   }
   const beatTimings = templateBeatTimings(template, input.durationMs);
+  const beforeAfterPairId = input.templateKey === "before_after_workflow"
+    ? moments.find((moment) => moment.visualRole === "before" && moment.beforeAfterPairId)?.beforeAfterPairId
+    : undefined;
   return beatTimings.map((timing, index) => {
     const purpose = timing.rule.purpose;
-    const moment = momentForBeat(moments, index, purpose);
+    const moment = momentForBeat(moments, index, purpose, beforeAfterPairId);
     const focus = moment.focus ?? focusForBeat(index, input.templateKey);
     return {
       startMs: timing.startMs,
@@ -610,14 +613,15 @@ function instructionForPurpose(purpose: NonNullable<VisualBeat["purpose"]>, labe
 function momentForBeat(
   moments: DetectedMoment[],
   index: number,
-  purpose: NonNullable<VisualBeat["purpose"]>
+  purpose: NonNullable<VisualBeat["purpose"]>,
+  beforeAfterPairId?: string
 ): DetectedMoment {
   const byRole = moments.find((moment) => {
     if (purpose === "problem") {
-      return moment.visualRole === "before";
+      return moment.visualRole === "before" && (!beforeAfterPairId || moment.beforeAfterPairId === beforeAfterPairId);
     }
     if (purpose === "payoff" || purpose === "cta") {
-      return moment.visualRole === "payoff";
+      return moment.visualRole === "payoff" && (!beforeAfterPairId || moment.beforeAfterPairId === beforeAfterPairId);
     }
     if (purpose === "proof") {
       return moment.visualRole === "proof" || (moment.proofScore ?? 0) >= 0.75;

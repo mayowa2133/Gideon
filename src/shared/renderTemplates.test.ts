@@ -194,6 +194,38 @@ describe("creator render templates", () => {
     expect(editDecisionList.transitions.some((transition) => transition.id === "cut-2")).toBe(false);
   });
 
+  it("keeps before and payoff beats on the same ranked evidence pair", () => {
+    const pairedMoments: DetectedMoment[] = [
+      {
+        ...moments[0]!,
+        id: "before-moment",
+        visualRole: "before",
+        beforeAfterPairId: "before-after:before-moment:payoff-moment"
+      },
+      {
+        ...moments[1]!,
+        id: "payoff-moment",
+        visualRole: "payoff",
+        beforeAfterPairId: "before-after:before-moment:payoff-moment"
+      },
+      {
+        ...moments[0]!,
+        id: "other-payoff",
+        visualRole: "payoff",
+        proofScore: 0.99
+      }
+    ];
+    const beats = buildVisualBeatsForTemplate({
+      moments: pairedMoments,
+      durationMs: 18_000,
+      templateKey: "before_after_workflow"
+    });
+
+    expect(beats.find((beat) => beat.purpose === "problem")?.momentId).toBe("before-moment");
+    expect(beats.find((beat) => beat.purpose === "payoff")?.momentId).toBe("payoff-moment");
+    expect(beats.find((beat) => beat.purpose === "cta")?.momentId).toBe("payoff-moment");
+  });
+
   it("uses visual beat cursor emphasis overrides when building cursor cues", () => {
     const profile = createDefaultProfile();
     const captions = splitCaptionSegments("Click generate. The finished draft appears.", 16_000);
