@@ -284,6 +284,10 @@ export function buildVisualBeatsForTemplate(input: {
       instruction: instructionForPurpose(purpose, moment.label),
       callout: calloutForPurpose(purpose, moment.label),
       focus,
+      transitionIn: {
+        enabled: index > 0,
+        kind: transitionKindForTemplate(template)
+      },
       evidenceIds: moment.sourceEvidenceIds ?? []
     };
   });
@@ -332,13 +336,20 @@ export function buildEditDecisionList(input: {
       easing: template.visualRhythm === "snap" ? "snap" as const : "standard" as const
     };
   });
-  const transitions = input.visualBeats.slice(1).map((beat, index) => ({
-    id: `cut-${index + 1}`,
-    kind: template.visualRhythm === "contrast" ? "wipe" as const : template.visualRhythm === "steady" ? "match_cut" as const : "snap_cut" as const,
-    startMs: Math.max(0, beat.startMs - 90),
-    endMs: Math.min(durationMs, beat.startMs + 230),
-    emphasis: index % 2 === 0 ? "accent" as const : "primary" as const
-  }));
+  const transitions = input.visualBeats.slice(1).flatMap((beat, index) => {
+    if (beat.transitionIn?.enabled === false) {
+      return [];
+    }
+    return [
+      {
+        id: `cut-${index + 1}`,
+        kind: beat.transitionIn?.kind ?? transitionKindForTemplate(template),
+        startMs: Math.max(0, beat.startMs - 90),
+        endMs: Math.min(durationMs, beat.startMs + 230),
+        emphasis: index % 2 === 0 ? "accent" as const : "primary" as const
+      }
+    ];
+  });
   const overlays = [
     {
       id: "hook",
@@ -476,6 +487,16 @@ function zoomScaleForTemplate(scale: number, intensity: CreatorTemplateDefinitio
     return clamp(scale - 0.04, 1, 2.5);
   }
   return clamp(scale, 1, 2.5);
+}
+
+function transitionKindForTemplate(template: CreatorTemplateDefinition): EditDecisionList["transitions"][number]["kind"] {
+  if (template.visualRhythm === "contrast") {
+    return "wipe";
+  }
+  if (template.visualRhythm === "steady") {
+    return "match_cut";
+  }
+  return "snap_cut";
 }
 
 function buildSfxCues(input: {

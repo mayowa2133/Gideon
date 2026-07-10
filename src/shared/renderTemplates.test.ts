@@ -110,6 +110,8 @@ describe("creator render templates", () => {
       templateKey: "brand_presenter"
     });
     expect(visualBeats[0]).toMatchObject({ sourceStartMs: moments[0]?.startMs, sourceEndMs: moments[0]?.endMs });
+    expect(visualBeats[0]?.transitionIn?.enabled).toBe(false);
+    expect(visualBeats[1]?.transitionIn).toMatchObject({ enabled: true, kind: "snap_cut" });
     expect(visualBeats[0]?.endMs).toBeLessThan(3_600);
     expect(visualBeats.at(-1)?.endMs).toBe(18_000);
     const editDecisionList = buildEditDecisionList({
@@ -155,6 +157,36 @@ describe("creator render templates", () => {
     expect(editDecisionList.music.enabled).toBe(false);
     expect(editDecisionList.sfx).toHaveLength(0);
     expect(editDecisionList.qualityGates.requireEvidenceBackedClaims).toBe(true);
+  });
+
+  it("uses visual beat transition overrides when building quick cuts", () => {
+    const profile = createDefaultProfile();
+    const captions = splitCaptionSegments("Show the slow part. Now show the faster result.", 16_000);
+    const visualBeats = buildVisualBeatsForTemplate({
+      moments,
+      durationMs: 16_000,
+      templateKey: "before_after_workflow"
+    }).map((beat, index) =>
+      index === 1
+        ? { ...beat, transitionIn: { enabled: true, kind: "match_cut" as const } }
+        : index === 2
+          ? { ...beat, transitionIn: { enabled: false, kind: "wipe" as const } }
+          : beat
+    );
+
+    const editDecisionList = buildEditDecisionList({
+      profile,
+      templateKey: "before_after_workflow",
+      durationMs: 16_000,
+      captions,
+      visualBeats,
+      hook: "Here is the before and after",
+      cta: "Try it on one workflow.",
+      moments
+    });
+
+    expect(editDecisionList.transitions[0]?.kind).toBe("match_cut");
+    expect(editDecisionList.transitions.some((transition) => transition.id === "cut-2")).toBe(false);
   });
 
   it("adds deterministic music and SFX cues when sound design is enabled", () => {

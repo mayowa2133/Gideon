@@ -701,12 +701,14 @@ video {
   font-size: 0.76rem;
 }
 
-.focus-control-grid input {
+.focus-control-grid input,
+.focus-control-grid select {
   min-height: 24px;
   padding: 0;
 }
 
-.focus-control-grid .wide-control input {
+.focus-control-grid .wide-control input,
+.focus-control-grid .wide-control select {
   min-height: 34px;
   padding: 0 0.65rem;
 }

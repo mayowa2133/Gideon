@@ -1639,6 +1639,32 @@ function ScriptEditor({
     );
   }
 
+  function updateVisualBeatTransition(scriptId: string, beatIndex: number, value: "auto" | "off" | "snap_cut" | "match_cut" | "wipe"): void {
+    setScripts(
+      scripts.map((script) => {
+        if (script.id !== scriptId) {
+          return script;
+        }
+        return {
+          ...script,
+          visualBeats: script.visualBeats.map((beat, index) =>
+            index === beatIndex
+              ? {
+                  ...beat,
+                  transitionIn: value === "auto"
+                    ? undefined
+                    : {
+                        enabled: value !== "off",
+                        kind: value === "off" ? beat.transitionIn?.kind : value
+                      }
+                }
+              : beat
+          )
+        };
+      })
+    );
+  }
+
   return (
     <div className="script-stack">
       {scripts.map((script, index) => {
@@ -1696,6 +1722,7 @@ function ScriptEditor({
             </div>
             <div className="render-plan-summary">
               <span>{script.editDecisionList?.zooms.length ?? script.visualBeats.length} punch-ins</span>
+              <span>{script.editDecisionList?.transitions.length ?? Math.max(0, script.visualBeats.length - 1)} cuts</span>
               <span>{script.editDecisionList?.callouts.length ?? script.visualBeats.length} callouts</span>
               <span>{script.editDecisionList?.cursorCues.length ?? 0} cursor cues</span>
               <span>{script.editDecisionList?.presenter.enabled ? "presenter on" : "presenter off"}</span>
@@ -1720,6 +1747,33 @@ function ScriptEditor({
                             value={beat.callout ?? ""}
                           />
                         </label>
+                        {beatIndex > 0 ? (
+                          <label>
+                            Cut
+                            <select
+                              onChange={(event) =>
+                                updateVisualBeatTransition(
+                                  script.id,
+                                  beatIndex,
+                                  event.target.value as "auto" | "off" | "snap_cut" | "match_cut" | "wipe"
+                                )
+                              }
+                              value={
+                                beat.transitionIn
+                                  ? beat.transitionIn.enabled === false
+                                    ? "off"
+                                    : beat.transitionIn.kind ?? "auto"
+                                  : "auto"
+                              }
+                            >
+                              <option value="auto">Template</option>
+                              <option value="snap_cut">Snap</option>
+                              <option value="match_cut">Match</option>
+                              <option value="wipe">Wipe</option>
+                              <option value="off">Off</option>
+                            </select>
+                          </label>
+                        ) : null}
                         <label>
                           In
                           <input

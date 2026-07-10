@@ -980,12 +980,17 @@ describe("GideonStore billing reconciliation", () => {
     const editedFocus = { x: 0.31, y: 0.62, scale: 1.44 };
     const editedSource = { sourceStartMs: 500, sourceEndMs: 2_400 };
     const editedCallout = "Proof: CSV imported in seconds";
+    const transitionOverride = { enabled: false, kind: "snap_cut" as const };
 
     const updated = await store.updateScripts(project.id, [
       {
         ...firstScript,
         visualBeats: firstScript.visualBeats.map((beat, index) =>
-          index === 0 ? { ...beat, ...editedSource, callout: editedCallout, focus: editedFocus } : beat
+          index === 0
+            ? { ...beat, ...editedSource, callout: editedCallout, focus: editedFocus }
+            : index === 1
+              ? { ...beat, transitionIn: transitionOverride }
+              : beat
         )
       }
     ]);
@@ -994,12 +999,14 @@ describe("GideonStore billing reconciliation", () => {
     expect(saved.visualBeats[0]).toMatchObject(editedSource);
     expect(saved.visualBeats[0]?.callout).toBe(editedCallout);
     expect(saved.visualBeats[0]?.focus).toEqual(editedFocus);
+    expect(saved.visualBeats[1]?.transitionIn).toEqual(transitionOverride);
     expect(saved.editDecisionList?.sourceSegments[0]).toMatchObject(editedSource);
     expect(saved.editDecisionList?.sourceSegments[0]?.focus).toEqual(editedFocus);
     expect(saved.editDecisionList?.zooms[0]?.focus).toEqual(editedFocus);
     expect(saved.editDecisionList?.callouts[0]?.anchor).toEqual(editedFocus);
     expect(saved.editDecisionList?.callouts[0]?.text).toBe(editedCallout);
     expect(saved.editDecisionList?.overlays.find((overlay) => overlay.id === "proof-1")?.text).toBe(editedCallout);
+    expect(saved.editDecisionList?.transitions.some((transition) => transition.id === "cut-1")).toBe(false);
     expect(updated.renders).toEqual([]);
   });
 

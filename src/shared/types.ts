@@ -475,6 +475,10 @@ export interface VisualBeat {
   purpose?: "hook" | "problem" | "demo" | "proof" | "payoff" | "cta";
   callout?: string;
   focus?: RenderFocusPoint;
+  transitionIn?: {
+    enabled: boolean;
+    kind?: RenderTransitionCue["kind"];
+  };
   evidenceIds?: string[];
 }
 
