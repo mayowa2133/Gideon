@@ -127,6 +127,29 @@ describe("content engine", () => {
     );
   });
 
+  it("adapts creator-native script openings to supported tones", () => {
+    const moments = createMoments(profile, recording, () => "moment-1");
+    const [concept] = generateConcepts(profile, moments, () => "concept-1");
+    const voices = new Map<string, string>();
+
+    (["direct", "casual", "founder", "educational", "bold"] as const).forEach((preferredTone) => {
+      const [script] = generateScripts(
+        { ...profile, preferredTone },
+        [{ ...concept!, selected: true }],
+        moments,
+        () => `script-${preferredTone}`,
+        () => "2026-07-10T00:00:00.000Z"
+      );
+      voices.set(preferredTone, script!.voiceoverText);
+    });
+
+    expect(voices.get("direct")).toContain("this is the part that matters");
+    expect(voices.get("casual")).toContain("Okay, watch");
+    expect(voices.get("founder")).toContain("I built this");
+    expect(voices.get("educational")).toContain("Here is what");
+    expect(voices.get("bold")).toContain("Stop doing the slow part by hand");
+  });
+
   it("replaces forbidden generic marketing phrases", () => {
     expect(sanitizeMarketingCopy("This revolutionary platform is a game-changing solution.")).not.toMatch(
       /revolutionary platform|game-changing solution/i

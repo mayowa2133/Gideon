@@ -339,7 +339,8 @@ export function generateScriptDraft(
     outcome,
     primaryLabel: primaryMoment?.label,
     secondaryLabel: secondaryMoment?.label,
-    templateKey
+    templateKey,
+    tone: profile.preferredTone
   });
   const body = sanitizeMarketingCopy(bodyLines.join(" "));
   const voiceoverText = `${hook}. ${body}`;
@@ -391,12 +392,14 @@ function creatorVoiceoverLines(input: {
   primaryLabel: string | undefined;
   secondaryLabel: string | undefined;
   templateKey: CreatorTemplateKey;
+  tone: ProductProfile["preferredTone"];
 }): string[] {
   const primary = input.primaryLabel?.toLowerCase() ?? "the first proof moment";
   const secondary = input.secondaryLabel?.toLowerCase() ?? "the result";
+  const toneOpening = creatorToneOpening(input.tone, input.customer, primary);
   if (input.templateKey === "three_reasons") {
     return [
-      `Reason one: ${primary} removes the slow part.`,
+      toneOpening,
       `Reason two: ${secondary} makes the outcome visible.`,
       `Reason three: ${input.customer} can repeat it without a long demo.`,
       `That matters because ${input.outcome}.`
@@ -404,7 +407,7 @@ function creatorVoiceoverLines(input: {
   }
   if (input.templateKey === "saves_you_time") {
     return [
-      `This is the slow step ${input.customer} usually repeats.`,
+      toneOpening,
       `Now watch ${primary} take over that part.`,
       `${secondary} shows the saved time turning into a visible result.`,
       `That matters because ${input.outcome}.`
@@ -412,7 +415,7 @@ function creatorVoiceoverLines(input: {
   }
   if (input.templateKey === "before_after_workflow") {
     return [
-      `Before, ${input.customer} has to watch the slow step happen.`,
+      toneOpening,
       `Then ${primary} shows the product taking over.`,
       `After that, ${secondary} proves the result.`,
       `That matters because ${input.outcome}.`
@@ -420,7 +423,7 @@ function creatorVoiceoverLines(input: {
   }
   if (input.templateKey === "founder_demo") {
     return [
-      `The old way made ${input.customer} explain this manually.`,
+      toneOpening,
       `So the first screen to watch is ${primary}.`,
       `Then ${secondary} shows the part that saves the time.`,
       `That matters because ${input.outcome}.`
@@ -428,18 +431,27 @@ function creatorVoiceoverLines(input: {
   }
   if (input.templateKey === "hidden_feature_reveal") {
     return [
-      `Watch ${primary} first.`,
+      toneOpening,
       `This is the part most viewers miss.`,
       `Then ${secondary} makes the benefit obvious.`,
       `That matters because ${input.outcome}.`
     ];
   }
   return [
-    `If you are ${input.customer}, this is the part that matters.`,
+    toneOpening,
     `First, watch ${primary}.`,
     `Then it moves into ${secondary}, so the proof is on screen.`,
     `That matters because ${input.outcome}.`
   ];
+}
+
+function creatorToneOpening(tone: ProductProfile["preferredTone"], customer: string, primary: string): string {
+  if (tone === "casual") return `Okay, watch ${primary} for a second.`;
+  if (tone === "founder") return `I built this so ${customer} do not manage the slow part manually.`;
+  if (tone === "educational") return `Here is what ${primary} changes in the workflow.`;
+  if (tone === "bold") return `Stop doing the slow part by hand. Watch ${primary}.`;
+  if (tone === "professional") return `For ${customer}, ${primary} makes the workflow more repeatable.`;
+  return `If you are ${customer}, this is the part that matters.`;
 }
 
 function choosePlatforms(platforms: Platform[], family: string): Platform[] {

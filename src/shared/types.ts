@@ -277,7 +277,8 @@ export type TonePreset =
   | "founder"
   | "casual"
   | "professional"
-  | "educational";
+  | "educational"
+  | "bold";
 
 export type CreatorTemplateKey =
   | "hidden_feature_reveal"
@@ -820,5 +821,6 @@ export const toneLabels: Record<TonePreset, string> = {
   founder: "Founder-native",
   casual: "Casual",
   professional: "Professional",
-  educational: "Educational"
+  educational: "Educational",
+  bold: "Bold"
 };
