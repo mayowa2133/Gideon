@@ -128,6 +128,7 @@ export type ArtifactKind =
   | "extracted_audio"
   | "frame"
   | "voiceover"
+  | "avatar_presenter"
   | "render"
   | "export";
 
@@ -590,6 +591,16 @@ export interface FictionalAvatarPresenter {
   allowsRealLikeness: false;
   disclosure: BrandPresenterLayer["disclosure"];
   supportedMotions: Array<BrandPresenterLayer["motion"]>;
+}
+
+export interface AvatarModelReceipt {
+  provider: "sadtalker" | "musetalk" | "talkinghead";
+  modelVersion: string;
+  modelLicense: string;
+  avatarId: FictionalAvatarPresenterId;
+  avatarProvenance: BrandPresenterLayer["provenance"];
+  disclosure: BrandPresenterLayer["disclosure"];
+  generatedAt: string;
 }
 
 export interface EditDecisionList {
