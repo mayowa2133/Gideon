@@ -353,7 +353,8 @@ describe("media pipeline", () => {
     const presenterProfile: ProductProfile = {
       ...profile,
       defaultTemplateKey: "brand_presenter",
-      brandPresenterEnabled: true
+      brandPresenterEnabled: true,
+      avatarPresenterId: "orbit"
     };
     let counter = 0;
     const moments = createMoments(presenterProfile, recording, () => `moment-${++counter}`);

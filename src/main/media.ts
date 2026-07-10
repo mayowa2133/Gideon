@@ -908,7 +908,16 @@ async function drawBrandPresenter(
     context.fillText(initials(brandKit.productName), baseX + 78, baseY + 176);
   }
   if (presenter.style !== "logo_head") {
-    drawFictionalAvatarFace(context, presenter.avatarId, baseX, baseY, brandKit, speaking);
+    const drewCatalogAvatar = await drawLogoImage(
+      context,
+      catalogAvatarPath(presenter.avatarId),
+      baseX + 47,
+      baseY + 83,
+      150
+    );
+    if (!drewCatalogAvatar) {
+      drawFictionalAvatarFace(context, presenter.avatarId, baseX, baseY, brandKit, speaking);
+    }
   }
   drawSolidRect(
     context,
@@ -1581,6 +1590,15 @@ async function drawLogoImage(
   } catch {
     return false;
   }
+}
+
+function catalogAvatarPath(avatarId: EditDecisionList["presenter"]["avatarId"]): string | undefined {
+  if (avatarId !== "orbit" && avatarId !== "nova") {
+    return undefined;
+  }
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const root = process.env.GIDEON_AVATAR_CATALOG_DIR ?? (resourcesPath ? path.join(resourcesPath, "assets", "avatar-catalog") : path.join(process.cwd(), "assets", "avatar-catalog"));
+  return path.join(root, `${avatarId}.png`);
 }
 
 function initials(productName: string): string {
