@@ -54,6 +54,8 @@ const api = {
     ipcRenderer.invoke("scripts:update", projectId, scripts),
   chooseBrandLogo: (): Promise<{ logoPath: string; logoUrl: string } | null> => ipcRenderer.invoke("brand:choose-logo"),
   renderSelected: (projectId: string): Promise<Project> => ipcRenderer.invoke("render:selected", projectId),
+  renderScript: (projectId: string, scriptId: string, voiceoverMode: "regenerate" | "reuse"): Promise<Project> =>
+    ipcRenderer.invoke("render:script", projectId, scriptId, voiceoverMode),
   cancelJob: (projectId: string, jobId: string): Promise<Project> => ipcRenderer.invoke("job:cancel", projectId, jobId),
   retryJob: (projectId: string, jobId: string): Promise<Project> => ipcRenderer.invoke("job:retry", projectId, jobId),
   exportVideo: (projectId: string, renderId: string): Promise<string | null> =>

@@ -250,6 +250,10 @@ export interface JobRecord {
   workerId?: string;
   heartbeatAt?: string;
   leaseExpiresAt?: string;
+  renderScope?: {
+    scriptIds?: string[];
+    voiceoverMode?: "regenerate" | "reuse";
+  };
 }
 
 export interface JobEvent {

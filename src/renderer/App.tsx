@@ -989,6 +989,9 @@ function ProjectWorkspace({
           onRegenerate={(scriptId) =>
             void runAction("scripts", () => window.gideon.regenerateScript(project.id, scriptId))
           }
+          onRenderScript={(scriptId, voiceoverMode) =>
+            void runAction("rendering", () => window.gideon.renderScript(project.id, scriptId, voiceoverMode))
+          }
         />
       </Panel>
 
@@ -1558,11 +1561,13 @@ function ConceptGrid({
 function ScriptEditor({
   scripts,
   setScripts,
-  onRegenerate
+  onRegenerate,
+  onRenderScript
 }: {
   scripts: ScriptDraft[];
   setScripts: (scripts: ScriptDraft[]) => void;
   onRegenerate: (scriptId: string) => void;
+  onRenderScript: (scriptId: string, voiceoverMode: "regenerate" | "reuse") => void;
 }): JSX.Element {
   if (scripts.length === 0) {
     return <div className="empty-inline">Generate scripts from selected concepts, then edit voiceover and CTA before render.</div>;
@@ -1758,6 +1763,22 @@ function ScriptEditor({
             <div className="action-row">
               <button className="secondary compact" onClick={() => onRegenerate(script.id)} type="button">
                 Regenerate script
+              </button>
+              <button
+                className="secondary compact"
+                disabled={!script.approved || hasBlockingWarnings}
+                onClick={() => onRenderScript(script.id, "reuse")}
+                type="button"
+              >
+                Re-render
+              </button>
+              <button
+                className="secondary compact"
+                disabled={!script.approved || hasBlockingWarnings}
+                onClick={() => onRenderScript(script.id, "regenerate")}
+                type="button"
+              >
+                New voice + render
               </button>
             </div>
             <label className="checkbox-row">

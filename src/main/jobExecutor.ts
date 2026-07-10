@@ -274,20 +274,22 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
     if (!project.recording) {
       throw new Error("Choose a recording before rendering.");
     }
+    let job = await store.getJob(projectId, jobId);
+    const scopedScriptIds = job.renderScope?.scriptIds;
     const selectedConcepts = project.concepts.filter((concept) => concept.selected);
     const scripts = project.scripts.filter((script) =>
       script.approved &&
       selectedConcepts.some((concept) => concept.id === script.conceptId) &&
+      (!scopedScriptIds?.length || scopedScriptIds.includes(script.id)) &&
       !hasBlockingScriptWarnings(script.qualityWarnings)
     );
     if (scripts.length === 0) {
       throw new Error("Approve at least one selected script without blocking warnings before rendering.");
     }
-    let job = await store.getJob(projectId, jobId);
     if (job.status === "canceled") {
       return project;
     }
-    job = startJob(job, now(), "Rendering selected drafts.");
+    job = startJob(job, now(), scopedScriptIds?.length === 1 ? "Rendering one approved draft." : "Rendering selected drafts.");
     await store.updateJob(projectId, job);
     await store.appendJobEvent(projectId, {
       jobId,
@@ -312,15 +314,20 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
           .map((momentId) => project.moments.find((candidate) => candidate.id === momentId))
           .find(Boolean);
         const createdAt = now();
-        job = await advanceJobStage(
-          projectId,
-          jobId,
-          "tts",
-          index + 2,
-          scriptsToRender.length + 3,
-          `Generating voiceover for draft ${index + 1}/${scriptsToRender.length}.`
-        );
-        const voiceoverPath = await createProviderVoiceover(projectId, script);
+        let voiceoverPath = job.renderScope?.voiceoverMode === "reuse"
+          ? await reusableVoiceoverPath(projectId, script.id)
+          : null;
+        if (!voiceoverPath) {
+          job = await advanceJobStage(
+            projectId,
+            jobId,
+            "tts",
+            index + 2,
+            scriptsToRender.length + 3,
+            `Generating voiceover for draft ${index + 1}/${scriptsToRender.length}.`
+          );
+          voiceoverPath = await createProviderVoiceover(projectId, script);
+        }
         if (await finishIfCancelRequested(projectId, jobId)) {
           return store.getProject(projectId);
         }
@@ -410,7 +417,9 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
         return store.getProject(projectId);
       }
       job = await advanceJobStage(projectId, jobId, "finalize", scriptsToRender.length + 2, scriptsToRender.length + 3, "Saving render outputs.");
-      await store.replaceRenders(projectId, renders);
+      const targetedScriptIds = new Set(scriptsToRender.map((script) => script.id));
+      const retainedRenders = project.renders.filter((render) => !targetedScriptIds.has(render.scriptId));
+      await store.replaceRenders(projectId, [...retainedRenders, ...renders]);
       await store.appendJobEvent(projectId, {
         jobId,
         kind: "stage",
@@ -593,6 +602,17 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
           error: safeProviderError(error)
         }
       ]);
+      return null;
+    }
+  }
+
+  async function reusableVoiceoverPath(projectId: string, scriptId: string): Promise<string | null> {
+    const voiceoverPath = path.join(store.projectDir(projectId), "voiceovers", `${scriptId}.wav`);
+    try {
+      await fs.access(voiceoverPath);
+      await validateVoiceoverAudio(voiceoverPath);
+      return voiceoverPath;
+    } catch {
       return null;
     }
   }

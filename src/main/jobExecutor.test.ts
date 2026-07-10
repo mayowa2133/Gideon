@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createJob } from "../shared/jobState";
 import {
@@ -199,6 +202,100 @@ describe("Gideon job executor", () => {
     ]);
   });
 
+  it("renders only the scoped draft and preserves other completed renders", async () => {
+    const secondScript = scriptFixture({ id: "script-2", conceptId: "concept-2" });
+    const project = projectFixture({
+      concepts: [
+        { id: "concept-1", title: "First", formatFamily: "demo", targetPain: "slow", hookDirection: "show", proofMomentIds: ["moment-1"], platformFit: ["youtube_shorts"], estimatedDurationSec: 30, rationale: "proof", selected: true, brief: "first" },
+        { id: "concept-2", title: "Second", formatFamily: "demo", targetPain: "slow", hookDirection: "show", proofMomentIds: ["moment-1"], platformFit: ["youtube_shorts"], estimatedDurationSec: 30, rationale: "proof", selected: true, brief: "second" }
+      ],
+      moments: [momentFixture()],
+      scripts: [scriptFixture(), secondScript],
+      renders: [{ id: "render-2-old", scriptId: "script-2", title: "Second", status: "completed", createdAt: "2026-06-25T12:00:00.000Z" }]
+    });
+    const store = new FakeExecutorStore(project);
+    store.project.jobs = [createJob({
+      id: "job-1",
+      projectId: store.project.id,
+      kind: "render",
+      now: "2026-06-25T12:00:00.000Z",
+      renderScope: { scriptIds: ["script-1"], voiceoverMode: "regenerate" }
+    })];
+    const renderedScriptIds: string[] = [];
+    const executor = createGideonJobExecutor({
+      store,
+      now: clock(),
+      loadProviderConfig: () => providerConfig(false),
+      makeId: idSequence(["render-1"]),
+      statFile: async () => ({ size: 4096 }),
+      renderDraft: async (input) => {
+        renderedScriptIds.push(input.script.id);
+        return { outputPath: "/tmp/render.mp4", validation: { width: 1080, height: 1920, durationMs: 30_000, videoCodec: "h264", audioCodec: "aac", fastStart: true } };
+      },
+      createPrivateObjectStorage: () => ({
+        async putFile() {
+          return { filePath: "/private/storage/render.mp4", fileUrl: "file:///private/storage/render.mp4", artifact: artifactFixture({ id: "artifact-render-1" }) };
+        }
+      })
+    });
+
+    const rendered = await executor.runRenderJob(store.project.id, "job-1");
+
+    expect(renderedScriptIds).toEqual(["script-1"]);
+    expect(rendered.renders.map((render) => render.scriptId)).toEqual(expect.arrayContaining(["script-1", "script-2"]));
+    expect(rendered.renders.find((render) => render.scriptId === "script-2")?.id).toBe("render-2-old");
+  });
+
+  it("reuses a validated scoped voiceover without calling synthesis", async () => {
+    const voiceoverDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-voiceover-"));
+    const voiceoverPath = path.join(voiceoverDir, "voiceovers", "script-1.wav");
+    await fs.mkdir(path.dirname(voiceoverPath), { recursive: true });
+    await fs.writeFile(voiceoverPath, "fixture-audio");
+    const project = projectFixture({
+      concepts: [{ id: "concept-1", title: "First", formatFamily: "demo", targetPain: "slow", hookDirection: "show", proofMomentIds: ["moment-1"], platformFit: ["youtube_shorts"], estimatedDurationSec: 30, rationale: "proof", selected: true, brief: "first" }],
+      moments: [momentFixture()],
+      scripts: [scriptFixture()]
+    });
+    const store = new FakeExecutorStore(project, voiceoverDir);
+    store.project.jobs = [createJob({
+      id: "job-1",
+      projectId: store.project.id,
+      kind: "render",
+      now: "2026-06-25T12:00:00.000Z",
+      renderScope: { scriptIds: ["script-1"], voiceoverMode: "reuse" }
+    })];
+    let receivedVoiceoverPath: string | undefined;
+    const executor = createGideonJobExecutor({
+      store,
+      now: clock(),
+      loadProviderConfig: () => providerConfig(true),
+      validateVoiceoverAudio: async (candidate) => {
+        expect(candidate).toBe(voiceoverPath);
+        return { byteSize: 13, dataBytes: 13 };
+      },
+      createSpeechProvider: () => ({
+        synthesize: async () => {
+          throw new Error("Voice synthesis should not run when a reusable voiceover exists.");
+        }
+      }),
+      makeId: idSequence(["render-1"]),
+      statFile: async () => ({ size: 4096 }),
+      renderDraft: async (input) => {
+        receivedVoiceoverPath = input.voiceoverPath;
+        return { outputPath: "/tmp/render.mp4", validation: { width: 1080, height: 1920, durationMs: 30_000, videoCodec: "h264", audioCodec: "aac", fastStart: true } };
+      },
+      createPrivateObjectStorage: () => ({
+        async putFile() {
+          return { filePath: "/private/storage/render.mp4", fileUrl: "file:///private/storage/render.mp4", artifact: artifactFixture({ id: "artifact-render-1" }) };
+        }
+      })
+    });
+
+    await executor.runRenderJob(store.project.id, "job-1");
+
+    expect(receivedVoiceoverPath).toBe(voiceoverPath);
+  });
+
   it("requires an approved selected script before rendering", async () => {
     const project = projectFixture({
       concepts: [
@@ -381,7 +478,7 @@ class FakeExecutorStore implements GideonJobExecutorStore {
   events: Array<Omit<JobEvent, "id" | "createdAt" | "projectId"> & { createdAt?: string }> = [];
   usage: Array<{ metric: string; quantity: number; source: string }> = [];
 
-  constructor(readonly project: Project) {}
+  constructor(readonly project: Project, private readonly projectDirectory = "/tmp/project") {}
 
   async getProject(): Promise<Project> {
     return this.project;
@@ -459,7 +556,7 @@ class FakeExecutorStore implements GideonJobExecutorStore {
   }
 
   projectDir(): string {
-    return "/tmp/project";
+    return this.projectDirectory;
   }
 
   storageRoot(): string {

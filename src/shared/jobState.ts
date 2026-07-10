@@ -8,6 +8,7 @@ export interface CreateJobInput {
   maxAttempts?: number;
   userMessage?: string;
   cancelable?: boolean;
+  renderScope?: JobRecord["renderScope"];
 }
 
 export interface CreateJobEventInput {
@@ -63,6 +64,7 @@ export function createJob(input: CreateJobInput): JobRecord {
     userMessage: input.userMessage ?? "Waiting to start.",
     cancelable: input.cancelable ?? true,
     retryable: false,
+    renderScope: input.renderScope,
     createdAt: input.now,
     updatedAt: input.now
   };

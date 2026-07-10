@@ -29,6 +29,7 @@ import type {
   CreateRecordingUploadSessionInput,
   CreateWorkspaceInput,
   DetectedMoment,
+  JobRecord,
   Project,
   RecordingUploadSession,
   RemoveWorkspaceMemberInput,
@@ -328,6 +329,11 @@ function registerIpcHandlers(): void {
   ipcMain.handle("render:selected", async (_event, projectId: string) => {
     return enqueueRenderFromControl(projectId);
   });
+  ipcMain.handle(
+    "render:script",
+    async (_event, projectId: string, scriptId: string, voiceoverMode: "regenerate" | "reuse") =>
+      enqueueRenderFromControl(projectId, "local_user", { scriptIds: [scriptId], voiceoverMode })
+  );
 
   ipcMain.handle("job:cancel", async (_event, projectId: string, jobId: string) => {
     const project = await store.requestJobCancel(projectId, jobId);
@@ -515,7 +521,11 @@ async function enqueueAnalysisFromControl(projectId: string, actorType: "local_u
   return store.getProject(projectId);
 }
 
-async function enqueueRenderFromControl(projectId: string, actorType: "local_user" | "mcp_agent" = "local_user"): Promise<Project> {
+async function enqueueRenderFromControl(
+  projectId: string,
+  actorType: "local_user" | "mcp_agent" = "local_user",
+  renderScope?: JobRecord["renderScope"]
+): Promise<Project> {
   const project = await store.getProject(projectId);
   if (!project.recording) {
     throw new Error("Choose a recording before rendering.");
@@ -532,7 +542,10 @@ async function enqueueRenderFromControl(projectId: string, actorType: "local_use
     projectId,
     kind: "render",
     now: new Date().toISOString(),
-    userMessage: "Waiting to render selected drafts."
+    userMessage: renderScope?.scriptIds?.length === 1
+      ? "Waiting to render one approved draft."
+      : "Waiting to render selected drafts.",
+    renderScope
   });
   await store.appendJob(projectId, job, actorType);
   enqueueRenderJob(projectId, job.id);
