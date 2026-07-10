@@ -350,17 +350,23 @@ describe("media pipeline", () => {
     ]);
 
     const recording = await probeRecording(sourcePath);
+    const presenterProfile: ProductProfile = {
+      ...profile,
+      defaultTemplateKey: "brand_presenter",
+      brandPresenterEnabled: true
+    };
     let counter = 0;
-    const moments = createMoments(profile, recording, () => `moment-${++counter}`);
-    const concepts = generateConcepts(profile, moments, () => `concept-${++counter}`);
-    const [script] = generateScripts(profile, concepts, moments, () => `script-${++counter}`, () => "2026-06-24T00:00:00.000Z");
+    const moments = createMoments(presenterProfile, recording, () => `moment-${++counter}`);
+    const concepts = generateConcepts(presenterProfile, moments, () => `concept-${++counter}`);
+    const [script] = generateScripts(presenterProfile, concepts, moments, () => `script-${++counter}`, () => "2026-06-24T00:00:00.000Z");
     expect(script).toBeDefined();
+    expect(script?.templateKey).toBe("brand_presenter");
 
     process.env.GIDEON_DISABLE_SAY = "1";
     const rendered = await renderDraft({
       projectId: "project-test",
       projectDir: tempDir,
-      profile,
+      profile: presenterProfile,
       recording,
       script: script!,
       moment: moments[0],
