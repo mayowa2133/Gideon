@@ -507,6 +507,78 @@ describe("Gideon job executor", () => {
     expect(store.usage).toEqual(expect.arrayContaining([expect.objectContaining({ metric: "tts_characters", source: "tts" })]));
   });
 
+  it("generates a fictional avatar clip from an approved private voiceover and stores its model receipt", async () => {
+    const projectDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-avatar-job-"));
+    const voiceoverPath = path.join(projectDir, "voiceovers", "script-1.wav");
+    await fs.mkdir(path.dirname(voiceoverPath), { recursive: true });
+    await fs.writeFile(voiceoverPath, "fixture-audio");
+    const project = projectFixture({
+      profile: { ...profileFixture(), avatarPresenterId: "orbit" },
+      scripts: [scriptFixture({ approved: true })]
+    });
+    const store = new FakeExecutorStore(project, projectDir);
+    store.project.jobs = [createJob({
+      id: "job-avatar-1",
+      projectId: store.project.id,
+      kind: "avatar",
+      now: "2026-06-25T12:00:00.000Z",
+      renderScope: { scriptIds: ["script-1"], voiceoverMode: "reuse" }
+    })];
+    let receivedRequest: { avatarId: string; audioPath: string; outputPath: string } | undefined;
+    const executor = createGideonJobExecutor({
+      store,
+      now: clock(),
+      validateVoiceoverAudio: async () => ({ byteSize: 13, dataBytes: 13 }),
+      statFile: async () => ({ size: 29 }),
+      createAvatarWorker: () => ({
+        async render(input) {
+          receivedRequest = input;
+          await fs.mkdir(path.dirname(input.outputPath), { recursive: true });
+          await fs.writeFile(input.outputPath, "fixture-avatar-video");
+          return {
+            outputPath: input.outputPath,
+            receipt: {
+              provider: "sadtalker",
+              modelVersion: "sadtalker-test",
+              modelLicense: "Apache-2.0-reviewed",
+              avatarId: "orbit",
+              avatarProvenance: "gideon_fictional_catalog",
+              disclosure: "AI-generated brand presenter",
+              generatedAt: "2026-06-25T12:00:00.000Z"
+            }
+          };
+        }
+      }),
+      createPrivateObjectStorage: () => ({
+        async putFile(input) {
+          expect(input.kind).toBe("avatar_presenter");
+          expect(input.avatarModelReceipt).toMatchObject({ avatarId: "orbit", provider: "sadtalker" });
+          return {
+            filePath: "/private/storage/avatar.mp4",
+            fileUrl: "file:///private/storage/avatar.mp4",
+            artifact: artifactFixture({
+              id: "artifact-avatar-1",
+              kind: "avatar_presenter",
+              byteSize: 29,
+              avatarModelReceipt: input.avatarModelReceipt
+            })
+          };
+        }
+      })
+    });
+
+    const completed = await executor.runAvatarJob(store.project.id, "job-avatar-1");
+
+    expect(receivedRequest).toMatchObject({
+      avatarId: "orbit",
+      audioPath: voiceoverPath,
+      consent: { assetType: "fictional_catalog", status: "not_required" }
+    });
+    expect(completed.jobs[0]).toMatchObject({ status: "succeeded", userMessage: "Avatar presenter clip generated." });
+    expect(completed.artifacts).toEqual([expect.objectContaining({ id: "artifact-avatar-1", kind: "avatar_presenter" })]);
+    expect(store.usage).toEqual(expect.arrayContaining([expect.objectContaining({ metric: "storage_bytes", source: "render", quantity: 29 })]));
+  });
+
   it("rounds media durations up to billable minutes", () => {
     expect(minutesForDuration(1)).toBe(1);
     expect(minutesForDuration(60_000)).toBe(1);

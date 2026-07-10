@@ -1004,6 +1004,10 @@ function ProjectWorkspace({
           onRegenerateVoiceover={(scriptId) =>
             void runAction("rendering", () => window.gideon.regenerateVoiceover(project.id, scriptId))
           }
+          onGenerateAvatarPresenter={(scriptId) =>
+            void runAction("rendering", () => window.gideon.generateAvatarPresenter(project.id, scriptId))
+          }
+          canGenerateAvatarPresenter={project.profile.avatarPresenterId === "orbit" || project.profile.avatarPresenterId === "nova"}
         />
       </Panel>
 
@@ -1600,13 +1604,17 @@ function ScriptEditor({
   setScripts,
   onRegenerate,
   onRenderScript,
-  onRegenerateVoiceover
+  onRegenerateVoiceover,
+  onGenerateAvatarPresenter,
+  canGenerateAvatarPresenter
 }: {
   scripts: ScriptDraft[];
   setScripts: (scripts: ScriptDraft[]) => void;
   onRegenerate: (scriptId: string) => void;
   onRenderScript: (scriptId: string, voiceoverMode: "regenerate" | "reuse") => void;
   onRegenerateVoiceover: (scriptId: string) => void;
+  onGenerateAvatarPresenter: (scriptId: string) => void;
+  canGenerateAvatarPresenter: boolean;
 }): JSX.Element {
   if (scripts.length === 0) {
     return <div className="empty-inline">Generate scripts from selected concepts, then edit voiceover and CTA before render.</div>;
@@ -1810,6 +1818,14 @@ function ScriptEditor({
                 type="button"
               >
                 Regenerate voice
+              </button>
+              <button
+                className="secondary compact"
+                disabled={!canGenerateAvatarPresenter || !script.approved || hasBlockingWarnings}
+                onClick={() => onGenerateAvatarPresenter(script.id)}
+                type="button"
+              >
+                Generate avatar clip
               </button>
               <button
                 className="secondary compact"

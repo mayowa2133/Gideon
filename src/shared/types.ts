@@ -15,7 +15,7 @@ export type ProjectStatus =
   | "ready"
   | "failed";
 
-export type JobKind = "analysis" | "transcription" | "semantic_analysis" | "ocr" | "tts" | "render" | "export";
+export type JobKind = "analysis" | "transcription" | "semantic_analysis" | "ocr" | "tts" | "avatar" | "render" | "export";
 
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceling" | "canceled";
 
@@ -38,6 +38,7 @@ export type JobStage =
   | "ocr"
   | "semantic_analysis"
   | "tts"
+  | "avatar"
   | "render"
   | "usage"
   | "finalize"

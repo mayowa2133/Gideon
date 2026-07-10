@@ -304,6 +304,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle("voiceover:regenerate", async (_event, projectId: string, scriptId: string) =>
     enqueueVoiceoverFromControl(projectId, scriptId)
   );
+  ipcMain.handle("avatar:generate", async (_event, projectId: string, scriptId: string) =>
+    enqueueAvatarFromControl(projectId, scriptId)
+  );
   ipcMain.handle("scripts:generate", async (_event, projectId: string) => store.generateScripts(projectId));
   ipcMain.handle("scripts:regenerate", async (_event, projectId: string, scriptId: string) =>
     store.regenerateScript(projectId, scriptId)
@@ -361,6 +364,14 @@ function registerIpcHandlers(): void {
     }
     if (job.kind === "render") {
       enqueueRenderJob(projectId, job.id);
+      return store.getProject(projectId);
+    }
+    if (job.kind === "tts") {
+      enqueueVoiceoverJob(projectId, job.id);
+      return store.getProject(projectId);
+    }
+    if (job.kind === "avatar") {
+      enqueueAvatarJob(projectId, job.id);
       return store.getProject(projectId);
     }
     throw new Error(`Retry is not wired for ${job.kind} jobs yet.`);
@@ -571,6 +582,10 @@ async function recoverInterruptedJobsAtStartup(): Promise<void> {
       enqueueVoiceoverJob(job.projectId, job.id);
       continue;
     }
+    if (job.kind === "avatar") {
+      enqueueAvatarJob(job.projectId, job.id);
+      continue;
+    }
     console.warn(`Recovered queued ${job.kind} job ${job.id}, but no local runner is wired for that job kind.`);
   }
 }
@@ -626,6 +641,39 @@ function enqueueVoiceoverJob(projectId: string, jobId: string): void {
     .catch((error) => {
       if (!isWorkerQueueCanceledError(error)) {
         console.error(`Voiceover job ${jobId} failed outside normal job handling.`, error);
+      }
+    });
+}
+
+async function enqueueAvatarFromControl(projectId: string, scriptId: string): Promise<Project> {
+  const project = await store.getProject(projectId);
+  const script = project.scripts.find((candidate) => candidate.id === scriptId);
+  if (!script?.approved || hasBlockingScriptWarnings(script.qualityWarnings) || !project.profile.avatarPresenterId || project.profile.avatarPresenterId === "logo_head") {
+    throw new Error("Choose an approved script and a fictional catalog presenter before generating an avatar clip.");
+  }
+  const activeJob = findActiveJob(project.jobs, "avatar");
+  if (activeJob) {
+    return project;
+  }
+  const job = createJob({
+    id: randomUUID(),
+    projectId,
+    kind: "avatar",
+    now: new Date().toISOString(),
+    userMessage: "Waiting to generate a fictional avatar presenter.",
+    renderScope: { scriptIds: [scriptId], voiceoverMode: "reuse" }
+  });
+  await store.appendJob(projectId, job);
+  enqueueAvatarJob(projectId, job.id);
+  return store.getProject(projectId);
+}
+
+function enqueueAvatarJob(projectId: string, jobId: string): void {
+  void workerQueue
+    .enqueue(createExecutorWorkerQueueTask(jobExecutor, { kind: "avatar", projectId, jobId }))
+    .catch((error) => {
+      if (!isWorkerQueueCanceledError(error)) {
+        console.error(`Avatar job ${jobId} failed outside normal job handling.`, error);
       }
     });
 }

@@ -473,8 +473,8 @@ Expand Gideon only after the core upload-to-export loop proves valuable.
    - Shared libraries of angles, hooks, and CTAs.
 
 5. Avatar and voice cloning.
-   - Only after consent, policy, disclosure, and abuse controls are in place.
-   - Keep clearly outside MVP.
+   - Fictional catalog avatar generation is available through the isolated, receipt-backed worker boundary.
+   - Real-person likeness and voice cloning remain outside MVP until consent, policy, disclosure, and abuse controls are implemented and independently reviewed.
 
 ## First 10 implementation tasks
 

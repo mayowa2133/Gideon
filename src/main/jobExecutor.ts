@@ -6,7 +6,9 @@ import { runAnalysisPipeline as defaultRunAnalysisPipeline, safeProviderError } 
 import { createPrivateObjectStorage as defaultCreatePrivateObjectStorage, type PrivateObjectStorage } from "./storage";
 import { loadProviderConfig as defaultLoadProviderConfig, type ProviderConfig } from "./providers/config";
 import { OpenAiProvider, validateWavAudioFile as defaultValidateWavAudioFile } from "./providers/openai";
+import { createAvatarWorker, type AvatarWorker } from "./avatarWorker";
 import { failJob, startJob, succeedJob, updateJobStage } from "../shared/jobState";
+import { estimateScriptDurationMs } from "../shared/contentEngine";
 import { hasBlockingScriptWarnings } from "../shared/renderTemplates";
 import type {
   ArtifactRecord,
@@ -80,7 +82,7 @@ export type GideonJobExecutorMetricEvent =
   | {
       name: "artifact_storage_finished";
       projectId: string;
-      kind: "voiceover" | "render";
+      kind: "voiceover" | "avatar_presenter" | "render";
       durationMs: number;
       artifactId: string;
       byteSize: number;
@@ -88,7 +90,7 @@ export type GideonJobExecutorMetricEvent =
   | {
       name: "artifact_storage_failed";
       projectId: string;
-      kind: "voiceover" | "render";
+      kind: "voiceover" | "avatar_presenter" | "render";
       durationMs: number;
       safeError: string;
     }
@@ -151,6 +153,7 @@ export interface GideonJobExecutorStore {
 export interface GideonJobExecutor {
   runAnalysisJob(projectId: string, jobId: string): Promise<Project>;
   runVoiceoverJob(projectId: string, jobId: string): Promise<Project>;
+  runAvatarJob(projectId: string, jobId: string): Promise<Project>;
   runRenderJob(projectId: string, jobId: string): Promise<Project>;
 }
 
@@ -162,6 +165,7 @@ export interface GideonJobExecutorOptions {
   loadProviderConfig?: () => ProviderConfig;
   createSpeechProvider?: (config: ProviderConfig) => SpeechProvider;
   validateVoiceoverAudio?: (filePath: string) => Promise<{ byteSize: number; dataBytes: number }>;
+  createAvatarWorker?: () => AvatarWorker;
   statFile?: (filePath: string) => Promise<{ size: number }>;
   makeId?: () => string;
   now?: () => string;
@@ -178,6 +182,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
   const createSpeechProvider =
     options.createSpeechProvider ?? ((config: ProviderConfig) => new OpenAiProvider({ config: config.openai }));
   const validateVoiceoverAudio = options.validateVoiceoverAudio ?? defaultValidateWavAudioFile;
+  const createApprovedAvatarWorker = options.createAvatarWorker ?? createAvatarWorker;
   const statFile = options.statFile ?? ((filePath: string) => fs.stat(filePath));
   const makeId = options.makeId ?? randomUUID;
   const now = options.now ?? (() => new Date().toISOString());
@@ -493,6 +498,82 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
     }
   }
 
+  async function runAvatarJob(projectId: string, jobId: string): Promise<Project> {
+    const project = await store.getProject(projectId);
+    const job = await store.getJob(projectId, jobId);
+    const scriptId = job.renderScope?.scriptIds?.[0];
+    const script = scriptId ? project.scripts.find((candidate) => candidate.id === scriptId) : undefined;
+    const avatarId = project.profile.avatarPresenterId;
+    if (!script || !script.approved || hasBlockingScriptWarnings(script.qualityWarnings) || !avatarId || avatarId === "logo_head") {
+      throw new Error("Choose one approved script and a fictional catalog presenter before generating an avatar clip.");
+    }
+    if (job.status === "canceled") {
+      return project;
+    }
+    let activeJob = startJob(job, now(), "Generating a fictional avatar presenter clip.");
+    await store.updateJob(projectId, activeJob);
+    await store.appendJobEvent(projectId, {
+      jobId,
+      kind: "started",
+      stage: "queued",
+      message: "Avatar job started.",
+      progress: activeJob.progress,
+      metadata: jobAttemptMetadata(activeJob)
+    });
+    try {
+      activeJob = await advanceJobStage(projectId, jobId, "quota", 1, 4, "Checking private artifact storage quota.");
+      const voiceoverPath = await reusableVoiceoverPath(projectId, script.id);
+      if (!voiceoverPath) {
+        throw new Error("Generate and validate a private voiceover before creating an avatar clip.");
+      }
+      activeJob = await advanceJobStage(projectId, jobId, "avatar", 2, 4, "Generating the fictional avatar presenter.");
+      const outputPath = path.join(store.projectDir(projectId), "avatar-presenters", `${script.id}.mp4`);
+      const result = await createApprovedAvatarWorker().render({
+        avatarId,
+        audioPath: voiceoverPath,
+        outputPath,
+        durationMs: estimateScriptDurationMs(script),
+        disclosure: "AI-generated brand presenter",
+        consent: { assetType: "fictional_catalog", status: "not_required" }
+      });
+      const output = await statFile(result.outputPath);
+      await store.assertUsageAvailable(projectId, "storage_bytes", output.size);
+      const stored = await storeArtifactWithMetrics(projectId, "avatar_presenter", () =>
+        createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
+          workspaceId: project.workspaceId,
+          projectId,
+          kind: "avatar_presenter",
+          sourcePath: result.outputPath,
+          originalFileName: `${script.id}-${avatarId}.mp4`,
+          contentType: "video/mp4",
+          avatarModelReceipt: result.receipt
+        })
+      );
+      await store.appendArtifact(projectId, stored.artifact);
+      activeJob = await advanceJobStage(projectId, jobId, "usage", 3, 4, "Recording avatar artifact storage usage.");
+      await recordUsageWithMetrics(projectId, {
+        metric: "storage_bytes",
+        quantity: stored.artifact.byteSize,
+        unit: "byte",
+        source: "render",
+        idempotencyKey: `avatar:${projectId}:${stored.artifact.id}:storage_bytes`
+      });
+      activeJob = await store.getJob(projectId, jobId);
+      activeJob = succeedJob(activeJob, now(), "Avatar presenter clip generated.");
+      await store.appendJobEvent(projectId, {
+        jobId,
+        kind: "succeeded",
+        stage: "finalize",
+        message: activeJob.userMessage,
+        progress: { current: 4, total: 4, unit: "stage" },
+        metadata: jobAttemptMetadata(activeJob)
+      });
+      return store.updateJob(projectId, activeJob);
+    } catch (error) {
+      return failOrCancelJob(projectId, jobId, error);
+    }
+  }
+
   async function advanceJobStage(
     projectId: string,
     jobId: string,
@@ -750,7 +831,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
 
   async function storeArtifactWithMetrics(
     projectId: string,
-    kind: "voiceover" | "render",
+    kind: "voiceover" | "avatar_presenter" | "render",
     put: () => ReturnType<PrivateObjectStorage["putFile"]>
   ): ReturnType<PrivateObjectStorage["putFile"]> {
     const storageStartedAtMs = nowMs();
@@ -780,6 +861,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
   return {
     runAnalysisJob,
     runVoiceoverJob,
+    runAvatarJob,
     runRenderJob
   };
 }

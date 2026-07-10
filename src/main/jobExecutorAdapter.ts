@@ -2,7 +2,7 @@ import type { GideonJobExecutor } from "./jobExecutor";
 import type { HostedWorkerJobExecutor, WorkerQueueTask } from "./jobQueue";
 import type { JobKind, Project } from "../shared/types";
 
-export type GideonExecutableJobKind = Extract<JobKind, "analysis" | "tts" | "render">;
+export type GideonExecutableJobKind = Extract<JobKind, "analysis" | "tts" | "avatar" | "render">;
 
 export interface GideonExecutorJobInput {
   projectId: string;
@@ -39,6 +39,9 @@ export function runGideonExecutorJob(executor: GideonJobExecutor, input: GideonE
   }
   if (input.kind === "tts") {
     return executor.runVoiceoverJob(input.projectId, input.jobId);
+  }
+  if (input.kind === "avatar") {
+    return executor.runAvatarJob(input.projectId, input.jobId);
   }
   return executor.runRenderJob(input.projectId, input.jobId);
 }

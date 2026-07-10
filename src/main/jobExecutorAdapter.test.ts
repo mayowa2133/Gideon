@@ -57,6 +57,14 @@ function executorFixture(calls: string[]): GideonJobExecutor {
     async runRenderJob(projectId, jobId) {
       calls.push(`render:${projectId}:${jobId}`);
       return { id: projectId } as Project;
+    },
+    async runVoiceoverJob(projectId, jobId) {
+      calls.push(`tts:${projectId}:${jobId}`);
+      return { id: projectId } as Project;
+    },
+    async runAvatarJob(projectId, jobId) {
+      calls.push(`avatar:${projectId}:${jobId}`);
+      return { id: projectId } as Project;
     }
   };
 }
