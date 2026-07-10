@@ -1271,6 +1271,14 @@ function validateCaptionSafeAreas(editDecisionList: EditDecisionList): void {
       throw new Error("CTA text is too long for the selected safe-area preset.");
     }
   }
+
+  context.font = "24pt Arial";
+  const overflowingCallout = editDecisionList.callouts.find(
+    (callout) => !textFitsWithinLines(context, callout.text, 265, 2)
+  );
+  if (overflowingCallout) {
+    throw new Error("Callout text is too long for the selected safe-area preset.");
+  }
 }
 
 function textFitsWithinLines(

@@ -632,19 +632,29 @@ function momentForBeat(
 
 function calloutForPurpose(purpose: NonNullable<VisualBeat["purpose"]>, label: string): string {
   const clean = label.replace(/\s+/g, " ").trim();
+  let text: string;
   if (purpose === "problem") {
-    return `Before: ${clean}`;
+    text = `Before: ${clean}`;
+  } else if (purpose === "payoff") {
+    text = `Payoff: ${clean}`;
+  } else if (purpose === "proof") {
+    text = `Proof: ${clean}`;
+  } else if (purpose === "hook") {
+    text = `Watch: ${clean}`;
+  } else {
+    text = clean;
   }
-  if (purpose === "payoff") {
-    return `Payoff: ${clean}`;
+  return compactCalloutText(text);
+}
+
+function compactCalloutText(text: string): string {
+  const maxLength = 32;
+  if (text.length <= maxLength) {
+    return text;
   }
-  if (purpose === "proof") {
-    return `Proof: ${clean}`;
-  }
-  if (purpose === "hook") {
-    return `Watch: ${clean}`;
-  }
-  return clean;
+  const shortened = text.slice(0, maxLength - 3).trimEnd();
+  const boundary = shortened.lastIndexOf(" ");
+  return `${(boundary > 12 ? shortened.slice(0, boundary) : shortened).trimEnd()}...`;
 }
 
 function focusForBeat(index: number, templateKey: CreatorTemplateKey): RenderFocusPoint {

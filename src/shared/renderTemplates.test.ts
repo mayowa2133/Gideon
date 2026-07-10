@@ -8,7 +8,7 @@ import {
   normalizeBrandKit,
   templateForFormatFamily
 } from "./renderTemplates";
-import type { DetectedMoment } from "./types";
+import type { DetectedMoment, ProductProfile } from "./types";
 
 const moments: DetectedMoment[] = [
   {
@@ -96,7 +96,7 @@ describe("creator render templates", () => {
   });
 
   it("builds a renderable edit decision list with zooms, callouts, presenter, and brand kit", () => {
-    const profile = {
+    const profile: ProductProfile = {
       ...createDefaultProfile(),
       productName: "LeadPilot",
       brandPresenterEnabled: true,
@@ -116,6 +116,7 @@ describe("creator render templates", () => {
     expect(visualBeats[1]?.transitionIn).toMatchObject({ enabled: true, kind: "snap_cut" });
     expect(visualBeats[0]?.endMs).toBeLessThan(3_600);
     expect(visualBeats.at(-1)?.endMs).toBe(18_000);
+    expect(visualBeats.every((beat) => (beat.callout?.length ?? 0) <= 32)).toBe(true);
     const editDecisionList = buildEditDecisionList({
       profile,
       templateKey: "brand_presenter",

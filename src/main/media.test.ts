@@ -57,6 +57,21 @@ describe("media pipeline", () => {
     })).toThrow("Caption text is too long");
   });
 
+  it("rejects render manifests with unsafe callout layout", () => {
+    const script = draftScript();
+    const callout = script.editDecisionList!.callouts[0]!;
+
+    expect(() => validateRenderManifest({
+      ...script.editDecisionList!,
+      callouts: [
+        {
+          ...callout,
+          text: "ThisCalloutLabelIsIntentionallyTooWideForTheRenderedTwoLineSafeAreaAndMustBeEditedBeforeExport"
+        }
+      ]
+    })).toThrow("Callout text is too long");
+  });
+
   it("rejects render manifests with invalid caption word timing", () => {
     const script = draftScript();
     const caption = script.editDecisionList!.captions[0]!;

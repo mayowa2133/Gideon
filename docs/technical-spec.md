@@ -301,7 +301,7 @@ type EditDecisionList = {
 };
 ```
 
-Validation enforces duration bounds, source ranges, normalized focus coordinates, safe scale limits, caption/word timing, caption/hook/CTA fit against safe areas, overlay/callout/presenter/SFX timing, audio gain bounds, and referenced-object ownership. The current desktop implementation renders this EDL through FFmpeg plus generated transparent overlay frame sequences and deterministic generated audio tones; no arbitrary filter string, component name, URL, path, or command is accepted from AI or user-controlled text.
+Validation enforces duration bounds, source ranges, normalized focus coordinates, safe scale limits, caption/word timing, caption/hook/CTA/callout fit against safe areas, overlay/callout/presenter/SFX timing, audio gain bounds, and referenced-object ownership. The current desktop implementation renders this EDL through FFmpeg plus generated transparent overlay frame sequences and deterministic generated audio tones; no arbitrary filter string, component name, URL, path, or command is accepted from AI or user-controlled text.
 
 ### Render manifest
 
