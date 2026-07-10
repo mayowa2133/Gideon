@@ -121,6 +121,8 @@ export function createDefaultProfile(): ProductProfile {
     walkthroughNotes: "",
     defaultTemplateKey: "problem_demo_payoff",
     brandPresenterEnabled: false,
+    brandPresenterPosition: "lower_right",
+    brandPresenterMotion: "caption_sync",
     soundDesignEnabled: false,
     musicMood: "none",
     brandKit: createDefaultBrandKit(productName)

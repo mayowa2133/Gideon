@@ -442,10 +442,10 @@ export function buildEditDecisionList(input: {
       style: "logo_head",
       startMs: 600,
       endMs: Math.max(600, durationMs - 700),
-      position: "lower_right",
+      position: input.profile.brandPresenterPosition ?? "lower_right",
       logoPath: brandKit.logoPath,
       logoUrl: brandKit.logoUrl,
-      motion: "caption_sync"
+      motion: input.profile.brandPresenterMotion ?? "caption_sync"
     },
     music: {
       enabled: soundDesignEnabled && musicMood !== "none",

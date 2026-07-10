@@ -314,6 +314,8 @@ export interface ProductProfile {
   walkthroughNotes: string;
   defaultTemplateKey?: CreatorTemplateKey;
   brandPresenterEnabled?: boolean;
+  brandPresenterPosition?: BrandPresenterLayer["position"];
+  brandPresenterMotion?: BrandPresenterLayer["motion"];
   soundDesignEnabled?: boolean;
   musicMood?: MusicMood;
   brandKit?: BrandKit;

@@ -2824,6 +2824,8 @@ export function newProjectTemplate(): CreateProjectInput {
 
 function normalizeProfile(profile: ProductProfile): ProductProfile {
   const productName = (profile.productName ?? "").trim();
+  const brandPresenterPosition = profile.brandPresenterPosition === "lower_left" ? "lower_left" : "lower_right";
+  const brandPresenterMotion = profile.brandPresenterMotion === "idle_bob" ? "idle_bob" : "caption_sync";
   return {
     productName,
     targetCustomer: (profile.targetCustomer ?? "").trim(),
@@ -2838,6 +2840,8 @@ function normalizeProfile(profile: ProductProfile): ProductProfile {
     walkthroughNotes: (profile.walkthroughNotes ?? "").trim(),
     defaultTemplateKey: profile.defaultTemplateKey ?? "problem_demo_payoff",
     brandPresenterEnabled: Boolean(profile.brandPresenterEnabled),
+    brandPresenterPosition,
+    brandPresenterMotion,
     soundDesignEnabled: Boolean(profile.soundDesignEnabled),
     musicMood: profile.musicMood ?? "none",
     brandKit: normalizeBrandKit(profile.brandKit, productName)

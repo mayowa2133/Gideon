@@ -179,7 +179,7 @@ Creator templates are versioned render recipes, not just labels. Each template d
 - `pacingRules` with ordered beat purpose, duration weight, and min/max duration.
 - `captionStyle`, `visualRhythm`, and `zoomIntensity`.
 - `hookOverlayMs`, `proofOverlayMs`, and `ctaLeadMs`.
-- CTA placement and brand-presenter compatibility.
+- CTA placement and brand-presenter compatibility. Presenter-enabled profiles also carry a validated lower-left/lower-right placement and caption-synced/idle motion choice into the EDL.
 
 The script compiler turns these rules into visual beat timings, source segment timing, zoom cues, transition cues, callouts, and hook/CTA overlays. Template changes therefore alter the EDL deterministically while keeping all renderer inputs schema-validated.
 

@@ -1045,6 +1045,8 @@ describe("GideonStore billing reconciliation", () => {
     const updated = await store.updateProfile(project.id, {
       ...scripted.profile,
       brandPresenterEnabled: true,
+      brandPresenterPosition: "lower_left",
+      brandPresenterMotion: "idle_bob",
       brandKit: {
         ...scripted.profile.brandKit!,
         primaryColor: "#123456"
@@ -1055,6 +1057,18 @@ describe("GideonStore billing reconciliation", () => {
     expect(updated.status).toBe("script_review");
     expect(updated.scripts[0]?.editDecisionList?.brandKit.primaryColor).toBe("#123456");
     expect(updated.scripts[0]?.editDecisionList?.presenter.enabled).toBe(true);
+    expect(updated.scripts[0]?.editDecisionList?.presenter.position).toBe("lower_left");
+    expect(updated.scripts[0]?.editDecisionList?.presenter.motion).toBe("idle_bob");
+
+    const normalized = await store.updateProfile(project.id, {
+      ...updated.profile,
+      brandPresenterPosition: "center" as ProductProfile["brandPresenterPosition"],
+      brandPresenterMotion: "wave" as ProductProfile["brandPresenterMotion"]
+    });
+    expect(normalized.profile.brandPresenterPosition).toBe("lower_right");
+    expect(normalized.profile.brandPresenterMotion).toBe("caption_sync");
+    expect(normalized.scripts[0]?.editDecisionList?.presenter.position).toBe("lower_right");
+    expect(normalized.scripts[0]?.editDecisionList?.presenter.motion).toBe("caption_sync");
   });
 
   it("creates exports with explicit hosted session scope", async () => {

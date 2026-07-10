@@ -51,6 +51,8 @@ const platforms: Platform[] = ["tiktok", "instagram_reels", "youtube_shorts", "l
 const captionStyles: CaptionStylePreset[] = ["kinetic_bold", "clean_founder", "educational_stack"];
 const ctaStyles: CtaStylePreset[] = ["soft_try", "direct_signup", "learn_more"];
 const musicMoods: MusicMood[] = ["none", "clean_tech", "upbeat"];
+const presenterPositions = ["lower_right", "lower_left"] as const;
+const presenterMotions = ["caption_sync", "idle_bob"] as const;
 
 function App(): JSX.Element {
   const [state, setState] = useState<AppState>(() => createEmptyAppState());
@@ -1248,6 +1250,34 @@ function ProfileForm({
           type="checkbox"
         />
         Brand presenter
+      </label>
+      <label>
+        Presenter side
+        <select
+          disabled={!profile.brandPresenterEnabled}
+          value={profile.brandPresenterPosition ?? "lower_right"}
+          onChange={(event) => update("brandPresenterPosition", event.target.value as ProductProfile["brandPresenterPosition"])}
+        >
+          {presenterPositions.map((position) => (
+            <option key={position} value={position}>
+              {position.replace(/_/g, " ")}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Presenter motion
+        <select
+          disabled={!profile.brandPresenterEnabled}
+          value={profile.brandPresenterMotion ?? "caption_sync"}
+          onChange={(event) => update("brandPresenterMotion", event.target.value as ProductProfile["brandPresenterMotion"])}
+        >
+          {presenterMotions.map((motion) => (
+            <option key={motion} value={motion}>
+              {motion.replace(/_/g, " ")}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="checkbox-row">
         <input

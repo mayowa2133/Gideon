@@ -100,6 +100,8 @@ describe("creator render templates", () => {
       ...createDefaultProfile(),
       productName: "LeadPilot",
       brandPresenterEnabled: true,
+      brandPresenterPosition: "lower_left",
+      brandPresenterMotion: "idle_bob",
       brandKit: normalizeBrandKit({ primaryColor: "#112233", accentColor: "#445566" }, "LeadPilot")
     };
     const voiceover = "Most people miss this part of LeadPilot. Watch the result appear on screen.";
@@ -131,6 +133,8 @@ describe("creator render templates", () => {
     expect(editDecisionList.brandKit.productName).toBe("LeadPilot");
     expect(editDecisionList.brandKit.id).toBe("brand-kit:leadpilot");
     expect(editDecisionList.presenter.enabled).toBe(true);
+    expect(editDecisionList.presenter.position).toBe("lower_left");
+    expect(editDecisionList.presenter.motion).toBe("idle_bob");
     expect(editDecisionList.sourceSegments.length).toBeGreaterThanOrEqual(5);
     expect(editDecisionList.sourceSegments[0]).toMatchObject({
       sourceStartMs: visualBeats[0]?.sourceStartMs,
