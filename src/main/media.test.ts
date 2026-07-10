@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { createMoments, generateConcepts, generateScripts } from "../shared/contentEngine";
+import { createMoments, generateConcepts, generateScripts, splitCaptionSegments } from "../shared/contentEngine";
+import { buildEditDecisionList, buildVisualBeatsForTemplate, creatorTemplatePack } from "../shared/renderTemplates";
 import type { ProductProfile } from "../shared/types";
 import {
   buildAudioMixFilter,
@@ -55,6 +56,47 @@ describe("media pipeline", () => {
         }
       ]
     })).toThrow("Caption text is too long");
+  });
+
+  it("validates an export-ready edit decision list for every creator template", () => {
+    const recording = {
+      filePath: "/tmp/source.mp4",
+      fileUrl: "file:///tmp/source.mp4",
+      fileName: "source.mp4",
+      sizeBytes: 1024,
+      durationMs: 24_000,
+      width: 1280,
+      height: 720,
+      fps: 30,
+      videoCodec: "h264",
+      audioCodec: "aac",
+      hasAudio: true,
+      validatedAt: "2026-06-24T00:00:00.000Z"
+    };
+    const moments = createMoments(profile, recording, (id) => `template-moment-${id}`);
+    const voiceover = "Watch the slow step. Then see the result happen on screen. That matters because the workflow is simpler.";
+
+    creatorTemplatePack.forEach((template) => {
+      const visualBeats = buildVisualBeatsForTemplate({
+        moments,
+        durationMs: 24_000,
+        templateKey: template.key
+      });
+      const manifest = buildEditDecisionList({
+        profile: { ...profile, brandPresenterEnabled: template.key === "brand_presenter" },
+        templateKey: template.key,
+        durationMs: 24_000,
+        captions: splitCaptionSegments(voiceover, 24_000),
+        visualBeats,
+        hook: `Watch ${profile.productName} handle the workflow.`,
+        cta: `Try ${profile.productName} on one workflow.`,
+        moments
+      });
+
+      expect(() => validateRenderManifest(manifest)).not.toThrow();
+      expect(manifest.templateId).toBe(`creator-template:${template.key}:v1`);
+      expect(manifest.transitions.length).toBeGreaterThanOrEqual(visualBeats.length - 1);
+    });
   });
 
   it("rejects render manifests with unsafe callout layout", () => {

@@ -318,6 +318,7 @@ Test:
 - Voiceover belongs to the approved script version.
 - Export profile is supported.
 - Referenced fonts and overlays exist.
+- Every creator template fixture compiles to a safe, evidence-backed EDL with valid captions, focus cues, transitions, and overlays.
 
 Expected result:
 
