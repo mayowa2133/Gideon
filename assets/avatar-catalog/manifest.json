@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "OpenAI image generation",
+  "disclosure": "AI-generated brand presenter",
+  "entries": [
+    {
+      "id": "orbit",
+      "file": "orbit.png",
+      "sha256": "d38f3dea5b8184402993a6afeb878a5077ee1204b60f089992250c0fecabc52a",
+      "provenance": "gideon_fictional_catalog",
+      "commercialApproved": true,
+      "realLikeness": false,
+      "voiceCloning": false
+    },
+    {
+      "id": "nova",
+      "file": "nova.png",
+      "sha256": "2c98a5e07380582c0138d800da6f6877a2a198027bb6519fab5d8445d5b67053",
+      "provenance": "gideon_fictional_catalog",
+      "commercialApproved": true,
+      "realLikeness": false,
+      "voiceCloning": false
+    }
+  ]
+}
