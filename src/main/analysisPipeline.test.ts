@@ -121,6 +121,35 @@ describe("analysis pipeline", () => {
     expect(ranked?.visualRole).toBe("action");
   });
 
+  it("pairs the earliest visible before state with the strongest later payoff", () => {
+    const moments = createMoments(profile, recording, randomUUID);
+    const ranked = rankFrameEvidence(
+      [
+        {
+          id: "frame-before",
+          momentId: moments[0]!.id,
+          timestampMs: 1_000,
+          ocrProvider: "openai",
+          createdAt: "2026-07-09T00:00:00.000Z"
+        },
+        {
+          id: "frame-payoff",
+          momentId: moments[3]!.id,
+          timestampMs: 24_000,
+          ocrProvider: "openai",
+          uiElements: [{ id: "status-1", kind: "status", text: "Campaign generated", confidence: 0.96 }],
+          createdAt: "2026-07-09T00:00:00.000Z"
+        }
+      ],
+      moments,
+      recording.durationMs
+    );
+
+    const pairId = `before-after:${moments[0]!.id}:${moments[3]!.id}`;
+    expect(ranked.find((frame) => frame.id === "frame-before")?.beforeAfterPairId).toBe(pairId);
+    expect(ranked.find((frame) => frame.id === "frame-payoff")?.beforeAfterPairId).toBe(pairId);
+  });
+
   it("records prompt provenance on provider-backed semantic analysis runs", async () => {
     const oldEnv = snapshotEnv([
       "OPENAI_API_KEY",

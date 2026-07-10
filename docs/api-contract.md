@@ -246,7 +246,7 @@ Return project summary, active artifacts, sanitized completed/queued render proj
 Return sanitized project context for Codex/Claude Code MCP agents using the user's hosted session.
 
 - **Auth:** Active member authorized for project workspace.
-- **Response 200:** Project summary plus product profile, recording metadata without private paths or object keys, transcript text/segments, detected moments with revision values and source-evidence IDs but without local thumbnail paths, frame OCR evidence with bounded typed UI elements and without local image paths, scripts with revision values, jobs, sanitized renders, and recent project audit events.
+- **Response 200:** Project summary plus product profile, recording metadata without private paths or object keys, transcript text/segments, detected moments with revision values, source-evidence IDs, proof score, visual role, optional before/after pairing, focus and interaction hints but without local thumbnail paths, frame OCR evidence with the same bounded review metadata and typed UI elements but without local image paths, scripts with revision values, jobs, sanitized renders, and recent project audit events.
 - **Errors:** 404.
 - **Rate limit:** 120/min.
 

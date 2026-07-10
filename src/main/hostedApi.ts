@@ -1461,7 +1461,13 @@ function mcpProjectContextResource(project: Project, state: AppState) {
       startMs: moment.startMs,
       endMs: moment.endMs,
       evidence: moment.evidence,
+      sourceEvidenceIds: moment.sourceEvidenceIds,
       confidence: moment.confidence,
+      proofScore: moment.proofScore,
+      visualRole: moment.visualRole,
+      beforeAfterPairId: moment.beforeAfterPairId,
+      focus: moment.focus,
+      interactionHint: moment.interactionHint,
       enabled: moment.enabled,
       thumbnailUrl: moment.thumbnailUrl
     })),
@@ -1474,6 +1480,11 @@ function mcpProjectContextResource(project: Project, state: AppState) {
       uiElements: frame.uiElements,
       ocrProvider: frame.ocrProvider,
       confidence: frame.confidence,
+      proofScore: frame.proofScore,
+      visualRole: frame.visualRole,
+      beforeAfterPairId: frame.beforeAfterPairId,
+      focus: frame.focus,
+      interactionHints: frame.interactionHints,
       createdAt: frame.createdAt
     })),
     scripts: project.scripts.map((script) => ({

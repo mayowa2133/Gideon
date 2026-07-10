@@ -263,7 +263,7 @@ function createFrameEvidence(moments: DetectedMoment[], createdAt: string): Fram
 }
 
 export function rankFrameEvidence(frames: FrameEvidence[], moments: DetectedMoment[], durationMs: number): FrameEvidence[] {
-  return frames.map((frame, index) => {
+  const ranked = frames.map((frame, index) => {
     const moment = moments.find((candidate) => candidate.id === frame.momentId);
     const uiElements = frame.uiElements ?? [];
     const actionSignals = uiElements.filter((element) => element.kind === "button" || element.kind === "input").length;
@@ -292,6 +292,7 @@ export function rankFrameEvidence(frames: FrameEvidence[], moments: DetectedMome
       interactionHints
     };
   });
+  return pairBeforeAfterEvidence(ranked);
 }
 
 function annotateMomentsWithFrameEvidence(moments: DetectedMoment[], frames: FrameEvidence[]): DetectedMoment[] {
@@ -306,10 +307,30 @@ function annotateMomentsWithFrameEvidence(moments: DetectedMoment[], frames: Fra
       ...moment,
       proofScore: Math.max(moment.proofScore ?? 0, frame.proofScore ?? 0),
       visualRole: frame.visualRole ?? moment.visualRole,
+      beforeAfterPairId: frame.beforeAfterPairId,
       focus: frame.focus ?? moment.focus,
       interactionHint: frame.interactionHints?.[0] ?? moment.interactionHint
     };
   });
+}
+
+function pairBeforeAfterEvidence(frames: FrameEvidence[]): FrameEvidence[] {
+  const before = [...frames]
+    .filter((frame) => frame.visualRole === "before")
+    .sort((left, right) => left.timestampMs - right.timestampMs)[0];
+  if (!before) {
+    return frames;
+  }
+  const payoff = [...frames]
+    .filter((frame) => frame.visualRole === "payoff" && frame.timestampMs > before.timestampMs)
+    .sort((left, right) => (right.proofScore ?? 0) - (left.proofScore ?? 0) || left.timestampMs - right.timestampMs)[0];
+  if (!payoff) {
+    return frames;
+  }
+  const beforeAfterPairId = `before-after:${before.momentId}:${payoff.momentId}`;
+  return frames.map((frame) =>
+    frame.id === before.id || frame.id === payoff.id ? { ...frame, beforeAfterPairId } : frame
+  );
 }
 
 function inferVisualRole(

@@ -373,6 +373,7 @@ export interface FrameEvidence {
   changeScore?: number;
   proofScore?: number;
   visualRole?: "before" | "action" | "proof" | "payoff";
+  beforeAfterPairId?: string;
   focus?: RenderFocusPoint;
   interactionHints?: InteractionHint[];
   createdAt: string;
@@ -429,6 +430,7 @@ export interface DetectedMoment {
   enabled: boolean;
   proofScore?: number;
   visualRole?: "before" | "action" | "proof" | "payoff";
+  beforeAfterPairId?: string;
   focus?: RenderFocusPoint;
   interactionHint?: InteractionHint;
   thumbnailPath?: string;
