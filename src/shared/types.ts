@@ -479,6 +479,11 @@ export interface VisualBeat {
     enabled: boolean;
     kind?: RenderTransitionCue["kind"];
   };
+  cursorEmphasis?: {
+    enabled: boolean;
+    kind?: InteractionHint["kind"];
+    label?: string;
+  };
   evidenceIds?: string[];
 }
 

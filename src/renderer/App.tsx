@@ -1665,6 +1665,59 @@ function ScriptEditor({
     );
   }
 
+  function updateVisualBeatCursor(scriptId: string, beatIndex: number, value: "auto" | "off" | "click_target" | "cursor_candidate"): void {
+    setScripts(
+      scripts.map((script) => {
+        if (script.id !== scriptId) {
+          return script;
+        }
+        return {
+          ...script,
+          visualBeats: script.visualBeats.map((beat, index) =>
+            index === beatIndex
+              ? {
+                  ...beat,
+                  cursorEmphasis: value === "auto"
+                    ? undefined
+                    : {
+                        enabled: value !== "off",
+                        kind: value === "off" ? beat.cursorEmphasis?.kind : value,
+                        label: beat.cursorEmphasis?.label
+                      }
+                }
+              : beat
+          )
+        };
+      })
+    );
+  }
+
+  function updateVisualBeatCursorLabel(scriptId: string, beatIndex: number, label: string): void {
+    const normalizedLabel = label.replace(/\s+/g, " ").trimStart().slice(0, 64);
+    setScripts(
+      scripts.map((script) => {
+        if (script.id !== scriptId) {
+          return script;
+        }
+        return {
+          ...script,
+          visualBeats: script.visualBeats.map((beat, index) =>
+            index === beatIndex
+              ? {
+                  ...beat,
+                  cursorEmphasis: {
+                    enabled: beat.cursorEmphasis?.enabled ?? true,
+                    kind: beat.cursorEmphasis?.kind,
+                    label: normalizedLabel
+                  }
+                }
+              : beat
+          )
+        };
+      })
+    );
+  }
+
   return (
     <div className="script-stack">
       {scripts.map((script, index) => {
@@ -1774,6 +1827,34 @@ function ScriptEditor({
                             </select>
                           </label>
                         ) : null}
+                        <label>
+                          Cursor
+                          <select
+                            onChange={(event) =>
+                              updateVisualBeatCursor(script.id, beatIndex, event.target.value as "auto" | "off" | "click_target" | "cursor_candidate")
+                            }
+                            value={
+                              beat.cursorEmphasis
+                                ? beat.cursorEmphasis.enabled === false
+                                  ? "off"
+                                  : beat.cursorEmphasis.kind ?? "cursor_candidate"
+                                : "auto"
+                            }
+                          >
+                            <option value="auto">Detected</option>
+                            <option value="click_target">Click</option>
+                            <option value="cursor_candidate">Cursor</option>
+                            <option value="off">Off</option>
+                          </select>
+                        </label>
+                        <label className="wide-control">
+                          Cursor label
+                          <input
+                            maxLength={64}
+                            onChange={(event) => updateVisualBeatCursorLabel(script.id, beatIndex, event.target.value)}
+                            value={beat.cursorEmphasis?.label ?? ""}
+                          />
+                        </label>
                         <label>
                           In
                           <input

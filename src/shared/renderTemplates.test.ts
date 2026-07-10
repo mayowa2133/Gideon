@@ -189,6 +189,46 @@ describe("creator render templates", () => {
     expect(editDecisionList.transitions.some((transition) => transition.id === "cut-2")).toBe(false);
   });
 
+  it("uses visual beat cursor emphasis overrides when building cursor cues", () => {
+    const profile = createDefaultProfile();
+    const captions = splitCaptionSegments("Click generate. The finished draft appears.", 16_000);
+    const visualBeats = buildVisualBeatsForTemplate({
+      moments,
+      durationMs: 16_000,
+      templateKey: "hidden_feature_reveal"
+    }).map((beat, index) =>
+      index === 0
+        ? { ...beat, cursorEmphasis: { enabled: false, kind: "click_target" as const } }
+        : index === 1
+          ? {
+              ...beat,
+              focus: { x: 0.34, y: 0.61, scale: 1.3 },
+              cursorEmphasis: { enabled: true, kind: "cursor_candidate" as const, label: "Result appears" }
+            }
+          : beat
+    );
+
+    const editDecisionList = buildEditDecisionList({
+      profile,
+      templateKey: "hidden_feature_reveal",
+      durationMs: 16_000,
+      captions,
+      visualBeats,
+      hook: "Most people miss this",
+      cta: "Try it on one workflow.",
+      moments
+    });
+
+    expect(editDecisionList.cursorCues.some((cue) => cue.id === "cursor-1")).toBe(false);
+    expect(editDecisionList.cursorCues[0]).toMatchObject({
+      id: "cursor-2",
+      kind: "cursor_candidate",
+      label: "Result appears",
+      anchor: { x: 0.34, y: 0.61, scale: 1.3 },
+      confidence: 0.7
+    });
+  });
+
   it("adds deterministic music and SFX cues when sound design is enabled", () => {
     const profile = {
       ...createDefaultProfile(),

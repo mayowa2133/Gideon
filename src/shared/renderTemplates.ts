@@ -324,15 +324,15 @@ export function buildEditDecisionList(input: {
     };
   });
   const zooms = input.visualBeats.map((beat, index) => {
-    const focus = beat.focus ?? focusForBeat(index, input.templateKey);
+    const baseFocus = beat.focus ?? focusForBeat(index, input.templateKey);
     const zoomDurationMs = template.zoomIntensity === "strong" ? 1500 : template.zoomIntensity === "medium" ? 1800 : 2200;
     const fromScale = template.zoomIntensity === "strong" && index > 0 ? 1.06 : index === 0 ? 1 : 1.03;
     return {
       startMs: beat.startMs,
       endMs: Math.min(beat.endMs, beat.startMs + zoomDurationMs),
       fromScale,
-      toScale: zoomScaleForTemplate(focus.scale, template.zoomIntensity),
-      focus,
+      toScale: zoomScaleForTemplate(baseFocus.scale, template.zoomIntensity),
+      focus: baseFocus,
       easing: template.visualRhythm === "snap" ? "snap" as const : "standard" as const
     };
   });
@@ -381,23 +381,31 @@ export function buildEditDecisionList(input: {
   ];
   const cursorCues = input.visualBeats.flatMap((beat, index) => {
     const moment = input.moments.find((candidate) => candidate.id === beat.momentId);
-    if (!moment?.interactionHint) {
+    if (beat.cursorEmphasis?.enabled === false) {
       return [];
     }
+    const baseFocus = beat.focus ?? focusForBeat(index, input.templateKey);
+    const interactionHint = moment?.interactionHint;
+    const hasCursorSource = Boolean(beat.cursorEmphasis?.enabled || interactionHint);
+    if (!hasCursorSource) {
+      return [];
+    }
+    const cueKind = beat.cursorEmphasis?.kind ?? interactionHint?.kind ?? "cursor_candidate";
+    const cueLabel = cleanOptionalText(beat.cursorEmphasis?.label) ?? cleanOptionalText(interactionHint?.label);
     const focus = {
-      x: clamp(moment.interactionHint.x, 0, 1),
-      y: clamp(moment.interactionHint.y, 0, 1),
-      scale: beat.focus?.scale ?? focusForBeat(index, input.templateKey).scale
+      x: clamp(interactionHint?.x ?? baseFocus.x, 0, 1),
+      y: clamp(interactionHint?.y ?? baseFocus.y, 0, 1),
+      scale: baseFocus.scale
     };
     return [
       {
         id: `cursor-${index + 1}`,
-        kind: moment.interactionHint.kind,
+        kind: cueKind,
         startMs: Math.min(beat.endMs - 500, beat.startMs + 180),
         endMs: Math.min(beat.endMs, beat.startMs + 1450),
         anchor: focus,
-        label: cleanOptionalText(moment.interactionHint.label)?.slice(0, 64),
-        confidence: Number(clamp(moment.interactionHint.confidence, 0, 1).toFixed(3))
+        label: cueLabel?.slice(0, 64),
+        confidence: Number(clamp(interactionHint?.confidence ?? 0.7, 0, 1).toFixed(3))
       }
     ];
   });
