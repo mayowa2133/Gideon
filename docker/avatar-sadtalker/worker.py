@@ -64,6 +64,9 @@ def main() -> None:
     model_license = os.environ.get("GIDEON_AVATAR_MODEL_LICENSE", "").strip()
     if not model_version or not model_license or os.environ.get("GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED") != "true":
         fail("SadTalker model version, license, and commercial approval are required.")
+    checkpoints_dir = Path(os.environ["SADTALKER_HOME"]) / "checkpoints"
+    if not checkpoints_dir.is_dir() or not any(checkpoints_dir.iterdir()):
+        fail("SadTalker checkpoints must be mounted read-only by the operator.")
 
     audio_path = require_under(Path(request["audioPath"]), Path("/work/input"), "audio")
     output_path = require_under(Path(request["outputPath"]), Path("/work/output"), "output")
