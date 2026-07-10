@@ -758,6 +758,10 @@ Detailed rules live in [security-rules.md](./security-rules.md). Baseline:
 - Secret manager, least-privilege identities, log redaction, audit events, deletion.
 - Consent and anti-impersonation requirements before any voice/avatar cloning.
 
+### Fictional avatar worker boundary
+
+The default avatar renderer is deterministic and accepts only catalog presenters. Optional external avatar workers are disabled unless all of the following are set: `GIDEON_AVATAR_WORKER_PROVIDER` (`sadtalker` or `musetalk`), `GIDEON_AVATAR_MODEL_VERSION`, `GIDEON_AVATAR_MODEL_LICENSE`, and `GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED=true`. The runtime validates an approved fictional catalog avatar, private local audio/output paths, a short-form duration, and the required `AI-generated brand presenter` disclosure before invoking a provider. An uninstalled provider fails closed; Gideon must not download model weights, accept arbitrary portrait URLs, or accept reference voice clips from this boundary.
+
 ## Deployment plan
 
 ### Environments
