@@ -15,7 +15,7 @@
 
 ## Non-goals
 
-- Native/extension recording, autonomous browser control, AI avatar generation, voice cloning, social posting, analytics, or a general multitrack editor.
+- Native/extension recording, autonomous browser control, real-person avatar generation, voice cloning, social posting, analytics, or a general multitrack editor. Gideon may render only approved fictional catalog presenters until a separate consent-gated avatar program is approved.
 - Executing LLM-generated code, JSX, FFmpeg command strings, SQL, URLs, or tool calls.
 - Synchronous analysis/render endpoints.
 - Multi-region active-active processing in MVP.

@@ -16,7 +16,7 @@ Gideon is not a screen recorder, general AI video generator, or autonomous socia
 
 `upload → understand → propose 10 angles → select 3 → edit scripts → render 3 drafts → review → export`
 
-Creative reference: the target explanation style is creator-led product education in the spirit of Nick Saraev and nivedan.ai, where fast cuts, visible product proof, plain-language benefit framing, and a human-presenter feel make software features understandable and marketable quickly. The MVP approximates this with scripted voiceover, dynamic product footage, captions, overlays, focus moves, and deterministic brand-presenter elements; AI human avatars or imported user likenesses are a future capability, not part of the initial reliable upload-to-export loop.
+Creative reference: the target explanation style is creator-led product education in the spirit of Nick Saraev and nivedan.ai, where fast cuts, visible product proof, plain-language benefit framing, and a human-presenter feel make software features understandable and marketable quickly. Gideon supports deterministic logo and fictional catalog presenters with a visible AI-generated disclosure; imported real-person likenesses and voice cloning remain future consent-gated capabilities.
 
 ## Problem statement
 
