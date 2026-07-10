@@ -766,6 +766,8 @@ The default avatar renderer is deterministic and accepts only catalog presenters
 
 Avatar generation is a separate cancellable `avatar` job. It requires one approved script and a validated private voiceover, emits only a private `avatar_presenter` artifact, and retains the provider/model/license/avatar/disclosure receipt with that artifact. The desktop UI exposes this only when a fictional catalog presenter is selected; failed or unconfigured workers do not alter the approved script or existing render.
 
+For the Docker implementation, set `GIDEON_AVATAR_WORKER_COMMAND` to the absolute path of `scripts/run-sadtalker-avatar-worker.mjs`, mark that script executable, and set `GIDEON_AVATAR_WORK_DIR` to the same absolute host directory mounted by Compose. The launcher copies only the requested private audio into the mounted input directory, invokes `docker compose` without a shell, maps the worker result back to the original private output path, and removes its temporary files.
+
 ## Deployment plan
 
 ### Environments
