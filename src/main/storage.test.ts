@@ -79,6 +79,35 @@ describe("local private object storage", () => {
     expect(await fs.readFile(stored.filePath, "utf8")).toBe("render bytes");
   });
 
+  it("records pinned model lineage for private avatar presenter artifacts", async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-avatar-storage-"));
+    const sourcePath = path.join(tempDir, "orbit.mp4");
+    await fs.writeFile(sourcePath, Buffer.from("avatar bytes"));
+
+    const storage = new LocalPrivateObjectStorage(path.join(tempDir, "objects"));
+    const stored = await storage.putFile({
+      workspaceId: "workspace-1",
+      projectId: "project-1",
+      kind: "avatar_presenter",
+      sourcePath,
+      originalFileName: "orbit.mp4",
+      contentType: "video/mp4",
+      avatarModelReceipt: {
+        provider: "musetalk",
+        modelVersion: "musetalk-1.5-pinned",
+        modelLicense: "reviewed-license",
+        avatarId: "orbit",
+        avatarProvenance: "gideon_fictional_catalog",
+        disclosure: "AI-generated brand presenter",
+        generatedAt: "2026-07-10T00:00:00.000Z"
+      }
+    });
+
+    expect(stored.artifact.kind).toBe("avatar_presenter");
+    expect(stored.artifact.avatarModelReceipt).toMatchObject({ avatarId: "orbit", provider: "musetalk" });
+    expect(stored.artifact.storageKey).toContain("projects/project-1/avatar_presenter/");
+  });
+
   it("stores exported videos as private video artifacts", async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-export-storage-"));
     const sourcePath = path.join(tempDir, "approved-draft.mp4");

@@ -206,6 +206,7 @@ export interface ArtifactRecord {
   originalFileName: string;
   localPath?: string;
   localUrl?: string;
+  avatarModelReceipt?: AvatarModelReceipt;
   createdAt: string;
 }
 

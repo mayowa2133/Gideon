@@ -6,7 +6,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { pathToFileURL } from "node:url";
-import type { ArtifactKind, ArtifactProvider, ArtifactRecord } from "../shared/types";
+import type { ArtifactKind, ArtifactProvider, ArtifactRecord, AvatarModelReceipt } from "../shared/types";
 
 export interface PutFileInput {
   workspaceId: string;
@@ -15,6 +15,7 @@ export interface PutFileInput {
   sourcePath: string;
   originalFileName?: string;
   contentType?: string;
+  avatarModelReceipt?: AvatarModelReceipt;
   now?: string;
 }
 
@@ -215,6 +216,7 @@ export class LocalPrivateObjectStorage implements PrivateObjectStorage {
         originalFileName,
         localPath: destinationPath,
         localUrl: fileUrl,
+        avatarModelReceipt: input.avatarModelReceipt,
         createdAt: input.now ?? new Date().toISOString()
       }
     };
@@ -288,6 +290,7 @@ export class S3CompatibleObjectStorage implements PrivateObjectStorage {
         originalFileName,
         localPath: cachePath,
         localUrl: fileUrl,
+        avatarModelReceipt: input.avatarModelReceipt,
         createdAt: input.now ?? new Date().toISOString()
       }
     };
