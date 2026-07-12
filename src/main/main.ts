@@ -350,6 +350,10 @@ function registerIpcHandlers(): void {
     });
     return store.updateProfile(projectId, {
       ...project.profile,
+      brandPresenterEnabled: true,
+      avatarPresenterId: project.profile.avatarPresenterId === "logo_head" || !project.profile.avatarPresenterId
+        ? "orbit"
+        : project.profile.avatarPresenterId,
       customAvatarSource: {
         artifactId: stored.artifact.id,
         displayName: path.basename(sourcePath),

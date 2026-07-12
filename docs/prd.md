@@ -43,7 +43,7 @@ The consequence is inconsistent marketing, weak generic copy, and underused prod
 
 - Film/TV editors who need a general nonlinear editor.
 - Influencer channels based primarily on talking-head or entertainment footage.
-- Users seeking fully synthetic avatar content.
+- Users seeking unsupervised bulk avatar generation, public-figure impersonation, or voice cloning.
 - Social media managers who need scheduling/analytics more than creation.
 
 ## Personas
@@ -84,7 +84,7 @@ For software builders who need to market consistently, Gideon converts an existi
 5. **Native, not corporate.** Short hooks, visual proof early, readable captions, tight pacing, and platform safe areas.
 6. **Async by default.** Upload, analysis, TTS, and rendering never block an HTTP request or freeze the UI.
 7. **Stage-level recovery.** Retry or regenerate a failed stage without restarting the project.
-8. **MVP discipline.** Uploaded screen recordings and MP4 export first; recorder, AI avatars, replay, scheduling, and analytics later.
+8. **MVP discipline.** Uploaded screen recordings and MP4 export first; avatar presenters remain an optional isolated workflow, while recorder, replay, scheduling, analytics, and voice cloning stay later.
 9. **Deterministic execution.** AI proposes structured decisions; validated workers render them.
 10. **Private by default.** Source recordings and outputs are private, workspace-scoped objects.
 
@@ -421,9 +421,9 @@ Validate that useful, evidence-backed concepts and editable vertical drafts save
 - Social scheduling/posting after platform/security review.
 - Performance analytics and hook A/B testing.
 
-### Future: human presenter and avatar marketing
+### Presenter roadmap
 
-- Optional AI avatar or imported user likeness that can take the role of a creator-style presenter, subject to consent, likeness rights, and safety review.
+- Optional AI avatar or imported authorized self likeness can take the role of a creator-style presenter through the private consent-gated worker boundary.
 - Company-logo presenter variants for brands that want a stylized host without using a real person. The MVP illustration uses a generic torso, shoulders, neck, logo head, motion, and an on-frame `brand presenter` disclosure; it does not model a real individual.
 - Presenter scripts and gestures aligned to the same evidence-backed product moments, so the avatar explains visible product proof instead of inventing claims.
 - Content calendar and campaign planning.
@@ -443,7 +443,7 @@ Validate that useful, evidence-backed concepts and editable vertical drafts save
 | Provider lock-in | Margin/reliability loss | Versioned provider interfaces and artifacts |
 | Scope expands into editor/recorder/social suite | MVP stalls | Enforce non-MVP list and outcome metrics |
 | Open-source license misuse | Legal/product constraint | Dependency register, exact license/model review, no unapproved copying/forks |
-| Voice/avatar abuse | Impersonation and platform harm | Keep out of MVP; consent/revocation/audit/labeling before launch |
+| Voice/avatar abuse | Impersonation and platform harm | Restrict avatars to reviewed fictional assets or consented self likenesses with revocation/audit/labeling; keep voice cloning disabled |
 
 ## Open questions requiring human decision
 

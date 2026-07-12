@@ -548,7 +548,7 @@ Expand Gideon only after the core upload-to-export loop proves valuable.
 | Upload handling is unsafe | Private recordings or infrastructure may be exposed | Use direct private uploads, strict validation, signed URLs, FFmpeg sandboxing, and object lifecycle rules |
 | Vendor lock-in | Costs or provider failures could block the product | Keep provider adapters and store normalized artifacts |
 | Licensing surprise | Commercial rollout could be delayed | Keep Remotion and ButterCut licensing notes in engineering docs; review before production scale |
-| Scope creep into avatars and social posting | MVP delivery slows down | Keep avatars and posting in post-MVP phases with explicit consent and API controls |
+| Scope creep into avatars and social posting | MVP delivery slows down | Keep the avatar surface limited to reviewed fictional assets and consented self likenesses; keep posting and voice cloning out of MVP |
 
 ## Definition of done for implementation changes
 

@@ -30,7 +30,7 @@ Implement in vertical slices that keep the app usable after each commit:
 - Add provider-backed behavior only behind explicit configuration.
 - Treat MCP agent control as a first-class no-provider-key path: external agents may bring their own model credentials, while Gideon exposes local/project tools and keeps user approval gates.
 - Add tests and push to `main` after each working slice.
-- Do not add social publishing, avatars, or voice cloning until the core evidence-to-render loop is production-grade.
+- Do not add social publishing, unauthorized likeness generation, or voice cloning until the core evidence-to-render loop and abuse controls are production-grade. Fictional and consent-gated self-avatar generation follow a separate isolated-worker release gate.
 
 ## Milestone 0: MCP agent control plane
 

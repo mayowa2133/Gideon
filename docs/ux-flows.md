@@ -227,6 +227,7 @@ Page-level layout: selected concepts as tabs/left rail; structured editor center
 7. Caption preview derived from spoken text.
 8. CTA.
 9. Dense visual beats mapped to moments/time ranges, editable callout labels, cursor/click emphasis, per-beat cut treatment, and repeated proof moments allowed for quick-cut pacing. Brand presenter reviews also allow placement and motion selection.
+10. Optional self-avatar import requires an ownership/permission attestation before the private portrait picker opens. The selected source is named in product context and exposes an explicit revoke action.
 
 ### Interaction
 
@@ -237,6 +238,7 @@ Page-level layout: selected concepts as tabs/left rail; structured editor center
 - `Regenerate section` opens a small instruction field and affects only that section.
 - `Preview voice` may synthesize a short sample subject to usage limits.
 - Each approved draft can regenerate only its private voiceover, re-render on its own with its validated prior voiceover, or render with a fresh voiceover, without replacing other completed drafts.
+- Presenter-enabled approved drafts can generate or regenerate a private avatar clip. The status distinguishes a generated clip that matches the current script/source revision from the deterministic fallback presenter.
 - Voiceover toggle: AI voice, source audio only, or voiceover plus ducked source audio if supported.
 - `Approve & render drafts` summarizes the approved script, template, brand kit, sound-design setting, caption style, and evidence-backed visual plan versions that will be used.
 

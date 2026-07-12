@@ -758,9 +758,9 @@ Detailed rules live in [security-rules.md](./security-rules.md). Baseline:
 - Secret manager, least-privilege identities, log redaction, audit events, deletion.
 - Consent and anti-impersonation requirements before any voice/avatar cloning.
 
-### Fictional avatar worker boundary
+### Avatar worker boundary
 
-The default avatar renderer is deterministic and accepts only catalog presenters. Optional external avatar workers are disabled unless all of the following are set: `GIDEON_AVATAR_WORKER_PROVIDER` (`sadtalker` or `musetalk`), `GIDEON_AVATAR_MODEL_VERSION`, `GIDEON_AVATAR_MODEL_LICENSE`, and `GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED=true`. The runtime validates an approved fictional catalog avatar, private local audio/output paths, a short-form duration, and the required `AI-generated brand presenter` disclosure before invoking a provider. An uninstalled provider fails closed; Gideon must not download model weights, accept arbitrary portrait URLs, or accept reference voice clips from this boundary.
+The default avatar renderer is deterministic. Optional external avatar workers are disabled unless all of the following are set: `GIDEON_AVATAR_WORKER_PROVIDER` (`sadtalker` or `musetalk`), `GIDEON_AVATAR_MODEL_VERSION`, `GIDEON_AVATAR_MODEL_LICENSE`, and `GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED=true`. The runtime accepts an approved fictional catalog avatar or a private project-owned portrait with matching active likeness consent; it validates private local audio/output/source paths, a short-form duration, and the required `AI-generated brand presenter` disclosure before invoking a provider. An uninstalled provider fails closed; Gideon must not download model weights at runtime, accept portrait URLs, or accept reference voice clips from this boundary.
 
 `docker-compose.avatar-worker.yml` defines the isolated SadTalker implementation: non-root, read-only filesystem, no runtime network, GPU reservation, a writable private `/work` mount, a read-only fictional asset catalog, and separate read-only mounts for SadTalker checkpoints and required facexlib alignment/detection weights. The catalog hashes and provenance are recorded in `assets/avatar-catalog/manifest.json`; the worker validates its output receipt before Gideon imports the MP4 as a private `avatar_presenter` artifact.
 

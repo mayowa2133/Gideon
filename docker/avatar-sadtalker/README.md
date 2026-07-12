@@ -14,6 +14,8 @@ Build/run with `docker compose -f docker-compose.avatar-worker.yml build`. Set `
 
 Run `pnpm avatar:worker:check` before starting a worker. It verifies configuration, executable permissions, model artifact presence and minimum reviewed sizes, and the fictional catalog hashes without loading models into memory.
 
+Run `pnpm avatar:worker:canary` only on the approved GPU worker host. It renders a one-second fictional Orbit clip, validates the receipt and MP4 with ffprobe, removes all temporary media, and optionally writes a path-free report to `GIDEON_AVATAR_CANARY_REPORT_PATH`. `pnpm avatar:worker:canary -- --dry-run` performs no model or media work.
+
 The worker prints exactly one JSON result to stdout. Gideon validates the result path and model receipt before importing the MP4 as a private `avatar_presenter` artifact.
 
 Dependency resolution is constrained to PyTorch 2.2.2, torchvision 0.17.2, and a `pkg_resources`-compatible setuptools release. The image also applies BasicSR's one-line import migration from the removed `functional_tensor` module to the equivalent supported `torchvision.transforms.functional` module.

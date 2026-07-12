@@ -90,6 +90,7 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm production:release-receipt:check
 - pnpm worker:hosted:check
 - pnpm avatar:worker:check
+- pnpm avatar:worker:canary
 - pnpm release:mac:check
 - pnpm db:migrate
 - pnpm db:seed
