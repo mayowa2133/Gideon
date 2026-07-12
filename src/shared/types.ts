@@ -350,6 +350,8 @@ export interface CustomAvatarSource {
     status: "granted";
     sourceArtifactId: string;
     consentVerifiedAt: string;
+    consentPolicyVersion: "self-avatar-v1";
+    subjectRelationship: "self";
   };
 }
 
@@ -634,6 +636,8 @@ export interface AvatarConsentRecord {
   consentVerifiedAt?: string;
   expiresAt?: string;
   sourceArtifactId?: string;
+  consentPolicyVersion?: "self-avatar-v1";
+  subjectRelationship?: "self";
 }
 
 export interface EditDecisionList {

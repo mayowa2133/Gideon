@@ -906,7 +906,7 @@ function ProjectWorkspace({
                 onChange={(event) => setAvatarConsentAttested(event.target.checked)}
                 type="checkbox"
               />
-              I own this likeness or have explicit permission to use it as an AI presenter.
+              This portrait is me, and I consent to its use as a disclosed AI presenter.
             </label>
             <button
               className="secondary"

@@ -629,7 +629,9 @@ describe("Gideon job executor", () => {
         assetType: "real_likeness",
         status: "granted",
         sourceArtifactId: "avatar-source-1",
-        consentVerifiedAt
+        consentVerifiedAt,
+        consentPolicyVersion: "self-avatar-v1",
+        subjectRelationship: "self"
       }
     });
     const project = projectFixture({
@@ -644,7 +646,9 @@ describe("Gideon job executor", () => {
             assetType: "real_likeness",
             status: "granted",
             sourceArtifactId: sourceArtifact.id,
-            consentVerifiedAt
+            consentVerifiedAt,
+            consentPolicyVersion: "self-avatar-v1",
+            subjectRelationship: "self"
           }
         }
       },

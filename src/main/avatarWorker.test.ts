@@ -54,7 +54,9 @@ describe("avatar worker boundary", () => {
         assetType: "real_likeness" as const,
         status: "granted" as const,
         sourceArtifactId: "avatar-source-1",
-        consentVerifiedAt: new Date(Date.now() - 60_000).toISOString()
+        consentVerifiedAt: new Date(Date.now() - 60_000).toISOString(),
+        consentPolicyVersion: "self-avatar-v1" as const,
+        subjectRelationship: "self" as const
       }
     };
     expect(() => validateAvatarWorkerRequest(customRequest, config)).not.toThrow();
@@ -104,7 +106,9 @@ describe("avatar worker boundary", () => {
         assetType: "real_likeness" as const,
         status: "granted" as const,
         sourceArtifactId: "avatar-source-1",
-        consentVerifiedAt: new Date(Date.now() - 60_000).toISOString()
+        consentVerifiedAt: new Date(Date.now() - 60_000).toISOString(),
+        consentPolicyVersion: "self-avatar-v1" as const,
+        subjectRelationship: "self" as const
       }
     };
     const customReceipt = { ...receipt, avatarProvenance: "user_authorized_likeness" as const };

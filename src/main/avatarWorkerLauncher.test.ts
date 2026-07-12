@@ -31,7 +31,9 @@ describe("SadTalker host launcher", () => {
         assetType: "real_likeness",
         status: "granted",
         sourceArtifactId: "avatar-source-1",
-        consentVerifiedAt: new Date(Date.now() - 60_000).toISOString()
+        consentVerifiedAt: new Date(Date.now() - 60_000).toISOString(),
+        consentPolicyVersion: "self-avatar-v1",
+        subjectRelationship: "self"
       }
     }));
     const fakeDockerPath = path.join(fakeBin, "docker");

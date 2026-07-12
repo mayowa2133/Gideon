@@ -73,6 +73,8 @@ export function validateAvatarWorkerRequest(input: AvatarWorkerRequest, config: 
       input.consent.assetType !== "real_likeness" ||
       input.consent.status !== "granted" ||
       !input.consent.sourceArtifactId ||
+      input.consent.consentPolicyVersion !== "self-avatar-v1" ||
+      input.consent.subjectRelationship !== "self" ||
       !Number.isFinite(verifiedAt) ||
       verifiedAt > Date.now() + 5 * 60_000 ||
       (expiresAt !== undefined && (!Number.isFinite(expiresAt) || expiresAt <= Date.now()))

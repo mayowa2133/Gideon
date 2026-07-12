@@ -2888,6 +2888,8 @@ function normalizeCustomAvatarSource(source: ProductProfile["customAvatarSource"
     source.consent.assetType !== "real_likeness" ||
     source.consent.status !== "granted" ||
     source.consent.sourceArtifactId !== source.artifactId ||
+    source.consent.consentPolicyVersion !== "self-avatar-v1" ||
+    source.consent.subjectRelationship !== "self" ||
     !source.consent.consentVerifiedAt ||
     !Number.isFinite(Date.parse(source.consent.consentVerifiedAt)) ||
     !Number.isFinite(Date.parse(source.importedAt)) ||
@@ -2907,6 +2909,8 @@ function normalizeCustomAvatarSource(source: ProductProfile["customAvatarSource"
       status: "granted",
       sourceArtifactId: source.artifactId.trim(),
       consentVerifiedAt: source.consent.consentVerifiedAt,
+      consentPolicyVersion: "self-avatar-v1",
+      subjectRelationship: "self",
       expiresAt: source.consent.expiresAt
     }
   };

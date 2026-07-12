@@ -51,7 +51,9 @@ def authorized_source(request: dict, avatar_id: str) -> tuple[Path, str]:
             fail("Approved fictional avatar source is missing.")
         verify_catalog_asset(avatar_id, source_path)
         return source_path, "gideon_fictional_catalog"
-    if consent.get("assetType") != "real_likeness" or consent.get("status") != "granted" or not consent.get("sourceArtifactId"):
+    if (consent.get("assetType") != "real_likeness" or consent.get("status") != "granted"
+            or not consent.get("sourceArtifactId") or consent.get("consentPolicyVersion") != "self-avatar-v1"
+            or consent.get("subjectRelationship") != "self"):
         fail("Custom avatar generation requires verified likeness consent.")
     try:
         verified_at = datetime.fromisoformat(consent["consentVerifiedAt"].replace("Z", "+00:00"))

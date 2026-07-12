@@ -338,7 +338,9 @@ function registerIpcHandlers(): void {
       assetType: "real_likeness",
       status: "granted",
       sourceArtifactId: stored.artifact.id,
-      consentVerifiedAt: importedAt
+      consentVerifiedAt: importedAt,
+      consentPolicyVersion: "self-avatar-v1",
+      subjectRelationship: "self"
     };
     await store.appendArtifact(projectId, stored.artifact);
     await store.recordUsage(projectId, {
@@ -362,7 +364,9 @@ function registerIpcHandlers(): void {
           assetType: "real_likeness",
           status: "granted",
           sourceArtifactId: stored.artifact.id,
-          consentVerifiedAt: importedAt
+          consentVerifiedAt: importedAt,
+          consentPolicyVersion: "self-avatar-v1",
+          subjectRelationship: "self"
         }
       }
     });

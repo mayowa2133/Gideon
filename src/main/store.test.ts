@@ -1083,7 +1083,9 @@ describe("GideonStore billing reconciliation", () => {
         assetType: "real_likeness",
         status: "granted",
         sourceArtifactId: "avatar-source-1",
-        consentVerifiedAt: importedAt
+        consentVerifiedAt: importedAt,
+        consentPolicyVersion: "self-avatar-v1",
+        subjectRelationship: "self"
       }
     });
     await store.appendArtifact(project.id, sourceArtifact);
@@ -1098,7 +1100,9 @@ describe("GideonStore billing reconciliation", () => {
           assetType: "real_likeness",
           status: "granted",
           sourceArtifactId: sourceArtifact.id,
-          consentVerifiedAt: importedAt
+          consentVerifiedAt: importedAt,
+          consentPolicyVersion: "self-avatar-v1",
+          subjectRelationship: "self"
         }
       }
     });
