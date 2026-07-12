@@ -1,6 +1,6 @@
 # SadTalker fictional-avatar worker
 
-This container is the concrete `sadtalker` implementation of Gideon's avatar worker protocol. It is intentionally restricted to `orbit.png` and `nova.png` mounted from a catalog directory. It never accepts a face URL, reference voice, or arbitrary source portrait.
+This container is the concrete `sadtalker` implementation of Gideon's avatar worker protocol. It accepts the approved `orbit.png` and `nova.png` catalog assets, plus a private project-owned self-likeness source when the request carries matching active consent provenance. It never accepts a face URL or reference voice.
 
 Required mounted directories:
 

@@ -16,7 +16,7 @@ Gideon is not a screen recorder, general AI video generator, or autonomous socia
 
 `upload → understand → propose 10 angles → select 3 → edit scripts → render 3 drafts → review → export`
 
-Creative reference: the target explanation style is creator-led product education in the spirit of Nick Saraev and nivedan.ai, where fast cuts, visible product proof, plain-language benefit framing, and a human-presenter feel make software features understandable and marketable quickly. Gideon supports deterministic logo and fictional catalog presenters with a visible AI-generated disclosure; imported real-person likenesses and voice cloning remain future consent-gated capabilities.
+Creative reference: the target explanation style is creator-led product education in the spirit of Nick Saraev and nivedan.ai, where fast cuts, visible product proof, plain-language benefit framing, and a human-presenter feel make software features understandable and marketable quickly. Gideon supports deterministic logo presenters, fictional catalog presenters, and private consent-gated self-avatar sources with a visible AI-generated disclosure. Voice cloning remains disabled.
 
 ## Problem statement
 
@@ -141,9 +141,9 @@ For software builders who need to market consistently, Gideon converts an existi
 - Chrome extension or native recorder.
 - rrweb structured capture and Playwright replay.
 - Autonomous interaction with a customer’s product.
-- Real-person impersonation, likeness uploads, and reference-voice cloning.
+- Unauthorized or public-figure impersonation, third-party likeness uploads without explicit permission, and reference-voice cloning.
 
-Synthetic presenters are limited to Gideon-owned fictional catalog entries with commercial approval and an `AI-generated brand presenter` disclosure. A generated clip is composited only when its private artifact matches the approved script revision, selected catalog avatar, and pinned model receipt.
+Synthetic presenters use Gideon-owned fictional catalog entries or a private project-owned self-avatar source with explicit consent and an `AI-generated brand presenter` disclosure. A generated clip is composited only when its private artifact matches the approved script revision, current source-avatar artifact, selected presenter, and pinned model receipt.
 - Founder voice cloning.
 - Multitrack general-purpose timeline editing.
 - Social posting, scheduling, analytics, or A/B delivery.

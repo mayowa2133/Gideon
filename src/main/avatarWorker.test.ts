@@ -37,7 +37,35 @@ describe("avatar worker boundary", () => {
     expect(() => validateAvatarWorkerRequest({
       ...request,
       consent: { assetType: "reference_voice", status: "granted", consentVerifiedAt: "2026-07-10T00:00:00.000Z" }
-    }, config)).toThrow("blocks likeness");
+    }, config)).toThrow("without an authorized private source image");
+  });
+
+  it("accepts an authorized private self-likeness source and rejects expired or voice-reference consent", () => {
+    const config = loadAvatarWorkerConfig({
+      GIDEON_AVATAR_WORKER_PROVIDER: "sadtalker",
+      GIDEON_AVATAR_MODEL_VERSION: "sadtalker-pinned",
+      GIDEON_AVATAR_MODEL_LICENSE: "Apache-2.0-reviewed",
+      GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED: "true"
+    });
+    const customRequest = {
+      ...request,
+      sourceImagePath: "/private/project/founder.png",
+      consent: {
+        assetType: "real_likeness" as const,
+        status: "granted" as const,
+        sourceArtifactId: "avatar-source-1",
+        consentVerifiedAt: new Date(Date.now() - 60_000).toISOString()
+      }
+    };
+    expect(() => validateAvatarWorkerRequest(customRequest, config)).not.toThrow();
+    expect(() => validateAvatarWorkerRequest({
+      ...customRequest,
+      consent: { ...customRequest.consent, expiresAt: new Date(Date.now() - 1_000).toISOString() }
+    }, config)).toThrow("active verified likeness consent");
+    expect(() => validateAvatarWorkerRequest({
+      ...customRequest,
+      consent: { ...customRequest.consent, assetType: "reference_voice" as const }
+    }, config)).toThrow("active verified likeness consent");
   });
 
   it("does not silently execute an uninstalled provider", async () => {
@@ -69,6 +97,22 @@ describe("avatar worker boundary", () => {
     expect(parseAvatarWorkerResult(JSON.stringify({ outputPath: request.outputPath, receipt }), request, config)).toMatchObject({ receipt });
     expect(() => parseAvatarWorkerResult(JSON.stringify({ outputPath: "/tmp/other.mp4", receipt }), request, config)).toThrow("output path");
     expect(() => parseAvatarWorkerResult(JSON.stringify({ outputPath: request.outputPath, receipt: { ...receipt, modelVersion: "unknown" } }), request, config)).toThrow("does not match");
+    const customRequest = {
+      ...request,
+      sourceImagePath: "/private/project/founder.png",
+      consent: {
+        assetType: "real_likeness" as const,
+        status: "granted" as const,
+        sourceArtifactId: "avatar-source-1",
+        consentVerifiedAt: new Date(Date.now() - 60_000).toISOString()
+      }
+    };
+    const customReceipt = { ...receipt, avatarProvenance: "user_authorized_likeness" as const };
+    expect(parseAvatarWorkerResult(
+      JSON.stringify({ outputPath: request.outputPath, receipt: customReceipt }),
+      customRequest,
+      config
+    )).toMatchObject({ receipt: customReceipt });
   });
 
   it("writes a sealed request file and removes it after an isolated process response", async () => {

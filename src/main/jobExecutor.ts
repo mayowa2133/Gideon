@@ -17,6 +17,7 @@ import type {
   JobEvent,
   JobRecord,
   JobStage,
+  ProductProfile,
   Project,
   ProviderRun,
   RenderedVideo,
@@ -528,15 +529,24 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
       if (!voiceoverPath) {
         throw new Error("Generate and validate a private voiceover before creating an avatar clip.");
       }
-      activeJob = await advanceJobStage(projectId, jobId, "avatar", 2, 4, "Generating the fictional avatar presenter.");
+      const customAvatar = await authorizedCustomAvatarInput(project);
+      activeJob = await advanceJobStage(
+        projectId,
+        jobId,
+        "avatar",
+        2,
+        4,
+        customAvatar ? "Generating the authorized self avatar presenter." : "Generating the fictional avatar presenter."
+      );
       const outputPath = path.join(store.projectDir(projectId), "avatar-presenters", `${script.id}.mp4`);
       const result = await createApprovedAvatarWorker().render({
         avatarId,
         audioPath: voiceoverPath,
+        sourceImagePath: customAvatar?.sourcePath,
         outputPath,
         durationMs: estimateScriptDurationMs(script),
         disclosure: "AI-generated brand presenter",
-        consent: { assetType: "fictional_catalog", status: "not_required" }
+        consent: customAvatar?.consent ?? { assetType: "fictional_catalog", status: "not_required" }
       });
       const output = await statFile(result.outputPath);
       const sourceVoiceoverArtifact = latestArtifactForScript(project.artifacts, "voiceover", script.id);
@@ -553,7 +563,8 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
           avatarPresenterLineage: {
             sourceScriptId: script.id,
             sourceScriptUpdatedAt: script.updatedAt,
-            sourceVoiceoverArtifactId: sourceVoiceoverArtifact?.id
+            sourceVoiceoverArtifactId: sourceVoiceoverArtifact?.id,
+            sourceAvatarArtifactId: customAvatar?.artifactId
           }
         })
       );
@@ -902,11 +913,14 @@ async function matchingAvatarPresenterPath(project: Project, script: ScriptDraft
   const artifact = latestArtifactForScript(project.artifacts, "avatar_presenter", script.id);
   const receipt = artifact?.avatarModelReceipt;
   const lineage = artifact?.avatarPresenterLineage;
+  const customAvatarArtifactId = project.profile.customAvatarSource?.artifactId;
+  const expectedProvenance = customAvatarArtifactId ? "user_authorized_likeness" : "gideon_fictional_catalog";
   if (
     !artifact?.localPath ||
     lineage?.sourceScriptUpdatedAt !== script.updatedAt ||
     receipt?.avatarId !== avatarId ||
-    receipt.avatarProvenance !== "gideon_fictional_catalog" ||
+    receipt.avatarProvenance !== expectedProvenance ||
+    lineage.sourceAvatarArtifactId !== customAvatarArtifactId ||
     receipt.disclosure !== "AI-generated brand presenter"
   ) {
     return undefined;
@@ -917,4 +931,33 @@ async function matchingAvatarPresenterPath(project: Project, script: ScriptDraft
   } catch {
     return undefined;
   }
+}
+
+async function authorizedCustomAvatarInput(project: Project): Promise<{
+  artifactId: string;
+  sourcePath: string;
+  consent: NonNullable<ProductProfile["customAvatarSource"]>["consent"];
+} | undefined> {
+  const source = project.profile.customAvatarSource;
+  if (!source) {
+    return undefined;
+  }
+  const artifact = project.artifacts.find((candidate) =>
+    candidate.id === source.artifactId && candidate.kind === "avatar_source_image"
+  );
+  if (
+    !artifact?.localPath ||
+    source.consent.sourceArtifactId !== artifact.id ||
+    artifact.avatarConsentRecord?.status !== "granted" ||
+    artifact.avatarConsentRecord.sourceArtifactId !== artifact.id ||
+    artifact.avatarConsentRecord.consentVerifiedAt !== source.consent.consentVerifiedAt
+  ) {
+    throw new Error("Authorized custom avatar source artifact is unavailable.");
+  }
+  try {
+    await fs.access(artifact.localPath);
+  } catch {
+    throw new Error("Authorized custom avatar source file is unavailable.");
+  }
+  return { artifactId: artifact.id, sourcePath: artifact.localPath, consent: source.consent };
 }

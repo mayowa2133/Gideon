@@ -15,7 +15,7 @@
 
 ## Non-goals
 
-- Native/extension recording, autonomous browser control, real-person avatar generation, voice cloning, social posting, analytics, or a general multitrack editor. Gideon may render only approved fictional catalog presenters until a separate consent-gated avatar program is approved.
+- Native/extension recording, autonomous browser control, unauthorized third-party/public-figure avatar generation, voice cloning, social posting, analytics, or a general multitrack editor. Custom avatar generation is limited to private source artifacts with explicit self/authorized-likeness consent and revocation controls.
 - Executing LLM-generated code, JSX, FFmpeg command strings, SQL, URLs, or tool calls.
 - Synchronous analysis/render endpoints.
 - Multi-region active-active processing in MVP.
@@ -764,7 +764,7 @@ The default avatar renderer is deterministic and accepts only catalog presenters
 
 `docker-compose.avatar-worker.yml` defines the isolated SadTalker implementation: non-root, read-only filesystem, no runtime network, GPU reservation, a writable private `/work` mount, a read-only fictional asset catalog, and separate read-only mounts for SadTalker checkpoints and required facexlib alignment/detection weights. The catalog hashes and provenance are recorded in `assets/avatar-catalog/manifest.json`; the worker validates its output receipt before Gideon imports the MP4 as a private `avatar_presenter` artifact.
 
-Avatar generation is a separate cancellable `avatar` job. It requires one approved script and a validated private voiceover, emits only a private `avatar_presenter` artifact, and retains the provider/model/license/avatar/disclosure receipt with that artifact. The desktop UI exposes this only when a fictional catalog presenter is selected; failed or unconfigured workers do not alter the approved script or existing render.
+Avatar generation is a separate cancellable `avatar` job. It requires one approved script and a validated private voiceover, emits only a private `avatar_presenter` artifact, and retains the provider/model/license/avatar/disclosure receipt with that artifact. The source may be an approved fictional catalog presenter or a private project-owned portrait carrying active self/authorized-likeness consent. Failed or unconfigured workers do not alter the approved script or existing render.
 
 Each avatar artifact also records the source script ID, exact script revision timestamp, and source voiceover artifact when available. The render executor selects only a private local clip whose lineage and model receipt match the current script and selected fictional avatar. FFmpeg loops and crops that clip into the configured presenter position before applying transparent captions and disclosure overlays; stale, missing, or mismatched clips fall back to the deterministic catalog presenter.
 

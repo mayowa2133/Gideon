@@ -851,7 +851,10 @@ function ProjectWorkspace({
     .filter((artifact) =>
       artifact.kind === "avatar_presenter" &&
       artifact.avatarModelReceipt?.avatarId === project.profile.avatarPresenterId &&
-      artifact.avatarModelReceipt?.avatarProvenance === "gideon_fictional_catalog"
+      artifact.avatarModelReceipt?.avatarProvenance === (
+        project.profile.customAvatarSource ? "user_authorized_likeness" : "gideon_fictional_catalog"
+      ) &&
+      artifact.avatarPresenterLineage?.sourceAvatarArtifactId === project.profile.customAvatarSource?.artifactId
     )
     .flatMap((artifact) => {
       const script = project.scripts.find((candidate) => candidate.id === artifact.avatarPresenterLineage?.sourceScriptId);
@@ -904,7 +907,17 @@ function ProjectWorkspace({
               {project.profile.customAvatarSource ? "Replace self avatar" : "Import self avatar"}
             </button>
             {project.profile.customAvatarSource ? (
-              <small>Authorized source: {project.profile.customAvatarSource.displayName}</small>
+              <>
+                <small>Authorized source: {project.profile.customAvatarSource.displayName}</small>
+                <button
+                  className="ghost"
+                  disabled={busy === "avatar"}
+                  onClick={() => void runAction("avatar", () => window.gideon.revokeCustomAvatarSource(project.id))}
+                  type="button"
+                >
+                  Revoke self avatar
+                </button>
+              </>
             ) : null}
           </div>
           <button

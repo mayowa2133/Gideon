@@ -1075,9 +1075,18 @@ describe("GideonStore billing reconciliation", () => {
     const store = new GideonStore();
     await store.load();
     const project = await store.createProject({ name: "Avatar consent", profile: profileFixture() });
-    const sourceArtifact = artifactFixture({ id: "avatar-source-1", kind: "avatar_source_image" });
-    await store.appendArtifact(project.id, sourceArtifact);
     const importedAt = "2026-06-25T12:00:00.000Z";
+    const sourceArtifact = artifactFixture({
+      id: "avatar-source-1",
+      kind: "avatar_source_image",
+      avatarConsentRecord: {
+        assetType: "real_likeness",
+        status: "granted",
+        sourceArtifactId: "avatar-source-1",
+        consentVerifiedAt: importedAt
+      }
+    });
+    await store.appendArtifact(project.id, sourceArtifact);
 
     const updated = await store.updateProfile(project.id, {
       ...project.profile,
@@ -1109,6 +1118,10 @@ describe("GideonStore billing reconciliation", () => {
         }
       }
     })).rejects.toThrow("private artifact in this project");
+
+    const revoked = await store.revokeCustomAvatarSource(project.id);
+    expect(revoked.profile.customAvatarSource).toBeUndefined();
+    expect(revoked.artifacts.find((artifact) => artifact.id === sourceArtifact.id)?.avatarConsentRecord?.status).toBe("revoked");
   });
 
   it("creates exports with explicit hosted session scope", async () => {

@@ -17,6 +17,7 @@ export interface AvatarWorkerConfig {
 export interface AvatarWorkerRequest {
   avatarId: FictionalAvatarPresenterId;
   audioPath: string;
+  sourceImagePath?: string;
   outputPath: string;
   durationMs: number;
   disclosure: "AI-generated brand presenter";
@@ -59,14 +60,32 @@ export function validateAvatarWorkerRequest(input: AvatarWorkerRequest, config: 
   if (input.disclosure !== "AI-generated brand presenter") {
     throw new Error("Avatar worker disclosure is required.");
   }
-  if (input.consent.assetType !== "fictional_catalog" || input.consent.status !== "not_required") {
-    throw new Error("Avatar worker blocks likeness and reference-voice generation until consent-gated support is enabled.");
-  }
-  if (input.consent.sourceArtifactId || input.consent.consentVerifiedAt || input.consent.expiresAt) {
-    throw new Error("Fictional avatar worker requests must not carry likeness or voice reference artifacts.");
-  }
   if (!path.isAbsolute(input.audioPath) || !path.isAbsolute(input.outputPath)) {
     throw new Error("Avatar worker requires private local artifact paths.");
+  }
+  if (input.sourceImagePath) {
+    if (!path.isAbsolute(input.sourceImagePath)) {
+      throw new Error("Custom avatar source must use a private local path.");
+    }
+    const verifiedAt = Date.parse(input.consent.consentVerifiedAt ?? "");
+    const expiresAt = input.consent.expiresAt ? Date.parse(input.consent.expiresAt) : undefined;
+    if (
+      input.consent.assetType !== "real_likeness" ||
+      input.consent.status !== "granted" ||
+      !input.consent.sourceArtifactId ||
+      !Number.isFinite(verifiedAt) ||
+      verifiedAt > Date.now() + 5 * 60_000 ||
+      (expiresAt !== undefined && (!Number.isFinite(expiresAt) || expiresAt <= Date.now()))
+    ) {
+      throw new Error("Custom avatar generation requires active verified likeness consent.");
+    }
+  } else {
+    if (input.consent.assetType !== "fictional_catalog" || input.consent.status !== "not_required") {
+      throw new Error("Avatar worker blocks likeness inputs without an authorized private source image.");
+    }
+    if (input.consent.sourceArtifactId || input.consent.consentVerifiedAt || input.consent.expiresAt) {
+      throw new Error("Fictional avatar worker requests must not carry likeness or voice reference artifacts.");
+    }
   }
   if (input.durationMs < 500 || input.durationMs > 60_000) {
     throw new Error("Avatar worker duration is outside the supported short-form range.");
@@ -116,13 +135,14 @@ export function parseAvatarWorkerResult(
     throw new Error("Avatar worker output path or receipt is invalid.");
   }
   const receipt = result.receipt;
+  const expectedProvenance = input.sourceImagePath ? "user_authorized_likeness" : "gideon_fictional_catalog";
   if (
     receipt.provider !== config.provider ||
     receipt.modelVersion !== config.modelVersion ||
     receipt.modelLicense !== config.modelLicense ||
     receipt.avatarId !== input.avatarId ||
     receipt.disclosure !== input.disclosure ||
-    receipt.avatarProvenance !== "gideon_fictional_catalog"
+    receipt.avatarProvenance !== expectedProvenance
   ) {
     throw new Error("Avatar worker receipt does not match the approved request.");
   }

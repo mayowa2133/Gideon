@@ -148,10 +148,10 @@ Uploaded recordings are untrusted input.
 
 - MVP should use provider-approved stock voices.
 - Do not clone a user voice without explicit consent, ownership verification, and revocation path.
-- Store consent records before any future voice cloning or avatar generation.
+- Store consent on the private source artifact before custom avatar generation and retain revocation state after the profile stops using that source.
 - Make voice and avatar provenance visible in internal artifact metadata.
 - Do not generate a synthetic likeness or voice for a person who has not consented.
-- Avatar generation and voice cloning are post-MVP features because they expand abuse and consent risk.
+- Fictional and explicitly authorized self-avatar generation must retain source, consent, model, script, and disclosure lineage. Voice cloning remains disabled and post-MVP.
 
 ## Privacy rules
 

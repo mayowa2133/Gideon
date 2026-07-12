@@ -737,6 +737,36 @@ export class GideonStore {
     );
   }
 
+  async revokeCustomAvatarSource(projectId: string): Promise<Project> {
+    return this.updateProject(
+      projectId,
+      (project) => {
+        const source = project.profile.customAvatarSource;
+        if (!source) {
+          return;
+        }
+        project.artifacts = project.artifacts.map((artifact) => artifact.id === source.artifactId
+          ? {
+              ...artifact,
+              avatarConsentRecord: {
+                ...source.consent,
+                status: "revoked"
+              }
+            }
+          : artifact);
+        applyProfileUpdate(project, { ...project.profile, customAvatarSource: undefined });
+      },
+      {
+        audit: {
+          action: "project.update_profile",
+          targetType: "project",
+          targetId: projectId,
+          summary: "Revoked custom avatar likeness consent."
+        }
+      }
+    );
+  }
+
   async attachRecording(projectId: string, recording: RecordingMetadata): Promise<Project> {
     return this.updateProject(
       projectId,

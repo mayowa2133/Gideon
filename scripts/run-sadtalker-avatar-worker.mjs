@@ -18,6 +18,9 @@ if (!request || typeof request !== "object" || Array.isArray(request)) {
 if (!isAbsoluteString(request.audioPath) || !isAbsoluteString(request.outputPath)) {
   fail("Avatar request requires private absolute audio and output paths.");
 }
+if (request.sourceImagePath !== undefined && !isAbsoluteString(request.sourceImagePath)) {
+  fail("Custom avatar source requires a private absolute path.");
+}
 
 const workDir = requiredAbsoluteEnv("GIDEON_AVATAR_WORK_DIR");
 const composeFile = path.resolve(process.env.GIDEON_AVATAR_COMPOSE_FILE ?? "docker-compose.avatar-worker.yml");
@@ -26,16 +29,28 @@ const inputDir = path.join(workDir, "input");
 const outputDir = path.join(workDir, "output");
 const containerAudioPath = `/work/input/${jobId}${path.extname(request.audioPath) || ".wav"}`;
 const containerOutputPath = `/work/output/${jobId}.mp4`;
+const containerSourcePath = request.sourceImagePath
+  ? `/work/input/${jobId}-source${path.extname(request.sourceImagePath) || ".png"}`
+  : undefined;
 const containerRequestPath = path.join(outputDir, `${jobId}.request.json`);
 const hostAudioPath = path.join(inputDir, path.basename(containerAudioPath));
 const hostOutputPath = path.join(outputDir, `${jobId}.mp4`);
+const hostSourcePath = containerSourcePath ? path.join(inputDir, path.basename(containerSourcePath)) : undefined;
 
 await fs.mkdir(inputDir, { recursive: true });
 await fs.mkdir(outputDir, { recursive: true });
 await fs.copyFile(request.audioPath, hostAudioPath);
+if (request.sourceImagePath && hostSourcePath) {
+  await fs.copyFile(request.sourceImagePath, hostSourcePath);
+}
 await fs.writeFile(
   containerRequestPath,
-  JSON.stringify({ ...request, audioPath: containerAudioPath, outputPath: containerOutputPath }),
+  JSON.stringify({
+    ...request,
+    audioPath: containerAudioPath,
+    outputPath: containerOutputPath,
+    sourceImagePath: containerSourcePath
+  }),
   "utf8"
 );
 
@@ -51,6 +66,7 @@ try {
 } finally {
   await Promise.all([
     fs.rm(hostAudioPath, { force: true }),
+    ...(hostSourcePath ? [fs.rm(hostSourcePath, { force: true })] : []),
     fs.rm(containerRequestPath, { force: true }),
     fs.rm(hostOutputPath, { force: true })
   ]);

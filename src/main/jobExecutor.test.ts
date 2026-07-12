@@ -611,6 +611,105 @@ describe("Gideon job executor", () => {
     expect(store.usage).toEqual(expect.arrayContaining([expect.objectContaining({ metric: "storage_bytes", source: "render", quantity: 29 })]));
   });
 
+  it("passes a project-owned authorized self portrait to the avatar worker and records its lineage", async () => {
+    const projectDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-custom-avatar-job-"));
+    const voiceoverPath = path.join(projectDir, "voiceovers", "script-1.wav");
+    const sourcePath = path.join(projectDir, "avatar-source", "founder.png");
+    await fs.mkdir(path.dirname(voiceoverPath), { recursive: true });
+    await fs.mkdir(path.dirname(sourcePath), { recursive: true });
+    await fs.writeFile(voiceoverPath, "fixture-audio");
+    await fs.writeFile(sourcePath, "fixture-image");
+    const consentVerifiedAt = new Date(Date.now() - 60_000).toISOString();
+    const sourceArtifact = artifactFixture({
+      id: "avatar-source-1",
+      kind: "avatar_source_image",
+      localPath: sourcePath,
+      originalFileName: "founder.png",
+      avatarConsentRecord: {
+        assetType: "real_likeness",
+        status: "granted",
+        sourceArtifactId: "avatar-source-1",
+        consentVerifiedAt
+      }
+    });
+    const project = projectFixture({
+      profile: {
+        ...profileFixture(),
+        avatarPresenterId: "orbit",
+        customAvatarSource: {
+          artifactId: sourceArtifact.id,
+          displayName: "Founder portrait",
+          importedAt: consentVerifiedAt,
+          consent: {
+            assetType: "real_likeness",
+            status: "granted",
+            sourceArtifactId: sourceArtifact.id,
+            consentVerifiedAt
+          }
+        }
+      },
+      scripts: [scriptFixture({ approved: true })],
+      artifacts: [sourceArtifact]
+    });
+    const store = new FakeExecutorStore(project, projectDir);
+    store.project.jobs = [createJob({
+      id: "job-avatar-custom",
+      projectId: project.id,
+      kind: "avatar",
+      now: "2026-06-25T12:00:00.000Z",
+      renderScope: { scriptIds: ["script-1"], voiceoverMode: "reuse" }
+    })];
+    const executor = createGideonJobExecutor({
+      store,
+      now: clock(),
+      validateVoiceoverAudio: async () => ({ byteSize: 13, dataBytes: 13 }),
+      statFile: async () => ({ size: 31 }),
+      createAvatarWorker: () => ({
+        async render(input) {
+          expect(input.sourceImagePath).toBe(sourcePath);
+          expect(input.consent).toMatchObject({
+            assetType: "real_likeness",
+            status: "granted",
+            sourceArtifactId: sourceArtifact.id
+          });
+          return {
+            outputPath: input.outputPath,
+            receipt: {
+              provider: "sadtalker",
+              modelVersion: "sadtalker-test",
+              modelLicense: "Apache-2.0-reviewed",
+              avatarId: "orbit",
+              avatarProvenance: "user_authorized_likeness",
+              disclosure: "AI-generated brand presenter",
+              generatedAt: "2026-06-25T12:00:00.000Z"
+            }
+          };
+        }
+      }),
+      createPrivateObjectStorage: () => ({
+        async putFile(input) {
+          expect(input.avatarPresenterLineage?.sourceAvatarArtifactId).toBe(sourceArtifact.id);
+          return {
+            filePath: "/private/storage/custom-avatar.mp4",
+            fileUrl: "file:///private/storage/custom-avatar.mp4",
+            artifact: artifactFixture({
+              id: "artifact-avatar-custom",
+              kind: "avatar_presenter",
+              avatarModelReceipt: input.avatarModelReceipt,
+              avatarPresenterLineage: input.avatarPresenterLineage
+            })
+          };
+        }
+      })
+    });
+
+    const completed = await executor.runAvatarJob(project.id, "job-avatar-custom");
+    expect(completed.jobs[0]).toMatchObject({ status: "succeeded" });
+    expect(completed.artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "artifact-avatar-custom", kind: "avatar_presenter" })
+    ]));
+  });
+
   it("rounds media durations up to billable minutes", () => {
     expect(minutesForDuration(1)).toBe(1);
     expect(minutesForDuration(60_000)).toBe(1);

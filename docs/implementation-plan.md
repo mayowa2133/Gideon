@@ -474,7 +474,7 @@ Expand Gideon only after the core upload-to-export loop proves valuable.
 
 5. Avatar and voice cloning.
    - Fictional catalog avatar generation is available through the isolated, receipt-backed worker boundary.
-   - Real-person likeness and voice cloning remain outside MVP until consent, policy, disclosure, and abuse controls are implemented and independently reviewed.
+   - Private self/authorized-likeness imports are consent-gated, revocable, disclosed, and lineage-tracked. Unauthorized likeness use and all voice cloning remain outside MVP.
 
 ## First 10 implementation tasks
 

@@ -333,6 +333,13 @@ function registerIpcHandlers(): void {
       originalFileName: path.basename(sourcePath),
       contentType: validation.contentType
     });
+    const importedAt = new Date().toISOString();
+    stored.artifact.avatarConsentRecord = {
+      assetType: "real_likeness",
+      status: "granted",
+      sourceArtifactId: stored.artifact.id,
+      consentVerifiedAt: importedAt
+    };
     await store.appendArtifact(projectId, stored.artifact);
     await store.recordUsage(projectId, {
       metric: "storage_bytes",
@@ -341,7 +348,6 @@ function registerIpcHandlers(): void {
       source: "render",
       idempotencyKey: `avatar-source:${projectId}:${stored.artifact.id}:storage_bytes`
     });
-    const importedAt = new Date().toISOString();
     return store.updateProfile(projectId, {
       ...project.profile,
       customAvatarSource: {
@@ -357,6 +363,9 @@ function registerIpcHandlers(): void {
       }
     });
   });
+  ipcMain.handle("avatar:revoke-source", async (_event, projectId: string) =>
+    store.revokeCustomAvatarSource(projectId)
+  );
   ipcMain.handle("scripts:generate", async (_event, projectId: string) => store.generateScripts(projectId));
   ipcMain.handle("scripts:regenerate", async (_event, projectId: string, scriptId: string) =>
     store.regenerateScript(projectId, scriptId)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Isolated SadTalker adapter for Gideon's fictional-avatar catalog."""
+"""Isolated SadTalker adapter for fictional and consented self-avatar sources."""
 
 import argparse
 import hashlib
@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 CATALOG = {"orbit": "orbit.png", "nova": "nova.png"}
@@ -53,8 +54,20 @@ def main() -> None:
     if avatar_id not in CATALOG:
         fail("SadTalker worker only accepts Gideon fictional catalog avatars.")
     consent = request.get("consent", {})
-    if consent != {"assetType": "fictional_catalog", "status": "not_required"}:
-        fail("SadTalker worker does not accept likeness or reference-voice inputs.")
+    source_image = request.get("sourceImagePath")
+    if source_image:
+        if consent.get("assetType") != "real_likeness" or consent.get("status") != "granted" or not consent.get("sourceArtifactId"):
+            fail("Custom avatar generation requires verified likeness consent.")
+        try:
+            verified_at = datetime.fromisoformat(consent["consentVerifiedAt"].replace("Z", "+00:00"))
+            expires_at = datetime.fromisoformat(consent["expiresAt"].replace("Z", "+00:00")) if consent.get("expiresAt") else None
+        except (KeyError, TypeError, ValueError):
+            fail("Custom avatar consent timestamps are invalid.")
+        now = datetime.now(timezone.utc)
+        if verified_at.tzinfo is None or verified_at > now or (expires_at and (expires_at.tzinfo is None or expires_at <= now)):
+            fail("Custom avatar consent is not active.")
+    elif consent != {"assetType": "fictional_catalog", "status": "not_required"}:
+        fail("Likeness consent requires a private custom source image.")
     if request.get("disclosure") != DISCLOSURE:
         fail("Avatar disclosure is required.")
     if not (500 <= int(request.get("durationMs", 0)) <= 60000):
@@ -74,10 +87,11 @@ def main() -> None:
 
     audio_path = require_under(Path(request["audioPath"]), Path("/work/input"), "audio")
     output_path = require_under(Path(request["outputPath"]), Path("/work/output"), "output")
-    avatar_path = Path("/catalog") / CATALOG[avatar_id]
+    avatar_path = require_under(Path(source_image), Path("/work/input"), "custom avatar source") if source_image else Path("/catalog") / CATALOG[avatar_id]
     if not audio_path.is_file() or not avatar_path.is_file():
-        fail("Approved audio or fictional avatar asset is missing.")
-    verify_catalog_asset(avatar_id, avatar_path)
+        fail("Approved audio or avatar source asset is missing.")
+    if not source_image:
+        verify_catalog_asset(avatar_id, avatar_path)
 
     result_dir = output_path.parent / "sadtalker-result"
     command = [
@@ -88,7 +102,18 @@ def main() -> None:
         "--result_dir", str(result_dir),
         "--still",
     ]
-    subprocess.run(command, check=True, cwd=os.environ["SADTALKER_HOME"])
+    try:
+        subprocess.run(
+            command,
+            check=True,
+            cwd=os.environ["SADTALKER_HOME"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=900,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        fail("SadTalker inference failed.")
     candidates = sorted(result_dir.rglob("*.mp4"), key=lambda candidate: candidate.stat().st_mtime)
     if not candidates:
         fail("SadTalker did not produce an MP4.")
@@ -101,7 +126,7 @@ def main() -> None:
             "modelVersion": model_version,
             "modelLicense": model_license,
             "avatarId": avatar_id,
-            "avatarProvenance": "gideon_fictional_catalog",
+            "avatarProvenance": "user_authorized_likeness" if source_image else "gideon_fictional_catalog",
             "disclosure": DISCLOSURE,
             "generatedAt": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
         },

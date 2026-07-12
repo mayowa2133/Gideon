@@ -210,6 +210,7 @@ export interface ArtifactRecord {
   localUrl?: string;
   avatarModelReceipt?: AvatarModelReceipt;
   avatarPresenterLineage?: AvatarPresenterLineage;
+  avatarConsentRecord?: AvatarConsentRecord;
   createdAt: string;
 }
 
@@ -217,6 +218,7 @@ export interface AvatarPresenterLineage {
   sourceScriptId: string;
   sourceScriptUpdatedAt: string;
   sourceVoiceoverArtifactId?: string;
+  sourceAvatarArtifactId?: string;
 }
 
 export type RecordingUploadSessionStatus = "pending" | "completed" | "expired" | "aborted";
@@ -621,7 +623,7 @@ export interface AvatarModelReceipt {
   modelVersion: string;
   modelLicense: string;
   avatarId: FictionalAvatarPresenterId;
-  avatarProvenance: BrandPresenterLayer["provenance"];
+  avatarProvenance: BrandPresenterLayer["provenance"] | "user_authorized_likeness";
   disclosure: BrandPresenterLayer["disclosure"];
   generatedAt: string;
 }
