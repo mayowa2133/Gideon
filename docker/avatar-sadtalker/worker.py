@@ -67,6 +67,10 @@ def main() -> None:
     checkpoints_dir = Path(os.environ["SADTALKER_HOME"]) / "checkpoints"
     if not checkpoints_dir.is_dir() or not any(checkpoints_dir.iterdir()):
         fail("SadTalker checkpoints must be mounted read-only by the operator.")
+    face_model_dir = Path(os.environ["SADTALKER_HOME"]) / "gfpgan" / "weights"
+    required_face_models = {"alignment_WFLW_4HG.pth", "detection_Resnet50_Final.pth"}
+    if not face_model_dir.is_dir() or not required_face_models.issubset({item.name for item in face_model_dir.iterdir()}):
+        fail("SadTalker face alignment and detection models must be mounted read-only by the operator.")
 
     audio_path = require_under(Path(request["audioPath"]), Path("/work/input"), "audio")
     output_path = require_under(Path(request["outputPath"]), Path("/work/output"), "output")

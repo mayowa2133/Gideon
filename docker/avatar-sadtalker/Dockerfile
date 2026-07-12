@@ -6,10 +6,13 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt
+COPY constraints.txt /app/constraints.txt
 RUN git clone https://github.com/OpenTalker/SadTalker.git sadtalker \
   && cd sadtalker \
   && git checkout "$SADTALKER_REV" \
-  && pip install --no-cache-dir -r requirements.txt
+  && pip install --no-cache-dir -c /app/constraints.txt -r requirements.txt \
+  && sed -i 's/from torchvision.transforms.functional_tensor import rgb_to_grayscale/from torchvision.transforms.functional import rgb_to_grayscale/' \
+    /opt/conda/lib/python*/site-packages/basicsr/data/degradations.py
 
 COPY worker.py /app/worker.py
 RUN useradd --create-home --uid 10001 avatar \
