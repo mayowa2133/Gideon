@@ -845,6 +845,16 @@ function ProjectWorkspace({
   const approvedSelectedScriptCount = project.scripts.filter(
     (script) => script.approved && selectedConceptIds.has(script.conceptId) && !hasBlockingScriptWarnings(script.qualityWarnings)
   ).length;
+  const readyAvatarScriptIds = new Set(project.artifacts
+    .filter((artifact) =>
+      artifact.kind === "avatar_presenter" &&
+      artifact.avatarModelReceipt?.avatarId === project.profile.avatarPresenterId &&
+      artifact.avatarModelReceipt?.avatarProvenance === "gideon_fictional_catalog"
+    )
+    .flatMap((artifact) => {
+      const script = project.scripts.find((candidate) => candidate.id === artifact.avatarPresenterLineage?.sourceScriptId);
+      return script && artifact.avatarPresenterLineage?.sourceScriptUpdatedAt === script.updatedAt ? [script.id] : [];
+    }));
 
   return (
     <div className="project-workspace">
@@ -1008,6 +1018,7 @@ function ProjectWorkspace({
             void runAction("rendering", () => window.gideon.generateAvatarPresenter(project.id, scriptId))
           }
           canGenerateAvatarPresenter={project.profile.avatarPresenterId === "orbit" || project.profile.avatarPresenterId === "nova"}
+          readyAvatarScriptIds={readyAvatarScriptIds}
         />
       </Panel>
 
@@ -1606,7 +1617,8 @@ function ScriptEditor({
   onRenderScript,
   onRegenerateVoiceover,
   onGenerateAvatarPresenter,
-  canGenerateAvatarPresenter
+  canGenerateAvatarPresenter,
+  readyAvatarScriptIds
 }: {
   scripts: ScriptDraft[];
   setScripts: (scripts: ScriptDraft[]) => void;
@@ -1615,6 +1627,7 @@ function ScriptEditor({
   onRegenerateVoiceover: (scriptId: string) => void;
   onGenerateAvatarPresenter: (scriptId: string) => void;
   canGenerateAvatarPresenter: boolean;
+  readyAvatarScriptIds: Set<string>;
 }): JSX.Element {
   if (scripts.length === 0) {
     return <div className="empty-inline">Generate scripts from selected concepts, then edit voiceover and CTA before render.</div>;
@@ -1825,7 +1838,7 @@ function ScriptEditor({
                 onClick={() => onGenerateAvatarPresenter(script.id)}
                 type="button"
               >
-                Generate avatar clip
+                {readyAvatarScriptIds.has(script.id) ? "Regenerate avatar clip" : "Generate avatar clip"}
               </button>
               <button
                 className="secondary compact"
@@ -1893,6 +1906,7 @@ function ScriptEditor({
               <span>{script.editDecisionList?.callouts.length ?? script.visualBeats.length} callouts</span>
               <span>{script.editDecisionList?.cursorCues.length ?? 0} cursor cues</span>
               <span>{script.editDecisionList?.presenter.enabled ? "presenter on" : "presenter off"}</span>
+              <span>{readyAvatarScriptIds.has(script.id) ? "avatar clip ready" : "static presenter"}</span>
               <span>{script.approved ? "approved" : "needs approval"}</span>
             </div>
             {script.visualBeats.length > 0 ? (

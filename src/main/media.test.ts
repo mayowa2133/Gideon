@@ -325,6 +325,7 @@ describe("media pipeline", () => {
   it.runIf(Boolean(ffmpeg))("probes and renders a vertical H.264/AAC draft from a local recording", async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-media-"));
     const sourcePath = path.join(tempDir, "source.mp4");
+    const avatarPath = path.join(tempDir, "avatar.mp4");
     await run(ffmpeg!, [
       "-hide_banner",
       "-loglevel",
@@ -347,6 +348,23 @@ describe("media pipeline", () => {
       "-c:a",
       "aac",
       sourcePath
+    ]);
+    await run(ffmpeg!, [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=red:size=512x512:rate=30",
+      "-t",
+      "12",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      avatarPath
     ]);
 
     const recording = await probeRecording(sourcePath);
@@ -371,7 +389,8 @@ describe("media pipeline", () => {
       recording,
       script: script!,
       moment: moments[0],
-      title: "Smoke render"
+      title: "Smoke render",
+      avatarPresenterPath: avatarPath
     });
     delete process.env.GIDEON_DISABLE_SAY;
 
@@ -383,6 +402,24 @@ describe("media pipeline", () => {
     expect(rendered.validation.frameQa?.informativeFrames).toBeGreaterThan(0);
     const overlayFrames = await fs.readdir(path.join(tempDir, "renders", script!.id, "overlay-frames"));
     expect(overlayFrames.filter((fileName) => fileName.endsWith(".png")).length).toBeGreaterThan(1);
+    const signal = await run(ffmpeg!, [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-ss",
+      "5",
+      "-i",
+      rendered.outputPath,
+      "-vf",
+      "crop=180:180:740:1100,signalstats,metadata=print:file=-",
+      "-frames:v",
+      "1",
+      "-f",
+      "null",
+      "-"
+    ]);
+    const redChannel = /lavfi\.signalstats\.VAVG=([\d.]+)/.exec(signal.stdout)?.[1];
+    expect(Number(redChannel)).toBeGreaterThan(180);
     await expect(fs.access(rendered.outputPath)).resolves.toBeUndefined();
   }, 120_000);
 });

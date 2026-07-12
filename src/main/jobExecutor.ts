@@ -350,6 +350,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
           const renderStartedAtMs = nowMs();
           let rendered: RenderDraftResult;
           try {
+            const avatarPresenterPath = await matchingAvatarPresenterPath(project, script);
             rendered = await renderDraft({
               projectId,
               projectDir: store.projectDir(projectId),
@@ -358,7 +359,8 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
               script,
               moment,
               title: concept?.title ?? script.hook,
-              voiceoverPath: voiceoverPath ?? undefined
+              voiceoverPath: voiceoverPath ?? undefined,
+              avatarPresenterPath
             });
             emitMetric({
               name: "render_draft_finished",
@@ -537,6 +539,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
         consent: { assetType: "fictional_catalog", status: "not_required" }
       });
       const output = await statFile(result.outputPath);
+      const sourceVoiceoverArtifact = latestArtifactForScript(project.artifacts, "voiceover", script.id);
       await store.assertUsageAvailable(projectId, "storage_bytes", output.size);
       const stored = await storeArtifactWithMetrics(projectId, "avatar_presenter", () =>
         createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
@@ -546,7 +549,12 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
           sourcePath: result.outputPath,
           originalFileName: `${script.id}-${avatarId}.mp4`,
           contentType: "video/mp4",
-          avatarModelReceipt: result.receipt
+          avatarModelReceipt: result.receipt,
+          avatarPresenterLineage: {
+            sourceScriptId: script.id,
+            sourceScriptUpdatedAt: script.updatedAt,
+            sourceVoiceoverArtifactId: sourceVoiceoverArtifact?.id
+          }
         })
       );
       await store.appendArtifact(projectId, stored.artifact);
@@ -868,4 +876,45 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
 
 export function minutesForDuration(durationMs: number): number {
   return Math.max(1, Math.ceil(durationMs / 60_000));
+}
+
+function latestArtifactForScript(
+  artifacts: ArtifactRecord[],
+  kind: "voiceover" | "avatar_presenter",
+  scriptId: string
+): ArtifactRecord | undefined {
+  return artifacts
+    .filter((artifact) =>
+      artifact.kind === kind &&
+      (kind === "avatar_presenter"
+        ? artifact.avatarPresenterLineage?.sourceScriptId === scriptId
+        : artifact.originalFileName === `${scriptId}.wav`)
+    )
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0];
+}
+
+async function matchingAvatarPresenterPath(project: Project, script: ScriptDraft): Promise<string | undefined> {
+  const avatarId = project.profile.avatarPresenterId;
+  const presenterEnabled = script.editDecisionList?.presenter.enabled ?? project.profile.brandPresenterEnabled ?? false;
+  if (!avatarId || avatarId === "logo_head" || !presenterEnabled) {
+    return undefined;
+  }
+  const artifact = latestArtifactForScript(project.artifacts, "avatar_presenter", script.id);
+  const receipt = artifact?.avatarModelReceipt;
+  const lineage = artifact?.avatarPresenterLineage;
+  if (
+    !artifact?.localPath ||
+    lineage?.sourceScriptUpdatedAt !== script.updatedAt ||
+    receipt?.avatarId !== avatarId ||
+    receipt.avatarProvenance !== "gideon_fictional_catalog" ||
+    receipt.disclosure !== "AI-generated brand presenter"
+  ) {
+    return undefined;
+  }
+  try {
+    await fs.access(artifact.localPath);
+    return artifact.localPath;
+  } catch {
+    return undefined;
+  }
 }

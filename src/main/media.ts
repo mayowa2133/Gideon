@@ -62,6 +62,7 @@ interface RenderDraftInput {
   moment?: DetectedMoment;
   title: string;
   voiceoverPath?: string;
+  avatarPresenterPath?: string;
 }
 
 export async function getToolAvailability(): Promise<{
@@ -183,7 +184,8 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     input.script,
     editDecisionList,
     overlayDir,
-    sourceDurationSec
+    sourceDurationSec,
+    Boolean(input.avatarPresenterPath)
   );
   validateOverlaySequenceForRender(overlaySequence, sourceDurationSec);
   const voiceCreated = input.voiceoverPath ? true : await createVoiceover(input.script.voiceoverText, voicePath);
@@ -192,12 +194,29 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   }
 
   const audioInput = input.voiceoverPath ?? (voiceCreated ? voicePath : audioPath);
+  const presenterInputIndex = input.avatarPresenterPath ? 2 : undefined;
+  const audioInputIndex = input.avatarPresenterPath ? 3 : 2;
+  const presenterPosition = editDecisionList.presenter.position === "lower_left" ? "70" : "650";
+  const presenterStartSec = (editDecisionList.presenter.startMs / 1000).toFixed(3);
+  const presenterEndSec = (editDecisionList.presenter.endMs / 1000).toFixed(3);
   const filter = [
     timeline.filter,
+    ...(presenterInputIndex
+      ? [
+          `[${presenterInputIndex}:v]fps=30,scale=360:360:force_original_aspect_ratio=increase,crop=360:360,` +
+          `trim=duration=${sourceDurationSec.toFixed(3)},setpts=PTS-STARTPTS[presenter]`,
+          `[base][presenter]overlay=x=${presenterPosition}:y=1030:shortest=1:` +
+          `enable='between(t,${presenterStartSec},${presenterEndSec})'[base_with_presenter]`
+        ]
+      : []),
     "[1:v]fps=30,format=rgba[overlay]",
-    "[base][overlay]overlay=0:0:shortest=1[v]",
-    buildAudioMixFilter(editDecisionList, sourceDurationSec)
+    `[${presenterInputIndex ? "base_with_presenter" : "base"}][overlay]overlay=0:0:shortest=1[v]`,
+    buildAudioMixFilter(editDecisionList, sourceDurationSec, audioInputIndex)
   ].join(";");
+
+  const presenterInputArgs = input.avatarPresenterPath
+    ? ["-stream_loop", "-1", "-i", input.avatarPresenterPath]
+    : [];
 
   await runCommand(resolveFfmpeg(), [
     "-hide_banner",
@@ -212,6 +231,7 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     "0",
     "-i",
     overlaySequence.pattern,
+    ...presenterInputArgs,
     "-i",
     audioInput,
     "-filter_complex",
@@ -475,10 +495,10 @@ async function createSilentAudio(outputPath: string, durationSec: number): Promi
   ]);
 }
 
-export function buildAudioMixFilter(editDecisionList: EditDecisionList, durationSec: number): string {
+export function buildAudioMixFilter(editDecisionList: EditDecisionList, durationSec: number, audioInputIndex = 2): string {
   const duration = durationSec.toFixed(3);
   const filters = [
-    `[2:a]apad,atrim=0:${duration},asetpts=N/SR/TB,aresample=44100,aformat=channel_layouts=stereo[voice]`
+    `[${audioInputIndex}:a]apad,atrim=0:${duration},asetpts=N/SR/TB,aresample=44100,aformat=channel_layouts=stereo[voice]`
   ];
   const layerLabels = ["[voice]"];
   if (editDecisionList.music.enabled && editDecisionList.music.mood !== "none") {
@@ -540,7 +560,8 @@ async function createTimedOverlaySequence(
   script: ScriptDraft,
   editDecisionList: EditDecisionList,
   outputDir: string,
-  durationSec: number
+  durationSec: number,
+  hasGeneratedPresenter = false
 ): Promise<OverlaySequence> {
   loadOverlayFont();
   await fs.mkdir(outputDir, { recursive: true });
@@ -553,7 +574,8 @@ async function createTimedOverlaySequence(
       script,
       editDecisionList,
       timestampMs,
-      path.join(outputDir, overlayFrameName(frameIndex))
+      path.join(outputDir, overlayFrameName(frameIndex)),
+      hasGeneratedPresenter
     );
   }
   return {
@@ -568,7 +590,8 @@ async function createTimedOverlayFrame(
   script: ScriptDraft,
   editDecisionList: EditDecisionList,
   timestampMs: number,
-  outputPath: string
+  outputPath: string,
+  hasGeneratedPresenter = false
 ): Promise<void> {
   const image = PImage.make(OUTPUT_WIDTH, OUTPUT_HEIGHT);
   const context = image.getContext("2d");
@@ -586,13 +609,17 @@ async function createTimedOverlayFrame(
     showPresenterHook: Boolean(activeHook)
   });
   if (isPresenterTemplate) {
-    await drawBrandPresenter(
-      context,
-      brandKit,
-      editDecisionList.presenter,
-      timestampMs,
-      Boolean(activeCaption && activeWordIndex >= 0)
-    );
+    if (hasGeneratedPresenter && isCueActive(editDecisionList.presenter, timestampMs)) {
+      drawGeneratedPresenterDisclosure(context, editDecisionList.presenter);
+    } else if (!hasGeneratedPresenter) {
+      await drawBrandPresenter(
+        context,
+        brandKit,
+        editDecisionList.presenter,
+        timestampMs,
+        Boolean(activeCaption && activeWordIndex >= 0)
+      );
+    }
   }
 
   context.fillStyle = brandKit.primaryColor;
@@ -613,14 +640,17 @@ async function createTimedOverlayFrame(
   drawCursorEmphasis(context, editDecisionList, timestampMs);
 
   if (activeCaption) {
+    const generatedPresenterOnLeft = hasGeneratedPresenter && editDecisionList.presenter.position === "lower_left";
+    const captionX = generatedPresenterOnLeft ? 470 : 130;
+    const captionWidth = hasGeneratedPresenter ? 480 : (isPresenterTemplate ? 700 : 820);
     context.font = brandKit.captionStyle === "educational_stack" ? "39pt Arial" : "46pt Arial";
     drawCaptionWithWordHighlight(
       context,
       activeCaption,
       activeWordIndex,
-      130,
+      captionX,
       1360,
-      isPresenterTemplate ? 700 : 820,
+      captionWidth,
       58,
       brandKit,
       brandKit.captionStyle === "educational_stack" ? 3 : 2
@@ -930,6 +960,20 @@ async function drawBrandPresenter(
   context.fillStyle = "rgba(255,255,255,0.9)";
   context.font = "18pt Arial";
   context.fillText(presenter.disclosure.toLowerCase(), baseX + 39, baseY + 585);
+}
+
+function drawGeneratedPresenterDisclosure(
+  context: OverlayContext,
+  presenter: EditDecisionList["presenter"]
+): void {
+  if (!presenter.enabled) {
+    return;
+  }
+  const x = presenter.position === "lower_left" ? 70 : 650;
+  drawPanel(context, x, 1400, 360, 48, "rgba(5, 7, 13, 0.84)");
+  context.fillStyle = "rgba(255,255,255,0.92)";
+  context.font = "15pt Arial";
+  context.fillText(presenter.disclosure.toLowerCase(), x + 22, 1431);
 }
 
 function drawFictionalAvatarFace(

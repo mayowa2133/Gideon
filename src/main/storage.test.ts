@@ -100,11 +100,21 @@ describe("local private object storage", () => {
         avatarProvenance: "gideon_fictional_catalog",
         disclosure: "AI-generated brand presenter",
         generatedAt: "2026-07-10T00:00:00.000Z"
+      },
+      avatarPresenterLineage: {
+        sourceScriptId: "script-1",
+        sourceScriptUpdatedAt: "2026-07-10T00:00:00.000Z",
+        sourceVoiceoverArtifactId: "voiceover-1"
       }
     });
 
     expect(stored.artifact.kind).toBe("avatar_presenter");
     expect(stored.artifact.avatarModelReceipt).toMatchObject({ avatarId: "orbit", provider: "musetalk" });
+    expect(stored.artifact.avatarPresenterLineage).toEqual({
+      sourceScriptId: "script-1",
+      sourceScriptUpdatedAt: "2026-07-10T00:00:00.000Z",
+      sourceVoiceoverArtifactId: "voiceover-1"
+    });
     expect(stored.artifact.storageKey).toContain("projects/project-1/avatar_presenter/");
   });
 

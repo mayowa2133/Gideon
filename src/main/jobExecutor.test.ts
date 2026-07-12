@@ -249,12 +249,36 @@ describe("Gideon job executor", () => {
   it("reuses a validated scoped voiceover without calling synthesis", async () => {
     const voiceoverDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-voiceover-"));
     const voiceoverPath = path.join(voiceoverDir, "voiceovers", "script-1.wav");
+    const avatarPath = path.join(voiceoverDir, "avatar-presenters", "script-1.mp4");
     await fs.mkdir(path.dirname(voiceoverPath), { recursive: true });
     await fs.writeFile(voiceoverPath, "fixture-audio");
+    await fs.mkdir(path.dirname(avatarPath), { recursive: true });
+    await fs.writeFile(avatarPath, "fixture-avatar");
     const project = projectFixture({
+      profile: { ...profileFixture(), brandPresenterEnabled: true, avatarPresenterId: "orbit" },
       concepts: [{ id: "concept-1", title: "First", formatFamily: "demo", targetPain: "slow", hookDirection: "show", proofMomentIds: ["moment-1"], platformFit: ["youtube_shorts"], estimatedDurationSec: 30, rationale: "proof", selected: true, brief: "first" }],
       moments: [momentFixture()],
-      scripts: [scriptFixture()]
+      scripts: [scriptFixture()],
+      artifacts: [artifactFixture({
+        id: "artifact-avatar-1",
+        kind: "avatar_presenter",
+        originalFileName: "script-1-orbit.mp4",
+        localPath: avatarPath,
+        createdAt: "2026-06-25T12:00:01.000Z",
+        avatarModelReceipt: {
+          provider: "sadtalker",
+          modelVersion: "test",
+          modelLicense: "reviewed",
+          avatarId: "orbit",
+          avatarProvenance: "gideon_fictional_catalog",
+          disclosure: "AI-generated brand presenter",
+          generatedAt: "2026-06-25T12:00:01.000Z"
+        },
+        avatarPresenterLineage: {
+          sourceScriptId: "script-1",
+          sourceScriptUpdatedAt: "2026-06-25T12:00:00.000Z"
+        }
+      })]
     });
     const store = new FakeExecutorStore(project, voiceoverDir);
     store.project.jobs = [createJob({
@@ -265,6 +289,7 @@ describe("Gideon job executor", () => {
       renderScope: { scriptIds: ["script-1"], voiceoverMode: "reuse" }
     })];
     let receivedVoiceoverPath: string | undefined;
+    let receivedAvatarPresenterPath: string | undefined;
     const executor = createGideonJobExecutor({
       store,
       now: clock(),
@@ -282,6 +307,7 @@ describe("Gideon job executor", () => {
       statFile: async () => ({ size: 4096 }),
       renderDraft: async (input) => {
         receivedVoiceoverPath = input.voiceoverPath;
+        receivedAvatarPresenterPath = input.avatarPresenterPath;
         return { outputPath: "/tmp/render.mp4", validation: { width: 1080, height: 1920, durationMs: 30_000, videoCodec: "h264", audioCodec: "aac", fastStart: true } };
       },
       createPrivateObjectStorage: () => ({
@@ -294,6 +320,7 @@ describe("Gideon job executor", () => {
     await executor.runRenderJob(store.project.id, "job-1");
 
     expect(receivedVoiceoverPath).toBe(voiceoverPath);
+    expect(receivedAvatarPresenterPath).toBe(avatarPath);
   });
 
   it("requires an approved selected script before rendering", async () => {
@@ -553,6 +580,10 @@ describe("Gideon job executor", () => {
         async putFile(input) {
           expect(input.kind).toBe("avatar_presenter");
           expect(input.avatarModelReceipt).toMatchObject({ avatarId: "orbit", provider: "sadtalker" });
+          expect(input.avatarPresenterLineage).toMatchObject({
+            sourceScriptId: "script-1",
+            sourceScriptUpdatedAt: "2026-06-25T12:00:00.000Z"
+          });
           return {
             filePath: "/private/storage/avatar.mp4",
             fileUrl: "file:///private/storage/avatar.mp4",
@@ -560,7 +591,8 @@ describe("Gideon job executor", () => {
               id: "artifact-avatar-1",
               kind: "avatar_presenter",
               byteSize: 29,
-              avatarModelReceipt: input.avatarModelReceipt
+              avatarModelReceipt: input.avatarModelReceipt,
+              avatarPresenterLineage: input.avatarPresenterLineage
             })
           };
         }

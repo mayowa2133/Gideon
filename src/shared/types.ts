@@ -208,7 +208,14 @@ export interface ArtifactRecord {
   localPath?: string;
   localUrl?: string;
   avatarModelReceipt?: AvatarModelReceipt;
+  avatarPresenterLineage?: AvatarPresenterLineage;
   createdAt: string;
+}
+
+export interface AvatarPresenterLineage {
+  sourceScriptId: string;
+  sourceScriptUpdatedAt: string;
+  sourceVoiceoverArtifactId?: string;
 }
 
 export type RecordingUploadSessionStatus = "pending" | "completed" | "expired" | "aborted";
