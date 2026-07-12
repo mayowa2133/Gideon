@@ -18,6 +18,7 @@
     "worker:hosted": "pnpm build:main && pnpm worker:hosted:run",
     "worker:hosted:run": "node dist/main/main/hostedWorkerProcess.js",
     "worker:hosted:check": "node scripts/check-hosted-worker-config.mjs",
+    "avatar:worker:check": "node scripts/check-avatar-worker-config.mjs",
     "provider:canary": "pnpm build:main && node dist/main/main/providerCanaryCli.js",
     "smoke:local-core": "pnpm build && node scripts/run-local-core-smoke.mjs",
     "staging:check": "node scripts/check-staging-readiness.mjs",
