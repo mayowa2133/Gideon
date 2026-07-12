@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -95,7 +96,7 @@ def main() -> None:
     if not source_image:
         verify_catalog_asset(avatar_id, avatar_path)
 
-    result_dir = output_path.parent / "sadtalker-result"
+    result_dir = output_path.parent / f"{output_path.stem}-sadtalker-result"
     command = [
         sys.executable,
         str(Path(os.environ["SADTALKER_HOME"]) / "inference.py"),
@@ -121,6 +122,7 @@ def main() -> None:
         fail("SadTalker did not produce an MP4.")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     candidates[-1].replace(output_path)
+    shutil.rmtree(result_dir, ignore_errors=True)
     print(json.dumps({
         "outputPath": str(output_path),
         "receipt": {

@@ -74,7 +74,10 @@ try {
     fs.rm(hostAudioPath, { force: true }),
     ...(hostSourcePath ? [fs.rm(hostSourcePath, { force: true })] : []),
     fs.rm(containerRequestPath, { force: true }),
-    fs.rm(hostOutputPath, { force: true })
+    fs.rm(hostOutputPath, { force: true }),
+    fs.rm(path.join(outputDir, `${jobId}-sadtalker-result`), { recursive: true, force: true }),
+    fs.rm(path.join(outputDir, `${jobId}-musetalk-result`), { recursive: true, force: true }),
+    fs.rm(path.join(outputDir, `${jobId}-musetalk.json`), { force: true })
   ]);
 }
 

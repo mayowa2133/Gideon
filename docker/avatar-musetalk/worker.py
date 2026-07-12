@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -111,7 +112,7 @@ def main() -> None:
     if not audio_path.is_file():
         fail("Approved narration audio is missing.")
     source_path, provenance = authorized_source(request, avatar_id)
-    result_dir = output_path.parent / "musetalk-result"
+    result_dir = output_path.parent / f"{output_path.stem}-musetalk-result"
     config_path = output_path.parent / f"{output_path.stem}-musetalk.json"
     config_path.write_text(json.dumps({
         "gideon": {
@@ -142,6 +143,7 @@ def main() -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     generated.replace(output_path)
     config_path.unlink(missing_ok=True)
+    shutil.rmtree(result_dir, ignore_errors=True)
     print(json.dumps({
         "outputPath": str(output_path),
         "receipt": {
