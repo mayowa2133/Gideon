@@ -18,6 +18,10 @@ if (process.argv.includes("--dry-run")) {
 }
 
 const commandPath = requiredAbsoluteEnv("GIDEON_AVATAR_WORKER_COMMAND");
+const provider = requiredEnv("GIDEON_AVATAR_WORKER_PROVIDER");
+if (provider !== "sadtalker" && provider !== "musetalk") {
+  throw new Error("GIDEON_AVATAR_WORKER_PROVIDER must be sadtalker or musetalk.");
+}
 const modelVersion = requiredEnv("GIDEON_AVATAR_MODEL_VERSION");
 const modelLicense = requiredEnv("GIDEON_AVATAR_MODEL_LICENSE");
 const ffmpeg = process.env.GIDEON_FFMPEG_PATH?.trim() || "ffmpeg";
@@ -35,6 +39,7 @@ try {
     "-t", "1", "-c:a", "pcm_s16le", audioPath
   ]);
   await fs.writeFile(requestPath, JSON.stringify({
+    provider,
     avatarId: "orbit",
     audioPath,
     outputPath,
@@ -43,7 +48,7 @@ try {
     consent: { assetType: "fictional_catalog", status: "not_required" }
   }), "utf8");
   const worker = await run(commandPath, ["--request", requestPath], 1_200_000);
-  const result = parseWorkerResult(worker.stdout, { outputPath, modelVersion, modelLicense });
+  const result = parseWorkerResult(worker.stdout, { outputPath, modelVersion, modelLicense, provider });
   const probe = JSON.parse((await run(ffprobe, [
     "-v", "error", "-print_format", "json", "-show_format", "-show_streams", result.outputPath
   ])).stdout);
@@ -91,7 +96,7 @@ function parseWorkerResult(output, expected) {
   }
   if (
     result?.outputPath !== expected.outputPath ||
-    result.receipt?.provider !== "sadtalker" ||
+    result.receipt?.provider !== expected.provider ||
     result.receipt?.modelVersion !== expected.modelVersion ||
     result.receipt?.modelLicense !== expected.modelLicense ||
     result.receipt?.avatarId !== "orbit" ||

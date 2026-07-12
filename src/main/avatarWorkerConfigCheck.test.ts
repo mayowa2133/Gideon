@@ -53,6 +53,49 @@ describe("avatar worker configuration check", () => {
       await fs.rm(root, { recursive: true, force: true });
     }
   });
+
+  it("validates the pinned MuseTalk component model tree without loading model data", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-musetalk-check-"));
+    const models = path.join(root, "models");
+    const work = path.join(root, "work");
+    const files: Array<[string, number]> = [
+      ["musetalkV15/unet.pth", 1_000_000],
+      ["musetalkV15/musetalk.json", 2],
+      ["sd-vae/config.json", 2],
+      ["sd-vae/diffusion_pytorch_model.bin", 1_000_000],
+      ["whisper/config.json", 2],
+      ["whisper/pytorch_model.bin", 1_000_000],
+      ["whisper/preprocessor_config.json", 2],
+      ["dwpose/dw-ll_ucoco_384.pth", 1_000_000],
+      ["face-parse-bisent/79999_iter.pth", 1_000_000],
+      ["face-parse-bisent/resnet18-5c106cde.pth", 1_000_000]
+    ];
+    await fs.mkdir(work);
+    for (const [relativePath, byteSize] of files) {
+      const filePath = path.join(models, relativePath);
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await sparseFile(filePath, byteSize);
+    }
+    try {
+      const result = await execFileAsync(process.execPath, [scriptPath], {
+        cwd: process.cwd(),
+        env: {
+          PATH: process.env.PATH ?? "",
+          GIDEON_AVATAR_WORKER_PROVIDER: "musetalk",
+          GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED: "true",
+          GIDEON_AVATAR_MODEL_VERSION: "musetalk-1.5-pinned",
+          GIDEON_AVATAR_MODEL_LICENSE: "reviewed-component-set",
+          GIDEON_AVATAR_WORKER_COMMAND: path.join(process.cwd(), "scripts/run-sadtalker-avatar-worker.mjs"),
+          GIDEON_AVATAR_CATALOG_DIR: path.join(process.cwd(), "assets/avatar-catalog"),
+          GIDEON_MUSETALK_MODEL_DIR: models,
+          GIDEON_AVATAR_WORK_DIR: work
+        }
+      });
+      expect(result.stdout).toContain("Avatar worker configuration passed.");
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
 });
 
 async function sparseFile(filePath: string, byteSize: number): Promise<void> {

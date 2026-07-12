@@ -21,9 +21,15 @@ if (!isAbsoluteString(request.audioPath) || !isAbsoluteString(request.outputPath
 if (request.sourceImagePath !== undefined && !isAbsoluteString(request.sourceImagePath)) {
   fail("Custom avatar source requires a private absolute path.");
 }
+if (request.provider !== "sadtalker" && request.provider !== "musetalk") {
+  fail("Avatar request provider must be sadtalker or musetalk.");
+}
 
 const workDir = requiredAbsoluteEnv("GIDEON_AVATAR_WORK_DIR");
-const composeFile = path.resolve(process.env.GIDEON_AVATAR_COMPOSE_FILE ?? "docker-compose.avatar-worker.yml");
+const composeFile = path.resolve(process.env.GIDEON_AVATAR_COMPOSE_FILE ?? (
+  request.provider === "musetalk" ? "docker-compose.avatar-musetalk.yml" : "docker-compose.avatar-worker.yml"
+));
+const composeService = request.provider === "musetalk" ? "avatar-musetalk" : "avatar-sadtalker";
 const jobId = randomUUID();
 const inputDir = path.join(workDir, "input");
 const outputDir = path.join(workDir, "output");
@@ -55,10 +61,10 @@ await fs.writeFile(
 );
 
 try {
-  const result = await runDockerCompose(composeFile, `/work/output/${path.basename(containerRequestPath)}`);
+  const result = await runDockerCompose(composeFile, composeService, `/work/output/${path.basename(containerRequestPath)}`);
   const parsed = await parseResult(result.stdout);
   if (parsed.outputPath !== containerOutputPath) {
-    fail("SadTalker worker returned an unexpected output path.");
+    fail("Avatar worker returned an unexpected output path.");
   }
   await fs.mkdir(path.dirname(request.outputPath), { recursive: true });
   await fs.copyFile(hostOutputPath, request.outputPath);
@@ -72,9 +78,9 @@ try {
   ]);
 }
 
-function runDockerCompose(composeFile, containerRequestPath) {
+function runDockerCompose(composeFile, composeService, containerRequestPath) {
   return new Promise((resolve, reject) => {
-    const child = spawn("docker", ["compose", "-f", composeFile, "run", "--rm", "-T", "avatar-sadtalker", "--request", containerRequestPath], {
+    const child = spawn("docker", ["compose", "-f", composeFile, "run", "--rm", "-T", composeService, "--request", containerRequestPath], {
       shell: false,
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -89,7 +95,7 @@ function runDockerCompose(composeFile, containerRequestPath) {
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
-        reject(new Error(`SadTalker Docker worker exited with code ${code ?? "unknown"}.`));
+        reject(new Error(`Avatar Docker worker exited with code ${code ?? "unknown"}.`));
       }
     });
   });
@@ -107,14 +113,14 @@ async function parseResult(output) {
   try {
     const parsed = JSON.parse(output.trim());
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      fail("SadTalker worker returned invalid JSON.");
+      fail("Avatar worker returned invalid JSON.");
     }
     return parsed;
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("SadTalker worker")) {
+    if (error instanceof Error && error.message.startsWith("Avatar worker")) {
       throw error;
     }
-    fail("SadTalker worker returned invalid JSON.");
+    fail("Avatar worker returned invalid JSON.");
   }
 }
 

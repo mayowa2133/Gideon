@@ -79,7 +79,7 @@ Before any non-logo avatar is enabled, Gideon needs:
 | Need | Recommendation | Why |
 |---|---|---|
 | MVP avatar prototype | SadTalker + fictional catalog + non-cloning TTS | Minimal batch worker contract: image/audio in, private MP4 out; avoid real-person upload and cloning. |
-| Production avatar pipeline | Modular GPU worker with MuseTalk or a commercially cleared equivalent + Piper/provider narration | Separates lipsync, narration, compositing, and policy; avoids locking Gideon into an orchestration app or non-commercial checkpoint. |
+| Production avatar pipeline | Pinned MuseTalk 1.5 GPU worker + approved non-cloning provider narration | Implemented behind the shared private request/receipt contract; exact MuseTalk, VAE, Whisper, DWPose, and face-parsing weights still require release review and a GPU canary. |
 | Web-native avatar preview | TalkingHead + licensed GLB + word/viseme timestamps | Real-time, browser-native, fictional 3D host; easy to keep visibly non-human and branded. |
 | Future premium avatar generation | Hallo3 and AniPortrait benchmark program | Higher motion realism, but only after hardware benchmarks, model/asset legal approval, consent system, and deepfake red-team review. |
 

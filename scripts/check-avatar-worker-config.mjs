@@ -12,23 +12,42 @@ const faceRequirements = [
   ["alignment_WFLW_4HG.pth", 150_000_000],
   ["detection_Resnet50_Final.pth", 90_000_000]
 ];
+const museTalkRequirements = [
+  ["musetalkV15/unet.pth", 1_000_000],
+  ["musetalkV15/musetalk.json", 2],
+  ["sd-vae/config.json", 2],
+  ["sd-vae/diffusion_pytorch_model.bin", 1_000_000],
+  ["whisper/config.json", 2],
+  ["whisper/pytorch_model.bin", 1_000_000],
+  ["whisper/preprocessor_config.json", 2],
+  ["dwpose/dw-ll_ucoco_384.pth", 1_000_000],
+  ["face-parse-bisent/79999_iter.pth", 1_000_000],
+  ["face-parse-bisent/resnet18-5c106cde.pth", 1_000_000]
+];
 
 try {
-  assertEqual("GIDEON_AVATAR_WORKER_PROVIDER", "sadtalker");
+  const provider = requiredText("GIDEON_AVATAR_WORKER_PROVIDER");
+  if (provider !== "sadtalker" && provider !== "musetalk") {
+    throw new Error("GIDEON_AVATAR_WORKER_PROVIDER must be sadtalker or musetalk.");
+  }
   assertEqual("GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED", "true");
   requiredText("GIDEON_AVATAR_MODEL_VERSION");
   requiredText("GIDEON_AVATAR_MODEL_LICENSE");
   const commandPath = requiredAbsolutePath("GIDEON_AVATAR_WORKER_COMMAND");
   const catalogDir = requiredAbsolutePath("GIDEON_AVATAR_CATALOG_DIR");
-  const checkpointDir = requiredAbsolutePath("GIDEON_SADTALKER_MODEL_DIR");
-  const faceModelDir = requiredAbsolutePath("GIDEON_SADTALKER_GFPGAN_MODEL_DIR");
   const workDir = requiredAbsolutePath("GIDEON_AVATAR_WORK_DIR");
 
   await fs.access(commandPath, fs.constants.X_OK);
   await assertDirectory(workDir);
-  await assertModelFiles(checkpointDir, requirements);
-  await assertOnePackagedCheckpoint(checkpointDir);
-  await assertModelFiles(faceModelDir, faceRequirements);
+  if (provider === "sadtalker") {
+    const checkpointDir = requiredAbsolutePath("GIDEON_SADTALKER_MODEL_DIR");
+    const faceModelDir = requiredAbsolutePath("GIDEON_SADTALKER_GFPGAN_MODEL_DIR");
+    await assertModelFiles(checkpointDir, requirements);
+    await assertOnePackagedCheckpoint(checkpointDir);
+    await assertModelFiles(faceModelDir, faceRequirements);
+  } else {
+    await assertModelFiles(requiredAbsolutePath("GIDEON_MUSETALK_MODEL_DIR"), museTalkRequirements);
+  }
   await verifyCatalog(catalogDir);
 
   process.stdout.write("Avatar worker configuration passed.\n");

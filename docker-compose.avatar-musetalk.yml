@@ -1,0 +1,23 @@
+services:
+  avatar-musetalk:
+    build:
+      context: ./docker/avatar-musetalk
+      args:
+        MUSETALK_REV: 0a89dec45a0192b824e3cf4daf96c239440c5ed8
+    image: gideon-avatar-musetalk:local
+    user: "10001:10001"
+    read_only: true
+    network_mode: "none"
+    volumes:
+      - ${GIDEON_AVATAR_WORK_DIR:?set GIDEON_AVATAR_WORK_DIR}:/work
+      - ${GIDEON_AVATAR_CATALOG_DIR:?set GIDEON_AVATAR_CATALOG_DIR}:/catalog:ro
+      - ${GIDEON_MUSETALK_MODEL_DIR:?set GIDEON_MUSETALK_MODEL_DIR}:/opt/musetalk/models:ro
+    environment:
+      GIDEON_AVATAR_MODEL_VERSION: ${GIDEON_AVATAR_MODEL_VERSION:?set GIDEON_AVATAR_MODEL_VERSION}
+      GIDEON_AVATAR_MODEL_LICENSE: ${GIDEON_AVATAR_MODEL_LICENSE:?set GIDEON_AVATAR_MODEL_LICENSE}
+      GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED: "true"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
