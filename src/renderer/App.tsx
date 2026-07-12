@@ -847,7 +847,7 @@ function ProjectWorkspace({
   const approvedSelectedScriptCount = project.scripts.filter(
     (script) => script.approved && selectedConceptIds.has(script.conceptId) && !hasBlockingScriptWarnings(script.qualityWarnings)
   ).length;
-  const readyAvatarScriptIds = new Set(project.artifacts
+  const matchingAvatarArtifacts = project.artifacts
     .filter((artifact) =>
       artifact.kind === "avatar_presenter" &&
       artifact.avatarModelReceipt?.avatarId === project.profile.avatarPresenterId &&
@@ -856,10 +856,20 @@ function ProjectWorkspace({
       ) &&
       artifact.avatarPresenterLineage?.sourceAvatarArtifactId === project.profile.customAvatarSource?.artifactId
     )
-    .flatMap((artifact) => {
+    .filter((artifact) => {
       const script = project.scripts.find((candidate) => candidate.id === artifact.avatarPresenterLineage?.sourceScriptId);
-      return script && artifact.avatarPresenterLineage?.sourceScriptUpdatedAt === script.updatedAt ? [script.id] : [];
-    }));
+      return Boolean(script && artifact.avatarPresenterLineage?.sourceScriptUpdatedAt === script.updatedAt);
+    })
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+  const readyAvatarScriptIds = new Set(matchingAvatarArtifacts
+    .map((artifact) => artifact.avatarPresenterLineage!.sourceScriptId));
+  const avatarClipUrls = new Map<string, string>();
+  matchingAvatarArtifacts.forEach((artifact) => {
+    const scriptId = artifact.avatarPresenterLineage!.sourceScriptId;
+    if (!avatarClipUrls.has(scriptId) && artifact.localUrl) {
+      avatarClipUrls.set(scriptId, artifact.localUrl);
+    }
+  });
 
   return (
     <div className="project-workspace">
@@ -1055,6 +1065,7 @@ function ProjectWorkspace({
           }
           canGenerateAvatarPresenter={project.profile.avatarPresenterId === "orbit" || project.profile.avatarPresenterId === "nova"}
           readyAvatarScriptIds={readyAvatarScriptIds}
+          avatarClipUrls={avatarClipUrls}
         />
       </Panel>
 
@@ -1654,7 +1665,8 @@ function ScriptEditor({
   onRegenerateVoiceover,
   onGenerateAvatarPresenter,
   canGenerateAvatarPresenter,
-  readyAvatarScriptIds
+  readyAvatarScriptIds,
+  avatarClipUrls
 }: {
   scripts: ScriptDraft[];
   setScripts: (scripts: ScriptDraft[]) => void;
@@ -1664,6 +1676,7 @@ function ScriptEditor({
   onGenerateAvatarPresenter: (scriptId: string) => void;
   canGenerateAvatarPresenter: boolean;
   readyAvatarScriptIds: Set<string>;
+  avatarClipUrls: Map<string, string>;
 }): JSX.Element {
   if (scripts.length === 0) {
     return <div className="empty-inline">Generate scripts from selected concepts, then edit voiceover and CTA before render.</div>;
@@ -1945,6 +1958,16 @@ function ScriptEditor({
               <span>{readyAvatarScriptIds.has(script.id) ? "avatar clip ready" : "static presenter"}</span>
               <span>{script.approved ? "approved" : "needs approval"}</span>
             </div>
+            {avatarClipUrls.get(script.id) ? (
+              <video
+                className="avatar-clip-preview"
+                controls
+                muted
+                playsInline
+                preload="metadata"
+                src={avatarClipUrls.get(script.id)}
+              />
+            ) : null}
             {script.visualBeats.length > 0 ? (
               <div className="visual-beat-focus-list">
                 {script.visualBeats.slice(0, 6).map((beat, beatIndex) => {

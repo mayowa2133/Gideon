@@ -448,6 +448,15 @@ video {
   color: var(--muted);
 }
 
+.avatar-clip-preview {
+  display: block;
+  width: min(100%, 360px);
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: #080b13;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 .platform-picker,
 .action-row,
 .header-metrics {
