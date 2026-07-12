@@ -60,6 +60,8 @@ const api = {
     ipcRenderer.invoke("voiceover:regenerate", projectId, scriptId),
   generateAvatarPresenter: (projectId: string, scriptId: string): Promise<Project> =>
     ipcRenderer.invoke("avatar:generate", projectId, scriptId),
+  importCustomAvatarSource: (projectId: string, consentAttested: boolean): Promise<Project | null> =>
+    ipcRenderer.invoke("avatar:import-source", projectId, consentAttested),
   cancelJob: (projectId: string, jobId: string): Promise<Project> => ipcRenderer.invoke("job:cancel", projectId, jobId),
   retryJob: (projectId: string, jobId: string): Promise<Project> => ipcRenderer.invoke("job:retry", projectId, jobId),
   exportVideo: (projectId: string, renderId: string): Promise<string | null> =>

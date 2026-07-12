@@ -40,6 +40,7 @@ import type {
 import { loadProviderConfig } from "./providers/config";
 import { createJob, findActiveJob } from "../shared/jobState";
 import { hasBlockingScriptWarnings } from "../shared/renderTemplates";
+import { validateAvatarSourceImage } from "./avatarSource";
 
 const store = new GideonStore();
 const workerQueue = new LocalWorkerQueue(loadLocalWorkerQueueOptions());
@@ -307,6 +308,55 @@ function registerIpcHandlers(): void {
   ipcMain.handle("avatar:generate", async (_event, projectId: string, scriptId: string) =>
     enqueueAvatarFromControl(projectId, scriptId)
   );
+  ipcMain.handle("avatar:import-source", async (_event, projectId: string, consentAttested: boolean) => {
+    if (consentAttested !== true) {
+      throw new Error("Confirm that you own or are authorized to use this likeness before importing it.");
+    }
+    const project = await store.getProject(projectId);
+    const options: OpenDialogOptions = {
+      title: "Choose your authorized avatar portrait",
+      properties: ["openFile"],
+      filters: [{ name: "Portrait images", extensions: ["png", "jpg", "jpeg"] }]
+    };
+    const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
+    const sourcePath = result.filePaths[0];
+    if (result.canceled || !sourcePath) {
+      return null;
+    }
+    const validation = await validateAvatarSourceImage(sourcePath);
+    await store.assertUsageAvailable(projectId, "storage_bytes", validation.byteSize);
+    const stored = await createPrivateObjectStorage({ localRootDir: store.storageRoot() }).putFile({
+      workspaceId: project.workspaceId,
+      projectId,
+      kind: "avatar_source_image",
+      sourcePath,
+      originalFileName: path.basename(sourcePath),
+      contentType: validation.contentType
+    });
+    await store.appendArtifact(projectId, stored.artifact);
+    await store.recordUsage(projectId, {
+      metric: "storage_bytes",
+      quantity: stored.artifact.byteSize,
+      unit: "byte",
+      source: "render",
+      idempotencyKey: `avatar-source:${projectId}:${stored.artifact.id}:storage_bytes`
+    });
+    const importedAt = new Date().toISOString();
+    return store.updateProfile(projectId, {
+      ...project.profile,
+      customAvatarSource: {
+        artifactId: stored.artifact.id,
+        displayName: path.basename(sourcePath),
+        importedAt,
+        consent: {
+          assetType: "real_likeness",
+          status: "granted",
+          sourceArtifactId: stored.artifact.id,
+          consentVerifiedAt: importedAt
+        }
+      }
+    });
+  });
   ipcMain.handle("scripts:generate", async (_event, projectId: string) => store.generateScripts(projectId));
   ipcMain.handle("scripts:regenerate", async (_event, projectId: string, scriptId: string) =>
     store.regenerateScript(projectId, scriptId)

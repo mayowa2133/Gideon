@@ -1071,6 +1071,46 @@ describe("GideonStore billing reconciliation", () => {
     expect(normalized.scripts[0]?.editDecisionList?.presenter.motion).toBe("caption_sync");
   });
 
+  it("preserves granted self-likeness consent only for a private avatar source artifact in the project", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProject({ name: "Avatar consent", profile: profileFixture() });
+    const sourceArtifact = artifactFixture({ id: "avatar-source-1", kind: "avatar_source_image" });
+    await store.appendArtifact(project.id, sourceArtifact);
+    const importedAt = "2026-06-25T12:00:00.000Z";
+
+    const updated = await store.updateProfile(project.id, {
+      ...project.profile,
+      customAvatarSource: {
+        artifactId: sourceArtifact.id,
+        displayName: "Founder portrait.png",
+        importedAt,
+        consent: {
+          assetType: "real_likeness",
+          status: "granted",
+          sourceArtifactId: sourceArtifact.id,
+          consentVerifiedAt: importedAt
+        }
+      }
+    });
+
+    expect(updated.profile.customAvatarSource).toMatchObject({
+      artifactId: sourceArtifact.id,
+      consent: { assetType: "real_likeness", status: "granted", sourceArtifactId: sourceArtifact.id }
+    });
+    await expect(store.updateProfile(project.id, {
+      ...updated.profile,
+      customAvatarSource: {
+        ...updated.profile.customAvatarSource!,
+        artifactId: "another-project-artifact",
+        consent: {
+          ...updated.profile.customAvatarSource!.consent,
+          sourceArtifactId: "another-project-artifact"
+        }
+      }
+    })).rejects.toThrow("private artifact in this project");
+  });
+
   it("creates exports with explicit hosted session scope", async () => {
     const store = new GideonStore();
     await store.load();

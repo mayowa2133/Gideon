@@ -48,6 +48,7 @@ type BusyAction =
   | "concepts"
   | "scripts"
   | "rendering"
+  | "avatar"
   | "exporting"
   | "job"
   | null;
@@ -757,6 +758,7 @@ function ProjectWorkspace({
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadSession, setUploadSession] = useState<RecordingUploadSession | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [avatarConsentAttested, setAvatarConsentAttested] = useState(false);
 
   useEffect(() => {
     setProfile(project.profile);
@@ -884,6 +886,27 @@ function ProjectWorkspace({
       <section className="grid two">
         <Panel title="1. Product context" eyebrow="Grounding">
           <ProfileForm profile={profile} onChange={setProfile} />
+          <div className="avatar-consent-control">
+            <label className="checkbox-row">
+              <input
+                checked={avatarConsentAttested}
+                onChange={(event) => setAvatarConsentAttested(event.target.checked)}
+                type="checkbox"
+              />
+              I own this likeness or have explicit permission to use it as an AI presenter.
+            </label>
+            <button
+              className="secondary"
+              disabled={!avatarConsentAttested || busy === "avatar"}
+              onClick={() => void runAction("avatar", () => window.gideon.importCustomAvatarSource(project.id, avatarConsentAttested))}
+              type="button"
+            >
+              {project.profile.customAvatarSource ? "Replace self avatar" : "Import self avatar"}
+            </button>
+            {project.profile.customAvatarSource ? (
+              <small>Authorized source: {project.profile.customAvatarSource.displayName}</small>
+            ) : null}
+          </div>
           <button
             className="secondary"
             disabled={busy === "saving"}

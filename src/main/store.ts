@@ -2843,6 +2843,7 @@ function normalizeProfile(profile: ProductProfile): ProductProfile {
     avatarPresenterId: ["logo_head", "orbit", "nova"].includes(profile.avatarPresenterId ?? "")
       ? profile.avatarPresenterId
       : "logo_head",
+    customAvatarSource: normalizeCustomAvatarSource(profile.customAvatarSource),
     brandPresenterPosition,
     brandPresenterMotion,
     soundDesignEnabled: Boolean(profile.soundDesignEnabled),
@@ -2851,7 +2852,42 @@ function normalizeProfile(profile: ProductProfile): ProductProfile {
   };
 }
 
+function normalizeCustomAvatarSource(source: ProductProfile["customAvatarSource"]): ProductProfile["customAvatarSource"] {
+  if (
+    !source?.artifactId?.trim() ||
+    source.consent.assetType !== "real_likeness" ||
+    source.consent.status !== "granted" ||
+    source.consent.sourceArtifactId !== source.artifactId ||
+    !source.consent.consentVerifiedAt ||
+    !Number.isFinite(Date.parse(source.consent.consentVerifiedAt)) ||
+    !Number.isFinite(Date.parse(source.importedAt)) ||
+    (source.consent.expiresAt !== undefined && (
+      !Number.isFinite(Date.parse(source.consent.expiresAt)) ||
+      Date.parse(source.consent.expiresAt) <= Date.now()
+    ))
+  ) {
+    return undefined;
+  }
+  return {
+    artifactId: source.artifactId.trim(),
+    displayName: source.displayName.trim().slice(0, 120) || "Custom self avatar",
+    importedAt: source.importedAt,
+    consent: {
+      assetType: "real_likeness",
+      status: "granted",
+      sourceArtifactId: source.artifactId.trim(),
+      consentVerifiedAt: source.consent.consentVerifiedAt,
+      expiresAt: source.consent.expiresAt
+    }
+  };
+}
+
 function applyProfileUpdate(project: Project, profile: ProductProfile): void {
+  if (profile.customAvatarSource && !project.artifacts.some((artifact) =>
+    artifact.id === profile.customAvatarSource?.artifactId && artifact.kind === "avatar_source_image"
+  )) {
+    throw new Error("Custom avatar source must reference a private artifact in this project.");
+  }
   project.profile = profile;
   project.name = project.name.trim() || project.profile.productName;
   if (project.scripts.length > 0) {

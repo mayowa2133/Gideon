@@ -436,6 +436,18 @@ video {
   color: var(--muted);
 }
 
+.avatar-consent-control {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0.9rem 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+.avatar-consent-control small {
+  color: var(--muted);
+}
+
 .platform-picker,
 .action-row,
 .header-metrics {

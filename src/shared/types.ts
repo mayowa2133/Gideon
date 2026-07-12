@@ -129,6 +129,7 @@ export type ArtifactKind =
   | "extracted_audio"
   | "frame"
   | "voiceover"
+  | "avatar_source_image"
   | "avatar_presenter"
   | "render"
   | "export";
@@ -330,11 +331,24 @@ export interface ProductProfile {
   defaultTemplateKey?: CreatorTemplateKey;
   brandPresenterEnabled?: boolean;
   avatarPresenterId?: FictionalAvatarPresenterId;
+  customAvatarSource?: CustomAvatarSource;
   brandPresenterPosition?: BrandPresenterLayer["position"];
   brandPresenterMotion?: BrandPresenterLayer["motion"];
   soundDesignEnabled?: boolean;
   musicMood?: MusicMood;
   brandKit?: BrandKit;
+}
+
+export interface CustomAvatarSource {
+  artifactId: string;
+  displayName: string;
+  importedAt: string;
+  consent: AvatarConsentRecord & {
+    assetType: "real_likeness";
+    status: "granted";
+    sourceArtifactId: string;
+    consentVerifiedAt: string;
+  };
 }
 
 export interface RecordingMetadata {
