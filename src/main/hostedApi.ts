@@ -2136,6 +2136,7 @@ function flowExecutionResource(execution: import("../shared/productFlowCapture")
     environmentVersionId: execution.environmentVersionId, status: execution.status, attempt: execution.attempt,
     compiledPlanHash: execution.compiledPlanHash, receiptArtifactId: execution.receiptArtifactId ?? null,
     rawCaptureArtifactId: execution.rawCaptureArtifactId ?? null, normalizedClipArtifactId: execution.normalizedClipArtifactId ?? null,
+    quality: execution.quality ? { status: execution.quality.status, checks: execution.quality.checks.map((check) => ({ code: check.code, status: check.status })) } : null,
     blockerCode: execution.blockerCode ?? null, createdAt: execution.createdAt, updatedAt: execution.updatedAt
   };
 }

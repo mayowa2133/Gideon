@@ -32,6 +32,14 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
         response.end(`<!doctype html><html><body><p>Loading profile</p><script>setTimeout(() => location.href = '/new', 250)</script></body></html>`);
         return;
       }
+      if (request.url === "/login-state") {
+        response.end(`<!doctype html><html><body><label>Password <input type="password" /></label></body></html>`);
+        return;
+      }
+      if (request.url === "/loading-state") {
+        response.end(`<!doctype html><html><body><div role="progressbar">Loading fixture</div></body></html>`);
+        return;
+      }
       response.end(`<!doctype html><html><body><a href="/new">New project</a></body></html>`);
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -152,6 +160,17 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     expect(result.receipt.finalAssertions).toEqual([
       expect.objectContaining({ passed: false, safeMessage: "Expected browser state was not observed." })
     ]);
+  }, 20_000);
+
+  it.each([["/login-state", "login"], ["/loading-state", "loading"]] as const)("classifies %s without retaining page text", async (route, expectedSignal) => {
+    const flow = createFlow();
+    flow.steps = [{ id: "open-state", intent: "Open the synthetic state.", action: { type: "navigate", path: route }, riskClass: "navigate" }];
+    flow.finalAssertions = [{ type: "url", path: route }];
+    const result = await executePlaywrightCapture({ id: `execution-${expectedSignal}`, workspaceId: "workspace-1", plan: compileProductFlow(flow, createPolicy(baseUrl)), policy: createPolicy(baseUrl), fixtureValues: {}, outputDir, recordVideo: false, executablePath, now: incrementingClock() });
+    expect(result.receipt.status).toBe("verified");
+    expect(result.receipt.steps[0]?.visualEvidence?.pageSignal).toBe(expectedSignal);
+    expect(JSON.stringify(result.receipt.steps[0]?.visualEvidence)).not.toContain("Password");
+    expect(JSON.stringify(result.receipt.steps[0]?.visualEvidence)).not.toContain("Loading fixture");
   }, 20_000);
 });
 

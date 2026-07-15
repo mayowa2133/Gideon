@@ -10,6 +10,7 @@ import { createCaptureRunCoordinator } from "./captureRunCoordinator";
 import { createCaptureRunWorker } from "./captureRunWorker";
 import { createCaptureApplicationService } from "./captureService";
 import { renderCapturePresentation, type CaptureNarrationProvider, type CaptureStepTiming } from "./capturePresentationRenderer";
+import { analyzeCaptureVideoQuality, type CaptureVideoQualityReport } from "./captureVideoQuality";
 import { executePlaywrightCapture } from "./playwrightCaptureExecutor";
 import { createPostRunCoverageHook } from "./postRunCoverage";
 import { extractRepositoryEvidence } from "./repositoryEvidence";
@@ -109,7 +110,7 @@ export async function runCapturePilot(input: {
   const coverageService = createCaptureCoverageService(repository);
   const persistCoverage = createPostRunCoverageHook({ repository, coverage: coverageService });
   const chrome = input.executablePath ?? process.env.GIDEON_CAPTURE_CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-  const results: Array<{ workflowId: string; flow: ProductFlowRevision; run: CaptureRun; execution: FlowExecutionRecord; normalizedClip: ArtifactRecord; sourceArtifact?: ArtifactRecord; assemblyManifestArtifact?: ArtifactRecord; verification: unknown; interactionSummary: ReturnType<typeof summarizeInteractions>; presentationOutput?: { verticalRender: ArtifactRecord; captions: ArtifactRecord; framingManifest: ArtifactRecord; voiceover?: ArtifactRecord; validation: Awaited<ReturnType<typeof renderCapturePresentation>>["validation"]; framing: Awaited<ReturnType<typeof renderCapturePresentation>>["framingManifest"]; cues: Awaited<ReturnType<typeof renderCapturePresentation>>["cues"] } }> = [];
+  const results: Array<{ workflowId: string; flow: ProductFlowRevision; run: CaptureRun; execution: FlowExecutionRecord; normalizedClip: ArtifactRecord; sourceArtifact?: ArtifactRecord; assemblyManifestArtifact?: ArtifactRecord; verification: unknown; interactionSummary: ReturnType<typeof summarizeInteractions>; presentationOutput?: { verticalRender: ArtifactRecord; captions: ArtifactRecord; framingManifest: ArtifactRecord; qualityReport: ArtifactRecord; qualityContactSheet: ArtifactRecord; quality: CaptureVideoQualityReport; voiceover?: ArtifactRecord; validation: Awaited<ReturnType<typeof renderCapturePresentation>>["validation"]; framing: Awaited<ReturnType<typeof renderCapturePresentation>>["framingManifest"]; cues: Awaited<ReturnType<typeof renderCapturePresentation>>["cues"] } }> = [];
   const diagnostics: Array<{ workflowId: string; message: string }> = [];
 
   try {
@@ -161,6 +162,22 @@ export async function runCapturePilot(input: {
           framing: manifest.presentation.verticalOutput.framing,
           narrationProvider: input.narrationProvider
         });
+        const qualityResult = await analyzeCaptureVideoQuality({
+          videoPath: rendered.videoPath,
+          outputDir: path.join(runRoot, "quality", workflow.id),
+          profile: "vertical",
+          flow,
+          receipt: receipt.receipt,
+          cues: rendered.cues,
+          framing: rendered.framingManifest,
+          minimumSourceTextPx: manifest.presentation.verticalOutput.quality.minimumSourceTextPx,
+          presentation: { showPointer: manifest.presentation.showPointer, clickFeedback: manifest.presentation.showPointer, pointerMoveMs: manifest.presentation.pointerMoveMs, typingDelayMs: manifest.presentation.typingDelayMs, afterActionMs: manifest.presentation.afterActionMs }
+        });
+        const qualityReport = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "quality_report", sourcePath: qualityResult.reportPath, originalFileName: `${workflow.id}-quality.json`, contentType: "application/json" })).artifact;
+        const qualityContactSheet = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "quality_contact_sheet", sourcePath: qualityResult.contactSheetPath, originalFileName: `${workflow.id}-contact-sheet.jpg`, contentType: "image/jpeg" })).artifact;
+        await repository.upsertArtifact(qualityReport);
+        await repository.upsertArtifact(qualityContactSheet);
+        if (qualityResult.report.status === "failed") throw new Error(`Capture pilot workflow ${workflow.id} failed automated video quality gates.`);
         const captions = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "caption_track", sourcePath: rendered.captionsPath, originalFileName: `${workflow.id}.vtt`, contentType: "text/vtt" })).artifact;
         const framingManifest = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "framing_manifest", sourcePath: rendered.framingManifestPath, originalFileName: `${workflow.id}-framing.json`, contentType: "application/json" })).artifact;
         const verticalRender = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "render", sourcePath: rendered.videoPath, originalFileName: `${workflow.id}-vertical.mp4`, contentType: "video/mp4" })).artifact;
@@ -172,7 +189,7 @@ export async function runCapturePilot(input: {
           voiceover = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "voiceover", sourcePath: rendered.voiceoverPath, originalFileName: `${workflow.id}-voiceover.wav`, contentType: "audio/wav" })).artifact;
           await repository.upsertArtifact(voiceover);
         }
-        presentationOutput = { verticalRender, captions, framingManifest, voiceover, validation: rendered.validation, framing: rendered.framingManifest, cues: rendered.cues };
+        presentationOutput = { verticalRender, captions, framingManifest, qualityReport, qualityContactSheet, quality: qualityResult.report, voiceover, validation: rendered.validation, framing: rendered.framingManifest, cues: rendered.cues };
       }
       results.push({ workflowId: workflow.id, flow, run: result.run, execution, normalizedClip, sourceArtifact: result.sourceArtifact, assemblyManifestArtifact: result.assemblyManifestArtifact, verification, interactionSummary: summarizeInteractions(flow, manifest.presentation), presentationOutput });
       attempt.status = "verified";
@@ -243,7 +260,7 @@ function safePilotDiagnostic(error: unknown): string {
   return message.length > 0 && message.length <= 500 ? message : "Capture worker failed; the diagnostic exceeded the safe reporting limit.";
 }
 
-async function loadCaptureReceiptTiming(repository: LocalCapturePilotRepository, workspaceId: string, execution: FlowExecutionRecord): Promise<{ startedAt: string; steps: CaptureStepTiming[] }> {
+async function loadCaptureReceiptTiming(repository: LocalCapturePilotRepository, workspaceId: string, execution: FlowExecutionRecord): Promise<{ receipt: import("../shared/productFlowCapture").FlowExecutionReceipt; startedAt: string; steps: CaptureStepTiming[] }> {
   if (!execution.receiptArtifactId) throw new Error("Capture presentation requires a verified execution receipt.");
   const artifact = await repository.getArtifact({ workspaceId, artifactId: execution.receiptArtifactId });
   if (!artifact?.localPath) throw new Error("Capture presentation receipt is unavailable in private local storage.");
@@ -259,7 +276,8 @@ async function loadCaptureReceiptTiming(repository: LocalCapturePilotRepository,
     if (visualEvidence !== undefined) assertFlowStepVisualEvidence(visualEvidence as import("../shared/productFlowCapture").FlowStepVisualEvidence);
     return { stepId: step.stepId, startedAt: step.startedAt, completedAt: step.completedAt, visualEvidence: visualEvidence as import("../shared/productFlowCapture").FlowStepVisualEvidence | undefined };
   });
-  return { startedAt: record.startedAt, steps };
+  if (record.schemaVersion !== "1" || record.id !== execution.id + ":record" || record.flowId !== execution.flowId || record.flowRevision !== execution.flowRevision || !["verified", "failed", "blocked"].includes(String(record.status))) throw new Error("Capture presentation receipt identity is invalid.");
+  return { receipt: value as import("../shared/productFlowCapture").FlowExecutionReceipt, startedAt: record.startedAt, steps };
 }
 
 async function writePrivateJson(filePath: string, value: unknown): Promise<void> { await fs.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 }); await fs.writeFile(filePath, JSON.stringify(value, null, 2), { encoding: "utf8", mode: 0o600 }); }

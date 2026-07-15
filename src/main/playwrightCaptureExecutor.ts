@@ -369,13 +369,36 @@ async function captureStepVisualEvidence(
     if (resultTarget) break;
   }
   const modalRegion = await firstVisibleGeometry(page, page.locator('dialog, [role="dialog"], [aria-modal="true"]'));
+  const pageSignal = await detectSafePageSignal(page);
   return {
     schemaVersion: "1",
     viewport: safeViewport,
+    pageSignal,
     actionTarget: clampGeometry(actionTarget, safeViewport.width, safeViewport.height),
     resultTarget: clampGeometry(resultTarget, safeViewport.width, safeViewport.height),
     modalRegion: clampGeometry(modalRegion, safeViewport.width, safeViewport.height)
   };
+}
+
+async function detectSafePageSignal(page: Page): Promise<FlowStepVisualEvidence["pageSignal"]> {
+  try {
+    return await page.evaluate(() => {
+      const title = document.title.toLowerCase();
+      if (location.protocol === "chrome-error:" || /site can.t be reached|browser error|page crashed/.test(title)) return "browser_error" as const;
+      const visible = (element: Element): boolean => {
+        const style = window.getComputedStyle(element);
+        const box = element.getBoundingClientRect();
+        return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity) > 0 && box.width > 0 && box.height > 0;
+      };
+      if ([...document.querySelectorAll('input[type="password"]')].some(visible)) return "login" as const;
+      if ([...document.querySelectorAll('[aria-busy="true"], [role="progressbar"]')].some(visible)) return "loading" as const;
+      const alerts = [...document.querySelectorAll('[role="alert"]')].filter(visible);
+      if (alerts.some((element) => /\b(error|failed|unable to|something went wrong)\b/i.test(element.textContent ?? ""))) return "failure" as const;
+      return undefined;
+    });
+  } catch {
+    return "browser_error";
+  }
 }
 
 function assertionTarget(assertion: AssertionSpec): LocatorSpec | undefined {

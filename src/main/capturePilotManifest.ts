@@ -46,6 +46,7 @@ export interface CapturePilotManifest {
         transitionMs: number;
         manualFocus?: { x: number; y: number; width: number; height: number };
       };
+      quality: { minimumSourceTextPx: number };
     };
   };
   workflows: Array<{
@@ -157,7 +158,7 @@ function parsePresentation(value: unknown): CapturePilotManifest["presentation"]
   const viewport = record(input.viewport, "manifest.presentation.viewport");
   exactKeys(viewport, ["width", "height"], "manifest.presentation.viewport");
   const verticalOutput = record(input.verticalOutput, "manifest.presentation.verticalOutput");
-  exactKeys(verticalOutput, ["enabled", "narration", "framing"], "manifest.presentation.verticalOutput");
+  exactKeys(verticalOutput, ["enabled", "narration", "framing", "quality"], "manifest.presentation.verticalOutput");
   const framing = record(verticalOutput.framing, "manifest.presentation.verticalOutput.framing");
   const mode = framing.mode;
   if (!["full_frame", "automatic_focus", "manual"].includes(String(mode))) throw new Error("Capture pilot presentation framing mode is invalid.");
@@ -174,6 +175,8 @@ function parsePresentation(value: unknown): CapturePilotManifest["presentation"]
     };
     if (manualFocus.x + manualFocus.width > 1 || manualFocus.y + manualFocus.height > 1) throw new Error("Capture pilot manual focus must be inside the normalized frame.");
   }
+  const quality = record(verticalOutput.quality, "manifest.presentation.verticalOutput.quality");
+  exactKeys(quality, ["minimumSourceTextPx"], "manifest.presentation.verticalOutput.quality");
   if (typeof input.showPointer !== "boolean") throw new Error("Capture pilot presentation.showPointer must be boolean.");
   if (typeof verticalOutput.enabled !== "boolean" || !["none", "provider"].includes(String(verticalOutput.narration))) throw new Error("Capture pilot presentation.verticalOutput is invalid.");
   return {
@@ -193,7 +196,8 @@ function parsePresentation(value: unknown): CapturePilotManifest["presentation"]
         maxZoom: finiteNumber(framing.maxZoom, "manifest.presentation.verticalOutput.framing.maxZoom", 1, 2),
         transitionMs: integer(framing.transitionMs, "manifest.presentation.verticalOutput.framing.transitionMs", 0, 2_000),
         ...(manualFocus ? { manualFocus } : {})
-      }
+      },
+      quality: { minimumSourceTextPx: integer(quality.minimumSourceTextPx, "manifest.presentation.verticalOutput.quality.minimumSourceTextPx", 8, 32) }
     }
   };
 }

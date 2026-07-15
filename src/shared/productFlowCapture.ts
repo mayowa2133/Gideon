@@ -134,6 +134,7 @@ export interface CaptureTargetGeometry {
 export interface FlowStepVisualEvidence {
   schemaVersion: "1";
   viewport: CaptureViewportGeometry;
+  pageSignal?: "loading" | "login" | "browser_error" | "failure";
   actionTarget?: CaptureTargetGeometry;
   resultTarget?: CaptureTargetGeometry;
   modalRegion?: CaptureTargetGeometry;
@@ -330,6 +331,12 @@ export interface FlowExecutionRecord {
   receiptArtifactId?: string;
   rawCaptureArtifactId?: string;
   normalizedClipArtifactId?: string;
+  quality?: {
+    status: "ready" | "warning" | "failed";
+    reportArtifactId: string;
+    contactSheetArtifactId: string;
+    checks: Array<{ code: string; status: "pass" | "warning" | "fail" }>;
+  };
   blockerCode?: string;
   createdAt: string;
   updatedAt: string;
@@ -519,6 +526,7 @@ export function assertFlowStepVisualEvidence(value: FlowStepVisualEvidence): voi
   if (!viewport || !integerInRange(viewport.width, 1, 7_680) || !integerInRange(viewport.height, 1, 4_320) || !integerInRange(viewport.scrollX, 0, 10_000_000) || !integerInRange(viewport.scrollY, 0, 10_000_000)) {
     throw new Error("Step visual evidence viewport is invalid.");
   }
+  if (value.pageSignal !== undefined && !["loading", "login", "browser_error", "failure"].includes(value.pageSignal)) throw new Error("Step visual evidence page signal is invalid.");
   for (const [name, region] of [["actionTarget", value.actionTarget], ["resultTarget", value.resultTarget], ["modalRegion", value.modalRegion]] as const) {
     if (!region) continue;
     if (!integerInRange(region.x, 0, viewport.width - 1) || !integerInRange(region.y, 0, viewport.height - 1) || !integerInRange(region.width, 1, viewport.width) || !integerInRange(region.height, 1, viewport.height) || region.x + region.width > viewport.width || region.y + region.height > viewport.height) {

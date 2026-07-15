@@ -4,6 +4,10 @@ body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradie
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .48; }
+.quality-summary { margin: .75rem 0; padding: .7rem .8rem; border: 1px solid #d8e1ed; border-radius: .65rem; background: #f7fafc; color: #172033; }
+.quality-summary > div { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.quality-summary.warning { border-color: #d8a63f; background: #fff8e8; }
+.quality-summary.failed { border-color: #c65353; background: #fff0f0; }
 input, textarea, select { width: 100%; border: 1px solid var(--line); border-radius: 12px; background: #0c111a; color: var(--text); padding: .78rem .85rem; outline: none; }
 input:focus, textarea:focus, select:focus { border-color: rgba(242,202,99,.68); box-shadow: 0 0 0 3px rgba(242,202,99,.09); }
 textarea { resize: vertical; }

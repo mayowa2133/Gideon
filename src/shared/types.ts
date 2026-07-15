@@ -193,6 +193,8 @@ export type ArtifactKind =
   | "normalized_flow_clip"
   | "caption_track"
   | "framing_manifest"
+  | "quality_report"
+  | "quality_contact_sheet"
   | "capture_assembly_manifest"
   | "coverage_report"
   | "extracted_audio"

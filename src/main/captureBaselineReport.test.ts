@@ -30,6 +30,9 @@ describe("capture baseline report", () => {
     const normalized = await artifact(artifactRoot, "normalized.mp4", "normalized_flow_clip", "normalized media");
     const vertical = await artifact(artifactRoot, "vertical.mp4", "render", "vertical media");
     const captions = await artifact(artifactRoot, "captions.vtt", "caption_track", "WEBVTT\n\n1\n00:00:00.000 --> 00:00:05.000\nSynthetic step\n");
+    const quality = qualityReport("ready");
+    const qualityArtifact = await artifact(artifactRoot, "quality.json", "quality_report", JSON.stringify(quality));
+    const contactSheet = await artifactBytes(artifactRoot, "contact-sheet.jpg", "quality_contact_sheet", Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
     await writeJson(path.join(root, "config.json"), config());
     await writeJson(path.join(root, "tmp", "capture-pilot", "fixture", "latest.json"), { schemaVersion: "1", runId, runRoot: "/private/path/ignored", reportPath: "/private/path/ignored/report.json", updatedAt: "2026-07-15T00:00:00.000Z" });
     await writeJson(path.join(runRoot, "pilot-checkpoint.json"), { schemaVersion: "1", manifestKey: "fixture", runId, status: "completed", attempts: [{ workflowId: "flow-one", status: "verified" }] });
@@ -43,7 +46,7 @@ describe("capture baseline report", () => {
         sourceArtifact: source,
         normalizedClip: normalized,
         interactionSummary: { counts: { navigate: 0, click: 1, fill: 1, select: 0, key: 0, wait_for: 1 }, presentation: { showPointer: true, pointerMoveMs: 350, typingDelayMs: 30 } },
-        presentationOutput: { verticalRender: vertical, captions, validation: { frameQa: { sampledFrames: 3, informativeFrames: 3 } } }
+        presentationOutput: { verticalRender: vertical, captions, qualityReport: qualityArtifact, qualityContactSheet: contactSheet, quality, validation: { frameQa: { sampledFrames: 3, informativeFrames: 3 } } }
       }],
       coverage: { dimensions: [
         { key: "goal", denominatorSource: "declared_goals", denominator: 1, coveredIds: ["goal:flow-one"], uncoveredIds: [], excluded: [], blocked: [] },
@@ -61,7 +64,7 @@ describe("capture baseline report", () => {
       probeMedia: async (filePath) => filePath.endsWith("vertical.mp4") ? { ...landscape, width: 1080, height: 1920, audioCodec: "aac" } : landscape
     });
     expect(result.report.status).toBe("passed");
-    expect(result.report.summary).toMatchObject({ pilots: 1, workflows: 1, verifiedWorkflows: 1, landscapeClips: 1, verticalRenders: 1, captionTracks: 1, failures: 0 });
+    expect(result.report.summary).toMatchObject({ pilots: 1, workflows: 1, verifiedWorkflows: 1, landscapeClips: 1, verticalRenders: 1, captionTracks: 1, qualityReports: 1, qualityContactSheets: 1, qualityReady: 1, qualityWarnings: 0, qualityFailed: 0, failures: 0 });
     const serialized = JSON.stringify(result.report);
     for (const forbidden of [root, "localPath", "storageKey", "localUrl", "file://", "Synthetic step"]) expect(serialized).not.toContain(forbidden);
     expect((await fs.stat(result.outputPath)).mode & 0o777).toBe(0o600);
@@ -84,13 +87,16 @@ describe("capture baseline report", () => {
     const normalized = await artifact(artifactRoot, "normalized.mp4", "normalized_flow_clip", "normalized");
     const vertical = await artifact(artifactRoot, "vertical.mp4", "render", "vertical");
     const captions = await artifact(artifactRoot, "captions.vtt", "caption_track", "WEBVTT\n");
+    const quality = qualityReport("failed");
+    const qualityArtifact = await artifact(artifactRoot, "quality.json", "quality_report", JSON.stringify(quality));
+    const contactSheet = await artifactBytes(artifactRoot, "contact-sheet.jpg", "quality_contact_sheet", Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
     await writeJson(path.join(root, "config.json"), config());
     await writeJson(path.join(root, "tmp", "capture-pilot", "fixture", "latest.json"), { schemaVersion: "1", runId });
     await writeJson(path.join(runRoot, "pilot-checkpoint.json"), { schemaVersion: "1", manifestKey: "fixture", runId, status: "completed", attempts: [{ workflowId: "flow-one", status: "verified" }] });
     await writeJson(path.join(runRoot, "pilot-report.json"), {
       schemaVersion: "1", manifestKey: "fixture", runId,
       repositoryEvidence: { extractorVersion: "repository-evidence-v1", evidenceHash: "b".repeat(64), filesInspected: 1, bytesInspected: 1, excludedPaths: 1 },
-      results: [{ workflowId: "flow-one", sourceArtifact: source, normalizedClip: normalized, interactionSummary: { counts: { navigate: 0, click: 0, fill: 0, select: 0, key: 0, wait_for: 1 }, presentation: { showPointer: false, pointerMoveMs: 0, typingDelayMs: 0 } }, presentationOutput: { verticalRender: vertical, captions, validation: { frameQa: { sampledFrames: 3, informativeFrames: 1 } } } }],
+      results: [{ workflowId: "flow-one", sourceArtifact: source, normalizedClip: normalized, interactionSummary: { counts: { navigate: 0, click: 0, fill: 0, select: 0, key: 0, wait_for: 1 }, presentation: { showPointer: false, pointerMoveMs: 0, typingDelayMs: 0 } }, presentationOutput: { verticalRender: vertical, captions, qualityReport: qualityArtifact, qualityContactSheet: contactSheet, quality, validation: { frameQa: { sampledFrames: 3, informativeFrames: 1 } } } }],
       coverage: { dimensions: [
         { key: "goal", denominator: 1, coveredIds: ["goal:flow-one"], uncoveredIds: [], excluded: [], blocked: [] },
         { key: "approved_flow", denominator: 1, coveredIds: ["flow-one"], uncoveredIds: [], excluded: [], blocked: [] }
@@ -98,7 +104,7 @@ describe("capture baseline report", () => {
     });
     const result = await generateCaptureBaselineReport({ repositoryRoot: root, configPath: path.join(root, "config.json"), pilotRoot: path.join(root, "tmp", "capture-pilot"), outputPath: path.join(root, "tmp", "capture-baseline", "report.json"), probeMedia: async () => ({ durationMs: 1_000, width: 320, height: 200, fps: 10, videoCodec: "vp9", audioCodec: null }) });
     expect(result.report.status).toBe("failed");
-    expect(result.report.findings.map((finding) => finding.code)).toEqual(expect.arrayContaining(["duration_out_of_range", "frame_rate_out_of_range", "video_codec_mismatch", "pointer_disabled", "pointer_too_fast", "typing_pacing_out_of_range", "captions_missing", "uninformative_frame"]));
+    expect(result.report.findings.map((finding) => finding.code)).toEqual(expect.arrayContaining(["duration_out_of_range", "frame_rate_out_of_range", "video_codec_mismatch", "pointer_disabled", "pointer_too_fast", "typing_pacing_out_of_range", "captions_missing", "uninformative_frame", "video_quality_failed"]));
     expect(JSON.stringify(result.report)).not.toContain(root);
   });
 });
@@ -114,7 +120,7 @@ function config() {
       minimumFps: 24, maximumFps: 60,
       requiredVideoCodec: "h264", requiredVerticalAudioCodec: "aac",
       minimumPointerMoveMs: 250, minimumTypingDelayMs: 15, maximumTypingDelayMs: 80,
-      requirePointer: true, requireCaptions: true, requireFullDeclaredCoverage: true
+      requirePointer: true, requireCaptions: true, requireQualityArtifacts: true, allowQualityWarnings: true, requireFullDeclaredCoverage: true
     }
   };
 }
@@ -124,6 +130,24 @@ async function artifact(root: string, name: string, kind: string, content: strin
   await fs.writeFile(localPath, content);
   const bytes = Buffer.from(content);
   return { id: `${kind}-id`, kind, provider: "local_private", byteSize: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"), localPath, storageKey: `private/${name}`, localUrl: `file://${localPath}` };
+}
+
+async function artifactBytes(root: string, name: string, kind: string, bytes: Buffer) {
+  const localPath = path.join(root, name);
+  await fs.writeFile(localPath, bytes);
+  return { id: `${kind}-id`, kind, provider: "local_private", byteSize: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"), localPath, storageKey: `private/${name}`, localUrl: `file://${localPath}` };
+}
+
+function qualityReport(status: "ready" | "failed") {
+  const checkStatus = status === "failed" ? "fail" : "pass";
+  return {
+    schemaVersion: "1",
+    qualityVersion: "capture-video-quality-v1",
+    thresholdsVersion: "capture-quality-thresholds-v1",
+    status,
+    checks: [{ code: "black_frames", status: checkStatus }],
+    reportHash: status === "failed" ? "d".repeat(64) : "c".repeat(64)
+  };
 }
 
 async function writeJson(filePath: string, value: unknown) {

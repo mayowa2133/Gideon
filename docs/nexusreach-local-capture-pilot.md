@@ -1,6 +1,6 @@
 # NexusReach local capture pilot
 
-Status: verified locally on July 15, 2026 against the guarded NexusReach demo environment, including action-aware vertical framing.
+Status: verified locally on July 15, 2026 against the guarded NexusReach demo environment, including action-aware vertical framing and automated video-quality evidence.
 
 This pilot is an internal concierge command for exercising Gideon's real capture pipeline against one explicitly approved loopback product. It does not enable local browser execution for hosted or remote products.
 
@@ -44,7 +44,7 @@ This first supported command is headless rather than a hosted-UI launcher. The p
 
 ## Verified result
 
-The latest pilot completes dry runs and clean recordings for five approved workflows: onboarding, browsing/filtering jobs, reviewing saved contacts, updating the local job tracker, and reviewing a seeded unsent outreach draft. It produces a verified normalized clip, caption track, focused vertical derivative, and private framing manifest per workflow and independently verifies the expected synthetic API state. All five framing manifests applied focus with 3–12 geometry keyframes and no fallback. Aggregate coverage reports all five declared goals and all five current approved flow revisions covered, plus the requested persona covered; dimensions without a trustworthy denominator remain unknown.
+The latest pilot completes dry runs and clean recordings for five approved workflows: onboarding, browsing/filtering jobs, reviewing saved contacts, updating the local job tracker, and reviewing a seeded unsent outreach draft. It produces a verified normalized clip, caption track, focused vertical derivative, private framing manifest, private quality report, and private JPEG contact sheet per workflow and independently verifies the expected synthetic API state. The Phase 3 recapture run `2026-07-15T05-59-56-687Z-b6f334fb-ef0b-4aa8-b694-7227f76275ea` passed all five gates: four outputs were `ready`, and onboarding was `warning` because a legitimate loading state was observed. No output failed. Aggregate coverage reports all five declared goals and all five current approved flow revisions covered, plus the requested persona covered; dimensions without a trustworthy denominator remain unknown.
 
 Run `pnpm test:capture` for the capture regression suite. NexusReach's independent smoke suite is:
 

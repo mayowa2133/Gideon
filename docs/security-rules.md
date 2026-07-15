@@ -232,6 +232,8 @@ The post-MVP capture worker adds browser navigation but does not relax the SSRF 
 - Financial, destructive, security-sensitive, publishing/invitation, and external-side-effect actions are technically denied unless a later reviewed policy explicitly supports them.
 - Credential values are resolved only inside the login adapter from a scoped, expiring, revocable grant and must not enter prompts, job JSON, traces, screenshots, or logs.
 - Final success requires observable assertions and a versioned verification receipt; model claims of completion are not trusted.
+- Quality telemetry retains only bounded geometry, numeric media/presentation measurements, and safe page-state enums. Page text used to classify loading, login, browser-error, or failure states is never placed in receipts, reports, logs, or hosted API responses.
+- Quality JSON reports and contact sheets are private artifacts. A failed quality gate cannot publish a preview or contribute an assembly source, and baseline evidence must emit no local paths, storage keys, signed URLs, caption text, or product content.
 
 ## Web security headers
 

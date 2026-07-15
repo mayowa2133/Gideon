@@ -505,7 +505,7 @@ These `/api/v1` routes are available only when the structured-capture service is
 
 ### GET `/projects/{projectId}/capture-runs/{captureRunId}`
 
-- Returns the safe run projection and safe flow-execution lineage/status. Artifact IDs are opaque; this route does not mint preview URLs.
+- Returns the safe run projection and safe flow-execution lineage/status. A completed quality analysis may add `quality: { status: "ready" | "warning" | "failed", checks: [{ code, status: "pass" | "warning" | "fail" }] }` to an execution. It never exposes quality artifact IDs, sampled pixels, page text, local paths, object keys, or quality messages. This route does not mint preview URLs.
 
 ### POST `/projects/{projectId}/capture-runs/{captureRunId}/cancel`
 

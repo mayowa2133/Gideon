@@ -14,6 +14,7 @@ import type { ArtifactRecord, RecordingMetadata } from "../shared/types";
 import type { PrivateObjectStorage } from "./storage";
 import { browserPolicyForEnvironment } from "./captureService";
 import { assembleNormalizedCaptures, normalizeBrowserCapture, validateCaptureVisualQuality } from "./captureMedia";
+import { analyzeCaptureVideoQuality } from "./captureVideoQuality";
 import { executePlaywrightCapture, type PlaywrightCaptureExecutorInput, type PlaywrightCaptureResult } from "./playwrightCaptureExecutor";
 import type { CaptureLoginAdapter } from "./playwrightCaptureExecutor";
 import type { CaptureCredentialVault } from "./captureCredentials";
@@ -47,6 +48,12 @@ export interface CaptureResetAdapter {
   reset(input: { workspaceId: string; projectId: string; environment: CaptureEnvironment; version: CaptureEnvironmentVersion; persona: CapturePersona; phase: "dry_run" | "recording" }): Promise<void>;
 }
 
+export const defaultCleanTakePresentation = {
+  pacing: { initialHoldMs: 800, beforeActionMs: 250, afterActionMs: 750, finalHoldMs: 1_000 },
+  pointer: { showPointer: true, pointerMoveMs: 300, typingDelayMs: 35 },
+  minimumSourceTextPx: 12
+} as const;
+
 export function createCaptureRunWorker(options: {
   repository: CaptureRunWorkerRepository;
   storage: PrivateObjectStorage;
@@ -70,6 +77,12 @@ export function createCaptureRunWorker(options: {
   normalize?: typeof normalizeBrowserCapture;
   assemble?: typeof assembleNormalizedCaptures;
   validateQuality?: typeof validateCaptureVisualQuality;
+  analyzeQuality?: typeof analyzeCaptureVideoQuality;
+  cleanTakePresentation?: {
+    pacing: { initialHoldMs: number; beforeActionMs: number; afterActionMs: number; finalHoldMs: number };
+    pointer: { showPointer: boolean; pointerMoveMs: number; typingDelayMs: number };
+    minimumSourceTextPx: number;
+  };
   onDiagnostic?: (error: unknown) => void;
   shouldCancel?: (input: { workspaceId: string; captureRunId: string; jobId: string }) => Promise<boolean>;
   onCanceledCleanup?: (input: { workspaceId: string; projectId: string; captureRunId: string }) => Promise<void>;
@@ -82,6 +95,8 @@ export function createCaptureRunWorker(options: {
   const normalize = options.normalize ?? normalizeBrowserCapture;
   const assemble = options.assemble ?? assembleNormalizedCaptures;
   const validateQuality = options.validateQuality ?? validateCaptureVisualQuality;
+  const analyzeQuality = options.analyzeQuality ?? analyzeCaptureVideoQuality;
+  const cleanTakePresentation = options.cleanTakePresentation ?? defaultCleanTakePresentation;
   return {
     async execute(input: { workspaceId: string; captureRunId: string }): Promise<CaptureRunWorkerResult> {
       let run = await options.repository.getCaptureRun(input);
@@ -141,7 +156,7 @@ export function createCaptureRunWorker(options: {
           run = await updateRun(options.repository, run, "recording", now());
           await reset(options.resetAdapters, { run, environment, version, persona, phase: "recording" });
           await assertNotCanceled(options, run);
-          const recorded = await execute(options.runtime, { run, plan, policy: browserPolicyForEnvironment(environment), fixtures, outputDir: path.join(root, executionId, "record"), recordVideo: true, id: `${executionId}:record`, ...auth });
+          const recorded = await execute(options.runtime, { run, plan, policy: browserPolicyForEnvironment(environment), fixtures, outputDir: path.join(root, executionId, "record"), recordVideo: true, id: `${executionId}:record`, capturePacing: cleanTakePresentation.pacing, capturePresentation: cleanTakePresentation.pointer, ...auth });
           const receiptArtifact = await putJson(options.repository, options.storage, run, "verification_receipt", `${executionId}-receipt.json`, recorded.receipt, root);
           if (recorded.receipt.status !== "verified" || !recorded.rawCapture) {
             await options.repository.upsertFlowExecution({ ...execution, status: recorded.receipt.status === "verified" ? "failed" : recorded.receipt.status, receiptArtifactId: receiptArtifact.id, blockerCode: recorded.receipt.blockerCode ?? "recording_failed", updatedAt: now() });
@@ -162,10 +177,31 @@ export function createCaptureRunWorker(options: {
             now
           });
           await validateQuality({ videoPath: normalizedResult.outputPath, durationMs: normalizedResult.recording.durationMs, ffmpegPath: options.ffmpegPath });
+          const qualityResult = await analyzeQuality({
+            videoPath: normalizedResult.outputPath,
+            outputDir: path.join(root, executionId, "quality"),
+            profile: "landscape",
+            flow,
+            receipt: recorded.receipt,
+            minimumSourceTextPx: cleanTakePresentation.minimumSourceTextPx,
+            presentation: { ...cleanTakePresentation.pointer, clickFeedback: cleanTakePresentation.pointer.showPointer, afterActionMs: cleanTakePresentation.pacing.afterActionMs },
+            ffmpegPath: options.ffmpegPath,
+            now
+          });
+          const qualityReportStored = await options.storage.putFile({ workspaceId: run.workspaceId, projectId: run.projectId, kind: "quality_report", sourcePath: qualityResult.reportPath, originalFileName: `${flow.id}-quality.json`, contentType: "application/json" });
+          const contactSheetStored = await options.storage.putFile({ workspaceId: run.workspaceId, projectId: run.projectId, kind: "quality_contact_sheet", sourcePath: qualityResult.contactSheetPath, originalFileName: `${flow.id}-contact-sheet.jpg`, contentType: "image/jpeg" });
+          await options.repository.upsertArtifact(qualityReportStored.artifact);
+          await options.repository.upsertArtifact(contactSheetStored.artifact);
+          const quality = { status: qualityResult.report.status, reportArtifactId: qualityReportStored.artifact.id, contactSheetArtifactId: contactSheetStored.artifact.id, checks: qualityResult.report.checks.map(({ code, status }) => ({ code, status })) };
+          if (qualityResult.report.status === "failed") {
+            await options.repository.upsertFlowExecution({ ...execution, status: "failed", receiptArtifactId: receiptArtifact.id, rawCaptureArtifactId: rawStored.artifact.id, quality, blockerCode: "quality_gate_failed", updatedAt: now() });
+            run = await updateRun(options.repository, run, "needs_review", now());
+            return { run };
+          }
           const normalizedStored = await options.storage.putFile({ workspaceId: run.workspaceId, projectId: run.projectId, kind: "normalized_flow_clip", sourcePath: normalizedResult.outputPath, originalFileName: `${flow.id}.mp4`, contentType: "video/mp4" });
           await options.repository.upsertArtifact(normalizedStored.artifact);
           await putJson(options.repository, options.storage, run, "action_telemetry", `${executionId}-normalization.json`, { receipt: recorded.receipt, networkReceipts: recorded.networkReceipts, normalization: normalizedResult.manifest }, root);
-          execution = await options.repository.upsertFlowExecution({ ...execution, status: "verified", receiptArtifactId: receiptArtifact.id, rawCaptureArtifactId: rawStored.artifact.id, normalizedClipArtifactId: normalizedStored.artifact.id, updatedAt: now() });
+          execution = await options.repository.upsertFlowExecution({ ...execution, status: "verified", receiptArtifactId: receiptArtifact.id, rawCaptureArtifactId: rawStored.artifact.id, normalizedClipArtifactId: normalizedStored.artifact.id, quality, updatedAt: now() });
           normalized.push({ path: normalizedResult.outputPath, execution, artifact: normalizedStored.artifact, sha256: normalizedResult.manifest.output.sha256, durationMs: normalizedResult.recording.durationMs });
         }
         run = await updateRun(options.repository, run, "verifying", now());
@@ -212,8 +248,8 @@ async function assertNotCanceled(
   }
 }
 
-async function execute(runtime: CaptureBrowserRuntime, input: { run: CaptureRun; plan: CompiledFlowPlan; policy: ReturnType<typeof browserPolicyForEnvironment>; fixtures: Record<string, string>; outputDir: string; recordVideo: boolean; id: string; loginAdapter?: CaptureLoginAdapter; useCredential?: PlaywrightCaptureExecutorInput["useCredential"] }) {
-  return runtime.execute({ id: input.id, workspaceId: input.run.workspaceId, plan: input.plan, policy: input.policy, fixtureValues: input.fixtures, outputDir: input.outputDir, recordVideo: input.recordVideo, loginAdapter: input.loginAdapter, useCredential: input.useCredential });
+async function execute(runtime: CaptureBrowserRuntime, input: { run: CaptureRun; plan: CompiledFlowPlan; policy: ReturnType<typeof browserPolicyForEnvironment>; fixtures: Record<string, string>; outputDir: string; recordVideo: boolean; id: string; capturePacing?: PlaywrightCaptureExecutorInput["capturePacing"]; capturePresentation?: PlaywrightCaptureExecutorInput["capturePresentation"]; loginAdapter?: CaptureLoginAdapter; useCredential?: PlaywrightCaptureExecutorInput["useCredential"] }) {
+  return runtime.execute({ id: input.id, workspaceId: input.run.workspaceId, plan: input.plan, policy: input.policy, fixtureValues: input.fixtures, outputDir: input.outputDir, recordVideo: input.recordVideo, capturePacing: input.capturePacing, capturePresentation: input.capturePresentation, loginAdapter: input.loginAdapter, useCredential: input.useCredential });
 }
 
 async function reset(
