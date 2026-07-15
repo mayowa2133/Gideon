@@ -2,6 +2,8 @@
 
 Audited against [product-flow-capture-plan.md](./product-flow-capture-plan.md) on 2026-07-14.
 
+The concrete local pilot and remaining rollout evidence are recorded in [capture-rollout-audit-2026-07-14.md](./capture-rollout-audit-2026-07-14.md).
+
 This audit distinguishes code-complete boundaries from deployment, UX, vendor, and evidence gates. A checked code boundary is not permission to advertise general availability.
 
 | Plan area | Repository status | Remaining release evidence |
