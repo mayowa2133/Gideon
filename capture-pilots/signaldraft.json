@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1",
+  "key": "signaldraft",
+  "workspaceId": "local-workspace",
+  "projectId": "signaldraft-pilot",
+  "name": "SignalDraft capture pilot",
+  "artifactDirectoryName": "signaldraft",
+  "repository": { "rootDir": "/Users/mayowaadesanya/Documents/Projects/SignalDraft", "maxFiles": 2000, "maxBytes": 10000000 },
+  "environment": { "name": "SignalDraft isolated local demo", "type": "local_preview", "baseUrl": "http://127.0.0.1:8501", "allowedDomains": ["127.0.0.1"], "startupAdapterId": "signaldraft-local" },
+  "persona": {
+    "key": "alex-demo",
+    "displayName": "Alex Morgan",
+    "roleDescription": "Synthetic Toronto-based engineering candidate reviewing recruiter messages with a human approval gate.",
+    "fixtureProfileId": "signaldraft:alex-demo",
+    "fixtureValues": {
+      "messages.recruiter": "Hi Alex,\n\nI'm Jordan Lee from Nimbus AI. We are hiring a Founding AI Engineer in Toronto and your background in LangGraph and product engineering stood out. If you are open to exploring the role, I would love to share more details and talk about the team this week.\n\nBest,\nJordan Lee\nSenior Recruiter\njordan.lee@nimbusai.com",
+      "messages.sensitive": "Hi Alex,\n\nWe are excited about your profile for the Senior ML Engineer opportunity at Atlas Commerce. Before we move ahead, can you confirm whether you require visa sponsorship and share your compensation expectations for a base salary range of $170,000-$190,000?\n\nThanks,\nMegan Ortiz\nmegan@atlascommerce.com"
+    }
+  },
+  "presentation": {
+    "viewport": { "width": 1440, "height": 900 },
+    "initialHoldMs": 1800,
+    "beforeActionMs": 500,
+    "afterActionMs": 1100,
+    "finalHoldMs": 2600,
+    "showPointer": true,
+    "pointerMoveMs": 400,
+    "typingDelayMs": 22,
+    "verticalOutput": { "enabled": true, "narration": "none" }
+  },
+  "workflows": [
+    {
+      "id": "analyze-recruiter-outreach",
+      "goalId": "analyze-recruiter-outreach",
+      "resetAdapterId": "signaldraft-empty",
+      "verificationAdapterId": "signaldraft-analysis",
+      "scenario": {
+        "id": "analyze-recruiter-outreach",
+        "framework": "playwright",
+        "title": "Analyze recruiter outreach",
+        "entryPath": "/",
+        "sourcePath": "app/ui/streamlit_app.py",
+        "steps": [
+          { "intent": "Enter the synthetic recruiter message.", "action": { "type": "fill", "target": { "strategy": "label", "value": "Paste inbound message", "exact": true }, "valueRef": "fixture:messages.recruiter" }, "riskClass": "synthetic_write" },
+          { "intent": "Run the deterministic local analysis.", "action": { "type": "click", "target": { "strategy": "role", "role": "button", "value": "Run Analysis", "exact": true } }, "riskClass": "synthetic_write" },
+          { "intent": "Wait for the analysis explanation.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "text", "value": "Why This Decision", "exact": true } } }, "riskClass": "observe" },
+          { "intent": "Review the generated draft without approving or sending it.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "role", "role": "button", "value": "Mock Send", "exact": true } } }, "riskClass": "observe" }
+        ],
+        "finalAssertions": [
+          { "type": "visible", "target": { "strategy": "text", "value": "Why This Decision", "exact": true } },
+          { "type": "visible", "target": { "strategy": "text", "value": "Draft Reply", "exact": true } },
+          { "type": "visible", "target": { "strategy": "text", "value": "Approve or reject the draft before any mock send action.", "exact": true } }
+        ]
+      }
+    },
+    {
+      "id": "review-sensitive-compensation",
+      "goalId": "review-sensitive-compensation",
+      "resetAdapterId": "signaldraft-empty",
+      "verificationAdapterId": "signaldraft-analysis",
+      "scenario": {
+        "id": "review-sensitive-compensation",
+        "framework": "playwright",
+        "title": "Review sensitive compensation message",
+        "entryPath": "/",
+        "sourcePath": "app/ui/streamlit_app.py",
+        "steps": [
+          { "intent": "Enter the synthetic compensation and sponsorship message.", "action": { "type": "fill", "target": { "strategy": "label", "value": "Paste inbound message", "exact": true }, "valueRef": "fixture:messages.sensitive" }, "riskClass": "synthetic_write" },
+          { "intent": "Run the deterministic local analysis.", "action": { "type": "click", "target": { "strategy": "role", "role": "button", "value": "Run Analysis", "exact": true } }, "riskClass": "synthetic_write" },
+          { "intent": "Wait for the manual approval gate.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "text", "value": "This run requires a manual approval decision before it can be mock sent.", "exact": true } } }, "riskClass": "observe" },
+          { "intent": "Confirm the sensitive draft remains unapproved and unsent.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "role", "role": "button", "value": "Mock Send", "exact": true } } }, "riskClass": "observe" }
+        ],
+        "finalAssertions": [
+          { "type": "visible", "target": { "strategy": "text", "value": "Why This Decision", "exact": true } },
+          { "type": "visible", "target": { "strategy": "text", "value": "Draft Reply", "exact": true } },
+          { "type": "visible", "target": { "strategy": "text", "value": "This run requires a manual approval decision before it can be mock sent.", "exact": true } }
+        ]
+      }
+    }
+  ]
+}
