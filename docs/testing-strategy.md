@@ -16,6 +16,9 @@ The main testing goal is confidence in the end-to-end promise: a user can upload
 | Media fixture tests | Prove video/audio behavior | FFmpeg probe, frame extraction, transcript alignment, render manifest validation |
 | Prompt contract tests | Prove AI orchestration remains parseable and grounded | saved model outputs, invalid JSON repair, schema validation, evidence reference checks |
 | Browser E2E tests | Prove critical user journeys | create project, upload recording, approve script, render export |
+| Capture safety and browser integration | Prove approved flows can be recorded without expanding authority | runtime flow schemas, action/domain/DNS policy, credential grants, Playwright dry run and recording, verification receipt, FFmpeg normalization |
+
+Run the complete structured-capture suite with `pnpm test:capture`. It includes real Chromium and FFmpeg fixtures when the configured local executables are available, plus deterministic tests for provider, queue, persistence, coverage, and isolation boundaries.
 | Manual QA | Catch visual and content-quality issues | caption safe zones, audio pacing, angle quality, export playback |
 
 ## Required checks in CI
@@ -382,6 +385,10 @@ Secondary flows:
 - Render cancellation.
 - Cross-workspace access denial.
 - Archived project read-only behavior.
+- Structured capture session/capability initialization and fail-closed missing-isolation behavior.
+- Structured flow edit into a new draft revision, explicit approval, discovery/capture polling, private preview creation, honest coverage, and explicit assembly activation (`pnpm test:e2e`).
+
+Hosted client and proxy-policy unit tests run with `pnpm test:web`. Playwright E2E files are excluded from Vitest discovery and included in strict TypeScript checking.
 
 ## Accessibility testing
 

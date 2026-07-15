@@ -101,6 +101,7 @@ export function entitlementsForPlan(plan: WorkspacePlan): WorkspaceEntitlements 
 
 export const usageMetricLabels: Record<UsageMetric, string> = {
   source_minutes: "Source minutes",
+  browser_minutes: "Browser capture minutes",
   transcription_minutes: "Transcription minutes",
   llm_runs: "AI runs",
   tts_characters: "TTS characters",
@@ -114,6 +115,7 @@ export type UsageSummary = Record<UsageMetric, number>;
 export function emptyUsageSummary(): UsageSummary {
   return {
     source_minutes: 0,
+    browser_minutes: 0,
     transcription_minutes: 0,
     llm_runs: 0,
     tts_characters: 0,
@@ -206,6 +208,8 @@ export function monthStartIso(now = new Date()): string {
 export function entitlementLimit(entitlements: WorkspaceEntitlements, metric: UsageMetric): number {
   switch (metric) {
     case "source_minutes":
+      return entitlements.sourceMinutesMonthly;
+    case "browser_minutes":
       return entitlements.sourceMinutesMonthly;
     case "transcription_minutes":
       return entitlements.transcriptionMinutesMonthly;

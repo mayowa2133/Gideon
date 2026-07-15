@@ -2,11 +2,14 @@ node_modules/
 dist/
 release/
 .vite/
+.next/
+playwright-report/
+test-results/
 .DS_Store
 *.log
+*.tsbuildinfo
 .env
 .env.*
 !.env.example
 coverage/
 tmp/
-

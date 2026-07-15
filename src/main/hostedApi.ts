@@ -26,9 +26,26 @@ import {
   type HostedJobQueueConfig,
   type HostedWorkerJobBroker
 } from "./jobQueue";
+import type { CaptureApplicationService } from "./captureService";
+import type { CaptureRunCoordinator } from "./captureRunCoordinator";
+import type { CaptureRunControlService } from "./captureRunService";
+import { createInMemoryCaptureRateLimiter, type CaptureRateLimiter } from "./captureRateLimit";
+import type { CaptureCoverageService } from "./captureCoverageService";
+import type { CaptureExecutionRetryService } from "./captureExecutionRetry";
+import type { EnvironmentValidationCoordinator } from "./environmentValidationCoordinator";
+import type { DiscoveryRunCoordinator } from "./discoveryRunCoordinator";
+import type { DiscoveryRunControlService } from "./discoveryRunControl";
+import type { CaptureAuditSink } from "./captureAudit";
+import type { CaptureAssemblyCoordinator } from "./captureAssemblyCoordinator";
+import type { CapturePreviewService } from "./capturePreviewService";
+import type { CaptureCredentialVault, CaptureCredentialSecret } from "./captureCredentials";
+import type { CaptureEnvironment, CaptureEnvironmentType } from "../shared/productFlowCapture";
 import type {
   AppState,
   ApplyBillingSubscriptionInput,
+  AuditAction,
+  AuditMetadataValue,
+  AuditTargetType,
   ArtifactRecord,
   ArtifactProvider,
   CreateProjectInput,
@@ -258,6 +275,20 @@ export interface HostedApiDependencies {
   jobQueueBroker?: HostedWorkerJobBroker;
   exportService?: HostedExportService;
   billingService?: HostedBillingService;
+  captureService?: CaptureApplicationService;
+  captureRunCoordinator?: CaptureRunCoordinator;
+  captureRunControl?: CaptureRunControlService;
+  captureRateLimiter?: CaptureRateLimiter;
+  captureCoverageService?: CaptureCoverageService;
+  captureExecutionRetryService?: CaptureExecutionRetryService;
+  environmentValidationCoordinator?: EnvironmentValidationCoordinator;
+  discoveryRunCoordinator?: DiscoveryRunCoordinator;
+  discoveryRunControl?: DiscoveryRunControlService;
+  captureAuditSink?: CaptureAuditSink;
+  captureAssemblyCoordinator?: CaptureAssemblyCoordinator;
+  capturePreviewService?: CapturePreviewService;
+  captureRuntimeReady?: boolean;
+  captureCredentialVault?: CaptureCredentialVault;
   onMetric?: (event: HostedApiMetricEvent) => void;
 }
 
@@ -294,6 +325,20 @@ export function createHostedApiDependencies(input: {
   jobQueueBroker?: HostedWorkerJobBroker;
   exportService?: HostedExportService;
   billingService?: HostedBillingService;
+  captureService?: CaptureApplicationService;
+  captureRunCoordinator?: CaptureRunCoordinator;
+  captureRunControl?: CaptureRunControlService;
+  captureRateLimiter?: CaptureRateLimiter;
+  captureCoverageService?: CaptureCoverageService;
+  captureExecutionRetryService?: CaptureExecutionRetryService;
+  environmentValidationCoordinator?: EnvironmentValidationCoordinator;
+  discoveryRunCoordinator?: DiscoveryRunCoordinator;
+  discoveryRunControl?: DiscoveryRunControlService;
+  captureAuditSink?: CaptureAuditSink;
+  captureAssemblyCoordinator?: CaptureAssemblyCoordinator;
+  capturePreviewService?: CapturePreviewService;
+  captureRuntimeReady?: boolean;
+  captureCredentialVault?: CaptureCredentialVault;
   onMetric?: (event: HostedApiMetricEvent) => void;
 }): HostedApiDependencies {
   const config = input.config ?? loadHostedApiConfig(input.env);
@@ -306,6 +351,20 @@ export function createHostedApiDependencies(input: {
     jobQueueBroker,
     exportService: input.exportService,
     billingService: input.billingService ?? createHostedBillingService(config.billing),
+    captureService: input.captureService,
+    captureRunCoordinator: input.captureRunCoordinator,
+    captureRunControl: input.captureRunControl,
+    captureRateLimiter: input.captureRateLimiter ?? createInMemoryCaptureRateLimiter(),
+    captureCoverageService: input.captureCoverageService,
+    captureExecutionRetryService: input.captureExecutionRetryService,
+    environmentValidationCoordinator: input.environmentValidationCoordinator,
+    discoveryRunCoordinator: input.discoveryRunCoordinator,
+    discoveryRunControl: input.discoveryRunControl,
+    captureAuditSink: input.captureAuditSink,
+    captureAssemblyCoordinator: input.captureAssemblyCoordinator,
+    capturePreviewService: input.capturePreviewService,
+    captureRuntimeReady: input.captureRuntimeReady,
+    captureCredentialVault: input.captureCredentialVault,
     onMetric: input.onMetric
   };
 }
@@ -330,8 +389,133 @@ export async function handleHostedApiRequest(
     if (method === "GET" && path === "/api/v1/projects") {
       return await handleListProjects(request, dependencies, requestId);
     }
+    if (method === "GET" && path === "/api/v1/capture-capabilities") {
+      requiredSession(request, dependencies);
+      const capabilities = captureCapabilities(dependencies);
+      return jsonResponse(200, { capture: capabilities }, requestId);
+    }
     if (method === "POST" && path === "/api/v1/projects") {
       return await handleCreateProject(request, dependencies, requestId);
+    }
+    const captureEnvironmentsRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/capture-environments$/);
+    if (captureEnvironmentsRoute && (method === "GET" || method === "POST")) {
+      return await handleCaptureEnvironments(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(captureEnvironmentsRoute[1] ?? ""),
+        method
+      );
+    }
+    const captureEnvironmentValidateRoute = path.match(
+      /^\/api\/v1\/projects\/([^/]+)\/capture-environments\/([^/]+)\/validate$/
+    );
+    if (method === "POST" && captureEnvironmentValidateRoute) {
+      return await handleValidateCaptureEnvironment(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(captureEnvironmentValidateRoute[1] ?? ""),
+        decodeURIComponent(captureEnvironmentValidateRoute[2] ?? "")
+      );
+    }
+    const captureEnvironmentRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/capture-environments\/([^/]+)$/);
+    if (captureEnvironmentRoute && (method === "GET" || method === "PATCH")) {
+      return await handleCaptureEnvironment(request, dependencies, requestId, decodeURIComponent(captureEnvironmentRoute[1] ?? ""), decodeURIComponent(captureEnvironmentRoute[2] ?? ""), method);
+    }
+    const capturePersonasRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/capture-personas$/);
+    if (capturePersonasRoute && (method === "GET" || method === "POST")) {
+      return await handleCapturePersonas(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(capturePersonasRoute[1] ?? ""),
+        method
+      );
+    }
+    const captureCredentialGrantsRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/capture-credential-grants$/);
+    if (method === "POST" && captureCredentialGrantsRoute) {
+      return await handleCreateCaptureCredentialGrant(request, dependencies, requestId, decodeURIComponent(captureCredentialGrantsRoute[1] ?? ""));
+    }
+    const captureCredentialGrantRevokeRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/capture-credential-grants\/([^/]+)\/revoke$/);
+    if (method === "POST" && captureCredentialGrantRevokeRoute) {
+      return await handleRevokeCaptureCredentialGrant(request, dependencies, requestId, decodeURIComponent(captureCredentialGrantRevokeRoute[1] ?? ""), decodeURIComponent(captureCredentialGrantRevokeRoute[2] ?? ""));
+    }
+    const capturePersonaRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/capture-personas\/([^/]+)$/);
+    if (method === "PATCH" && capturePersonaRoute) {
+      return await handleUpdateCapturePersona(request, dependencies, requestId, decodeURIComponent(capturePersonaRoute[1] ?? ""), decodeURIComponent(capturePersonaRoute[2] ?? ""));
+    }
+    const productFlowsRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/product-flows$/);
+    if (productFlowsRoute && (method === "GET" || method === "POST")) {
+      return await handleProductFlows(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(productFlowsRoute[1] ?? ""),
+        method
+      );
+    }
+    const discoveryRunsRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/discovery-runs$/);
+    if (method === "POST" && discoveryRunsRoute) {
+      return await handleCreateDiscoveryRun(request, dependencies, requestId, decodeURIComponent(discoveryRunsRoute[1] ?? ""));
+    }
+    const discoveryRunRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/discovery-runs\/([^/]+)$/);
+    if (method === "GET" && discoveryRunRoute) {
+      return await handleGetDiscoveryRun(request, dependencies, requestId, decodeURIComponent(discoveryRunRoute[1] ?? ""), decodeURIComponent(discoveryRunRoute[2] ?? ""));
+    }
+    const discoveryRunCancelRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/discovery-runs\/([^/]+)\/cancel$/);
+    if (method === "POST" && discoveryRunCancelRoute) {
+      return await handleCancelDiscoveryRun(request, dependencies, requestId, decodeURIComponent(discoveryRunCancelRoute[1] ?? ""), decodeURIComponent(discoveryRunCancelRoute[2] ?? ""));
+    }
+    const productFlowRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/product-flows\/([^/]+)$/);
+    if (productFlowRoute && (method === "GET" || method === "PATCH")) {
+      return await handleProductFlow(request, dependencies, requestId, decodeURIComponent(productFlowRoute[1] ?? ""), decodeURIComponent(productFlowRoute[2] ?? ""), method);
+    }
+    const productFlowApprovalRoute = path.match(
+      /^\/api\/v1\/projects\/([^/]+)\/product-flows\/([^/]+)\/(approve|reject)$/
+    );
+    if (method === "POST" && productFlowApprovalRoute) {
+      return await handleProductFlowApproval(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(productFlowApprovalRoute[1] ?? ""),
+        decodeURIComponent(productFlowApprovalRoute[2] ?? ""),
+        productFlowApprovalRoute[3] === "approve" ? "approved" : "rejected"
+      );
+    }
+    const captureRunsRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/capture-runs$/);
+    if (method === "POST" && captureRunsRoute) {
+      return await handleCreateCaptureRun(
+        request,
+        dependencies,
+        requestId,
+        decodeURIComponent(captureRunsRoute[1] ?? "")
+      );
+    }
+    const captureRunRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/capture-runs\/([^/]+)$/);
+    if (method === "GET" && captureRunRoute) {
+      return await handleGetCaptureRun(request, dependencies, requestId, decodeURIComponent(captureRunRoute[1] ?? ""), decodeURIComponent(captureRunRoute[2] ?? ""));
+    }
+    const captureRunCancelRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/capture-runs\/([^/]+)\/cancel$/);
+    if (method === "POST" && captureRunCancelRoute) {
+      return await handleCancelCaptureRun(request, dependencies, requestId, decodeURIComponent(captureRunCancelRoute[1] ?? ""), decodeURIComponent(captureRunCancelRoute[2] ?? ""));
+    }
+    const captureAssemblyRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/capture-runs\/([^/]+)\/assemblies$/);
+    if (method === "POST" && captureAssemblyRoute) {
+      return await handleCreateCaptureAssembly(request, dependencies, requestId, decodeURIComponent(captureAssemblyRoute[1] ?? ""), decodeURIComponent(captureAssemblyRoute[2] ?? ""));
+    }
+    const latestCoverageRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/coverage-snapshots\/latest$/);
+    if (method === "GET" && latestCoverageRoute) {
+      return await handleLatestCaptureCoverage(request, dependencies, requestId, decodeURIComponent(latestCoverageRoute[1] ?? ""));
+    }
+    const executionRetryRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/flow-executions\/([^/]+)\/retry$/);
+    if (method === "POST" && executionRetryRoute) {
+      return await handleRetryCaptureExecution(request, dependencies, requestId, decodeURIComponent(executionRetryRoute[1] ?? ""), decodeURIComponent(executionRetryRoute[2] ?? ""));
+    }
+    const executionPreviewRoute = path.match(/^\/api\/v1\/projects\/([^/]+)\/flow-executions\/([^/]+)\/preview-url$/);
+    if (method === "POST" && executionPreviewRoute) {
+      return await handleCreateCapturePreview(request, dependencies, requestId, decodeURIComponent(executionPreviewRoute[1] ?? ""), decodeURIComponent(executionPreviewRoute[2] ?? ""));
     }
     const projectRoute = path.match(/^\/api\/v1\/projects\/([^/]+)$/);
     if (method === "GET" && projectRoute) {
@@ -666,6 +850,374 @@ async function handleCreateProject(
   return jsonResponse(201, { project: projectSummary(project) }, requestId, {
     Location: `/api/v1/projects/${project.id}`
   });
+}
+
+async function handleCaptureEnvironments(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string,
+  method: string
+): Promise<HostedApiResponse> {
+  const service = requiredCaptureService(dependencies);
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, method === "POST");
+  if (method === "GET") {
+    const environments = await captureServiceCall(() =>
+      service.listEnvironments({ workspaceId: claims.workspaceId, projectId })
+    );
+    return jsonResponse(200, { environments: environments.map(captureEnvironmentResource) }, requestId);
+  }
+  const input = hostedCaptureEnvironmentInput(objectBody(request));
+  const environment = await captureServiceCall(() =>
+    service.createEnvironment({ ...input, workspaceId: claims.workspaceId, projectId })
+  );
+  await recordCaptureAudit(dependencies, claims, projectId, "capture_environment.create", "capture_environment", environment.id);
+  return jsonResponse(201, { environment: captureEnvironmentResource(environment) }, requestId, {
+    Location: `/api/v1/projects/${projectId}/capture-environments/${environment.id}`
+  });
+}
+
+async function handleValidateCaptureEnvironment(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string,
+  environmentId: string
+): Promise<HostedApiResponse> {
+  const coordinator = dependencies.environmentValidationCoordinator;
+  if (!coordinator) throw new ApiError(503, "capture_not_configured", "Asynchronous capture environment validation is not configured.");
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  rejectUnknownKeys(objectBody(request), [], "capture environment validation");
+  const idempotencyKey = header(request, "idempotency-key")?.trim();
+  if (!idempotencyKey) throw new ApiError(422, "validation_failed", "Idempotency-Key header is required.");
+  const result = await captureServiceCall(() => coordinator.create({ workspaceId: claims.workspaceId, projectId, environmentId, idempotencyKey }));
+  if (!result.reused) await recordCaptureAudit(dependencies, claims, projectId, "capture_environment.validate", "capture_environment", environmentId, { job_id: result.job.id });
+  return jsonResponse(
+    result.reused ? 200 : 202,
+    {
+      environment: captureEnvironmentResource(result.environment),
+      job: { ...result.job, workspaceId: claims.workspaceId },
+      reused: result.reused
+    },
+    requestId,
+    { Location: `/api/v1/jobs/${result.job.id}` }
+  );
+}
+
+async function handleCaptureEnvironment(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, environmentId: string, method: string): Promise<HostedApiResponse> {
+  const service = requiredCaptureService(dependencies);
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, method === "PATCH");
+  if (method === "GET") {
+    const environment = await captureServiceCall(() => service.getEnvironment({ workspaceId: claims.workspaceId, projectId, environmentId }));
+    return jsonResponse(200, { environment: captureEnvironmentResource(environment) }, requestId);
+  }
+  const input = hostedCaptureEnvironmentInput(objectBody(request));
+  const environment = await captureServiceCall(() => service.updateEnvironment({ ...input, workspaceId: claims.workspaceId, projectId, environmentId }));
+  await recordCaptureAudit(dependencies, claims, projectId, "capture_environment.update", "capture_environment", environment.id);
+  return jsonResponse(200, { environment: captureEnvironmentResource(environment) }, requestId);
+}
+
+async function handleCapturePersonas(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string,
+  method: string
+): Promise<HostedApiResponse> {
+  const service = requiredCaptureService(dependencies);
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, method === "POST");
+  if (method === "GET") {
+    const personas = await captureServiceCall(() => service.listPersonas({ workspaceId: claims.workspaceId, projectId }));
+    return jsonResponse(200, { personas }, requestId);
+  }
+  const input = hostedCapturePersonaInput(objectBody(request));
+  const persona = await captureServiceCall(() =>
+    service.createPersona({ ...input, workspaceId: claims.workspaceId, projectId })
+  );
+  await recordCaptureAudit(dependencies, claims, projectId, "capture_persona.create", "capture_persona", persona.id);
+  return jsonResponse(201, { persona }, requestId);
+}
+
+async function handleUpdateCapturePersona(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, personaId: string): Promise<HostedApiResponse> {
+  const service = requiredCaptureService(dependencies);
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  const body = objectBody(request);
+  const input = hostedCapturePersonaInput(body, true);
+  const persona = await captureServiceCall(() => service.updatePersona({ ...input, personaId, workspaceId: claims.workspaceId, projectId, status: body.status as "active" | "disabled" | undefined }));
+  return jsonResponse(200, { persona }, requestId);
+}
+
+async function handleCreateCaptureCredentialGrant(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string): Promise<HostedApiResponse> {
+  const vault = dependencies.captureCredentialVault;
+  if (!vault) throw new ApiError(503, "capture_not_configured", "Capture credential storage is not configured.");
+  const service = requiredCaptureService(dependencies);
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  const body = objectBody(request);
+  rejectUnknownKeys(body, ["environmentId", "personaId", "kind", "secret", "expiresAt"], "capture credential grant");
+  const environmentId = requiredString(body.environmentId, "environmentId");
+  const personaId = requiredString(body.personaId, "personaId");
+  await captureServiceCall(() => service.getEnvironment({ workspaceId: claims.workspaceId, projectId, environmentId }));
+  const personas = await captureServiceCall(() => service.listPersonas({ workspaceId: claims.workspaceId, projectId }));
+  if (!personas.some((persona) => persona.id === personaId && persona.environmentId === environmentId)) throw new ApiError(404, "not_found", "Resource not found.");
+  const kind = requiredString(body.kind, "kind");
+  if (kind !== "username_password" && kind !== "session_bootstrap_token") throw new ApiError(422, "validation_failed", "kind is invalid.");
+  const grant = await captureServiceCall(() => vault.create({ workspaceId: claims.workspaceId, projectId, environmentId, personaId, kind, secret: hostedCaptureCredentialSecret(body.secret, kind), expiresAt: requiredString(body.expiresAt, "expiresAt") }));
+  await recordCaptureAudit(dependencies, claims, projectId, "capture_credential_grant.create", "capture_credential_grant", grant.id, { environment_id: environmentId, persona_id: personaId, kind });
+  return jsonResponse(201, { credentialGrant: grant }, requestId, { Location: `/api/v1/projects/${projectId}/capture-credential-grants/${grant.id}` });
+}
+
+async function handleRevokeCaptureCredentialGrant(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, grantId: string): Promise<HostedApiResponse> {
+  const vault = dependencies.captureCredentialVault;
+  if (!vault) throw new ApiError(503, "capture_not_configured", "Capture credential storage is not configured.");
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  const body = objectBody(request);
+  rejectUnknownKeys(body, ["environmentId", "personaId"], "capture credential revocation");
+  const grant = await captureServiceCall(() => vault.revoke({ grantId, workspaceId: claims.workspaceId, projectId, environmentId: requiredString(body.environmentId, "environmentId"), personaId: requiredString(body.personaId, "personaId") }));
+  await recordCaptureAudit(dependencies, claims, projectId, "capture_credential_grant.revoke", "capture_credential_grant", grant.id);
+  return jsonResponse(200, { credentialGrant: grant }, requestId);
+}
+
+async function handleProductFlows(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string,
+  method: string
+): Promise<HostedApiResponse> {
+  const service = requiredCaptureService(dependencies);
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, method === "POST");
+  if (method === "GET") {
+    const flows = await captureServiceCall(() => service.listFlows({ workspaceId: claims.workspaceId, projectId }));
+    return jsonResponse(200, { flows }, requestId);
+  }
+  const body = objectBody(request);
+  rejectUnknownKeys(body, ["flow"], "product flow");
+  if (body.flow === undefined) throw new ApiError(422, "validation_failed", "flow is required.");
+  const flow = await captureServiceCall(() =>
+    service.saveFlowRevision({ workspaceId: claims.workspaceId, projectId, flow: body.flow })
+  );
+  await recordCaptureAudit(dependencies, claims, projectId, "product_flow.revise", "product_flow", flow.id, { revision: flow.revision });
+  return jsonResponse(201, { flow }, requestId, {
+    Location: `/api/v1/projects/${projectId}/product-flows/${flow.id}`
+  });
+}
+
+async function handleProductFlow(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, flowId: string, method: string): Promise<HostedApiResponse> {
+  const service = requiredCaptureService(dependencies);
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, method === "PATCH");
+  if (method === "GET") {
+    const flow = await captureServiceCall(() => service.getFlow({ workspaceId: claims.workspaceId, projectId, flowId }));
+    return jsonResponse(200, { flow }, requestId);
+  }
+  const body = objectBody(request);
+  rejectUnknownKeys(body, ["flow"], "product flow");
+  if (!body.flow || typeof body.flow !== "object" || Array.isArray(body.flow) || (body.flow as { id?: unknown }).id !== flowId) throw new ApiError(422, "validation_failed", "flow.id must match the route.");
+  const flow = await captureServiceCall(() => service.saveFlowRevision({ workspaceId: claims.workspaceId, projectId, flow: body.flow }));
+  await recordCaptureAudit(dependencies, claims, projectId, "product_flow.revise", "product_flow", flow.id, { revision: flow.revision });
+  return jsonResponse(200, { flow }, requestId);
+}
+
+async function handleProductFlowApproval(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string,
+  flowId: string,
+  status: "approved" | "rejected"
+): Promise<HostedApiResponse> {
+  const service = requiredCaptureService(dependencies);
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  rejectUnknownKeys(objectBody(request), [], "product flow approval");
+  const flow = await captureServiceCall(() =>
+    service.setFlowApproval({
+      workspaceId: claims.workspaceId,
+      projectId,
+      flowId,
+      status,
+      actorUserId: claims.userId
+    })
+  );
+  await recordCaptureAudit(dependencies, claims, projectId, status === "approved" ? "product_flow.approve" : "product_flow.reject", "product_flow", flow.id, { revision: flow.revision });
+  return jsonResponse(200, { flow }, requestId);
+}
+
+async function handleCreateCaptureRun(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  requestId: string,
+  projectId: string
+): Promise<HostedApiResponse> {
+  const coordinator = requiredCaptureRunCoordinator(dependencies);
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  const body = objectBody(request);
+  rejectUnknownKeys(body, ["environmentId", "flowIds"], "capture run");
+  const idempotencyKey = header(request, "idempotency-key")?.trim();
+  if (!idempotencyKey) throw new ApiError(422, "validation_failed", "Idempotency-Key header is required.");
+  const result = await captureServiceCall(() =>
+    coordinator.create({
+      workspaceId: claims.workspaceId,
+      projectId,
+      environmentId: requiredString(body.environmentId, "environmentId"),
+      flowIds: requiredStringArray(body.flowIds, "flowIds", 1, 50),
+      idempotencyKey
+    })
+  );
+  if (!result.reused) await recordCaptureAudit(dependencies, claims, projectId, "capture_run.start", "capture_run", result.captureRun.id, { job_id: result.job.id, flow_count: result.captureRun.flowRevisionIds.length });
+  return jsonResponse(
+    result.reused ? 200 : 202,
+    {
+      captureRun: captureRunResource(result.captureRun),
+      job: { ...result.job, workspaceId: claims.workspaceId },
+      reused: result.reused
+    },
+    requestId,
+    { Location: `/api/v1/projects/${projectId}/capture-runs/${result.captureRun.id}` }
+  );
+}
+
+async function handleCreateDiscoveryRun(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string): Promise<HostedApiResponse> {
+  if (!dependencies.discoveryRunCoordinator) throw new ApiError(503, "capture_not_configured", "Asynchronous product flow discovery is not configured.");
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  const body = objectBody(request);
+  rejectUnknownKeys(body, ["environmentId", "goals", "maxCandidates"], "discovery run");
+  const idempotencyKey = header(request, "idempotency-key")?.trim();
+  if (!idempotencyKey) throw new ApiError(422, "validation_failed", "Idempotency-Key header is required.");
+  const result = await captureServiceCall(() => dependencies.discoveryRunCoordinator!.create({
+    workspaceId: claims.workspaceId,
+    projectId,
+    environmentId: requiredString(body.environmentId, "environmentId"),
+    goals: hostedDiscoveryGoals(body.goals),
+    maxCandidates: optionalBoundedInteger(body.maxCandidates, "maxCandidates", 1, 100),
+    idempotencyKey
+  }));
+  if (!result.reused) await recordCaptureAudit(dependencies, claims, projectId, "flow_discovery.start", "discovery_run", result.run.id, { job_id: result.job.id });
+  return jsonResponse(result.reused ? 200 : 202, { discoveryRun: discoveryRunResource(result.run), job: { ...result.job, workspaceId: claims.workspaceId }, reused: result.reused }, requestId, { Location: `/api/v1/projects/${projectId}/discovery-runs/${result.run.id}` });
+}
+
+async function handleGetDiscoveryRun(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, discoveryRunId: string): Promise<HostedApiResponse> {
+  if (!dependencies.discoveryRunControl) throw new ApiError(503, "capture_not_configured", "Product flow discovery control is not configured.");
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, false);
+  const run = await captureServiceCall(() => dependencies.discoveryRunControl!.get({ workspaceId: claims.workspaceId, projectId, discoveryRunId }));
+  return jsonResponse(200, { discoveryRun: discoveryRunResource(run) }, requestId);
+}
+
+async function handleCancelDiscoveryRun(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, discoveryRunId: string): Promise<HostedApiResponse> {
+  if (!dependencies.discoveryRunControl) throw new ApiError(503, "capture_not_configured", "Product flow discovery control is not configured.");
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  rejectUnknownKeys(objectBody(request), [], "discovery run cancellation");
+  const run = await captureServiceCall(() => dependencies.discoveryRunControl!.cancel({ workspaceId: claims.workspaceId, projectId, discoveryRunId }));
+  await recordCaptureAudit(dependencies, claims, projectId, "flow_discovery.cancel", "discovery_run", run.id);
+  return jsonResponse(202, { discoveryRun: discoveryRunResource(run) }, requestId);
+}
+
+async function handleGetCaptureRun(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, captureRunId: string): Promise<HostedApiResponse> {
+  const control = requiredCaptureRunControl(dependencies);
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, false);
+  const result = await captureServiceCall(() => control.get({ workspaceId: claims.workspaceId, projectId, captureRunId }));
+  return jsonResponse(200, { captureRun: captureRunResource(result.run), executions: result.executions.map(flowExecutionResource) }, requestId);
+}
+
+async function handleCancelCaptureRun(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, captureRunId: string): Promise<HostedApiResponse> {
+  const control = requiredCaptureRunControl(dependencies);
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  rejectUnknownKeys(objectBody(request), [], "capture run cancellation");
+  const run = await captureServiceCall(() => control.cancel({ workspaceId: claims.workspaceId, projectId, captureRunId }));
+  await recordCaptureAudit(dependencies, claims, projectId, "capture_run.cancel", "capture_run", run.id);
+  return jsonResponse(202, { captureRun: captureRunResource(run) }, requestId);
+}
+
+async function handleCreateCaptureAssembly(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, captureRunId: string): Promise<HostedApiResponse> {
+  if (!dependencies.captureAssemblyCoordinator) throw new ApiError(503, "capture_not_configured", "Capture assembly is not configured.");
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  const body = objectBody(request);
+  rejectUnknownKeys(body, ["executionIds"], "capture assembly");
+  const idempotencyKey = header(request, "idempotency-key")?.trim();
+  if (!idempotencyKey) throw new ApiError(422, "validation_failed", "Idempotency-Key header is required.");
+  const result = await captureServiceCall(() => dependencies.captureAssemblyCoordinator!.create({ workspaceId: claims.workspaceId, projectId, captureRunId, executionIds: requiredStringArray(body.executionIds, "executionIds", 1, 50), actorUserId: claims.userId, idempotencyKey }));
+  return jsonResponse(result.reused ? 200 : 202, { job: { ...result.job, workspaceId: claims.workspaceId }, reused: result.reused }, requestId, { Location: `/api/v1/jobs/${result.job.id}` });
+}
+
+async function handleCreateCapturePreview(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, executionId: string): Promise<HostedApiResponse> {
+  if (!dependencies.capturePreviewService) throw new ApiError(503, "capture_not_configured", "Capture clip previews are not configured.");
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  rejectUnknownKeys(objectBody(request), [], "capture clip preview");
+  const preview = await captureServiceCall(() => dependencies.capturePreviewService!.create({ workspaceId: claims.workspaceId, projectId, executionId }));
+  return jsonResponse(200, { preview }, requestId, { "Cache-Control": "private, no-store" });
+}
+
+async function handleLatestCaptureCoverage(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string): Promise<HostedApiResponse> {
+  if (!dependencies.captureCoverageService) throw new ApiError(503, "capture_not_configured", "Structured product capture coverage is not configured.");
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, false);
+  const snapshot = await captureServiceCall(() => dependencies.captureCoverageService!.latest({ workspaceId: claims.workspaceId, projectId }));
+  if (!snapshot) throw new ApiError(404, "not_found", "Resource not found.");
+  return jsonResponse(200, { coverageSnapshot: snapshot }, requestId);
+}
+
+async function handleRetryCaptureExecution(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, executionId: string): Promise<HostedApiResponse> {
+  if (!dependencies.captureExecutionRetryService) throw new ApiError(503, "capture_not_configured", "Structured product capture retry is not configured.");
+  const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
+  rejectUnknownKeys(objectBody(request), [], "flow execution retry");
+  const idempotencyKey = header(request, "idempotency-key")?.trim();
+  if (!idempotencyKey) throw new ApiError(422, "validation_failed", "Idempotency-Key header is required.");
+  const result = await captureServiceCall(() => dependencies.captureExecutionRetryService!.retry({ workspaceId: claims.workspaceId, projectId, executionId, idempotencyKey }));
+  if (!result.reused) await recordCaptureAudit(dependencies, claims, projectId, "capture_run.retry", "flow_execution", executionId, { capture_run_id: result.captureRun.id, job_id: result.job.id });
+  return jsonResponse(result.reused ? 200 : 202, { captureRun: captureRunResource(result.captureRun), job: { ...result.job, workspaceId: claims.workspaceId }, reused: result.reused }, requestId, { Location: `/api/v1/projects/${projectId}/capture-runs/${result.captureRun.id}` });
+}
+
+async function authorizeCaptureProject(
+  request: HostedApiRequest,
+  dependencies: HostedApiDependencies,
+  projectId: string,
+  mutation: boolean
+): Promise<SessionClaims> {
+  const claims = requiredSession(request, dependencies);
+  if (mutation) {
+    try {
+      assertCsrfToken(claims, header(request, "x-csrf-token"));
+    } catch {
+      throw new ApiError(403, "csrf_failed", "CSRF token is invalid.");
+    }
+    try {
+      await dependencies.captureRateLimiter?.consume({ workspaceId: claims.workspaceId, userId: claims.userId, nowMs: request.nowMs ?? Date.now() });
+    } catch {
+      throw new ApiError(429, "rate_limited", "Too many capture requests. Try again shortly.");
+    }
+  }
+  await storeCall(() =>
+    dependencies.store.getProjectForSession({
+      userId: claims.userId,
+      workspaceId: claims.workspaceId,
+      projectId
+    })
+  );
+  return claims;
+}
+
+async function recordCaptureAudit(
+  dependencies: HostedApiDependencies,
+  claims: SessionClaims,
+  projectId: string,
+  action: AuditAction,
+  targetType: AuditTargetType,
+  targetId?: string,
+  metadata?: Record<string, AuditMetadataValue>
+): Promise<void> {
+  await dependencies.captureAuditSink?.record({ workspaceId: claims.workspaceId, projectId, actorUserId: claims.userId, actorType: "local_user", action, targetType, targetId, metadata });
+}
+
+function captureCapabilities(dependencies: HostedApiDependencies) {
+  const checks = {
+    environmentValidation: Boolean(dependencies.environmentValidationCoordinator),
+    credentialVault: Boolean(dependencies.captureCredentialVault),
+    discovery: Boolean(dependencies.discoveryRunCoordinator && dependencies.discoveryRunControl),
+    capture: Boolean(dependencies.captureService && dependencies.captureRunCoordinator && dependencies.captureRunControl),
+    assembly: Boolean(dependencies.captureAssemblyCoordinator),
+    clipPreview: Boolean(dependencies.capturePreviewService),
+    coverage: Boolean(dependencies.captureCoverageService),
+    audit: Boolean(dependencies.captureAuditSink),
+    isolatedRuntime: dependencies.captureRuntimeReady === true
+  };
+  return { available: Object.values(checks).every(Boolean), ...checks };
 }
 
 async function handleGetProject(
@@ -1558,6 +2110,36 @@ function jobResource(project: Project, job: JobRecord) {
   };
 }
 
+function captureRunResource(run: import("../shared/productFlowCapture").CaptureRun) {
+  return {
+    id: run.id,
+    projectId: run.projectId,
+    environmentVersionId: run.environmentVersionId,
+    jobId: run.jobId,
+    status: run.status,
+    flowRevisionIds: run.flowRevisionIds,
+    compiledPlanHashes: run.compiledPlanHashes,
+    policyFingerprint: run.policyFingerprint,
+    estimatedBrowserSeconds: run.estimatedBrowserSeconds,
+    createdAt: run.createdAt,
+    updatedAt: run.updatedAt
+  };
+}
+
+function discoveryRunResource(run: import("../shared/productFlowCapture").DiscoveryRun) {
+  return { id: run.id, projectId: run.projectId, environmentVersionId: run.environmentVersionId, jobId: run.jobId, status: run.status, promptVersion: run.promptVersion, provider: run.provider ?? null, model: run.model ?? null, maxSteps: run.maxSteps, maxScreenshots: run.maxScreenshots, maxDurationMs: run.maxDurationMs, safeErrorCode: run.safeErrorCode ?? null, createdAt: run.createdAt, updatedAt: run.updatedAt };
+}
+
+function flowExecutionResource(execution: import("../shared/productFlowCapture").FlowExecutionRecord) {
+  return {
+    id: execution.id, captureRunId: execution.captureRunId, flowId: execution.flowId, flowRevision: execution.flowRevision,
+    environmentVersionId: execution.environmentVersionId, status: execution.status, attempt: execution.attempt,
+    compiledPlanHash: execution.compiledPlanHash, receiptArtifactId: execution.receiptArtifactId ?? null,
+    rawCaptureArtifactId: execution.rawCaptureArtifactId ?? null, normalizedClipArtifactId: execution.normalizedClipArtifactId ?? null,
+    blockerCode: execution.blockerCode ?? null, createdAt: execution.createdAt, updatedAt: execution.updatedAt
+  };
+}
+
 function renderResource(render: RenderedVideo) {
   return {
     id: render.id,
@@ -1600,6 +2182,25 @@ function recordingResource(recording: RecordingMetadata) {
     hasAudio: recording.hasAudio,
     sha256: recording.sha256,
     validatedAt: recording.validatedAt
+  };
+}
+
+function captureEnvironmentResource(environment: CaptureEnvironment) {
+  return {
+    id: environment.id,
+    projectId: environment.projectId,
+    workspaceId: environment.workspaceId,
+    name: environment.name,
+    type: environment.type,
+    baseUrl: environment.baseUrl,
+    allowedDomains: environment.allowedDomains,
+    status: environment.status,
+    resetAdapter: environment.resetAdapter,
+    revision: environment.revision,
+    currentVersionId: environment.currentVersionId ?? null,
+    safeErrorCode: environment.safeErrorCode ?? null,
+    createdAt: environment.createdAt,
+    updatedAt: environment.updatedAt
   };
 }
 
@@ -1851,6 +2452,98 @@ function hostedProfileInput(body: Record<string, unknown>): ProductProfile {
   return profile as ProductProfile;
 }
 
+function hostedCaptureEnvironmentInput(body: Record<string, unknown>): {
+  name: string;
+  type: CaptureEnvironmentType;
+  baseUrl: string;
+  allowedDomains: string[];
+  resetAdapter: CaptureEnvironment["resetAdapter"];
+} {
+  rejectUnknownKeys(body, ["name", "type", "baseUrl", "allowedDomains", "resetAdapter"], "capture environment");
+  const type = requiredString(body.type, "type");
+  if (!["local_preview", "staging", "demo", "production_sandbox"].includes(type)) {
+    throw new ApiError(422, "validation_failed", "type is invalid.");
+  }
+  const resetAdapter = requiredString(body.resetAdapter, "resetAdapter");
+  if (!["none", "http_endpoint", "fixture_api", "disposable_account", "manual"].includes(resetAdapter)) {
+    throw new ApiError(422, "validation_failed", "resetAdapter is invalid.");
+  }
+  return {
+    name: requiredString(body.name, "name"),
+    type: type as CaptureEnvironmentType,
+    baseUrl: requiredString(body.baseUrl, "baseUrl"),
+    allowedDomains: requiredStringArray(body.allowedDomains, "allowedDomains", 1, 20),
+    resetAdapter: resetAdapter as CaptureEnvironment["resetAdapter"]
+  };
+}
+
+function hostedCapturePersonaInput(body: Record<string, unknown>, allowStatus = false): {
+  environmentId: string;
+  key: string;
+  displayName: string;
+  roleDescription: string;
+  fixtureProfileId?: string;
+  credentialGrantId?: string;
+} {
+  rejectUnknownKeys(
+    body,
+    ["environmentId", "key", "displayName", "roleDescription", "fixtureProfileId", "credentialGrantId", ...(allowStatus ? ["status"] : [])],
+    "capture persona"
+  );
+  if (allowStatus && body.status !== undefined && body.status !== "active" && body.status !== "disabled") throw new ApiError(422, "validation_failed", "status is invalid.");
+  return {
+    environmentId: requiredString(body.environmentId, "environmentId"),
+    key: requiredString(body.key, "key"),
+    displayName: requiredString(body.displayName, "displayName"),
+    roleDescription: requiredString(body.roleDescription, "roleDescription"),
+    fixtureProfileId: optionalString(body.fixtureProfileId),
+    credentialGrantId: optionalString(body.credentialGrantId)
+  };
+}
+
+function hostedCaptureCredentialSecret(value: unknown, kind: "username_password" | "session_bootstrap_token"): CaptureCredentialSecret {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new ApiError(422, "validation_failed", "secret is required.");
+  const secret = value as Record<string, unknown>;
+  rejectUnknownKeys(secret, kind === "username_password" ? ["username", "password"] : ["sessionBootstrapToken"], "secret");
+  return kind === "username_password"
+    ? { username: requiredString(secret.username, "secret.username"), password: requiredString(secret.password, "secret.password") }
+    : { sessionBootstrapToken: requiredString(secret.sessionBootstrapToken, "secret.sessionBootstrapToken") };
+}
+
+function requiredStringArray(value: unknown, field: string, min: number, max: number): string[] {
+  if (!Array.isArray(value) || value.length < min || value.length > max) {
+    throw new ApiError(422, "validation_failed", `${field} must contain ${min}–${max} values.`);
+  }
+  const normalized = value.map((item) => requiredString(item, field));
+  if (new Set(normalized).size !== normalized.length) {
+    throw new ApiError(422, "validation_failed", `${field} must not contain duplicates.`);
+  }
+  return normalized;
+}
+
+function hostedDiscoveryGoals(value: unknown): Array<{ id: string; text: string; priority: number }> {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 50) throw new ApiError(422, "validation_failed", "goals must contain 1–50 values.");
+  return value.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) throw new ApiError(422, "validation_failed", "goal is invalid.");
+    const goal = item as Record<string, unknown>;
+    rejectUnknownKeys(goal, ["id", "text", "priority"], "goal");
+    return { id: requiredString(goal.id, "goal.id"), text: requiredString(goal.text, "goal.text"), priority: requiredBoundedInteger(goal.priority, "goal.priority", 0, 100) };
+  });
+}
+
+function optionalBoundedInteger(value: unknown, field: string, min: number, max: number): number | undefined { return value === undefined ? undefined : requiredBoundedInteger(value, field, min, max); }
+function requiredBoundedInteger(value: unknown, field: string, min: number, max: number): number { if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) throw new ApiError(422, "validation_failed", `${field} must be an integer from ${min} to ${max}.`); return value; }
+
+function rejectUnknownKeys(
+  body: Record<string, unknown>,
+  allowedKeys: string[],
+  resource: string
+): void {
+  const allowed = new Set(allowedKeys);
+  const unknown = Object.keys(body).find((key) => !allowed.has(key));
+  if (unknown) throw new ApiError(422, "validation_failed", `${resource}.${unknown} is not allowed.`);
+}
+
 function hostedRecordingUploadInput(body: Record<string, unknown>): {
   fileName: string;
   byteSize: number;
@@ -1923,6 +2616,44 @@ async function storeCall<T>(operation: () => Promise<T>): Promise<T> {
   } catch (error) {
     throw apiErrorFromStoreError(error);
   }
+}
+
+async function captureServiceCall<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Capture service operation failed.";
+    if (/not found/i.test(message)) throw new ApiError(404, "not_found", "Resource not found.");
+    if (/revision must|not current|not ready|revoked|already/i.test(message)) {
+      throw new ApiError(409, "state_conflict", message);
+    }
+    if (/must|required|invalid|forbidden|require HTTPS|allowed domain|draft/i.test(message)) {
+      throw new ApiError(422, "validation_failed", message);
+    }
+    if (/resolve|network|private|reserved|destination/i.test(message)) {
+      throw new ApiError(422, "environment_validation_failed", "Capture environment could not be validated safely.");
+    }
+    throw new ApiError(500, "internal_error", "Unexpected capture service error.");
+  }
+}
+
+function requiredCaptureService(dependencies: HostedApiDependencies): CaptureApplicationService {
+  if (!dependencies.captureService) {
+    throw new ApiError(503, "capture_not_configured", "Structured product capture is not configured.");
+  }
+  return dependencies.captureService;
+}
+
+function requiredCaptureRunCoordinator(dependencies: HostedApiDependencies): CaptureRunCoordinator {
+  if (!dependencies.captureRunCoordinator) {
+    throw new ApiError(503, "capture_not_configured", "Structured product capture execution is not configured.");
+  }
+  return dependencies.captureRunCoordinator;
+}
+
+function requiredCaptureRunControl(dependencies: HostedApiDependencies): CaptureRunControlService {
+  if (!dependencies.captureRunControl) throw new ApiError(503, "capture_not_configured", "Structured product capture control is not configured.");
+  return dependencies.captureRunControl;
 }
 
 function apiErrorFromStoreError(error: unknown): ApiError {

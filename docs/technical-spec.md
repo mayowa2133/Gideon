@@ -20,6 +20,21 @@
 - Synchronous analysis/render endpoints.
 - Multi-region active-active processing in MVP.
 
+## Post-MVP structured capture implementation boundary
+
+Implementation status and required production wiring are tracked in [product-flow-capture-implementation.md](./product-flow-capture-implementation.md). Local browser execution is test/development-only for `local_preview`; remote environments require an injected container or microVM runtime.
+
+The v2 capture foundation is specified in `docs/product-flow-capture-plan.md`. Its first implemented slice keeps adaptive reasoning separate from deterministic execution:
+
+- Declarative, runtime-validated flow revisions contain no generated JavaScript or shell commands.
+- A policy compiler hashes the approved flow and browser policy into an immutable execution plan.
+- Network validation requires an explicit domain allowlist, HTTPS outside approved localhost previews, and public DNS answers; mixed public/private answers are rejected.
+- Credentials are referenced through scoped grants and resolved only inside a login adapter, never by a computer-use model.
+- Playwright performs dry runs and clean takes; every step and final assertion produces a verification receipt.
+- Browser WebM is an intermediate private artifact normalized by FFmpeg to a validated H.264 MP4 source clip with checksum lineage.
+- Migration `0004_product_flow_capture.sql` implements the workspace-scoped persistence model. The hosted API can expose the reviewed foundation routes only when their services are injected; the remote browser-worker rollout remains gated until isolation, secret-store, audit, and operational checks pass.
+- `apps/web` is the hosted Next.js App Router surface. Browser requests use `/api/gideon/api/v1/*`; a server-only catch-all validates paths, forwards only allowlisted session/CSRF/idempotency headers, caps bodies, disables redirects and caching, and keeps `GIDEON_HOSTED_API_INTERNAL_URL` out of client bundles.
+
 ## Architecture decision summary
 
 | Area | MVP decision | Reason |

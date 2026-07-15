@@ -6,6 +6,8 @@ This plan turns the product requirements, architecture, API contract, schema, an
 
 The plan intentionally separates product scaffolding, media infrastructure, AI orchestration, rendering, and commercialization concerns. The highest-risk parts are video determinism, upload safety, AI quality control, and job reliability. Those are pulled forward instead of left until the end.
 
+The optional v2 structured product-capture track is specified separately in [product-flow-capture-plan.md](./product-flow-capture-plan.md), with current code and deployment gaps in [product-flow-capture-implementation.md](./product-flow-capture-implementation.md). It remains gated and must not displace reliability work on the existing upload-to-export loop.
+
 ## Delivery principles
 
 - Ship the smallest end-to-end loop before expanding breadth: upload one recording, detect moments, generate angles, approve one script, synthesize one voiceover, render one clip, export one file.

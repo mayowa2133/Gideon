@@ -58,6 +58,7 @@ erDiagram
 
 - **MVP required:** users, workspaces, workspace_members, projects, product_profiles, source_recordings, extracted_frames, analysis_runs, detected_moments, content_angles, scripts, voiceovers, jobs, render_jobs, generated_videos, exports, usage_events, audit_logs, outbox_events.
 - **MVP minimal/future expanded:** brand_kits and templates exist with default/system records but advanced editing is future.
+- **Gated structured capture:** migration `0004_product_flow_capture.sql` adds capture environments and immutable versions, personas, credential-grant metadata, discovery runs, UI state/transition projections, versioned product flows, idempotent capture runs (including request hash and estimated browser seconds), flow executions, and coverage snapshots. Hosted routes remain disabled unless their services are injected; remote execution additionally requires the isolated worker gate.
 - **Future:** social_accounts, scheduled_posts, performance_metrics are specified only as extension notes/API placeholders and should not be migrated in MVP without implementation.
 
 ## Tables

@@ -120,6 +120,25 @@ Validation is inline and explains quality, not only length. Example: “Name the
 ### Server validation
 
 - After bytes reach storage, status becomes `Checking recording` rather than falsely showing complete.
+
+## Let Gideon capture my product — gated v2
+
+When the deployment has an isolated capture worker configured, the recording step may offer a second choice beside upload: `Let Gideon capture my product`.
+
+The hosted entry page lists the signed-in workspace's projects and retains a project-ID fallback for deep links and support workflows. Before any capture controls render, it checks both the active session and `/api/v1/capture-capabilities`; missing dependencies produce a non-actionable availability state.
+
+1. Explain that Gideon needs a safe demo/local-preview environment and records nothing before flow review.
+2. Collect the environment URL, exact allowed domains, reset method, personas, synthetic fixtures, and opaque credential-grant status. Never collect a raw password in a general project form.
+3. Show validation stages and safe failures for DNS/domain/TLS/redirect, login, reset, or worker configuration.
+4. Present candidate flows with goal, persona, steps, expected outcome, provenance, assumptions, risk class, and unknown areas.
+5. Let the user edit, approve, reject, or merge candidates. Approval always creates a server-owned revision.
+6. `Capture approved flows` shows preparing, reset, authentication, dry run, recording, normalization, verification, assembly, and coverage stages. The page may be left while the queued job runs.
+7. Results show each clip’s verified/failed/blocked status and the coverage denominator. Never label unknown product areas as uncovered zero or claim complete-product coverage.
+8. The user activates the chosen assembly as the project source recording; the existing moment/script/render/export workflow then continues unchanged.
+
+Editing a proposal creates a new draft revision and invalidates any prior approval. The revised flow must be approved again before capture selection.
+
+If capture services are not wired, hide the choice. Do not expose a button that fails after the user enters environment or credential information.
 - Checks file signature, probe metadata, duration, streams, dimensions, and policy.
 - Success shows source thumbnail/metadata and `Analyze walkthrough`.
 - User may replace the file before analysis.

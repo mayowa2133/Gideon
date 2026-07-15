@@ -30,6 +30,9 @@ Do not expand the MVP into avatar generation, social posting, autonomous publish
 - Testing strategy: docs/testing-strategy.md
 - Security rules: docs/security-rules.md
 - Design system: docs/design-system.md
+- Structured product-flow capture plan: docs/product-flow-capture-plan.md
+- Structured capture implementation status: docs/product-flow-capture-implementation.md
+- Structured capture requirement audit: docs/product-flow-capture-requirement-audit.md
 - Tooling research: docs/research/open-source-tools-research.md
 - Build/buy/fork recommendation: docs/research/build-vs-buy-vs-fork.md
 
@@ -68,9 +71,12 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm lint
 - pnpm typecheck
 - pnpm test
+- pnpm test:capture
+- pnpm test:web
 - pnpm test:redis
 - pnpm test:e2e
 - pnpm build
+- pnpm build:web
 - pnpm provider:canary
 - pnpm staging:check
 - pnpm staging:smoke
@@ -89,12 +95,15 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm production:provider-canary-report:check
 - pnpm production:release-receipt:check
 - pnpm worker:hosted:check
+- pnpm capture:worker:check
+- pnpm capture:pilot
 - pnpm avatar:worker:check
 - pnpm avatar:worker:canary
 - pnpm release:mac:check
 - pnpm db:migrate
 - pnpm db:seed
 - pnpm dev
+- pnpm dev:web
 
 When package scripts are added or changed, update this section.
 

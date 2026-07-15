@@ -410,6 +410,7 @@ Validate that useful, evidence-backed concepts and editable vertical drafts save
 
 ### v2: structured product-flow capture
 
+- Detailed delivery and safety plan: `docs/product-flow-capture-plan.md`.
 - Browser recorder/extension.
 - rrweb capture with redaction.
 - Playwright replay from approved flows and disposable accounts.
