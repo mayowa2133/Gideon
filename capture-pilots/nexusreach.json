@@ -1,0 +1,176 @@
+{
+  "schemaVersion": "1",
+  "key": "nexusreach",
+  "workspaceId": "local-workspace",
+  "projectId": "nexusreach-pilot",
+  "name": "NexusReach capture pilot",
+  "artifactDirectoryName": "nexusreach",
+  "repository": {
+    "rootDir": "/Users/mayowaadesanya/Documents/Projects/NexusReach",
+    "maxFiles": 2000,
+    "maxBytes": 10000000
+  },
+  "environment": {
+    "name": "NexusReach safe demo",
+    "type": "local_preview",
+    "baseUrl": "http://127.0.0.1:5173",
+    "allowedDomains": ["127.0.0.1"],
+    "startupAdapterId": "nexusreach-demo"
+  },
+  "persona": {
+    "key": "jordan-demo",
+    "displayName": "Jordan Demo",
+    "roleDescription": "Synthetic early-career job seeker targeting Product Engineer and Frontend Engineer roles in Toronto and remote Canada.",
+    "fixtureProfileId": "nexusreach:onboarding",
+    "fixtureValues": {
+      "profile.full_name": "Jordan Demo",
+      "profile.bio": "Early-career product engineer building accessible web products.",
+      "profile.target_roles": "Product Engineer, Frontend Engineer",
+      "profile.target_locations": "Toronto, Remote Canada",
+      "profile.target_industries": "Developer tools, Climate tech",
+      "filters.job_title": "Product Engineer",
+      "filters.company": "Northstar Labs"
+    }
+  },
+  "presentation": {
+    "viewport": { "width": 1440, "height": 900 },
+    "initialHoldMs": 1500,
+    "beforeActionMs": 450,
+    "afterActionMs": 900,
+    "finalHoldMs": 2000,
+    "showPointer": true,
+    "pointerMoveMs": 350,
+    "typingDelayMs": 45
+  },
+  "workflows": [
+    {
+      "id": "complete-onboarding",
+      "goalId": "complete-onboarding",
+      "resetAdapterId": "nexusreach-onboarding",
+      "verificationAdapterId": "nexusreach-onboarding",
+      "scenario": {
+        "id": "complete-onboarding",
+        "framework": "playwright",
+        "title": "Complete onboarding",
+        "entryPath": "/dashboard",
+        "sourcePath": "e2e/tests-real/onboarding-happy-path.spec.ts",
+        "steps": [
+          { "intent": "Begin onboarding.", "action": { "type": "click", "target": { "strategy": "role", "role": "button", "value": "Get started", "exact": true } }, "riskClass": "synthetic_write" },
+          { "intent": "Enter the synthetic profile name.", "action": { "type": "fill", "target": { "strategy": "label", "value": "Full name" }, "valueRef": "fixture:profile.full_name" }, "riskClass": "synthetic_write" },
+          { "intent": "Enter a synthetic profile bio.", "action": { "type": "fill", "target": { "strategy": "label", "value": "Short bio (optional)" }, "valueRef": "fixture:profile.bio" }, "riskClass": "synthetic_write" },
+          { "intent": "Continue to goals.", "action": { "type": "click", "target": { "strategy": "role", "role": "button", "value": "Continue", "exact": true } }, "riskClass": "synthetic_write" },
+          { "intent": "Choose the local job-seeking goal.", "action": { "type": "click", "target": { "strategy": "text", "value": "Find a Job", "exact": true } }, "riskClass": "synthetic_write" },
+          { "intent": "Enter target roles.", "action": { "type": "fill", "target": { "strategy": "label", "value": "Target roles" }, "valueRef": "fixture:profile.target_roles" }, "riskClass": "synthetic_write" },
+          { "intent": "Enter target locations.", "action": { "type": "fill", "target": { "strategy": "label", "value": "Target locations (optional)" }, "valueRef": "fixture:profile.target_locations" }, "riskClass": "synthetic_write" },
+          { "intent": "Enter target industries.", "action": { "type": "fill", "target": { "strategy": "label", "value": "Target industries (optional)" }, "valueRef": "fixture:profile.target_industries" }, "riskClass": "synthetic_write" },
+          { "intent": "Continue without starting discovery.", "action": { "type": "click", "target": { "strategy": "role", "role": "button", "value": "Continue", "exact": true } }, "riskClass": "synthetic_write" },
+          { "intent": "Skip resume upload.", "action": { "type": "click", "target": { "strategy": "role", "role": "button", "value": "Skip for now", "exact": true } }, "riskClass": "synthetic_write" },
+          { "intent": "Skip network connection.", "action": { "type": "click", "target": { "strategy": "role", "role": "button", "value": "Skip for now", "exact": true } }, "riskClass": "synthetic_write" },
+          { "intent": "Finish by reviewing the profile.", "action": { "type": "click", "target": { "strategy": "role", "role": "button", "value": "Review full profile", "exact": true } }, "riskClass": "synthetic_write" },
+          { "intent": "Wait for the Profile route.", "action": { "type": "wait_for", "assertion": { "type": "url", "path": "/profile" } }, "riskClass": "observe" }
+        ],
+        "finalAssertions": [
+          { "type": "url", "path": "/profile" },
+          { "type": "value", "target": { "strategy": "label", "value": "Full Name" }, "valueRef": "fixture:profile.full_name" }
+        ]
+      }
+    },
+    {
+      "id": "browse-filter-jobs",
+      "goalId": "browse-filter-jobs",
+      "resetAdapterId": "nexusreach-returning",
+      "verificationAdapterId": "nexusreach-returning",
+      "scenario": {
+        "id": "browse-filter-jobs",
+        "framework": "playwright",
+        "title": "Browse and filter jobs",
+        "entryPath": "/jobs",
+        "sourcePath": "e2e/tests-demo/demo-safety.spec.ts",
+        "steps": [
+          { "intent": "Wait for the deterministic jobs feed.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "text", "value": "Product Engineer", "exact": true } } }, "riskClass": "observe" },
+          { "intent": "Filter the saved jobs to the approved synthetic role.", "action": { "type": "fill", "target": { "strategy": "label", "value": "Search saved jobs" }, "valueRef": "fixture:filters.job_title" }, "riskClass": "synthetic_write" },
+          { "intent": "Open the Product Engineer role.", "action": { "type": "click", "target": { "strategy": "text", "value": "Product Engineer", "exact": true } }, "riskClass": "navigate" },
+          { "intent": "Wait for the local job detail view.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "text", "value": "Job Description", "exact": true } } }, "riskClass": "observe" }
+        ],
+        "finalAssertions": [
+          { "type": "visible", "target": { "strategy": "text", "value": "Northstar Labs", "exact": true } },
+          { "type": "visible", "target": { "strategy": "text", "value": "Toronto, Canada", "exact": true } },
+          { "type": "visible", "target": { "strategy": "text", "value": "Job Description", "exact": true } }
+        ]
+      }
+    },
+    {
+      "id": "review-saved-contacts",
+      "goalId": "review-saved-contacts",
+      "resetAdapterId": "nexusreach-returning",
+      "verificationAdapterId": "nexusreach-returning",
+      "scenario": {
+        "id": "review-saved-contacts",
+        "framework": "playwright",
+        "title": "Review saved contacts",
+        "entryPath": "/people",
+        "sourcePath": "e2e/tests-demo/demo-safety.spec.ts",
+        "steps": [
+          { "intent": "Wait for the deterministic saved contacts.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "text", "value": "Avery Chen", "exact": true } } }, "riskClass": "observe" },
+          { "intent": "Filter saved contacts to Northstar Labs without running discovery.", "action": { "type": "fill", "target": { "strategy": "label", "value": "Filter saved contacts by company" }, "valueRef": "fixture:filters.company" }, "riskClass": "synthetic_write" },
+          { "intent": "Confirm Avery remains visible with seeded evidence.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "text", "value": "avery@example.test", "exact": false } } }, "riskClass": "observe" }
+        ],
+        "finalAssertions": [
+          { "type": "visible", "target": { "strategy": "text", "value": "Avery Chen", "exact": true } },
+          { "type": "visible", "target": { "strategy": "text", "value": "Senior Technical Recruiter", "exact": true } },
+          { "type": "visible", "target": { "strategy": "text", "value": "avery@example.test", "exact": false } }
+        ]
+      }
+    },
+    {
+      "id": "update-job-tracker",
+      "goalId": "update-job-tracker",
+      "resetAdapterId": "nexusreach-returning",
+      "verificationAdapterId": "nexusreach-returning",
+      "scenario": {
+        "id": "update-job-tracker",
+        "framework": "playwright",
+        "title": "Update the job tracker",
+        "entryPath": "/tracker",
+        "sourcePath": "e2e/tests-demo/demo-safety.spec.ts",
+        "steps": [
+          { "intent": "Confirm the application tracker starting surface.", "action": { "type": "wait_for", "assertion": { "type": "url", "path": "/tracker" } }, "riskClass": "observe" },
+          { "intent": "Open saved jobs to move the interested role into the tracker.", "action": { "type": "navigate", "path": "/jobs" }, "riskClass": "navigate" },
+          { "intent": "Filter to the Product Engineer role.", "action": { "type": "fill", "target": { "strategy": "label", "value": "Search saved jobs" }, "valueRef": "fixture:filters.job_title" }, "riskClass": "synthetic_write" },
+          { "intent": "Open the Product Engineer role.", "action": { "type": "click", "target": { "strategy": "text", "value": "Product Engineer", "exact": true } }, "riskClass": "navigate" },
+          { "intent": "Move the role into the local Applied tracker stage.", "action": { "type": "click", "target": { "strategy": "role", "role": "button", "value": "Applied", "exact": true } }, "riskClass": "synthetic_write" },
+          { "intent": "Wait for the local stage mutation.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "text", "value": "applied", "exact": true } } }, "riskClass": "observe" },
+          { "intent": "Return to the application tracker.", "action": { "type": "navigate", "path": "/tracker" }, "riskClass": "navigate" },
+          { "intent": "Select the Product Engineer tracker card.", "action": { "type": "click", "target": { "strategy": "text", "value": "Product Engineer", "exact": true } }, "riskClass": "navigate" },
+          { "intent": "Move the role to Interviewing in the local tracker.", "action": { "type": "click", "target": { "strategy": "role", "role": "button", "value": "Interviewing", "exact": true } }, "riskClass": "synthetic_write" },
+          { "intent": "Wait for the persisted tracker mutation.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "text", "value": "Moved to interviewing", "exact": true } } }, "riskClass": "observe" }
+        ],
+        "finalAssertions": [
+          { "type": "url", "path": "/tracker" }
+        ]
+      }
+    },
+    {
+      "id": "review-draft-outreach",
+      "goalId": "review-draft-outreach",
+      "resetAdapterId": "nexusreach-returning",
+      "verificationAdapterId": "nexusreach-returning",
+      "scenario": {
+        "id": "review-draft-outreach",
+        "framework": "playwright",
+        "title": "Review draft-only outreach",
+        "entryPath": "/messages",
+        "sourcePath": "backend/scripts/demo_reset.py",
+        "steps": [
+          { "intent": "Wait for the seeded local draft history.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "text", "value": "Learning about Northstar Labs", "exact": false } } }, "riskClass": "observe" },
+          { "intent": "Open the seeded Avery draft without copying, staging, or sending it.", "action": { "type": "click", "target": { "strategy": "text", "value": "Learning about Northstar Labs", "exact": false } }, "riskClass": "navigate" },
+          { "intent": "Confirm the local draft detail is visible and remains unsent.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "text", "value": "DRAFT — NOT SENT", "exact": true } } }, "riskClass": "observe" }
+        ],
+        "finalAssertions": [
+          { "type": "url", "path": "/messages" },
+          { "type": "visible", "target": { "strategy": "text", "value": "DRAFT — NOT SENT", "exact": true } }
+        ]
+      }
+    }
+  ]
+}
