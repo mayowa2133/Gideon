@@ -191,6 +191,7 @@ export type ArtifactKind =
   | "action_telemetry"
   | "verification_receipt"
   | "normalized_flow_clip"
+  | "caption_track"
   | "capture_assembly_manifest"
   | "coverage_report"
   | "extracted_audio"

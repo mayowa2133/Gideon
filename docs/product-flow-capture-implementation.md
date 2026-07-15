@@ -60,6 +60,7 @@ The supported local concierge proof is documented in [nexusreach-local-capture-p
 - `src/main/nexusReachPilot.ts`: allowlisted loopback-only NexusReach concierge composition and evidence report.
 - `src/main/capturePilotManifest.ts`: strict loopback-only pilot manifest and trusted adapter-registry boundary.
 - `src/main/capturePilot.ts`: generic versioned local pilot orchestration shared by registered product adapters.
+- `src/main/capturePresentationRenderer.ts`: receipt-timed caption tracks, safe vertical framing, and explicitly provider-gated optional narration for pilot derivatives.
 
 ## Required production wiring
 

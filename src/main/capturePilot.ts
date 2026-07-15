@@ -9,6 +9,7 @@ import { assertCapturePilotAdapters, type CapturePilotAdapterRegistry, type Capt
 import { createCaptureRunCoordinator } from "./captureRunCoordinator";
 import { createCaptureRunWorker } from "./captureRunWorker";
 import { createCaptureApplicationService } from "./captureService";
+import { renderCapturePresentation, type CaptureNarrationProvider, type CaptureStepTiming } from "./capturePresentationRenderer";
 import { executePlaywrightCapture } from "./playwrightCaptureExecutor";
 import { createPostRunCoverageHook } from "./postRunCoverage";
 import { extractRepositoryEvidence } from "./repositoryEvidence";
@@ -35,6 +36,7 @@ export interface CapturePilotWorkflowAttempt {
   captureRunId?: string;
   executionId?: string;
   normalizedClipArtifactId?: string;
+  verticalRenderArtifactId?: string;
   safeError?: string;
 }
 
@@ -73,6 +75,7 @@ export async function runCapturePilot(input: {
   executablePath?: string;
   now?: () => Date;
   workflowIds?: string[];
+  narrationProvider?: CaptureNarrationProvider;
 }) {
   const { manifest, adapters } = input;
   const workflows = selectPilotWorkflows(manifest, input.workflowIds);
@@ -106,7 +109,7 @@ export async function runCapturePilot(input: {
   const coverageService = createCaptureCoverageService(repository);
   const persistCoverage = createPostRunCoverageHook({ repository, coverage: coverageService });
   const chrome = input.executablePath ?? process.env.GIDEON_CAPTURE_CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-  const results: Array<{ workflowId: string; flow: ProductFlowRevision; run: CaptureRun; execution: FlowExecutionRecord; normalizedClip: ArtifactRecord; sourceArtifact?: ArtifactRecord; assemblyManifestArtifact?: ArtifactRecord; verification: unknown; interactionSummary: ReturnType<typeof summarizeInteractions> }> = [];
+  const results: Array<{ workflowId: string; flow: ProductFlowRevision; run: CaptureRun; execution: FlowExecutionRecord; normalizedClip: ArtifactRecord; sourceArtifact?: ArtifactRecord; assemblyManifestArtifact?: ArtifactRecord; verification: unknown; interactionSummary: ReturnType<typeof summarizeInteractions>; presentationOutput?: { verticalRender: ArtifactRecord; captions: ArtifactRecord; voiceover?: ArtifactRecord; validation: Awaited<ReturnType<typeof renderCapturePresentation>>["validation"]; cues: Awaited<ReturnType<typeof renderCapturePresentation>>["cues"] } }> = [];
   const diagnostics: Array<{ workflowId: string; message: string }> = [];
 
   try {
@@ -145,12 +148,36 @@ export async function runCapturePilot(input: {
       const normalizedClip = await repository.getArtifact({ workspaceId: manifest.workspaceId, artifactId: execution.normalizedClipArtifactId });
       if (!normalizedClip) throw new Error(`Capture pilot workflow ${workflow.id} normalized clip was not found.`);
       const verification = await adapters.verification[workflow.verificationAdapterId]!.verify({ manifest, workflowId: workflow.id });
-      results.push({ workflowId: workflow.id, flow, run: result.run, execution, normalizedClip, sourceArtifact: result.sourceArtifact, assemblyManifestArtifact: result.assemblyManifestArtifact, verification, interactionSummary: summarizeInteractions(flow, manifest.presentation) });
+      let presentationOutput: typeof results[number]["presentationOutput"];
+      if (manifest.presentation.verticalOutput.enabled) {
+        const receipt = await loadCaptureReceiptTiming(repository, manifest.workspaceId, execution);
+        const rendered = await renderCapturePresentation({
+          sourcePath: normalizedClip.localPath!,
+          outputDir: path.join(runRoot, "presentations", workflow.id),
+          flow,
+          receiptStartedAt: receipt.startedAt,
+          stepTimings: receipt.steps,
+          narration: manifest.presentation.verticalOutput.narration,
+          narrationProvider: input.narrationProvider
+        });
+        const captions = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "caption_track", sourcePath: rendered.captionsPath, originalFileName: `${workflow.id}.vtt`, contentType: "text/vtt" })).artifact;
+        const verticalRender = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "render", sourcePath: rendered.videoPath, originalFileName: `${workflow.id}-vertical.mp4`, contentType: "video/mp4" })).artifact;
+        await repository.upsertArtifact(captions);
+        await repository.upsertArtifact(verticalRender);
+        let voiceover: ArtifactRecord | undefined;
+        if (rendered.voiceoverPath) {
+          voiceover = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "voiceover", sourcePath: rendered.voiceoverPath, originalFileName: `${workflow.id}-voiceover.wav`, contentType: "audio/wav" })).artifact;
+          await repository.upsertArtifact(voiceover);
+        }
+        presentationOutput = { verticalRender, captions, voiceover, validation: rendered.validation, cues: rendered.cues };
+      }
+      results.push({ workflowId: workflow.id, flow, run: result.run, execution, normalizedClip, sourceArtifact: result.sourceArtifact, assemblyManifestArtifact: result.assemblyManifestArtifact, verification, interactionSummary: summarizeInteractions(flow, manifest.presentation), presentationOutput });
       attempt.status = "verified";
       attempt.completedAt = new Date().toISOString();
       attempt.captureRunId = result.run.id;
       attempt.executionId = execution.id;
       attempt.normalizedClipArtifactId = normalizedClip.id;
+      attempt.verticalRenderArtifactId = presentationOutput?.verticalRender.id;
       await writeCheckpoint("running");
     }
   } catch (error) {
@@ -211,6 +238,23 @@ function safePilotDiagnostic(error: unknown): string {
   const message = error.message.replace(/[\r\n\t]+/g, " ").trim();
   if (/(?:password|passcode|secret|token|authorization|cookie|bearer|api[_ -]?key)\s*[:=]/i.test(message)) return "Capture worker diagnostic contained sensitive-shaped data and was redacted.";
   return message.length > 0 && message.length <= 500 ? message : "Capture worker failed; the diagnostic exceeded the safe reporting limit.";
+}
+
+async function loadCaptureReceiptTiming(repository: LocalCapturePilotRepository, workspaceId: string, execution: FlowExecutionRecord): Promise<{ startedAt: string; steps: CaptureStepTiming[] }> {
+  if (!execution.receiptArtifactId) throw new Error("Capture presentation requires a verified execution receipt.");
+  const artifact = await repository.getArtifact({ workspaceId, artifactId: execution.receiptArtifactId });
+  if (!artifact?.localPath) throw new Error("Capture presentation receipt is unavailable in private local storage.");
+  const value = JSON.parse(await fs.readFile(artifact.localPath, "utf8")) as unknown;
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Capture presentation receipt is invalid.");
+  const record = value as Record<string, unknown>;
+  if (typeof record.startedAt !== "string" || !Number.isFinite(Date.parse(record.startedAt)) || !Array.isArray(record.steps)) throw new Error("Capture presentation receipt timing is invalid.");
+  const steps = record.steps.map((raw): CaptureStepTiming => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Capture presentation step timing is invalid.");
+    const step = raw as Record<string, unknown>;
+    if (typeof step.stepId !== "string" || typeof step.startedAt !== "string" || typeof step.completedAt !== "string" || !Number.isFinite(Date.parse(step.startedAt)) || !Number.isFinite(Date.parse(step.completedAt))) throw new Error("Capture presentation step timing is invalid.");
+    return { stepId: step.stepId, startedAt: step.startedAt, completedAt: step.completedAt };
+  });
+  return { startedAt: record.startedAt, steps };
 }
 
 async function writePrivateJson(filePath: string, value: unknown): Promise<void> { await fs.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 }); await fs.writeFile(filePath, JSON.stringify(value, null, 2), { encoding: "utf8", mode: 0o600 }); }
