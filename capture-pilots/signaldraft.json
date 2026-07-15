@@ -26,7 +26,11 @@
     "showPointer": true,
     "pointerMoveMs": 400,
     "typingDelayMs": 22,
-    "verticalOutput": { "enabled": true, "narration": "none" }
+    "verticalOutput": {
+      "enabled": true,
+      "narration": "none",
+      "framing": { "mode": "automatic_focus", "maxZoom": 1.6, "transitionMs": 650 }
+    }
   },
   "workflows": [
     {
@@ -43,12 +47,12 @@
         "steps": [
           { "intent": "Enter the synthetic recruiter message.", "action": { "type": "fill", "target": { "strategy": "label", "value": "Paste inbound message", "exact": true }, "valueRef": "fixture:messages.recruiter" }, "riskClass": "synthetic_write" },
           { "intent": "Run the deterministic local analysis.", "action": { "type": "click", "target": { "strategy": "role", "role": "button", "value": "Run Analysis", "exact": true } }, "riskClass": "synthetic_write" },
-          { "intent": "Wait for the analysis explanation.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "text", "value": "Why This Decision", "exact": true } } }, "riskClass": "observe" },
+          { "intent": "Wait for the analysis explanation.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "role", "role": "heading", "value": "Why This Decision", "exact": true } } }, "riskClass": "observe" },
           { "intent": "Review the generated draft without approving or sending it.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "role", "role": "button", "value": "Mock Send", "exact": true } } }, "riskClass": "observe" }
         ],
         "finalAssertions": [
-          { "type": "visible", "target": { "strategy": "text", "value": "Why This Decision", "exact": true } },
-          { "type": "visible", "target": { "strategy": "text", "value": "Draft Reply", "exact": true } },
+          { "type": "visible", "target": { "strategy": "role", "role": "heading", "value": "Why This Decision", "exact": true } },
+          { "type": "visible", "target": { "strategy": "role", "role": "heading", "value": "Draft Reply", "exact": true } },
           { "type": "visible", "target": { "strategy": "text", "value": "Approve or reject the draft before any mock send action.", "exact": true } }
         ]
       }
@@ -71,8 +75,8 @@
           { "intent": "Confirm the sensitive draft remains unapproved and unsent.", "action": { "type": "wait_for", "assertion": { "type": "visible", "target": { "strategy": "role", "role": "button", "value": "Mock Send", "exact": true } } }, "riskClass": "observe" }
         ],
         "finalAssertions": [
-          { "type": "visible", "target": { "strategy": "text", "value": "Why This Decision", "exact": true } },
-          { "type": "visible", "target": { "strategy": "text", "value": "Draft Reply", "exact": true } },
+          { "type": "visible", "target": { "strategy": "role", "role": "heading", "value": "Why This Decision", "exact": true } },
+          { "type": "visible", "target": { "strategy": "role", "role": "heading", "value": "Draft Reply", "exact": true } },
           { "type": "visible", "target": { "strategy": "text", "value": "This run requires a manual approval decision before it can be mock sent.", "exact": true } }
         ]
       }

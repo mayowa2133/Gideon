@@ -30,8 +30,9 @@ The v2 capture foundation is specified in `docs/product-flow-capture-plan.md`. I
 - A policy compiler hashes the approved flow and browser policy into an immutable execution plan.
 - Network validation requires an explicit domain allowlist, HTTPS outside approved localhost previews, and public DNS answers; mixed public/private answers are rejected.
 - Credentials are referenced through scoped grants and resolved only inside a login adapter, never by a computer-use model.
-- Playwright performs dry runs and clean takes; every step and final assertion produces a verification receipt.
+- Playwright performs dry runs and clean takes; every step and final assertion produces a verification receipt. Successful steps may add geometry-only viewport/action/result/modal bounds; no selectors, DOM text, values, or pixels are added to this telemetry.
 - Browser WebM is an intermediate private artifact normalized by FFmpeg to a validated H.264 MP4 source clip with checksum lineage.
+- Vertical pilot derivatives compile the receipt geometry into a private, versioned `capture-framing-v1` artifact. Automatic focus uses a bounded source-aspect crop with deterministic transitions and falls back to full-frame when evidence is missing; full-frame and normalized manual-focus profiles are explicit alternatives.
 - Migration `0004_product_flow_capture.sql` implements the workspace-scoped persistence model. The hosted API can expose the reviewed foundation routes only when their services are injected; the remote browser-worker rollout remains gated until isolation, secret-store, audit, and operational checks pass.
 - `apps/web` is the hosted Next.js App Router surface. Browser requests use `/api/gideon/api/v1/*`; a server-only catch-all validates paths, forwards only allowlisted session/CSRF/idempotency headers, caps bodies, disables redirects and caching, and keeps `GIDEON_HOSTED_API_INTERNAL_URL` out of client bundles.
 

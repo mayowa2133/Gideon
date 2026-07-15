@@ -23,7 +23,9 @@ The retained runs can be audited without replay or provider access using `pnpm c
 - Remote capture is refused unless the runtime identifies itself as container or microVM isolated. `local_test` is accepted only for `local_preview` environments. Remote responses must include an attestation bound to the exact declarative manifest hash, declared isolation class, valid runtime instance ID, completion time, and the caller's pinned SHA-256 worker image digest before their browser receipt or recording is trusted.
 - Every flow resets before both dry run and recording. Failed dry runs stop before recording; failed assertions produce review state instead of successful clips.
 - Playwright replay uses fixed viewport, locale, timezone, color scheme, reduced motion, disabled downloads, and per-request network-policy checks.
+- Successful step receipts include schema-validated geometry-only visual evidence: viewport and optional action, visible-result, and modal bounds. Receipts never add selector values, DOM text, fixture values, or screenshots to framing telemetry; isolated-runtime responses are revalidated before use.
 - Raw WebM, verification receipt, network/action telemetry, normalized H.264 clip, assembly manifest, and composite source recording are private artifacts with hashes and lineage. Explicit assembly jobs preserve the user's selected clip order before activation.
+- Pilot vertical renders compile that evidence into a versioned `capture-framing-v1` manifest. Automatic focus prefers a verified visible result, then a modal, then the action target; it uses a bounded 1–2× source-aspect crop and deterministic interpolated pan window. Missing evidence fails safely to the established full-frame presentation. Operators may explicitly select full-frame or provide a validated normalized manual region.
 - Media processing uses argument-array FFmpeg invocation with no shell interpolation. It verifies checksums and codec/profile and rejects mostly blank captures.
 - Cooperative cancellation is checked between expensive stages, deletes the private work directory, and exposes cleanup hooks for temporary capabilities.
 - Project deletion has a workspace-scoped transactional PostgreSQL purge path for capture rows and returns opaque vault references for external secret destruction and reconciliation.
@@ -53,6 +55,7 @@ The retained runs can be audited without replay or provider access using `pnpm c
 - `src/main/captureAssemblyCoordinator.ts` and `captureAssemblyWorker.ts`: ordered user-selected source assembly and activation.
 - `src/main/captureAudit.ts`, `postRunCoverage.ts`, and `capturePreviewService.ts`: audit, post-run coverage, and signed preview boundaries.
 - `src/main/playwrightCaptureExecutor.ts`: deterministic browser replay.
+- `src/main/captureFraming.ts`: privacy-safe focus selection, crop clamping, deterministic pan expressions, and full-frame fallback.
 - `src/main/isolatedCaptureRuntime.ts`: container/microVM client boundary.
 - `src/main/captureNetworkPolicy.ts` and `captureEnvironmentProbe.ts`: SSRF, DNS, redirect, and reachability policy.
 - `src/main/flowDiscovery.ts`, `captureInventoryCrawler.ts`, `repositoryEvidence.ts`, and `testScenarioImport.ts`: discovery inputs.
@@ -89,7 +92,7 @@ The hosted API includes asynchronous environment validation and discovery create
 
 ## Verification
 
-`pnpm test:capture` covers policy, SSRF/DNS/redirect behavior, credentials, real Chromium replay, deterministic crawling, login, real FFmpeg normalization and visual QA, discovery, prompt-like evidence, repair, repository/test import, coverage, queueing, idempotency, cancellation, persistence, isolation manifests, baseline evidence redaction, and service scoping. `pnpm test:web` covers the typed client and proxy policy. `pnpm test:e2e` covers session/capability gating and the edit → approve → discover → capture → preview → coverage → assembly journey in a real browser. Tests use synthetic applications/data and no customer media or credentials.
+`pnpm test:capture` covers policy, SSRF/DNS/redirect behavior, credentials, real Chromium replay, geometry-only step evidence, framing compilation/fallback, focused FFmpeg rendering, deterministic crawling, login, real FFmpeg normalization and visual QA, discovery, prompt-like evidence, repair, repository/test import, coverage, queueing, idempotency, cancellation, persistence, isolation manifests, baseline evidence redaction, and service scoping. `pnpm test:web` covers the typed client and proxy policy. `pnpm test:e2e` covers session/capability gating and the edit → approve → discover → capture → preview → coverage → assembly journey in a real browser. Tests use synthetic applications/data and no customer media or credentials.
 
 ## Honest product copy
 

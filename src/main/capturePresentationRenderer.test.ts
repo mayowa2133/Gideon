@@ -25,6 +25,6 @@ describe("capture presentation renderer", () => {
   });
 
   it("requires explicit narration provider wiring before media work", async () => {
-    await expect(renderCapturePresentation({ sourcePath: "/missing.mp4", outputDir: "/tmp/missing", flow, receiptStartedAt: "2026-07-14T10:00:00.000Z", stepTimings: [], narration: "provider" })).rejects.toThrow("requires an explicitly configured provider");
+    await expect(renderCapturePresentation({ sourcePath: "/missing.mp4", outputDir: "/tmp/missing", flow, receiptStartedAt: "2026-07-14T10:00:00.000Z", stepTimings: [], narration: "provider", framing: { mode: "full_frame", maxZoom: 1, transitionMs: 0 } })).rejects.toThrow("requires an explicitly configured provider");
   });
 });

@@ -41,7 +41,11 @@
     "showPointer": true,
     "pointerMoveMs": 350,
     "typingDelayMs": 45,
-    "verticalOutput": { "enabled": true, "narration": "none" }
+    "verticalOutput": {
+      "enabled": true,
+      "narration": "none",
+      "framing": { "mode": "automatic_focus", "maxZoom": 1.6, "transitionMs": 650 }
+    }
   },
   "workflows": [
     {

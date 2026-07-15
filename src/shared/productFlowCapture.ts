@@ -24,7 +24,7 @@ export type AllowedBrowserKey =
 export interface LocatorSpec {
   strategy: "role" | "label" | "test_id" | "placeholder" | "text";
   value: string;
-  role?: "button" | "link" | "textbox" | "combobox" | "checkbox" | "radio" | "tab" | "menuitem";
+  role?: "button" | "link" | "textbox" | "combobox" | "checkbox" | "radio" | "tab" | "menuitem" | "heading";
   exact?: boolean;
 }
 
@@ -116,6 +116,29 @@ export interface AssertionReceipt {
   safeMessage: string;
 }
 
+export interface CaptureViewportGeometry {
+  width: number;
+  height: number;
+  scrollX: number;
+  scrollY: number;
+}
+
+export interface CaptureTargetGeometry {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Geometry-only visual evidence. It intentionally excludes selectors, text, and values. */
+export interface FlowStepVisualEvidence {
+  schemaVersion: "1";
+  viewport: CaptureViewportGeometry;
+  actionTarget?: CaptureTargetGeometry;
+  resultTarget?: CaptureTargetGeometry;
+  modalRegion?: CaptureTargetGeometry;
+}
+
 export interface FlowStepReceipt {
   stepId: string;
   status: "succeeded" | "failed" | "blocked" | "skipped";
@@ -124,6 +147,7 @@ export interface FlowStepReceipt {
   startedAt: string;
   completedAt: string;
   safeErrorCode?: string;
+  visualEvidence?: FlowStepVisualEvidence;
 }
 
 export interface FlowExecutionReceipt {
@@ -320,7 +344,8 @@ const locatorRoles = new Set<NonNullable<LocatorSpec["role"]>>([
   "checkbox",
   "radio",
   "tab",
-  "menuitem"
+  "menuitem",
+  "heading"
 ]);
 const actionRisks = new Set<BrowserActionRisk>([
   "observe",
@@ -471,6 +496,7 @@ export function createFlowExecutionReceipt(input: Omit<FlowExecutionReceipt, "sc
   assertChronology(input.startedAt, input.completedAt, "execution");
   for (const step of input.steps) {
     assertChronology(step.startedAt, step.completedAt, `step ${step.stepId}`);
+    if (step.visualEvidence) assertFlowStepVisualEvidence(step.visualEvidence);
   }
   const blockedStep = input.steps.find((step) => step.status === "blocked" || !step.policyDecision.allowed);
   const failedStep = input.steps.find(
@@ -485,6 +511,24 @@ export function createFlowExecutionReceipt(input: Omit<FlowExecutionReceipt, "sc
   if (status === "blocked" && !input.blockerCode) throw new Error("Blocked receipts require blockerCode.");
   if (status !== "blocked" && input.blockerCode) throw new Error("Only blocked receipts may include blockerCode.");
   return { ...input, schemaVersion: "1", status };
+}
+
+export function assertFlowStepVisualEvidence(value: FlowStepVisualEvidence): void {
+  if (!value || value.schemaVersion !== "1") throw new Error("Step visual evidence schema is invalid.");
+  const viewport = value.viewport;
+  if (!viewport || !integerInRange(viewport.width, 1, 7_680) || !integerInRange(viewport.height, 1, 4_320) || !integerInRange(viewport.scrollX, 0, 10_000_000) || !integerInRange(viewport.scrollY, 0, 10_000_000)) {
+    throw new Error("Step visual evidence viewport is invalid.");
+  }
+  for (const [name, region] of [["actionTarget", value.actionTarget], ["resultTarget", value.resultTarget], ["modalRegion", value.modalRegion]] as const) {
+    if (!region) continue;
+    if (!integerInRange(region.x, 0, viewport.width - 1) || !integerInRange(region.y, 0, viewport.height - 1) || !integerInRange(region.width, 1, viewport.width) || !integerInRange(region.height, 1, viewport.height) || region.x + region.width > viewport.width || region.y + region.height > viewport.height) {
+      throw new Error(`Step visual evidence ${name} is outside the viewport.`);
+    }
+  }
+}
+
+function integerInRange(value: unknown, minimum: number, maximum: number): value is number {
+  return Number.isInteger(value) && (value as number) >= minimum && (value as number) <= maximum;
 }
 
 export function createCoverageSnapshot(input: Omit<CoverageSnapshot, "schemaVersion" | "dimensions"> & {

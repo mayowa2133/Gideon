@@ -16,11 +16,14 @@ The main testing goal is confidence in the end-to-end promise: a user can upload
 | Media fixture tests | Prove video/audio behavior | FFmpeg probe, frame extraction, transcript alignment, render manifest validation |
 | Prompt contract tests | Prove AI orchestration remains parseable and grounded | saved model outputs, invalid JSON repair, schema validation, evidence reference checks |
 | Browser E2E tests | Prove critical user journeys | create project, upload recording, approve script, render export |
-| Capture safety and browser integration | Prove approved flows can be recorded without expanding authority | runtime flow schemas, action/domain/DNS policy, credential grants, Playwright dry run and recording, verification receipt, FFmpeg normalization |
+| Capture safety and browser integration | Prove approved flows can be recorded without expanding authority | runtime flow schemas, action/domain/DNS policy, credential grants, Playwright dry run and recording, geometry-only visual evidence, verification receipt, FFmpeg normalization |
+| Capture presentation | Prove vertical output remains understandable and deterministic | focus manifest compilation, target priority, crop bounds, smooth pan expressions, full-frame fallback, real focused FFmpeg render |
 
 Run the complete structured-capture suite with `pnpm test:capture`. It includes real Chromium and FFmpeg fixtures when the configured local executables are available, plus deterministic tests for provider, queue, persistence, coverage, and isolation boundaries.
 
 Run `pnpm capture:baseline` after successful real-product pilot captures. It probes the retained private artifacts, checks the committed media/presentation/coverage thresholds, and produces an ignored path-free JSON report suitable for comparing later framing and quality changes.
+
+Action-aware pilot profiles use `automatic_focus` with a bounded zoom and transition duration. Unit tests prove target priority, clamping, manual framing, and fallback; the generic pilot integration renders a focused 1080×1920 MP4 and stores its private `framing_manifest` alongside captions and media.
 | Manual QA | Catch visual and content-quality issues | caption safe zones, audio pacing, angle quality, export playback |
 
 ## Required checks in CI

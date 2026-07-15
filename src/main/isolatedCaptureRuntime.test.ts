@@ -27,6 +27,17 @@ describe("isolated capture runtime boundary", () => {
     const runtime = createIsolatedCaptureRuntime({ isolation: "container", expectedImageDigest: imageDigest, async execute(input) { return { result: { receipt: receipt(plan), networkReceipts: [] }, attestation: { ...attestation(input, "container", imageDigest), manifestHash: "a".repeat(64) } }; } });
     await expect(runtime.execute({ id: "execution-1", workspaceId: "workspace-1", plan, policy: policy(), fixtureValues: {}, outputDir: "/ignored", recordVideo: false })).rejects.toThrow("attestation does not match");
   });
+
+  it("revalidates visual evidence returned by the untrusted worker", async () => {
+    const plan = compiledPlan();
+    const imageDigest = `sha256:${"d".repeat(64)}` as const;
+    const runtime = createIsolatedCaptureRuntime({ isolation: "container", expectedImageDigest: imageDigest, async execute(input) {
+      const remoteReceipt = receipt(plan);
+      remoteReceipt.steps[0]!.visualEvidence = { schemaVersion: "1", viewport: { width: 960, height: 600, scrollX: 0, scrollY: 0 }, actionTarget: { x: 950, y: 0, width: 50, height: 10 } };
+      return { result: { receipt: remoteReceipt, networkReceipts: [] }, attestation: attestation(input, "container", imageDigest) };
+    } });
+    await expect(runtime.execute({ id: "execution-1", workspaceId: "workspace-1", plan, policy: policy(), fixtureValues: {}, outputDir: "/ignored", recordVideo: false })).rejects.toThrow("outside the viewport");
+  });
 });
 
 function policy() { return browserPolicyForEnvironment({ id: "environment-1", workspaceId: "workspace-1", projectId: "project-1", name: "Demo", type: "staging", baseUrl: "https://demo.example.test", allowedDomains: ["demo.example.test"], status: "ready", resetAdapter: "fixture_api", revision: 1, currentVersionId: "version-1", createdAt: "2026-07-14T10:00:00.000Z", updatedAt: "2026-07-14T10:00:00.000Z" }); }

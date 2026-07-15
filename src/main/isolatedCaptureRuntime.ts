@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { assertFlowStepVisualEvidence } from "../shared/productFlowCapture";
 import type { PlaywrightCaptureExecutorInput, PlaywrightCaptureResult } from "./playwrightCaptureExecutor";
 import type { CaptureBrowserRuntime } from "./captureRunWorker";
 import { stableSerialize, verifyCompiledFlowPlan } from "./productFlowCompiler";
@@ -59,6 +60,7 @@ export function createIsolatedCaptureRuntime(client: IsolatedCaptureClient): Cap
       if (result.receipt.compiledPlanHash !== input.plan.compiledPlanHash || result.receipt.workspaceId !== input.workspaceId) {
         throw new Error("Isolated capture receipt does not match the submitted manifest.");
       }
+      for (const step of result.receipt.steps) if (step.visualEvidence) assertFlowStepVisualEvidence(step.visualEvidence);
       if (input.recordVideo && result.receipt.status === "verified" && !result.rawCapture) {
         throw new Error("Isolated capture did not return a recording artifact.");
       }

@@ -3,12 +3,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { ProductFlowRevision } from "../shared/productFlowCapture";
 import type { RenderValidation } from "../shared/types";
+import { buildFocusedCropFilter, compileCaptureFraming, type CaptureFramingConfig, type CaptureFramingManifest } from "./captureFraming";
 import { createCaptureCaptionOverlaySequence, probeRecording, validateRenderedVideo } from "./media";
 
 export interface CaptureStepTiming {
   stepId: string;
   startedAt: string;
   completedAt: string;
+  visualEvidence?: import("../shared/productFlowCapture").FlowStepVisualEvidence;
 }
 
 export interface CaptureNarrationProvider {
@@ -22,14 +24,23 @@ export async function renderCapturePresentation(input: {
   receiptStartedAt: string;
   stepTimings: CaptureStepTiming[];
   narration: "none" | "provider";
+  framing: CaptureFramingConfig;
   narrationProvider?: CaptureNarrationProvider;
-}): Promise<{ videoPath: string; captionsPath: string; voiceoverPath?: string; validation: RenderValidation; cues: Array<{ stepId: string; startMs: number; endMs: number; text: string }> }> {
+}): Promise<{ videoPath: string; captionsPath: string; framingManifestPath: string; framingManifest: CaptureFramingManifest; voiceoverPath?: string; validation: RenderValidation; cues: Array<{ stepId: string; startMs: number; endMs: number; text: string }> }> {
   if (input.narration === "provider" && !input.narrationProvider) throw new Error("Capture presentation narration requires an explicitly configured provider.");
   const recording = await probeRecording(input.sourcePath);
   await fs.mkdir(input.outputDir, { recursive: true, mode: 0o700 });
   const cues = buildCaptureCaptionCues({ flow: input.flow, receiptStartedAt: input.receiptStartedAt, stepTimings: input.stepTimings, durationMs: recording.durationMs });
   const captionsPath = path.join(input.outputDir, `${input.flow.id}.vtt`);
   await fs.writeFile(captionsPath, toWebVtt(cues), { encoding: "utf8", mode: 0o600 });
+  const framingManifest = compileCaptureFraming({
+    config: input.framing,
+    source: { width: recording.width, height: recording.height, durationMs: recording.durationMs },
+    receiptStartedAt: input.receiptStartedAt,
+    stepTimings: input.stepTimings
+  });
+  const framingManifestPath = path.join(input.outputDir, `${input.flow.id}-framing.json`);
+  await fs.writeFile(framingManifestPath, JSON.stringify(framingManifest, null, 2), { encoding: "utf8", mode: 0o600 });
 
   let voiceoverPath: string | undefined;
   if (input.narration === "provider") {
@@ -47,10 +58,12 @@ export async function renderCapturePresentation(input: {
   const audioInput = voiceoverPath
     ? ["-i", voiceoverPath]
     : ["-f", "lavfi", "-t", durationSec, "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"];
+  const focusedCrop = buildFocusedCropFilter(framingManifest);
+  const foregroundFilter = focusedCrop ? `[foreground]${focusedCrop},scale=1000:1120:force_original_aspect_ratio=decrease[product]` : "[foreground]scale=1000:1120:force_original_aspect_ratio=decrease[product]";
   const videoFilter = [
     "[0:v]split=2[background][foreground]",
     "[background]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=32[blurred]",
-    "[foreground]scale=1000:1120:force_original_aspect_ratio=decrease[product]",
+    foregroundFilter,
     "[blurred][product]overlay=(W-w)/2:340[framed]",
     "[1:v]fps=30,format=rgba[captions]",
     "[framed][captions]overlay=0:0:shortest=1[v]"
@@ -63,7 +76,7 @@ export async function renderCapturePresentation(input: {
     "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", videoPath
   ]);
   const validation = await validateRenderedVideo(videoPath);
-  return { videoPath, captionsPath, voiceoverPath, validation, cues };
+  return { videoPath, captionsPath, framingManifestPath, framingManifest, voiceoverPath, validation, cues };
 }
 
 export function buildCaptureCaptionCues(input: { flow: ProductFlowRevision; receiptStartedAt: string; stepTimings: CaptureStepTiming[]; durationMs: number }) {

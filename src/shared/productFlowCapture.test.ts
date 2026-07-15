@@ -296,6 +296,12 @@ describe("verification receipts", () => {
     expect(createFlowExecutionReceipt(base).status).toBe("verified");
   });
 
+  it("accepts geometry-only visual evidence and rejects regions outside the viewport", () => {
+    const visualEvidence = { schemaVersion: "1" as const, viewport: { width: 960, height: 600, scrollX: 0, scrollY: 120 }, actionTarget: { x: 100, y: 50, width: 200, height: 40 } };
+    expect(createFlowExecutionReceipt({ ...base, steps: [{ ...base.steps[0]!, visualEvidence }] }).steps[0]?.visualEvidence).toEqual(visualEvidence);
+    expect(() => createFlowExecutionReceipt({ ...base, steps: [{ ...base.steps[0]!, visualEvidence: { ...visualEvidence, actionTarget: { x: 900, y: 50, width: 200, height: 40 } } }] })).toThrow("outside the viewport");
+  });
+
   it("marks failed assertions as failed", () => {
     const receipt = createFlowExecutionReceipt({
       ...base,
