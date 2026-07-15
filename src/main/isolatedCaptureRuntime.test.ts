@@ -10,8 +10,8 @@ describe("isolated capture runtime boundary", () => {
     const plan = compiledPlan();
     const imageDigest = `sha256:${"d".repeat(64)}` as const;
     const runtime = createIsolatedCaptureRuntime({ isolation: "container", expectedImageDigest: imageDigest, async execute(input) { manifest = input; return { result: { receipt: receipt(plan), networkReceipts: [] }, attestation: attestation(input, "container", imageDigest) }; } });
-    await runtime.execute({ id: "execution-1", workspaceId: "workspace-1", plan, policy: policy(), fixtureValues: { project_name: "Demo" }, outputDir: "/ignored", recordVideo: false });
-    expect(manifest).toMatchObject({ schemaVersion: "1", outputHandle: "capture-output:execution-1", manifestHash: expect.stringMatching(/^[a-f0-9]{64}$/) });
+    await runtime.execute({ id: "execution-1", workspaceId: "workspace-1", plan, policy: policy(), fixtureValues: { project_name: "Demo" }, outputDir: "/ignored", recordVideo: false, capturePacing: { afterActionMs: 750 }, capturePresentation: { showPointer: true, pointerMoveMs: 300, typingDelayMs: 35 } });
+    expect(manifest).toMatchObject({ schemaVersion: "1", outputHandle: "capture-output:execution-1", capturePacing: { afterActionMs: 750 }, capturePresentation: { showPointer: true, pointerMoveMs: 300, typingDelayMs: 35 }, manifestHash: expect.stringMatching(/^[a-f0-9]{64}$/) });
     expect(JSON.stringify(manifest)).not.toContain("useCredential");
   });
 

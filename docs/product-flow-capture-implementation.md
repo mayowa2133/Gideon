@@ -26,6 +26,7 @@ The retained runs can be audited without replay or provider access using `pnpm c
 - Successful step receipts include schema-validated geometry-only visual evidence: viewport and optional action, visible-result, and modal bounds. Receipts never add selector values, DOM text, fixture values, or screenshots to framing telemetry; isolated-runtime responses are revalidated before use.
 - Raw WebM, verification receipt, network/action telemetry, normalized H.264 clip, assembly manifest, and composite source recording are private artifacts with hashes and lineage. Explicit assembly jobs preserve the user's selected clip order before activation.
 - Pilot vertical renders compile that evidence into a versioned `capture-framing-v1` manifest. Automatic focus prefers a verified visible result, then a modal, then the action target; it uses a bounded 1–2× source-aspect crop and deterministic interpolated pan window. Missing evidence fails safely to the established full-frame presentation. Operators may explicitly select full-frame or provide a validated normalized manual region.
+- Every clean-take derivative is evaluated by the deterministic `capture-video-quality-v1` gate before it can become a verified clip. Eight representative frames measure black/blank/frozen/detail signals; receipt, framing, caption, and presentation metadata measure safe page-state classifications, effective text-size lower bounds, caption fit, target evidence, cursor/click/typing presentation, dwell, pacing, and camera speed. The worker stores a private mode-0600 JSON report and JPEG contact sheet. A failed gate leaves the execution failed with no normalized preview or assembly source; warnings remain reviewable and are shown in the hosted results UI.
 - Media processing uses argument-array FFmpeg invocation with no shell interpolation. It verifies checksums and codec/profile and rejects mostly blank captures.
 - Cooperative cancellation is checked between expensive stages, deletes the private work directory, and exposes cleanup hooks for temporary capabilities.
 - Project deletion has a workspace-scoped transactional PostgreSQL purge path for capture rows and returns opaque vault references for external secret destruction and reconciliation.
@@ -56,6 +57,7 @@ The retained runs can be audited without replay or provider access using `pnpm c
 - `src/main/captureAudit.ts`, `postRunCoverage.ts`, and `capturePreviewService.ts`: audit, post-run coverage, and signed preview boundaries.
 - `src/main/playwrightCaptureExecutor.ts`: deterministic browser replay.
 - `src/main/captureFraming.ts`: privacy-safe focus selection, crop clamping, deterministic pan expressions, and full-frame fallback.
+- `src/main/captureVideoQuality.ts` and `captureQualityThresholds.json`: versioned deterministic frame/presentation quality checks, contact sheets, and ready/warning/failed gating.
 - `src/main/isolatedCaptureRuntime.ts`: container/microVM client boundary.
 - `src/main/captureNetworkPolicy.ts` and `captureEnvironmentProbe.ts`: SSRF, DNS, redirect, and reachability policy.
 - `src/main/flowDiscovery.ts`, `captureInventoryCrawler.ts`, `repositoryEvidence.ts`, and `testScenarioImport.ts`: discovery inputs.
@@ -67,7 +69,7 @@ The retained runs can be audited without replay or provider access using `pnpm c
 - `src/main/capturePilotManifest.ts`: strict loopback-only pilot manifest and trusted adapter-registry boundary.
 - `src/main/capturePilot.ts`: generic versioned local pilot orchestration shared by registered product adapters.
 - `src/main/capturePresentationRenderer.ts`: receipt-timed caption tracks, safe vertical framing, and explicitly provider-gated optional narration for pilot derivatives.
-- `src/main/captureBaselineReport.ts`: strict private-artifact selection, FFprobe inspection, versioned baseline thresholds, and redacted cross-product evidence reporting.
+- `src/main/captureBaselineReport.ts`: strict private-artifact selection, FFprobe inspection, quality-report/contact-sheet lineage, versioned baseline thresholds, and redacted cross-product evidence reporting.
 
 ## Required production wiring
 
@@ -92,7 +94,9 @@ The hosted API includes asynchronous environment validation and discovery create
 
 ## Verification
 
-`pnpm test:capture` covers policy, SSRF/DNS/redirect behavior, credentials, real Chromium replay, geometry-only step evidence, framing compilation/fallback, focused FFmpeg rendering, deterministic crawling, login, real FFmpeg normalization and visual QA, discovery, prompt-like evidence, repair, repository/test import, coverage, queueing, idempotency, cancellation, persistence, isolation manifests, baseline evidence redaction, and service scoping. `pnpm test:web` covers the typed client and proxy policy. `pnpm test:e2e` covers session/capability gating and the edit → approve → discover → capture → preview → coverage → assembly journey in a real browser. Tests use synthetic applications/data and no customer media or credentials.
+`pnpm test:capture` covers policy, SSRF/DNS/redirect behavior, credentials, real Chromium replay, geometry-only step evidence, framing compilation/fallback, focused FFmpeg rendering, black/blank/frozen/rushed/unreadable/caption-overflow/browser-error quality fixtures, deterministic crawling, login, real FFmpeg normalization, discovery, prompt-like evidence, repair, repository/test import, coverage, queueing, idempotency, cancellation, persistence, isolation manifests, baseline evidence redaction, and service scoping. `pnpm test:web` covers the typed client and proxy policy. `pnpm test:e2e` covers session/capability gating plus safe quality warnings in the edit → approve → discover → capture → preview → coverage → assembly journey. Tests use synthetic applications/data and no customer media or credentials.
+
+The quality gate is deterministic evidence, not a human-comprehension claim. Effective UI text is a conservative declared source-text lower bound transformed through the actual crop, caption wrapping is estimated using the fixed overlay typography, and page-state evidence is a safe enum rather than retained page text. OCR, perceptual design review, mobile-device viewing, and human pacing comprehension remain external review activities.
 
 ## Honest product copy
 

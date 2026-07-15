@@ -24,6 +24,8 @@ export interface CaptureBaselineConfig {
     maximumTypingDelayMs: number;
     requirePointer: boolean;
     requireCaptions: boolean;
+    requireQualityArtifacts: boolean;
+    allowQualityWarnings: boolean;
     requireFullDeclaredCoverage: boolean;
   };
 }
@@ -99,6 +101,11 @@ export async function generateCaptureBaselineReport(input: {
       landscapeClips: pilots.reduce((sum, pilot) => sum + pilot.workflows.filter((workflow) => workflow.normalizedClip).length, 0),
       verticalRenders: pilots.reduce((sum, pilot) => sum + pilot.workflows.filter((workflow) => workflow.verticalRender).length, 0),
       captionTracks: pilots.reduce((sum, pilot) => sum + pilot.workflows.filter((workflow) => workflow.captions).length, 0),
+      qualityReports: pilots.reduce((sum, pilot) => sum + pilot.workflows.filter((workflow) => workflow.quality?.reportArtifact).length, 0),
+      qualityContactSheets: pilots.reduce((sum, pilot) => sum + pilot.workflows.filter((workflow) => workflow.quality?.contactSheetArtifact).length, 0),
+      qualityReady: pilots.reduce((sum, pilot) => sum + pilot.workflows.filter((workflow) => workflow.quality?.status === "ready").length, 0),
+      qualityWarnings: pilots.reduce((sum, pilot) => sum + pilot.workflows.filter((workflow) => workflow.quality?.status === "warning").length, 0),
+      qualityFailed: pilots.reduce((sum, pilot) => sum + pilot.workflows.filter((workflow) => workflow.quality?.status === "failed").length, 0),
       failures: findings.filter((finding) => finding.severity === "failure").length,
       warnings: findings.filter((finding) => finding.severity === "warning").length
     },
@@ -135,7 +142,7 @@ export function parseCaptureBaselineConfig(value: unknown): CaptureBaselineConfi
     return { key, expectedWorkflowIds };
   });
   const thresholds = record(root.thresholds, "capture baseline config thresholds");
-  const thresholdKeys = ["minimumDurationMs", "maximumDurationMs", "normalizedMinimumWidth", "normalizedMinimumHeight", "verticalWidth", "verticalHeight", "minimumFps", "maximumFps", "requiredVideoCodec", "requiredVerticalAudioCodec", "minimumPointerMoveMs", "minimumTypingDelayMs", "maximumTypingDelayMs", "requirePointer", "requireCaptions", "requireFullDeclaredCoverage"];
+  const thresholdKeys = ["minimumDurationMs", "maximumDurationMs", "normalizedMinimumWidth", "normalizedMinimumHeight", "verticalWidth", "verticalHeight", "minimumFps", "maximumFps", "requiredVideoCodec", "requiredVerticalAudioCodec", "minimumPointerMoveMs", "minimumTypingDelayMs", "maximumTypingDelayMs", "requirePointer", "requireCaptions", "requireQualityArtifacts", "allowQualityWarnings", "requireFullDeclaredCoverage"];
   exactKeys(thresholds, thresholdKeys, "capture baseline config thresholds");
   const parsed: CaptureBaselineConfig["thresholds"] = {
     minimumDurationMs: integer(thresholds.minimumDurationMs, "minimumDurationMs", 1, 3_600_000),
@@ -153,6 +160,8 @@ export function parseCaptureBaselineConfig(value: unknown): CaptureBaselineConfi
     maximumTypingDelayMs: integer(thresholds.maximumTypingDelayMs, "maximumTypingDelayMs", 0, 1_000),
     requirePointer: booleanValue(thresholds.requirePointer, "requirePointer"),
     requireCaptions: booleanValue(thresholds.requireCaptions, "requireCaptions"),
+    requireQualityArtifacts: booleanValue(thresholds.requireQualityArtifacts, "requireQualityArtifacts"),
+    allowQualityWarnings: booleanValue(thresholds.allowQualityWarnings, "allowQualityWarnings"),
     requireFullDeclaredCoverage: booleanValue(thresholds.requireFullDeclaredCoverage, "requireFullDeclaredCoverage")
   };
   if (parsed.minimumDurationMs >= parsed.maximumDurationMs || parsed.minimumFps > parsed.maximumFps || parsed.minimumTypingDelayMs > parsed.maximumTypingDelayMs) throw new Error("Capture baseline threshold ranges are invalid.");
@@ -198,7 +207,7 @@ async function evaluatePilot(input: PilotInput, config: CaptureBaselineConfig, p
   const workflows = [];
   for (const raw of results) {
     const workflowId = identifier(raw.workflowId, `${input.key} workflowId`);
-    const workflowFindingsBefore = findings.length;
+    const workflowFailuresBefore = findings.filter((finding) => finding.severity === "failure").length;
     const normalized = safeArtifact(raw.normalizedClip, "normalized_flow_clip", input.key, workflowId);
     const source = safeArtifact(raw.sourceArtifact, "source_recording", input.key, workflowId);
     const presentation = record(raw.presentationOutput, `${input.key} ${workflowId} presentationOutput`);
@@ -214,6 +223,7 @@ async function evaluatePilot(input: PilotInput, config: CaptureBaselineConfig, p
     if (sourceProbe.statBytes !== source.byteSize || normalizedProbe.statBytes !== normalized.byteSize || verticalProbe.statBytes !== vertical.byteSize) fail("artifact_size_mismatch", "A media artifact byte size does not match its lineage record.", workflowId);
     const captionInfo = await inspectCaptions(captions, input.runRoot);
     if (config.thresholds.requireCaptions && captionInfo.cueCount < 1) fail("captions_missing", "The editable WebVTT track has no cues.", workflowId);
+    const quality = await inspectQuality(presentation, input.runRoot, input.key, workflowId, config, findings);
     const interaction = record(raw.interactionSummary, `${input.key} ${workflowId} interactionSummary`);
     const interactionPresentation = record(interaction.presentation, `${input.key} ${workflowId} interaction presentation`);
     const showPointer = interactionPresentation.showPointer === true;
@@ -229,13 +239,14 @@ async function evaluatePilot(input: PilotInput, config: CaptureBaselineConfig, p
     if (informativeFrames !== sampledFrames) fail("uninformative_frame", "The vertical render contains a sampled frame that did not pass informative-frame QA.", workflowId);
     workflows.push({
       workflowId,
-      status: findings.length === workflowFindingsBefore ? "passed" as const : "failed" as const,
+      status: findings.filter((finding) => finding.severity === "failure").length === workflowFailuresBefore ? "passed" as const : "failed" as const,
       resetAndVerification: "verified" as const,
       interactions: { showPointer, pointerMoveMs, typingDelayMs, counts: safeCounts(interaction.counts) },
       sourceRecording: publicArtifact(source, sourceProbe),
       normalizedClip: publicArtifact(normalized, normalizedProbe),
       verticalRender: publicArtifact(vertical, verticalProbe),
       captions: { artifactId: captions.artifactId, sha256: captions.sha256, byteSize: captions.byteSize, cueCount: captionInfo.cueCount },
+      quality,
       visualQa: { sampledFrames, informativeFrames }
     });
   }
@@ -288,6 +299,57 @@ async function inspectCaptions(artifact: SafeArtifact, runRoot: string) {
   const content = await fs.readFile(artifact.localPath, "utf8");
   if (!content.startsWith("WEBVTT\n") || content.length > 1_000_000) throw new Error("Caption artifact is not a bounded WebVTT file.");
   return { cueCount: [...content.matchAll(/^\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}$/gm)].length };
+}
+
+async function inspectQuality(
+  presentation: Record<string, unknown>,
+  runRoot: string,
+  pilotKey: string,
+  workflowId: string,
+  config: CaptureBaselineConfig,
+  findings: CaptureBaselineFinding[]
+) {
+  if (!config.thresholds.requireQualityArtifacts && presentation.quality === undefined) return undefined;
+  const reportArtifact = safeArtifact(presentation.qualityReport, "quality_report", pilotKey, workflowId);
+  const contactSheetArtifact = safeArtifact(presentation.qualityContactSheet, "quality_contact_sheet", pilotKey, workflowId);
+  const quality = record(presentation.quality, `${pilotKey} ${workflowId} quality`);
+  if (quality.schemaVersion !== "1" || quality.qualityVersion !== "capture-video-quality-v1" || quality.thresholdsVersion !== "capture-quality-thresholds-v1") throw new Error(`${pilotKey} ${workflowId} quality report version is invalid.`);
+  const status = enumValue(quality.status, ["ready", "warning", "failed"] as const, `${pilotKey} ${workflowId} quality status`);
+  const reportHash = sha256(quality.reportHash, `${pilotKey} ${workflowId} quality reportHash`);
+  const checks = array(quality.checks, `${pilotKey} ${workflowId} quality checks`).map((raw, index) => {
+    const check = record(raw, `${pilotKey} ${workflowId} quality check[${index}]`);
+    return {
+      code: identifier(check.code, `${pilotKey} ${workflowId} quality check code`),
+      status: enumValue(check.status, ["pass", "warning", "fail"] as const, `${pilotKey} ${workflowId} quality check status`)
+    };
+  });
+  if (checks.length < 1 || checks.length > 100) throw new Error(`${pilotKey} ${workflowId} quality checks are invalid.`);
+  if ((status === "failed") !== checks.some((check) => check.status === "fail") || (status === "warning") !== (!checks.some((check) => check.status === "fail") && checks.some((check) => check.status === "warning"))) throw new Error(`${pilotKey} ${workflowId} quality status does not match its checks.`);
+
+  const [reportBytes, contactSheetBytes] = await Promise.all([
+    assertPrivateRegularFile(reportArtifact.localPath, runRoot),
+    assertPrivateRegularFile(contactSheetArtifact.localPath, runRoot)
+  ]);
+  if (reportBytes !== reportArtifact.byteSize || contactSheetBytes !== contactSheetArtifact.byteSize) throw new Error(`${pilotKey} ${workflowId} quality artifact byte size does not match its lineage record.`);
+  if (reportBytes > 1_000_000 || contactSheetBytes > 25_000_000) throw new Error(`${pilotKey} ${workflowId} quality artifact exceeds its inspection limit.`);
+  const [storedReport, contactSheetHeader] = await Promise.all([
+    readJsonObject(reportArtifact.localPath, `${pilotKey} ${workflowId} stored quality report`),
+    readFileHeader(contactSheetArtifact.localPath, 3)
+  ]);
+  if (storedReport.reportHash !== reportHash || storedReport.status !== status || storedReport.qualityVersion !== quality.qualityVersion || storedReport.thresholdsVersion !== quality.thresholdsVersion) throw new Error(`${pilotKey} ${workflowId} stored quality report does not match the presentation result.`);
+  if (contactSheetHeader.length < 3 || contactSheetHeader[0] !== 0xff || contactSheetHeader[1] !== 0xd8 || contactSheetHeader[2] !== 0xff) throw new Error(`${pilotKey} ${workflowId} quality contact sheet is not a JPEG image.`);
+
+  const nonPassChecks = checks.filter((check) => check.status !== "pass");
+  if (status === "failed") findings.push({ code: "video_quality_failed", severity: "failure", pilotKey, workflowId, message: "The automated video-quality gate failed." });
+  if (status === "warning") findings.push({ code: "video_quality_warning", severity: config.thresholds.allowQualityWarnings ? "warning" : "failure", pilotKey, workflowId, message: "The automated video-quality gate requires human review." });
+  return {
+    status,
+    thresholdsVersion: "capture-quality-thresholds-v1" as const,
+    reportHash,
+    reportArtifact: { artifactId: reportArtifact.artifactId, sha256: reportArtifact.sha256, byteSize: reportBytes },
+    contactSheetArtifact: { artifactId: contactSheetArtifact.artifactId, sha256: contactSheetArtifact.sha256, byteSize: contactSheetBytes },
+    nonPassChecks
+  };
 }
 
 async function assertPrivateRegularFile(filePath: string, runRoot: string): Promise<number> {
@@ -352,6 +414,7 @@ function assertContained(candidate: string, parent: string, label: string) {
 
 function sameSet(left: string[], right: string[]) { return left.length === right.length && new Set(left).size === left.length && left.every((value) => right.includes(value)); }
 async function readJsonObject(filePath: string, label: string) { const stat = await fs.lstat(filePath); if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 25_000_000) throw new Error(`${label} must be a bounded regular non-symlink file.`); return record(JSON.parse(await fs.readFile(filePath, "utf8")) as unknown, label); }
+async function readFileHeader(filePath: string, length: number): Promise<Buffer> { const handle = await fs.open(filePath, "r"); try { const output = Buffer.alloc(length); const { bytesRead } = await handle.read(output, 0, length, 0); return output.subarray(0, bytesRead); } finally { await handle.close(); } }
 function record(value: unknown, label: string): Record<string, unknown> { if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object.`); return value as Record<string, unknown>; }
 function array(value: unknown, label: string): unknown[] { if (!Array.isArray(value)) throw new Error(`${label} must be an array.`); return value; }
 function exactKeys(value: Record<string, unknown>, allowed: string[], label: string) { const unknown = Object.keys(value).find((key) => !allowed.includes(key)); if (unknown) throw new Error(`${label}.${unknown} is not supported.`); const missing = allowed.find((key) => !(key in value)); if (missing) throw new Error(`${label}.${missing} is required.`); }
@@ -363,6 +426,7 @@ function numberValue(value: unknown, label: string, min: number, max: number): n
 function numberFromString(value: unknown, label: string, min: number, max: number): number { if (typeof value !== "string" || !value.trim()) throw new Error(`${label} is invalid.`); return numberValue(Number(value), label, min, max); }
 function booleanValue(value: unknown, label: string): boolean { if (typeof value !== "boolean") throw new Error(`${label} must be boolean.`); return value; }
 function sha256(value: unknown, label: string): string { if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) throw new Error(`${label} is invalid.`); return value; }
+function enumValue<const T extends readonly string[]>(value: unknown, allowed: T, label: string): T[number] { if (typeof value !== "string" || !allowed.includes(value)) throw new Error(`${label} is invalid.`); return value as T[number]; }
 
 async function runCli() {
   const result = await generateCaptureBaselineReport();

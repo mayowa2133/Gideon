@@ -18,12 +18,14 @@ The main testing goal is confidence in the end-to-end promise: a user can upload
 | Browser E2E tests | Prove critical user journeys | create project, upload recording, approve script, render export |
 | Capture safety and browser integration | Prove approved flows can be recorded without expanding authority | runtime flow schemas, action/domain/DNS policy, credential grants, Playwright dry run and recording, geometry-only visual evidence, verification receipt, FFmpeg normalization |
 | Capture presentation | Prove vertical output remains understandable and deterministic | focus manifest compilation, target priority, crop bounds, smooth pan expressions, full-frame fallback, real focused FFmpeg render |
+| Capture video quality | Reject deterministically unreadable or failed output before review | black/blank/frozen fixtures, safe page states, effective text scaling, caption fit/dwell, pointer/click/typing, pacing, contact-sheet lineage, failed-preview suppression |
 
 Run the complete structured-capture suite with `pnpm test:capture`. It includes real Chromium and FFmpeg fixtures when the configured local executables are available, plus deterministic tests for provider, queue, persistence, coverage, and isolation boundaries.
 
-Run `pnpm capture:baseline` after successful real-product pilot captures. It probes the retained private artifacts, checks the committed media/presentation/coverage thresholds, and produces an ignored path-free JSON report suitable for comparing later framing and quality changes.
+Run `pnpm capture:baseline` after successful real-product pilot captures. It probes retained private media, captions, quality reports, and JPEG contact sheets; checks committed media/presentation/quality/coverage thresholds; and produces an ignored path-free JSON report suitable for comparing later framing and quality changes. Warning-class quality findings are retained for human review, while any failed gate makes the command fail.
 
 Action-aware pilot profiles use `automatic_focus` with a bounded zoom and transition duration. Unit tests prove target priority, clamping, manual framing, and fallback; the generic pilot integration renders a focused 1080×1920 MP4 and stores its private `framing_manifest` alongside captions and media.
+Quality fixtures deliberately include moving/readable, black, frozen, unreadable, rushed, caption-overflow, browser-error, and lingering-caption inputs. The gate must fail the unsafe fixtures, warn for review-only conditions, store mode-restricted evidence, and omit private paths. These checks do not replace visual inspection or human comprehension testing.
 | Manual QA | Catch visual and content-quality issues | caption safe zones, audio pacing, angle quality, export playback |
 
 ## Required checks in CI

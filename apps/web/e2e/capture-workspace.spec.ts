@@ -23,6 +23,8 @@ test("reviews discovered intent before capture and activates an explicit assembl
 
   await expect(page.getByRole("heading", { name: "Review clips, coverage, and the final source" })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText("1/1 verified")).toBeVisible();
+  await expect(page.getByText("Video quality")).toBeVisible();
+  await expect(page.getByText("frozen frames")).toBeVisible();
   await page.getByRole("button", { name: "Load preview" }).click();
   await expect(page.locator("video")).toHaveAttribute("src", /^data:video\/mp4/);
   await expect(page.getByText("100%")).toBeVisible();
@@ -76,7 +78,7 @@ async function mockCaptureApi(page: Page, state: { discoveryReads: number; captu
 
 const environment = { id: "environment-1", projectId: "project-1", name: "Demo", type: "staging", baseUrl: "https://demo.example.test", allowedDomains: ["demo.example.test"], status: "ready", resetAdapter: "fixture_api", revision: 1, currentVersionId: "version-1", safeErrorCode: null, updatedAt: "2026-07-14T10:00:00.000Z" };
 const persona = { id: "persona-1", projectId: "project-1", environmentId: "environment-1", key: "admin", displayName: "Demo admin", roleDescription: "Administrator", status: "active", revision: 1 };
-const execution = { id: "execution-1", captureRunId: "capture-1", flowId: "flow-1", flowRevision: 2, status: "verified", attempt: 1, blockerCode: null, normalizedClipArtifactId: "artifact-1", updatedAt: "2026-07-14T10:00:00.000Z" };
+const execution = { id: "execution-1", captureRunId: "capture-1", flowId: "flow-1", flowRevision: 2, status: "verified", attempt: 1, blockerCode: null, normalizedClipArtifactId: "artifact-1", quality: { status: "warning", checks: [{ code: "frozen_frames", status: "warning" }] }, updatedAt: "2026-07-14T10:00:00.000Z" };
 function flow(state: { approved: boolean; flowRevision: number; flowTitle: string }) { return { schemaVersion: "1", id: "flow-1", revision: state.flowRevision, projectId: "project-1", environmentVersionId: "version-1", personaId: "persona-1", title: state.flowTitle, goal: "Create a campaign and verify its dashboard.", startingState: { entryPath: "/app" }, steps: [{ id: "step-1", intent: "Open campaign creation.", riskClass: "navigate", action: { type: "click" } }], finalAssertions: [{ type: "visible" }], approval: state.approved ? { status: "approved", approvedRevision: state.flowRevision } : { status: "draft" }, sourceEvidenceIds: ["goal-1", "page-dashboard"] }; }
 function discoveryRun(status: string) { return { id: "discovery-1", projectId: "project-1", environmentVersionId: "version-1", jobId: "discovery-job", status, safeErrorCode: null, updatedAt: "2026-07-14T10:00:00.000Z" }; }
 function captureRun(status: string) { return { id: "capture-1", projectId: "project-1", environmentVersionId: "version-1", jobId: "capture-job", status, flowRevisionIds: ["flow-1:revision:2"], estimatedBrowserSeconds: 48, updatedAt: "2026-07-14T10:00:00.000Z" }; }

@@ -13,6 +13,8 @@ export interface IsolatedCaptureManifest {
   fixtureValues: Record<string, string>;
   recordVideo: boolean;
   viewport: { width: number; height: number };
+  capturePacing?: PlaywrightCaptureExecutorInput["capturePacing"];
+  capturePresentation?: PlaywrightCaptureExecutorInput["capturePresentation"];
   outputHandle: string;
   manifestHash: string;
 }
@@ -51,6 +53,8 @@ export function createIsolatedCaptureRuntime(client: IsolatedCaptureClient): Cap
         fixtureValues: structuredClone(input.fixtureValues),
         recordVideo: input.recordVideo,
         viewport: input.viewport ?? { width: 1440, height: 900 },
+        capturePacing: input.capturePacing ? structuredClone(input.capturePacing) : undefined,
+        capturePresentation: input.capturePresentation ? structuredClone(input.capturePresentation) : undefined,
         outputHandle: `capture-output:${input.id}`
       };
       const manifest: IsolatedCaptureManifest = { ...withoutHash, manifestHash: sha256(stableSerialize(withoutHash)) };

@@ -35,6 +35,8 @@
     "maximumTypingDelayMs": 80,
     "requirePointer": true,
     "requireCaptions": true,
+    "requireQualityArtifacts": true,
+    "allowQualityWarnings": true,
     "requireFullDeclaredCoverage": true
   }
 }

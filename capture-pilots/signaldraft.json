@@ -29,7 +29,8 @@
     "verticalOutput": {
       "enabled": true,
       "narration": "none",
-      "framing": { "mode": "automatic_focus", "maxZoom": 1.6, "transitionMs": 650 }
+      "framing": { "mode": "automatic_focus", "maxZoom": 1.6, "transitionMs": 650 },
+      "quality": { "minimumSourceTextPx": 12 }
     }
   },
   "workflows": [

@@ -57,8 +57,8 @@ describe.skipIf(!executablePath)("generic capture pilot", () => {
     expect(resets).toBe(4);
     expect(result.report.results).toHaveLength(2);
     expect(result.report.results[0]).toMatchObject({ workflowId: "complete", execution: { status: "verified" }, verification: { outcome: "done" } });
-    expect(result.report.results[0]?.interactionSummary).toEqual({ counts: { navigate: 0, click: 1, fill: 0, select: 0, key: 0, wait_for: 0 }, presentation: { showPointer: true, pointerMoveMs: 100, typingDelayMs: 0 } });
-    expect(result.report.results[0]?.presentationOutput).toMatchObject({ validation: { width: 1080, height: 1920, videoCodec: "h264", audioCodec: "aac" }, framing: { framingVersion: "capture-framing-v1", appliedMode: "focused", keyframes: [{ evidence: "action_target" }] }, framingManifest: { kind: "framing_manifest", contentType: "application/json" }, cues: [{ stepId: "imported-step-1", text: "Complete the fixture." }] });
+    expect(result.report.results[0]?.interactionSummary).toEqual({ counts: { navigate: 0, click: 1, fill: 0, select: 0, key: 0, wait_for: 0 }, presentation: { showPointer: true, pointerMoveMs: 250, typingDelayMs: 35 } });
+    expect(result.report.results[0]?.presentationOutput).toMatchObject({ validation: { width: 1080, height: 1920, videoCodec: "h264", audioCodec: "aac" }, framing: { framingVersion: "capture-framing-v1", appliedMode: "focused", keyframes: [{ evidence: "action_target" }] }, framingManifest: { kind: "framing_manifest", contentType: "application/json" }, quality: { qualityVersion: "capture-video-quality-v1", status: expect.stringMatching(/^(ready|warning)$/) }, qualityReport: { kind: "quality_report" }, qualityContactSheet: { kind: "quality_contact_sheet" }, cues: [{ stepId: "imported-step-1", text: "Complete the fixture." }] });
     expect(result.report.coverage?.dimensions.find((dimension) => dimension.key === "goal")).toMatchObject({ denominator: 2, coveredIds: ["goal:complete", "goal:complete-again"], uncoveredIds: [] });
     expect(result.report.coverage?.dimensions.find((dimension) => dimension.key === "approved_flow")).toMatchObject({ denominator: 2, coveredIds: ["complete", "complete-again"], uncoveredIds: [] });
     await expect(fs.stat(result.report.results[0]!.normalizedClip.localPath!)).resolves.toMatchObject({ size: expect.any(Number) });
@@ -118,7 +118,7 @@ function manifestValue(baseUrl: string, rootDir: string) {
     repository: { rootDir, maxFiles: 100, maxBytes: 1_000_000 },
     environment: { name: "Fixture", type: "local_preview", baseUrl, allowedDomains: ["localhost"], startupAdapterId: "fixture" },
     persona: { key: "demo", displayName: "Demo", roleDescription: "Synthetic fixture persona.", fixtureProfileId: "fixture:demo", fixtureValues: { result: "Done" } },
-    presentation: { viewport: { width: 960, height: 600 }, initialHoldMs: 1500, beforeActionMs: 200, afterActionMs: 500, finalHoldMs: 1000, showPointer: true, pointerMoveMs: 100, typingDelayMs: 0, verticalOutput: { enabled: true, narration: "none", framing: { mode: "automatic_focus", maxZoom: 1.6, transitionMs: 650 } } },
+    presentation: { viewport: { width: 960, height: 600 }, initialHoldMs: 1500, beforeActionMs: 200, afterActionMs: 500, finalHoldMs: 1000, showPointer: true, pointerMoveMs: 250, typingDelayMs: 35, verticalOutput: { enabled: true, narration: "none", framing: { mode: "automatic_focus", maxZoom: 1.6, transitionMs: 650 }, quality: { minimumSourceTextPx: 12 } } },
     workflows: [workflow("complete"), workflow("complete-again")]
   };
 }
