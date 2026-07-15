@@ -30,6 +30,19 @@ import type {
 } from "../shared/types";
 import { buildEditDecisionList } from "../shared/renderTemplates";
 import { createLocalUserWorkspace } from "../shared/usage";
+import type { CaptureApplicationService } from "./captureService";
+import type { CaptureRunCoordinator } from "./captureRunCoordinator";
+import type { CaptureRunControlService } from "./captureRunService";
+import type { CaptureCoverageService } from "./captureCoverageService";
+import type { CaptureExecutionRetryService } from "./captureExecutionRetry";
+import type { EnvironmentValidationCoordinator } from "./environmentValidationCoordinator";
+import type { DiscoveryRunCoordinator } from "./discoveryRunCoordinator";
+import type { DiscoveryRunControlService } from "./discoveryRunControl";
+import type { CaptureAssemblyCoordinator } from "./captureAssemblyCoordinator";
+import type { CapturePreviewService } from "./capturePreviewService";
+import { createInMemoryCaptureCredentialVault, type CaptureCredentialVault } from "./captureCredentials";
+import type { CaptureEnvironment, CaptureEnvironmentVersion, CapturePersona, CaptureRun, DiscoveryRun, ProductFlowRevision } from "../shared/productFlowCapture";
+import { createJob } from "../shared/jobState";
 
 function defaultBullMqJobOptions() {
   return {
@@ -56,6 +69,13 @@ describe("hosted API foundation", () => {
       data: { session: null },
       meta: { requestId: "req_test_1" }
     });
+  });
+
+  it("reports capture unavailable unless every user-facing dependency is wired", async () => {
+    const api = testApi();
+    const session = createSignedSession({ secret: "session-secret", userId: "local-user", authSubject: "local:local-user", workspaceId: "local-workspace", csrfToken: "csrf-1", nowMs: Date.parse("2026-07-14T10:00:00.000Z") });
+    const response = await handleHostedApiRequest({ method: "GET", path: "/api/v1/capture-capabilities", headers: { cookie: `gideon_session=${session.token}` }, nowMs: Date.parse("2026-07-14T10:01:00.000Z") }, api);
+    expect(response).toMatchObject({ status: 200, body: { data: { capture: { available: false, environmentValidation: false, credentialVault: false, discovery: false, capture: false, assembly: false, clipPreview: false, coverage: false, audit: false, isolatedRuntime: false } } } });
   });
 
   it("auto-wires configured Stripe billing service into hosted dependencies", () => {
@@ -1863,6 +1883,248 @@ describe("hosted API foundation", () => {
       meta: { requestId: "req_portal" }
     });
   });
+
+  it("exposes CSRF-protected workspace-scoped structured capture environment routes", async () => {
+    const environment: CaptureEnvironment = {
+      id: "environment-1",
+      workspaceId: "local-workspace",
+      projectId: "project-1",
+      name: "Demo",
+      type: "staging",
+      baseUrl: "https://demo.example.test",
+      allowedDomains: ["demo.example.test"],
+      status: "draft",
+      resetAdapter: "fixture_api",
+      revision: 1,
+      createdAt: "2026-07-14T10:00:00.000Z",
+      updatedAt: "2026-07-14T10:00:00.000Z"
+    };
+    const captureService = captureServiceFixture({ environment });
+    const api = testApi({ captureService });
+    api.store.state.projects = [projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Demo" })];
+    const session = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-07-14T10:00:00.000Z")
+    });
+    const request = {
+      method: "POST",
+      path: "/api/v1/projects/project-1/capture-environments",
+      headers: { cookie: `gideon_session=${session.token}`, "x-csrf-token": "csrf-1" },
+      body: {
+        name: "Demo",
+        type: "staging",
+        baseUrl: "https://demo.example.test",
+        allowedDomains: ["demo.example.test"],
+        resetAdapter: "fixture_api"
+      },
+      nowMs: Date.parse("2026-07-14T10:01:00.000Z")
+    };
+    const missingCsrf = await handleHostedApiRequest({ ...request, headers: { cookie: `gideon_session=${session.token}` } }, api);
+    expect(missingCsrf).toMatchObject({ status: 403, body: { error: { code: "csrf_failed" } } });
+
+    const created = await handleHostedApiRequest(request, api);
+    expect(created).toMatchObject({
+      status: 201,
+      body: {
+        data: {
+          environment: {
+            id: "environment-1",
+            workspaceId: "local-workspace",
+            projectId: "project-1",
+            baseUrl: "https://demo.example.test",
+            currentVersionId: null
+          }
+        }
+      }
+    });
+
+    const listed = await handleHostedApiRequest(
+      {
+        method: "GET",
+        path: "/api/v1/projects/project-1/capture-environments",
+        headers: { cookie: `gideon_session=${session.token}` },
+        nowMs: Date.parse("2026-07-14T10:01:00.000Z")
+      },
+      api
+    );
+    expect(listed).toMatchObject({ status: 200, body: { data: { environments: [{ id: "environment-1" }] } } });
+  });
+
+  it("rejects unknown capture fields and converts environment validation failures to safe API errors", async () => {
+    const environment = captureEnvironmentFixture();
+    const captureService = captureServiceFixture({ environment });
+    const environmentValidationCoordinator = {
+      async create() {
+        throw new Error("Capture destination resolved to a private or reserved network address.");
+      }
+    } as EnvironmentValidationCoordinator;
+    const api = testApi({ captureService, environmentValidationCoordinator });
+    api.store.state.projects = [projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Demo" })];
+    const session = createSignedSession({
+      secret: "session-secret",
+      userId: "local-user",
+      authSubject: "local:local-user",
+      workspaceId: "local-workspace",
+      csrfToken: "csrf-1",
+      nowMs: Date.parse("2026-07-14T10:00:00.000Z")
+    });
+    const headers = { cookie: `gideon_session=${session.token}`, "x-csrf-token": "csrf-1" };
+    const unknown = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/capture-environments",
+        headers,
+        body: {
+          name: "Demo",
+          type: "staging",
+          baseUrl: "https://demo.example.test",
+          allowedDomains: ["demo.example.test"],
+          resetAdapter: "none",
+          rawPassword: "forbidden"
+        },
+        nowMs: Date.parse("2026-07-14T10:01:00.000Z")
+      },
+      api
+    );
+    expect(unknown).toMatchObject({ status: 422, body: { error: { code: "validation_failed" } } });
+
+    const failedValidation = await handleHostedApiRequest(
+      {
+        method: "POST",
+        path: "/api/v1/projects/project-1/capture-environments/environment-1/validate",
+        headers: { ...headers, "idempotency-key": "validate-key-1" },
+        body: {},
+        nowMs: Date.parse("2026-07-14T10:01:00.000Z")
+      },
+      api
+    );
+    expect(failedValidation).toMatchObject({
+      status: 422,
+      body: {
+        error: {
+          code: "environment_validation_failed",
+          message: "Capture environment could not be validated safely."
+        }
+      }
+    });
+  });
+
+  it("creates and revokes scoped credential grants without returning secret values", async () => {
+    let id = 0;
+    const captureCredentialVault = createInMemoryCaptureCredentialVault({ makeId: () => `grant-${++id}`, now: () => "2026-07-14T10:01:00.000Z" });
+    const api = testApi({ captureService: captureServiceFixture(), captureCredentialVault });
+    api.store.state.projects = [projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Demo" })];
+    const session = createSignedSession({ secret: "session-secret", userId: "local-user", authSubject: "local:local-user", workspaceId: "local-workspace", csrfToken: "csrf-1", nowMs: Date.parse("2026-07-14T10:00:00.000Z") });
+    const headers = { cookie: `gideon_session=${session.token}`, "x-csrf-token": "csrf-1" };
+    const created = await handleHostedApiRequest({ method: "POST", path: "/api/v1/projects/project-1/capture-credential-grants", headers, body: { environmentId: "environment-1", personaId: "persona-1", kind: "username_password", secret: { username: "robot@example.test", password: "private-password" }, expiresAt: "2026-07-14T11:01:00.000Z" }, nowMs: Date.parse("2026-07-14T10:01:00.000Z") }, api);
+    expect(created).toMatchObject({ status: 201, body: { data: { credentialGrant: { id: "grant-1", kind: "username_password" } } } });
+    expect(JSON.stringify(created)).not.toContain("private-password");
+    const revoked = await handleHostedApiRequest({ method: "POST", path: "/api/v1/projects/project-1/capture-credential-grants/grant-1/revoke", headers, body: { environmentId: "environment-1", personaId: "persona-1" }, nowMs: Date.parse("2026-07-14T10:02:00.000Z") }, api);
+    expect(revoked).toMatchObject({ status: 200, body: { data: { credentialGrant: { id: "grant-1", revokedAt: "2026-07-14T10:01:00.000Z" } } } });
+  });
+
+  it("creates durable asynchronous environment-validation jobs with idempotency protection", async () => {
+    const environment = { ...captureEnvironmentFixture(), status: "validating" as const };
+    const job = createJob({
+      id: "validation-job-1",
+      projectId: "project-1",
+      kind: "environment_validation",
+      now: "2026-07-14T10:01:00.000Z"
+    });
+    const calls: unknown[] = [];
+    const environmentValidationCoordinator = {
+      async create(input: unknown) {
+        calls.push(input);
+        return { environment, job, reused: false };
+      }
+    } as EnvironmentValidationCoordinator;
+    const api = testApi({ captureService: captureServiceFixture({ environment }), environmentValidationCoordinator });
+    api.store.state.projects = [projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Demo" })];
+    const session = createSignedSession({ secret: "session-secret", userId: "local-user", authSubject: "local:local-user", workspaceId: "local-workspace", csrfToken: "csrf-1", nowMs: Date.parse("2026-07-14T10:00:00.000Z") });
+    const base = {
+      method: "POST",
+      path: "/api/v1/projects/project-1/capture-environments/environment-1/validate",
+      headers: { cookie: `gideon_session=${session.token}`, "x-csrf-token": "csrf-1" },
+      body: {},
+      nowMs: Date.parse("2026-07-14T10:01:00.000Z")
+    };
+    const missingKey = await handleHostedApiRequest(base, api);
+    expect(missingKey).toMatchObject({ status: 422, body: { error: { code: "validation_failed" } } });
+    const accepted = await handleHostedApiRequest({ ...base, headers: { ...base.headers, "idempotency-key": "validate-key-1" } }, api);
+    expect(accepted).toMatchObject({
+      status: 202,
+      headers: { Location: "/api/v1/jobs/validation-job-1" },
+      body: { data: { environment: { id: "environment-1", status: "validating" }, job: { id: "validation-job-1", kind: "environment_validation" }, reused: false } }
+    });
+    expect(calls).toEqual([{ workspaceId: "local-workspace", projectId: "project-1", environmentId: "environment-1", idempotencyKey: "validate-key-1" }]);
+  });
+
+  it("creates capture runs with CSRF and Idempotency-Key protection", async () => {
+    const captureRun: CaptureRun = {
+      id: "capture-run-1", workspaceId: "local-workspace", projectId: "project-1", environmentVersionId: "version-1",
+      jobId: "capture-job-1", status: "queued", flowRevisionIds: ["flow-1:revision:2"], compiledPlanHashes: ["a".repeat(64)],
+      policyFingerprint: "b".repeat(64), idempotencyKey: "capture-key-1", requestHash: "c".repeat(64),
+      estimatedBrowserSeconds: 48,
+      createdAt: "2026-07-14T10:00:00.000Z", updatedAt: "2026-07-14T10:00:00.000Z"
+    };
+    const calls: unknown[] = [];
+    const captureRunCoordinator: CaptureRunCoordinator = {
+      async create(input) {
+        calls.push(input);
+        return { captureRun, job: createJob({ id: captureRun.jobId, projectId: captureRun.projectId, kind: "flow_capture", now: captureRun.createdAt }), reused: false };
+      }
+    };
+    const api = testApi({ captureRunCoordinator });
+    api.store.state.projects = [projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Demo" })];
+    const session = createSignedSession({ secret: "session-secret", userId: "local-user", authSubject: "local:local-user", workspaceId: "local-workspace", csrfToken: "csrf-1", nowMs: Date.parse("2026-07-14T10:00:00.000Z") });
+    const base = { method: "POST", path: "/api/v1/projects/project-1/capture-runs", body: { environmentId: "environment-1", flowIds: ["flow-1"] }, nowMs: Date.parse("2026-07-14T10:01:00.000Z") };
+    const missingKey = await handleHostedApiRequest({ ...base, headers: { cookie: `gideon_session=${session.token}`, "x-csrf-token": "csrf-1" } }, api);
+    expect(missingKey).toMatchObject({ status: 422, body: { error: { code: "validation_failed" } } });
+    const accepted = await handleHostedApiRequest({ ...base, headers: { cookie: `gideon_session=${session.token}`, "x-csrf-token": "csrf-1", "idempotency-key": "capture-key-1" } }, api);
+    expect(accepted).toMatchObject({ status: 202, body: { data: { captureRun: { id: "capture-run-1", status: "queued" }, job: { id: "capture-job-1" }, reused: false } } });
+    expect(calls).toEqual([{ workspaceId: "local-workspace", projectId: "project-1", environmentId: "environment-1", flowIds: ["flow-1"], idempotencyKey: "capture-key-1" }]);
+  });
+
+  it("creates, reads, and cancels asynchronous discovery runs", async () => {
+    const createdAt = "2026-07-14T10:01:00.000Z";
+    const job = createJob({ id: "discovery-job-1", projectId: "project-1", kind: "flow_discovery", now: createdAt });
+    let run: DiscoveryRun = { id: "discovery-1", workspaceId: "local-workspace", projectId: "project-1", environmentVersionId: "version-1", jobId: job.id, status: "queued", promptVersion: "deterministic-v1", maxSteps: 500, maxScreenshots: 100, maxDurationMs: 300_000, createdAt, updatedAt: createdAt };
+    const calls: unknown[] = [];
+    const discoveryRunCoordinator = { async create(input: unknown) { calls.push(input); return { run, job, reused: false }; } } as DiscoveryRunCoordinator;
+    const discoveryRunControl = { async get() { return run; }, async cancel() { run = { ...run, status: "canceled" }; return run; } } as DiscoveryRunControlService;
+    const api = testApi({ discoveryRunCoordinator, discoveryRunControl });
+    api.store.state.projects = [projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Demo" })];
+    const session = createSignedSession({ secret: "session-secret", userId: "local-user", authSubject: "local:local-user", workspaceId: "local-workspace", csrfToken: "csrf-1", nowMs: Date.parse("2026-07-14T10:00:00.000Z") });
+    const auth = { cookie: `gideon_session=${session.token}` };
+    const created = await handleHostedApiRequest({ method: "POST", path: "/api/v1/projects/project-1/discovery-runs", headers: { ...auth, "x-csrf-token": "csrf-1", "idempotency-key": "discover-key-1" }, body: { environmentId: "environment-1", goals: [{ id: "goal-1", text: "Show reporting", priority: 90 }], maxCandidates: 20 }, nowMs: Date.parse(createdAt) }, api);
+    expect(created).toMatchObject({ status: 202, headers: { Location: "/api/v1/projects/project-1/discovery-runs/discovery-1" }, body: { data: { discoveryRun: { id: "discovery-1", status: "queued" }, job: { id: "discovery-job-1" } } } });
+    expect(calls).toEqual([{ workspaceId: "local-workspace", projectId: "project-1", environmentId: "environment-1", goals: [{ id: "goal-1", text: "Show reporting", priority: 90 }], maxCandidates: 20, idempotencyKey: "discover-key-1" }]);
+    const read = await handleHostedApiRequest({ method: "GET", path: "/api/v1/projects/project-1/discovery-runs/discovery-1", headers: auth, nowMs: Date.parse(createdAt) }, api);
+    expect(read).toMatchObject({ status: 200, body: { data: { discoveryRun: { status: "queued" } } } });
+    const canceled = await handleHostedApiRequest({ method: "POST", path: "/api/v1/projects/project-1/discovery-runs/discovery-1/cancel", headers: { ...auth, "x-csrf-token": "csrf-1" }, body: {}, nowMs: Date.parse(createdAt) }, api);
+    expect(canceled).toMatchObject({ status: 202, body: { data: { discoveryRun: { status: "canceled" } } } });
+  });
+
+  it("queues an explicit clip assembly and mints a no-store preview URL", async () => {
+    const createdAt = "2026-07-14T10:01:00.000Z";
+    const assemblyJob = createJob({ id: "assembly-job-1", projectId: "project-1", kind: "capture_assembly", now: createdAt });
+    const assemblyCalls: unknown[] = [];
+    const captureAssemblyCoordinator = { async create(input: unknown) { assemblyCalls.push(input); return { job: assemblyJob, reused: false }; } } as CaptureAssemblyCoordinator;
+    const capturePreviewService = { async create() { return { executionId: "execution-1", artifactId: "artifact-1", contentType: "video/mp4", url: "https://signed.example.test/clip", expiresAt: "2026-07-14T10:06:00.000Z" }; } } as CapturePreviewService;
+    const api = testApi({ captureAssemblyCoordinator, capturePreviewService });
+    api.store.state.projects = [projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Demo" })];
+    const session = createSignedSession({ secret: "session-secret", userId: "local-user", authSubject: "local:local-user", workspaceId: "local-workspace", csrfToken: "csrf-1", nowMs: Date.parse("2026-07-14T10:00:00.000Z") });
+    const headers = { cookie: `gideon_session=${session.token}`, "x-csrf-token": "csrf-1" };
+    const assembled = await handleHostedApiRequest({ method: "POST", path: "/api/v1/projects/project-1/capture-runs/capture-1/assemblies", headers: { ...headers, "idempotency-key": "assembly-key-1" }, body: { executionIds: ["execution-2", "execution-1"] }, nowMs: Date.parse(createdAt) }, api);
+    expect(assembled).toMatchObject({ status: 202, headers: { Location: "/api/v1/jobs/assembly-job-1" }, body: { data: { job: { id: "assembly-job-1" } } } });
+    expect(assemblyCalls).toEqual([{ workspaceId: "local-workspace", projectId: "project-1", captureRunId: "capture-1", executionIds: ["execution-2", "execution-1"], actorUserId: "local-user", idempotencyKey: "assembly-key-1" }]);
+    const preview = await handleHostedApiRequest({ method: "POST", path: "/api/v1/projects/project-1/flow-executions/execution-1/preview-url", headers, body: {}, nowMs: Date.parse(createdAt) }, api);
+    expect(preview).toMatchObject({ status: 200, headers: { "Cache-Control": "private, no-store" }, body: { data: { preview: { url: "https://signed.example.test/clip" } } } });
+  });
 });
 
 function testApi(
@@ -1871,6 +2133,17 @@ function testApi(
     jobQueueService?: HostedJobQueueService;
     exportService?: HostedExportService;
     billingService?: HostedBillingService;
+    captureService?: CaptureApplicationService;
+    captureRunCoordinator?: CaptureRunCoordinator;
+    captureRunControl?: CaptureRunControlService;
+    captureCoverageService?: CaptureCoverageService;
+    captureExecutionRetryService?: CaptureExecutionRetryService;
+    environmentValidationCoordinator?: EnvironmentValidationCoordinator;
+    discoveryRunCoordinator?: DiscoveryRunCoordinator;
+    discoveryRunControl?: DiscoveryRunControlService;
+    captureAssemblyCoordinator?: CaptureAssemblyCoordinator;
+    capturePreviewService?: CapturePreviewService;
+    captureCredentialVault?: CaptureCredentialVault;
     onMetric?: (event: HostedApiMetricEvent) => void;
   } = {}
 ) {
@@ -1907,7 +2180,131 @@ function testApi(
     jobQueueService: input.jobQueueService,
     exportService: input.exportService,
     billingService: input.billingService,
+    captureService: input.captureService,
+    captureRunCoordinator: input.captureRunCoordinator,
+    captureRunControl: input.captureRunControl,
+    captureCoverageService: input.captureCoverageService,
+    captureExecutionRetryService: input.captureExecutionRetryService,
+    environmentValidationCoordinator: input.environmentValidationCoordinator,
+    discoveryRunCoordinator: input.discoveryRunCoordinator,
+    discoveryRunControl: input.discoveryRunControl,
+    captureAssemblyCoordinator: input.captureAssemblyCoordinator,
+    capturePreviewService: input.capturePreviewService,
+    captureCredentialVault: input.captureCredentialVault,
     onMetric: input.onMetric
+  };
+}
+
+function captureServiceFixture(input: {
+  environment?: CaptureEnvironment;
+  validateError?: Error;
+} = {}): CaptureApplicationService {
+  const environment = input.environment ?? captureEnvironmentFixture();
+  const version: CaptureEnvironmentVersion = {
+    id: "environment-version-1",
+    workspaceId: environment.workspaceId,
+    projectId: environment.projectId,
+    environmentId: environment.id,
+    revision: 1,
+    applicationFingerprint: "a".repeat(64),
+    browserPolicyFingerprint: "b".repeat(64),
+    validatedAt: "2026-07-14T10:00:00.000Z",
+    createdAt: "2026-07-14T10:00:00.000Z"
+  };
+  const persona: CapturePersona = {
+    id: "persona-1",
+    workspaceId: environment.workspaceId,
+    projectId: environment.projectId,
+    environmentId: environment.id,
+    key: "founder",
+    displayName: "Founder",
+    roleDescription: "Workspace owner using synthetic data.",
+    status: "active",
+    revision: 1,
+    createdAt: "2026-07-14T10:00:00.000Z",
+    updatedAt: "2026-07-14T10:00:00.000Z"
+  };
+  const flow: ProductFlowRevision = {
+    schemaVersion: "1",
+    id: "flow-1",
+    revision: 1,
+    projectId: environment.projectId,
+    environmentVersionId: version.id,
+    personaId: persona.id,
+    title: "Create project",
+    goal: "Create a project and verify its result.",
+    startingState: { entryPath: "/app" },
+    steps: [
+      {
+        id: "step-1",
+        intent: "Open project creation.",
+        action: { type: "click", target: { strategy: "role", role: "button", value: "New project" } },
+        riskClass: "navigate"
+      }
+    ],
+    finalAssertions: [{ type: "visible", target: { strategy: "text", value: "Create project" } }],
+    approval: { status: "draft" },
+    sourceEvidenceIds: ["user-goal:1"]
+  };
+  return {
+    async createEnvironment(createInput) {
+      return { ...environment, ...createInput, id: environment.id, status: "draft", revision: 1, createdAt: environment.createdAt, updatedAt: environment.updatedAt };
+    },
+    async listEnvironments() {
+      return [environment];
+    },
+    async getEnvironment() { return environment; },
+    async updateEnvironment() { return environment; },
+    async validateEnvironment() {
+      if (input.validateError) throw input.validateError;
+      return { environment: { ...environment, status: "ready", currentVersionId: version.id }, version };
+    },
+    async createPersona() {
+      return persona;
+    },
+    async listPersonas() {
+      return [persona];
+    },
+    async updatePersona() { return persona; },
+    async saveFlowRevision() {
+      return flow;
+    },
+    async setFlowApproval(approvalInput) {
+      return {
+        ...flow,
+        revision: 2,
+        approval:
+          approvalInput.status === "approved"
+            ? {
+                status: "approved",
+                approvedBy: approvalInput.actorUserId,
+                approvedAt: "2026-07-14T10:00:00.000Z",
+                approvedRevision: 2
+              }
+            : { status: "rejected" }
+      };
+    },
+    async listFlows() {
+      return [flow];
+    },
+    async getFlow() { return flow; }
+  };
+}
+
+function captureEnvironmentFixture(): CaptureEnvironment {
+  return {
+    id: "environment-1",
+    workspaceId: "local-workspace",
+    projectId: "project-1",
+    name: "Demo",
+    type: "staging",
+    baseUrl: "https://demo.example.test",
+    allowedDomains: ["demo.example.test"],
+    status: "draft",
+    resetAdapter: "fixture_api",
+    revision: 1,
+    createdAt: "2026-07-14T10:00:00.000Z",
+    updatedAt: "2026-07-14T10:00:00.000Z"
   };
 }
 

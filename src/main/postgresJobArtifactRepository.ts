@@ -29,6 +29,10 @@ interface JsonRecordRow<T> {
   record_json: T | string;
 }
 
+interface JobRequestRow extends JsonRecordRow<JobRecord> {
+  input_json: Record<string, unknown> | string;
+}
+
 export class PostgresJobArtifactRepository {
   constructor(
     private readonly query: PostgresQuery,
@@ -117,6 +121,22 @@ export class PostgresJobArtifactRepository {
     return result.rows[0] ? parseRecordJson(result.rows[0].record_json, "job") : null;
   }
 
+  async getJobRequest(input: { workspaceId: string; jobId: string }): Promise<{ job: JobRecord; inputJson: Record<string, unknown> } | null> {
+    const result = await this.query<JobRequestRow>(
+      "select record_json, input_json from gideon_jobs where workspace_id=$1 and id=$2 limit 1",
+      [input.workspaceId, input.jobId]
+    );
+    return parseJobRequest(result.rows[0]);
+  }
+
+  async getJobByIdempotency(input: { workspaceId: string; idempotencyKey: string; kind: JobRecord["kind"] }): Promise<{ job: JobRecord; inputJson: Record<string, unknown> } | null> {
+    const result = await this.query<JobRequestRow>(
+      "select record_json, input_json from gideon_jobs where workspace_id=$1 and idempotency_key=$2 and kind=$3 limit 1",
+      [input.workspaceId, input.idempotencyKey, input.kind]
+    );
+    return parseJobRequest(result.rows[0]);
+  }
+
   async listProjectJobs(input: ListProjectJobsInput): Promise<JobRecord[]> {
     const result = await this.query<JsonRecordRow<JobRecord>>(
       `select record_json from gideon_jobs
@@ -200,6 +220,14 @@ export class PostgresJobArtifactRepository {
   async close(): Promise<void> {
     await this.closeClient?.();
   }
+}
+
+function parseJobRequest(row: JobRequestRow | undefined): { job: JobRecord; inputJson: Record<string, unknown> } | null {
+  if (!row) return null;
+  return {
+    job: typeof row.record_json === "string" ? JSON.parse(row.record_json) as JobRecord : row.record_json,
+    inputJson: typeof row.input_json === "string" ? JSON.parse(row.input_json) as Record<string, unknown> : row.input_json
+  };
 }
 
 function parseRecordJson<T>(value: T | string | undefined, label: string): T {

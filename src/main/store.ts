@@ -1099,6 +1099,37 @@ export class GideonStore {
     return project;
   }
 
+  async activateCapturedAssemblyForSession(input: {
+    userId: string;
+    workspaceId: string;
+    projectId: string;
+    captureRunId: string;
+    sourceArtifact: ArtifactRecord;
+    manifestArtifact: ArtifactRecord;
+    recording: RecordingMetadata;
+  }): Promise<Project> {
+    const state = await this.load();
+    const workspace = requireWorkspace(state, input.workspaceId);
+    assertWorkspacePermission({ members: state.workspaceMembers, workspaceId: input.workspaceId, userId: input.userId, action: "project:update" });
+    const project = state.projects.find((candidate) => candidate.id === input.projectId && candidate.workspaceId === input.workspaceId);
+    if (!project) throw new Error("Project not found.");
+    if (input.sourceArtifact.projectId !== project.id || input.sourceArtifact.workspaceId !== input.workspaceId || input.sourceArtifact.kind !== "source_recording" || input.manifestArtifact.projectId !== project.id || input.manifestArtifact.workspaceId !== input.workspaceId || input.manifestArtifact.kind !== "capture_assembly_manifest") throw new Error("Capture assembly artifacts are outside the project scope.");
+    const sourceMinutes = minutesForDuration(input.recording.durationMs);
+    assertWithinEntitlement({ entitlements: workspace.entitlements, summary: summarizeUsage(state.usageEvents, workspace.id), metric: "source_minutes", additionalQuantity: sourceMinutes });
+    assertWithinEntitlement({ entitlements: workspace.entitlements, summary: summarizeUsage(state.usageEvents, workspace.id), metric: "storage_bytes", additionalQuantity: input.sourceArtifact.byteSize + input.manifestArtifact.byteSize });
+    const now = new Date().toISOString();
+    const recording: RecordingMetadata = { ...input.recording, artifactId: input.sourceArtifact.id, storageKey: input.sourceArtifact.storageKey, sha256: input.sourceArtifact.sha256, sizeBytes: input.sourceArtifact.byteSize, origin: "captured_assembly", captureRunId: input.captureRunId, assemblyManifestArtifactId: input.manifestArtifact.id };
+    project.artifacts = [...(project.artifacts ?? []).filter((artifact) => artifact.id !== input.sourceArtifact.id && artifact.id !== input.manifestArtifact.id), input.sourceArtifact, input.manifestArtifact];
+    project.recording = recording;
+    project.status = "recording_ready";
+    project.transcript = undefined; project.analysisSummary = undefined; project.frameEvidence = []; project.moments = []; project.concepts = []; project.scripts = []; project.renders = []; project.updatedAt = now;
+    state.usageEvents = mergeUsageEvent(state.usageEvents, { id: randomUUID(), workspaceId: input.workspaceId, projectId: project.id, metric: "source_minutes", quantity: sourceMinutes, unit: "minute", source: "capture_assembly", idempotencyKey: `capture-assembly:${input.captureRunId}:${input.sourceArtifact.id}:source_minutes`, createdAt: now });
+    state.usageEvents = mergeUsageEvent(state.usageEvents, { id: randomUUID(), workspaceId: input.workspaceId, projectId: project.id, metric: "storage_bytes", quantity: input.sourceArtifact.byteSize + input.manifestArtifact.byteSize, unit: "byte", source: "capture_assembly", idempotencyKey: `capture-assembly:${input.captureRunId}:${input.sourceArtifact.id}:storage_bytes`, createdAt: now });
+    this.appendAuditToState(state, { workspaceId: input.workspaceId, projectId: project.id, actorUserId: input.userId, action: "recording.attach", targetType: "recording", targetId: input.sourceArtifact.id, summary: "Attached an approved captured assembly as the source recording.", metadata: { captureRunId: input.captureRunId, manifestArtifactId: input.manifestArtifact.id, durationMs: recording.durationMs, sizeBytes: recording.sizeBytes } });
+    await this.save();
+    return project;
+  }
+
   async runAnalysis(
     projectId: string,
     enrich: (project: Project, moments: DetectedMoment[]) => Promise<{

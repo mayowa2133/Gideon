@@ -418,8 +418,130 @@ Return safe recording metadata/status and short-lived preview URL only when veri
 
 - **Auth:** Active member.
 - **Response 200:** Recording metadata, validation error code/user message, thumbnail/preview signed URL expiry.
+
+## Structured product capture — gated implementation
+
+These `/api/v1` routes are available only when the structured-capture service is configured. They preserve the same session, workspace, CSRF, runtime-validation, and generic cross-workspace `404` rules as recording routes. Enabling them for external users remains gated by `docs/product-flow-capture-plan.md`.
+
+### GET/POST `/projects/{projectId}/capture-environments`
+
+- `GET` returns safe environment projections for the authorized project.
+- `POST` accepts only `name`, `type`, `baseUrl`, `allowedDomains`, and `resetAdapter`; unknown fields fail validation.
+- Remote environments require HTTPS. Only `local_preview` may use explicitly approved HTTP localhost.
+- URL credentials are rejected. Responses never contain credential or vault material.
+
+### GET/PATCH `/projects/{projectId}/capture-environments/{environmentId}`
+
+- `GET` returns one safe workspace-scoped projection.
+- `PATCH` accepts the same complete configuration as create. It increments the environment revision, clears the current validation version, and returns the environment to `draft` so stale flow revisions cannot run.
+
+### POST `/projects/{projectId}/capture-environments/{environmentId}/validate`
+
+- Requires an empty body, CSRF, `Idempotency-Key`, and editor-level project mutation authorization.
+- Atomically marks the environment `validating`, persists an `environment_validation` job, and returns `202` (`200 reused` for an identical request). The worker validates the allowlisted destination, DNS/private-address safety, pinned-address reachability, TLS, and every redirect before creating an immutable environment version.
+- Unsafe resolution is persisted as a safe failed state without IP, DNS, or internal network details.
+
+### POST `/projects/{projectId}/discovery-runs`
+
+- Requires CSRF, `Idempotency-Key`, a ready environment ID, 1–50 bounded goals, and an optional candidate limit from 1–100.
+- Atomically persists the discovery run and `flow_discovery` job. Queue payloads contain opaque workspace/project/run/job IDs only; goals stay in private job input.
+- Remote products require a container or microVM inventory runtime. Local browser crawling is accepted only for `local_preview`.
+- Returns `202` for new work and `200 reused` for an identical request.
+
+### GET `/projects/{projectId}/discovery-runs/{discoveryRunId}`
+
+- Returns a safe status/budget/model projection. It does not return raw DOM, screenshots, repository contents, or usage-event payloads.
+
+### POST `/projects/{projectId}/discovery-runs/{discoveryRunId}/cancel`
+
+- Requires an empty body and CSRF. Queued work is canceled when supported; active workers converge on the persisted canceled state.
+
+### GET/POST `/projects/{projectId}/capture-personas`
+
+- `GET` lists project personas.
+- `POST` accepts environment ID, key, display name, role description, and optional fixture/credential grant references.
+- The referenced environment must belong to the same workspace/project. Credential values are never accepted by this route.
+
+### PATCH `/projects/{projectId}/capture-personas/{personaId}`
+
+- Replaces the safe persona configuration, optionally changes `active`/`disabled`, and increments the persona revision.
+- Raw credentials remain forbidden; only an opaque grant ID may be referenced.
+
+### POST `/projects/{projectId}/capture-credential-grants`
+
+- Requires CSRF and accepts an environment/persona scope, `username_password` or `session_bootstrap_token`, the matching one-time secret object, and an expiry.
+- The server verifies environment/persona ownership before passing the secret directly to the configured vault callback. Persistence receives only grant metadata and an opaque vault reference.
+- The response contains metadata only; secrets, vault references, and provider internals are never returned or audited.
+
+### POST `/projects/{projectId}/capture-credential-grants/{grantId}/revoke`
+
+- Requires CSRF plus the environment/persona scope. It deletes the external secret, marks metadata revoked, and returns metadata only.
+
+### GET/POST `/projects/{projectId}/product-flows`
+
+- `GET` lists current flow revisions.
+- `POST` accepts one runtime-validated declarative `flow`. New revisions must be drafts, monotonically increment the current revision, use the current ready environment version, and reference a same-project persona.
+- Generated JavaScript, shell commands, arbitrary network calls, and unknown action types are rejected by the flow schema.
+
+### GET/PATCH `/projects/{projectId}/product-flows/{flowId}`
+
+- `GET` returns the current authorized revision.
+- `PATCH` accepts a complete next draft revision whose body ID matches the route. Revisions are append-only.
+
+### POST `/projects/{projectId}/product-flows/{flowId}/approve`
+
+### POST `/projects/{projectId}/product-flows/{flowId}/reject`
+
+- Require an empty body and CSRF.
+- Create a new immutable flow revision; approval actor/time/revision are server-owned and cannot be supplied by clients.
+- Approval remains distinct from starting a capture run.
+
+### POST `/projects/{projectId}/capture-runs`
+
+- Requires CSRF and `Idempotency-Key` plus `{ "environmentId": "...", "flowIds": ["..."] }`.
+- Resolves the current ready environment, compiles only current approved flow revisions, enforces the policy and quota hook, atomically persists run/job state, and queues an isolated worker job.
+- Returns `202` for a new run and `200` with `reused: true` for an identical idempotent request. Reusing the key for different input returns `409`.
+- Responses expose plan/policy hashes and estimated browser seconds, never the base URL, credentials, queue internals, private paths, or object keys.
+
+### GET `/projects/{projectId}/capture-runs/{captureRunId}`
+
+- Returns the safe run projection and safe flow-execution lineage/status. Artifact IDs are opaque; this route does not mint preview URLs.
+
+### POST `/projects/{projectId}/capture-runs/{captureRunId}/cancel`
+
+- Requires an empty body and CSRF. Cancellation is cooperative and returns `202`.
+- The worker checks cancellation between expensive stages, deletes its private work directory, and invokes temporary-capability cleanup.
+
+### POST `/projects/{projectId}/capture-runs/{captureRunId}/assemblies`
+
+- Requires CSRF, `Idempotency-Key`, and 1–50 ordered verified execution IDs from the completed run.
+- Persists a `capture_assembly` job and returns `202`. The worker materializes only the selected normalized clips, verifies artifact scope/checksums, assembles them in the submitted order, stores a versioned manifest and source artifact, and activates that recording through the authorized project store.
+- Activation marks prior analysis/script/render state stale and records source minutes/storage usage with assembly lineage.
+
+### POST `/projects/{projectId}/flow-executions/{executionId}/preview-url`
+
+- Requires an empty body, CSRF, and project authorization.
+- Mints a 60–600 second private GET URL only for the execution's verified `normalized_flow_clip`; raw captures and cross-project artifacts are rejected.
+- Returns `Cache-Control: private, no-store` with artifact ID, content type, URL, and expiry. Storage keys are never returned.
+
+### GET `/projects/{projectId}/coverage-snapshots/latest`
+
+- Returns the latest workspace/project-scoped multi-dimensional coverage snapshot when the coverage service is configured.
+- A dimension whose inventory is not trustworthy returns `denominator: "unknown"` and never fabricates an uncovered count.
+
+### POST `/projects/{projectId}/flow-executions/{executionId}/retry`
+
+- Requires an empty body, CSRF, and `Idempotency-Key`.
+- Resolves the failed/blocked execution and creates a normal one-flow capture run through the same current-environment, current-approval, quota, hash, and queue controls. Active executions cannot be retried.
+
+### GET `/capture-capabilities`
+
+- Returns safe booleans for validation, credential vault, isolated runtime, discovery, capture, assembly, clip preview, coverage, and audit wiring.
+- `available` is true only when every user-facing dependency is present. Clients must hide the self-service capture entry point when false.
+
+- **Configuration:** capture routes return `503 capture_not_configured` unless the application, coordinator, control, isolated runtime, queue, storage, and persistence dependencies required by that route are wired.
 - **Errors:** 404.
-- **Rate limit:** 120/min.
+- **Rate limit:** capture mutations default to 30/min/workspace-user in-process and require an edge/distributed limiter for horizontally scaled production.
 
 ## Analysis
 

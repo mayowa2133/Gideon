@@ -15,7 +15,23 @@ export type ProjectStatus =
   | "ready"
   | "failed";
 
-export type JobKind = "analysis" | "transcription" | "semantic_analysis" | "ocr" | "tts" | "avatar" | "render" | "export";
+export type JobKind =
+  | "environment_validation"
+  | "flow_discovery"
+  | "flow_compile"
+  | "flow_dry_run"
+  | "flow_capture"
+  | "capture_normalize"
+  | "capture_assembly"
+  | "coverage_calculation"
+  | "analysis"
+  | "transcription"
+  | "semantic_analysis"
+  | "ocr"
+  | "tts"
+  | "avatar"
+  | "render"
+  | "export";
 
 export type JobStatus = "queued" | "running" | "succeeded" | "failed" | "canceling" | "canceled";
 
@@ -33,6 +49,19 @@ export type JobEventKind =
 export type JobStage =
   | "queued"
   | "quota"
+  | "environment_validation"
+  | "inventory"
+  | "exploration"
+  | "flow_compile"
+  | "provisioning"
+  | "resetting"
+  | "authenticating"
+  | "dry_run"
+  | "recording"
+  | "normalizing"
+  | "verification"
+  | "assembly"
+  | "coverage"
   | "frame_extraction"
   | "transcription"
   | "ocr"
@@ -69,6 +98,26 @@ export type AuditAction =
   | "recording.attach"
   | "recording.upload_session.create"
   | "recording.upload_session.complete"
+  | "capture_environment.create"
+  | "capture_environment.update"
+  | "capture_environment.validate"
+  | "capture_persona.create"
+  | "capture_credential_grant.create"
+  | "capture_credential_grant.use"
+  | "capture_credential_grant.expire"
+  | "capture_credential_grant.revoke"
+  | "flow_discovery.start"
+  | "flow_discovery.cancel"
+  | "flow_discovery.complete"
+  | "product_flow.revise"
+  | "product_flow.approve"
+  | "product_flow.reject"
+  | "capture_run.start"
+  | "capture_run.cancel"
+  | "capture_run.retry"
+  | "capture_run.complete"
+  | "capture_assembly.activate"
+  | "capture_assembly.delete"
   | "analysis.complete"
   | "moments.update"
   | "concepts.generate"
@@ -90,6 +139,14 @@ export type AuditTargetType =
   | "user"
   | "project"
   | "recording"
+  | "capture_environment"
+  | "capture_persona"
+  | "capture_credential_grant"
+  | "discovery_run"
+  | "product_flow"
+  | "capture_run"
+  | "flow_execution"
+  | "coverage_snapshot"
   | "artifact"
   | "job"
   | "moment"
@@ -117,6 +174,7 @@ export interface AuditEvent {
 
 export type UsageMetric =
   | "source_minutes"
+  | "browser_minutes"
   | "transcription_minutes"
   | "llm_runs"
   | "tts_characters"
@@ -126,6 +184,15 @@ export type UsageMetric =
 
 export type ArtifactKind =
   | "source_recording"
+  | "discovery_evidence"
+  | "exploration_trace"
+  | "flow_plan"
+  | "raw_browser_capture"
+  | "action_telemetry"
+  | "verification_receipt"
+  | "normalized_flow_clip"
+  | "capture_assembly_manifest"
+  | "coverage_report"
   | "extracted_audio"
   | "frame"
   | "voiceover"
@@ -190,7 +257,7 @@ export interface UsageEvent {
   metric: UsageMetric;
   quantity: number;
   unit: "minute" | "count" | "character" | "byte";
-  source: "recording" | "transcription" | "analysis" | "ocr" | "tts" | "render" | "export";
+  source: "recording" | "capture" | "capture_assembly" | "transcription" | "analysis" | "ocr" | "tts" | "render" | "export";
   idempotencyKey: string;
   createdAt: string;
 }
@@ -361,6 +428,9 @@ export interface RecordingMetadata {
   fileName: string;
   originalFilePath?: string;
   artifactId?: string;
+  origin?: "uploaded" | "captured_assembly";
+  captureRunId?: string;
+  assemblyManifestArtifactId?: string;
   storageKey?: string;
   sha256?: string;
   sizeBytes: number;

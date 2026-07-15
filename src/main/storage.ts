@@ -190,6 +190,18 @@ export async function completeDirectUploadSession(
   }).cacheUploadedObject(sessionInput);
 }
 
+export function createPrivateArtifactDownloadUrl(input: { artifact: ArtifactRecord; env?: NodeJS.ProcessEnv; expiresInSeconds?: number; now?: Date }): { url: string; expiresAt: string } {
+  const config = loadStorageConfig(input.env);
+  if ((input.artifact.provider !== "s3" && input.artifact.provider !== "r2") || config.provider !== input.artifact.provider || !isCloudStorageConfigured(config)) throw new Error("Private artifact download signing is not configured for this artifact provider.");
+  if (!input.artifact.storageKey || input.artifact.storageKey.startsWith("/") || input.artifact.storageKey.includes("..")) throw new Error("Private artifact storage key is invalid.");
+  const expiresInSeconds = clamp(input.expiresInSeconds ?? 300, 60, 600);
+  const now = input.now ?? new Date();
+  return {
+    url: presignedGetUrl({ url: s3ObjectUrl(config.endpoint!, config.bucket!, input.artifact.storageKey), region: config.region, accessKeyId: config.accessKeyId!, secretAccessKey: config.secretAccessKey!, expiresInSeconds, now }),
+    expiresAt: new Date(now.getTime() + expiresInSeconds * 1000).toISOString()
+  };
+}
+
 export class LocalPrivateObjectStorage implements PrivateObjectStorage {
   constructor(private readonly rootDir: string) {}
 

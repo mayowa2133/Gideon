@@ -219,6 +219,20 @@ Detailed prompt and provider payloads may be stored only in protected artifact o
   - Enforce size and content-type limits.
   - Fetch through a hardened service with no cloud metadata access.
 
+### Structured product capture
+
+The post-MVP capture worker adds browser navigation but does not relax the SSRF rules:
+
+- Every navigation and subresource request passes through an explicit domain policy.
+- HTTPS is required except for an explicitly enabled localhost preview connector.
+- URL credentials are forbidden.
+- DNS validation rejects empty results and any private, loopback, link-local, multicast, reserved, documentation, or mixed public/private answer.
+- DNS policy must also be enforced at the worker egress boundary; application checks alone are not sufficient container isolation.
+- Computer-use providers may propose typed actions but cannot execute arbitrary JavaScript, shell commands, downloads, clipboard reads, or network calls.
+- Financial, destructive, security-sensitive, publishing/invitation, and external-side-effect actions are technically denied unless a later reviewed policy explicitly supports them.
+- Credential values are resolved only inside the login adapter from a scoped, expiring, revocable grant and must not enter prompts, job JSON, traces, screenshots, or logs.
+- Final success requires observable assertions and a versioned verification receipt; model claims of completion are not trusted.
+
 ## Web security headers
 
 Production responses should include:
