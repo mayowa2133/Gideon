@@ -18,7 +18,7 @@ The supported local concierge proof is documented in [nexusreach-local-capture-p
 - Disposable credential grants have a callback-only vault interface. The external-vault adapter persists only metadata and an opaque vault reference; the login adapter resolves the secret only while filling the approved form.
 - Capture-run creation is idempotent. The server compiles current approved flows, hashes policy and plans, estimates quota usage, and atomically persists the generic job and capture run before queueing.
 - BullMQ capture jobs contain only workspace, project, run, and job IDs. Queue retries are bounded.
-- Remote capture is refused unless the runtime identifies itself as container or microVM isolated. `local_test` is accepted only for `local_preview` environments.
+- Remote capture is refused unless the runtime identifies itself as container or microVM isolated. `local_test` is accepted only for `local_preview` environments. Remote responses must include an attestation bound to the exact declarative manifest hash, declared isolation class, valid runtime instance ID, completion time, and the caller's pinned SHA-256 worker image digest before their browser receipt or recording is trusted.
 - Every flow resets before both dry run and recording. Failed dry runs stop before recording; failed assertions produce review state instead of successful clips.
 - Playwright replay uses fixed viewport, locale, timezone, color scheme, reduced motion, disabled downloads, and per-request network-policy checks.
 - Raw WebM, verification receipt, network/action telemetry, normalized H.264 clip, assembly manifest, and composite source recording are private artifacts with hashes and lineage. Explicit assembly jobs preserve the user's selected clip order before activation.
@@ -66,7 +66,7 @@ The supported local concierge proof is documented in [nexusreach-local-capture-p
 
 The code deliberately does not fall back to a local browser for remote products. Production must provide:
 
-1. A browser pool using container or microVM isolation, non-root execution, read-only base filesystem, bounded work volume, CPU/memory/PID/time limits, and default-deny egress through the policy gateway.
+1. A browser pool using a pinned SHA-256 image digest, container or microVM isolation, non-root execution, read-only base filesystem, bounded work volume, CPU/memory/PID/time limits, default-deny egress through the policy gateway, and a response attestation bound to each submitted manifest hash.
 2. PostgreSQL migration `0004_product_flow_capture.sql`, Redis/BullMQ, and private S3/R2 storage.
 3. An external secret-store implementation and credential metadata repository.
 4. Reset adapters and reviewed login adapters for enabled environments.
@@ -75,7 +75,7 @@ The code deliberately does not fall back to a local browser for remote products.
 7. The provided PostgreSQL-backed capture audit sink wiring for environment, credential, discovery, flow approval, run, cancellation, retry, coverage, and assembly actions.
 8. Dashboards and alerts fed by capture observability plus browser-worker and queue metrics.
 
-Run `pnpm capture:worker:check` before starting a worker. Production configuration rejects local-test isolation, in-memory secrets, and local artifact storage.
+Run `pnpm capture:worker:check` before starting a worker. Production configuration rejects local-test isolation, in-memory secrets, local artifact storage, loopback or credential-bearing runtime endpoints, unpinned worker images, and missing policy bundle versions.
 
 ## API availability
 

@@ -18,10 +18,22 @@ export interface IsolatedCaptureManifest {
 
 export interface IsolatedCaptureClient {
   isolation: "container" | "microvm";
-  execute(manifest: IsolatedCaptureManifest): Promise<PlaywrightCaptureResult>;
+  expectedImageDigest: `sha256:${string}`;
+  execute(manifest: IsolatedCaptureManifest): Promise<{
+    result: PlaywrightCaptureResult;
+    attestation: {
+      schemaVersion: "1";
+      manifestHash: string;
+      isolation: "container" | "microvm";
+      runtimeInstanceId: string;
+      imageDigest: `sha256:${string}`;
+      completedAt: string;
+    };
+  }>;
 }
 
 export function createIsolatedCaptureRuntime(client: IsolatedCaptureClient): CaptureBrowserRuntime {
+  assertImageDigest(client.expectedImageDigest);
   return {
     isolation: client.isolation,
     async execute(input) {
@@ -41,7 +53,9 @@ export function createIsolatedCaptureRuntime(client: IsolatedCaptureClient): Cap
         outputHandle: `capture-output:${input.id}`
       };
       const manifest: IsolatedCaptureManifest = { ...withoutHash, manifestHash: sha256(stableSerialize(withoutHash)) };
-      const result = await client.execute(manifest);
+      const response = await client.execute(manifest);
+      assertAttestation(response.attestation, manifest, client);
+      const result = response.result;
       if (result.receipt.compiledPlanHash !== input.plan.compiledPlanHash || result.receipt.workspaceId !== input.workspaceId) {
         throw new Error("Isolated capture receipt does not match the submitted manifest.");
       }
@@ -51,6 +65,17 @@ export function createIsolatedCaptureRuntime(client: IsolatedCaptureClient): Cap
       return result;
     }
   };
+}
+
+function assertAttestation(attestation: Awaited<ReturnType<IsolatedCaptureClient["execute"]>>["attestation"], manifest: IsolatedCaptureManifest, client: IsolatedCaptureClient): void {
+  if (attestation.schemaVersion !== "1" || attestation.manifestHash !== manifest.manifestHash) throw new Error("Isolated capture attestation does not match the submitted manifest.");
+  if (attestation.isolation !== client.isolation || attestation.imageDigest !== client.expectedImageDigest) throw new Error("Isolated capture attestation does not match the pinned runtime.");
+  if (!/^[a-z0-9][a-z0-9._:-]{0,199}$/i.test(attestation.runtimeInstanceId) || !Number.isFinite(Date.parse(attestation.completedAt))) throw new Error("Isolated capture attestation is invalid.");
+  assertImageDigest(attestation.imageDigest);
+}
+
+function assertImageDigest(value: string): asserts value is `sha256:${string}` {
+  if (!/^sha256:[a-f0-9]{64}$/.test(value)) throw new Error("Isolated capture runtime image digest must be a pinned SHA-256 digest.");
 }
 
 function sha256(value: string) {
