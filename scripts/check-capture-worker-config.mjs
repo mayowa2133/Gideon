@@ -15,8 +15,11 @@ requirePositive("GIDEON_CAPTURE_MAX_BROWSER_SECONDS");
 const isolation = normalized("GIDEON_CAPTURE_ISOLATION");
 if (!new Set(["container", "microvm", "local_test"]).has(isolation)) errors.push("GIDEON_CAPTURE_ISOLATION must be container, microvm, or local_test.");
 if (production && isolation === "local_test") errors.push("Production capture workers cannot use local_test isolation.");
-if ((isolation === "container" || isolation === "microvm") && !normalized("GIDEON_CAPTURE_RUNTIME_ENDPOINT")) errors.push("Set GIDEON_CAPTURE_RUNTIME_ENDPOINT for an isolated browser pool.");
-if (normalized("GIDEON_CAPTURE_RUNTIME_ENDPOINT")) requireUrl("GIDEON_CAPTURE_RUNTIME_ENDPOINT", production ? ["https:"] : ["http:", "https:"]);
+if (isolation === "container" || isolation === "microvm") {
+  if (!normalized("GIDEON_CAPTURE_RUNTIME_ENDPOINT")) errors.push("Set GIDEON_CAPTURE_RUNTIME_ENDPOINT for an isolated browser pool.");
+  requireImageDigest("GIDEON_CAPTURE_RUNTIME_IMAGE_DIGEST");
+}
+if (normalized("GIDEON_CAPTURE_RUNTIME_ENDPOINT")) requireRuntimeUrl("GIDEON_CAPTURE_RUNTIME_ENDPOINT", production ? ["https:"] : ["http:", "https:"]);
 
 const secretProvider = normalized("GIDEON_CAPTURE_SECRET_PROVIDER");
 if (!new Set(["aws_secrets_manager", "gcp_secret_manager", "vault", "development_memory"]).has(secretProvider)) errors.push("GIDEON_CAPTURE_SECRET_PROVIDER is invalid.");
@@ -25,7 +28,7 @@ if (production && secretProvider === "development_memory") errors.push("Producti
 const storage = normalized("GIDEON_STORAGE_PROVIDER");
 if (production && !new Set(["s3", "r2"]).has(storage)) errors.push("Production capture workers require private S3/R2 object storage.");
 if (!normalized("GIDEON_FFMPEG_PATH")) warnings.push("GIDEON_FFMPEG_PATH is unset; the worker will depend on ffmpeg in PATH.");
-if (!normalized("GIDEON_CAPTURE_POLICY_VERSION")) warnings.push("Set GIDEON_CAPTURE_POLICY_VERSION so capture manifests identify the deployed policy bundle.");
+if (!normalized("GIDEON_CAPTURE_POLICY_VERSION")) (production ? errors : warnings).push("Set GIDEON_CAPTURE_POLICY_VERSION so capture manifests identify the deployed policy bundle.");
 
 if (errors.length) {
   console.error("Capture worker configuration is not ready:");
@@ -45,3 +48,13 @@ function requireUrl(name, protocols) {
   try { const url = new URL(value); if (!protocols.includes(url.protocol)) errors.push(`${name} must use ${protocols.join(" or ")}.`); }
   catch { errors.push(`${name} must be a valid URL.`); }
 }
+function requireRuntimeUrl(name, protocols) {
+  const value = normalized(name);
+  try {
+    const url = new URL(value);
+    if (!protocols.includes(url.protocol)) errors.push(`${name} must use ${protocols.join(" or ")}.`);
+    if (url.username || url.password || url.search || url.hash) errors.push(`${name} must not contain credentials, query parameters, or fragments.`);
+    if (production && (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "::1")) errors.push(`${name} must not target loopback in production.`);
+  } catch { errors.push(`${name} must be a valid URL.`); }
+}
+function requireImageDigest(name) { if (!/^sha256:[a-f0-9]{64}$/.test(normalized(name))) errors.push(`${name} must be a pinned SHA-256 image digest.`); }
