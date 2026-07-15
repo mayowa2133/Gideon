@@ -28,6 +28,9 @@ test("reviews discovered intent before capture and activates an explicit assembl
   await page.getByRole("button", { name: "Load preview" }).click();
   await expect(page.locator("video")).toHaveAttribute("src", /^data:video\/mp4/);
   await expect(page.getByText("100%")).toBeVisible();
+  await expect(page.getByText("Inventory current")).toBeVisible();
+  await expect(page.getByText(/capture-coverage-inventory-v1 · revision 2/)).toBeVisible();
+  await expect(page.getByText(/current approved flow revisions/)).toBeVisible();
   await page.getByRole("button", { name: "Activate selected assembly" }).click();
   await expect(page.getByText(/Assembly queued/)).toBeVisible();
   await expect(page.getByText(/Assembly activated as the project source recording/)).toBeVisible({ timeout: 8_000 });
@@ -69,7 +72,7 @@ async function mockCaptureApi(page: Page, state: { discoveryReads: number; captu
     if (path.endsWith("/capture-runs") && method === "POST") { state.mutations.push("capture"); expect(request.headers()["idempotency-key"]).toBeTruthy(); return respond(route, { captureRun: captureRun("queued"), job: job("capture-job"), reused: false }, 202); }
     if (path.endsWith("/capture-runs/capture-1") && method === "GET") { state.captureReads += 1; return respond(route, { captureRun: captureRun(state.captureReads >= 1 ? "completed" : "recording"), executions: state.captureReads >= 1 ? [execution] : [] }); }
     if (path.endsWith("/flow-executions/execution-1/preview-url")) { state.mutations.push("preview"); return respond(route, { preview: { executionId: "execution-1", artifactId: "artifact-1", contentType: "video/mp4", url: "data:video/mp4;base64,AAAA", expiresAt: "2026-07-14T10:05:00.000Z" } }); }
-    if (path.endsWith("/coverage-snapshots/latest")) return respond(route, { coverageSnapshot: { id: "coverage-1", projectId: "project-1", environmentVersionId: "version-1", calculationVersion: "capture-coverage-v1", createdAt: "2026-07-14T10:00:00.000Z", dimensions: [{ key: "approved_flow", denominator: 1, denominatorSource: "current_approved_flow_revisions", coveredIds: ["flow-1"], uncoveredIds: [], excluded: [], blocked: [] }] } });
+    if (path.endsWith("/coverage-snapshots/latest")) return respond(route, { coverageSnapshot: { id: "coverage-1", projectId: "project-1", environmentVersionId: "version-1", calculationVersion: "capture-coverage-v2", inventory: { version: "capture-coverage-inventory-v1", revision: 2 }, freshness: { status: "current", reasons: [], evaluatedAt: "2026-07-14T10:00:00.000Z" }, createdAt: "2026-07-14T10:00:00.000Z", dimensions: [{ key: "approved_flow", denominator: 1, denominatorSource: "current_approved_flow_revisions", denominatorSources: [], coveredIds: ["flow-1"], uncoveredIds: [], excluded: [], blocked: [] }] } });
     if (path.endsWith("/capture-runs/capture-1/assemblies")) { state.mutations.push("assembly"); expect(request.headers()["idempotency-key"]).toBeTruthy(); return respond(route, { job: job("assembly-job"), reused: false }, 202); }
     if (path.endsWith("/jobs/assembly-job")) return respond(route, { job: { ...job("assembly-job"), status: "succeeded", userMessage: "Assembly activated" } });
     return route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: { code: "not_found", message: `No mock for ${method} ${path}` } }) });

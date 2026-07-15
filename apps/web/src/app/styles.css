@@ -112,6 +112,10 @@ h3 { margin-bottom: .28rem; }
 .coverage-list { display: grid; gap: .9rem; margin-top: 1rem; }
 .coverage-list > div > div:first-child { display: flex; justify-content: space-between; font-size: .75rem; text-transform: capitalize; }
 .coverage-list small { color: var(--muted); font-size: .65rem; }
+.coverage-freshness { display: grid; gap: .2rem; margin-top: 1rem; padding: .75rem; border: 1px solid var(--line); border-radius: .65rem; background: var(--panel-2); }
+.coverage-freshness small { color: var(--muted); }
+.coverage-freshness.stale { border-color: #d97706; background: #fff7ed; color: #9a3412; }
+.coverage-freshness.unknown { border-color: #94a3b8; background: #f8fafc; color: #334155; }
 .meter { height: 5px; margin: .35rem 0; border-radius: 999px; background: #252d39; overflow: hidden; }
 .meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--green), #8ee4ff); }
 .banner { display: flex; gap: .5rem; align-items: center; margin-bottom: 1rem; border-radius: 13px; padding: .8rem 1rem; font-size: .78rem; }

@@ -182,6 +182,9 @@ export type CoverageDimensionKey =
 export interface CoverageDimensionInput {
   key: CoverageDimensionKey;
   denominatorSource?: string;
+  denominatorSources?: string[];
+  inventoryRevision?: number;
+  inventoryHash?: string;
   knownIds?: string[];
   coveredIds: string[];
   excluded?: Array<{ id: string; reason: string }>;
@@ -191,6 +194,9 @@ export interface CoverageDimensionInput {
 export interface CoverageDimensionSnapshot {
   key: CoverageDimensionKey;
   denominatorSource?: string;
+  denominatorSources?: string[];
+  inventoryRevision?: number;
+  inventoryHash?: string;
   denominator: number | "unknown";
   coveredIds: string[];
   uncoveredIds: string[];
@@ -205,8 +211,28 @@ export interface CoverageSnapshot {
   projectId: string;
   environmentVersionId: string;
   calculationVersion: string;
+  basis?: CoverageRevisionBasis;
+  freshness?: CoverageFreshness;
   dimensions: CoverageDimensionSnapshot[];
   createdAt: string;
+}
+
+export interface CoverageRevisionBasis {
+  schemaVersion: "1";
+  inventoryVersion: "capture-coverage-inventory-v1";
+  inventoryRevision: number;
+  inventoryHash: string;
+  environmentVersionId: string;
+  policyFingerprint: string;
+  fixtureRevision: string;
+  personaRevisionHash: string;
+  flowRevisionHash: string;
+}
+
+export interface CoverageFreshness {
+  status: "current" | "stale" | "unknown";
+  reasons: Array<"inventory" | "environment" | "policy" | "fixture" | "persona" | "flow" | "basis_unavailable" | "legacy_snapshot">;
+  evaluatedAt: string;
 }
 
 export type CaptureEnvironmentType = "local_preview" | "staging" | "demo" | "production_sandbox";
@@ -554,6 +580,9 @@ export function createCoverageSnapshot(input: Omit<CoverageSnapshot, "schemaVers
       return {
         key: dimension.key,
         denominatorSource: dimension.denominatorSource,
+        denominatorSources: dimension.denominatorSources,
+        inventoryRevision: dimension.inventoryRevision,
+        inventoryHash: dimension.inventoryHash,
         denominator: "unknown" as const,
         coveredIds,
         uncoveredIds: [],
@@ -569,6 +598,9 @@ export function createCoverageSnapshot(input: Omit<CoverageSnapshot, "schemaVers
     return {
       key: dimension.key,
       denominatorSource: dimension.denominatorSource,
+      denominatorSources: dimension.denominatorSources,
+      inventoryRevision: dimension.inventoryRevision,
+      inventoryHash: dimension.inventoryHash,
       denominator: knownIds.length,
       coveredIds,
       uncoveredIds: knownIds.filter((id) => !accounted.has(id)),

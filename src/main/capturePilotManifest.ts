@@ -49,6 +49,17 @@ export interface CapturePilotManifest {
       quality: { minimumSourceTextPx: number };
     };
   };
+  coverageInventory?: {
+    revision: number;
+    fixtureRevision: string;
+    dimensions: Array<{
+      key: "route" | "state" | "usage_sequence" | "feature_flag" | "outcome" | "failure_state";
+      trustworthyDenominator: boolean;
+      items: Array<{ id: string; workflowIds: string[] }>;
+      excluded: Array<{ id: string; reason: string }>;
+      blocked: Array<{ id: string; code: string }>;
+    }>;
+  };
   workflows: Array<{
     id: string;
     goalId: string;
@@ -68,13 +79,14 @@ const rootKeys = ["schemaVersion", "key", "workspaceId", "projectId", "name", "a
 
 export function parseCapturePilotManifest(value: unknown): CapturePilotManifest {
   const root = record(value, "manifest");
-  exactKeys(root, rootKeys, "manifest");
+  exactOptionalKeys(root, rootKeys, ["coverageInventory"], "manifest");
   if (root.schemaVersion !== "1") throw new Error("Capture pilot manifest schemaVersion must be 1.");
   const repository = parseRepository(root.repository);
   const environment = parseEnvironment(root.environment);
   const persona = parsePersona(root.persona);
   const presentation = parsePresentation(root.presentation);
   const workflows = parseWorkflows(root.workflows);
+  const coverageInventory = root.coverageInventory === undefined ? undefined : parseCoverageInventory(root.coverageInventory, workflows.map((workflow) => workflow.id));
   const manifest: CapturePilotManifest = {
     schemaVersion: "1",
     key: identifier(root.key, "manifest.key"),
@@ -86,10 +98,49 @@ export function parseCapturePilotManifest(value: unknown): CapturePilotManifest 
     environment,
     persona,
     presentation,
+    ...(coverageInventory ? { coverageInventory } : {}),
     workflows
   };
   validateScenarioContracts(manifest);
   return structuredClone(manifest);
+}
+
+function parseCoverageInventory(value: unknown, workflowIds: string[]): NonNullable<CapturePilotManifest["coverageInventory"]> {
+  const input = record(value, "manifest.coverageInventory");
+  exactKeys(input, ["revision", "fixtureRevision", "dimensions"], "manifest.coverageInventory");
+  if (!Array.isArray(input.dimensions) || input.dimensions.length > 6) throw new Error("Capture pilot coverage inventory dimensions are invalid.");
+  const dimensionKeys = ["route", "state", "usage_sequence", "feature_flag", "outcome", "failure_state"] as const;
+  const seen = new Set<string>();
+  const dimensions = input.dimensions.map((raw, index) => {
+    const dimension = record(raw, `manifest.coverageInventory.dimensions[${index}]`);
+    exactKeys(dimension, ["key", "trustworthyDenominator", "items", "excluded", "blocked"], `manifest.coverageInventory.dimensions[${index}]`);
+    if (!dimensionKeys.includes(dimension.key as typeof dimensionKeys[number]) || seen.has(String(dimension.key))) throw new Error(`Capture pilot coverage inventory dimension ${index} is invalid.`);
+    seen.add(String(dimension.key));
+    if (typeof dimension.trustworthyDenominator !== "boolean") throw new Error(`Capture pilot coverage inventory dimension ${index} trust is invalid.`);
+    if (!Array.isArray(dimension.items) || dimension.items.length > 500 || !Array.isArray(dimension.excluded) || dimension.excluded.length > 500 || !Array.isArray(dimension.blocked) || dimension.blocked.length > 500) throw new Error(`Capture pilot coverage inventory dimension ${index} items are invalid.`);
+    const itemIds = new Set<string>();
+    const items = dimension.items.map((rawItem, itemIndex) => {
+      const item = record(rawItem, `manifest.coverageInventory.dimensions[${index}].items[${itemIndex}]`);
+      exactKeys(item, ["id", "workflowIds"], `manifest.coverageInventory.dimensions[${index}].items[${itemIndex}]`);
+      const id = text(item.id, `manifest.coverageInventory.dimensions[${index}].items[${itemIndex}].id`, 500);
+      const mappedWorkflows = optionalStringArray(item.workflowIds, `manifest.coverageInventory.dimensions[${index}].items[${itemIndex}].workflowIds`, 50);
+      if (itemIds.has(id) || mappedWorkflows.some((workflowId) => !workflowIds.includes(workflowId))) throw new Error(`Capture pilot coverage inventory item ${id} is invalid.`);
+      itemIds.add(id);
+      return { id, workflowIds: mappedWorkflows };
+    });
+    const excluded = dimension.excluded.map((rawEntry, entryIndex) => parseCoverageEntry(rawEntry, "reason", `manifest.coverageInventory.dimensions[${index}].excluded[${entryIndex}]`));
+    const blocked = dimension.blocked.map((rawEntry, entryIndex) => parseCoverageEntry(rawEntry, "code", `manifest.coverageInventory.dimensions[${index}].blocked[${entryIndex}]`));
+    const allIds = [...items.map((item) => item.id), ...excluded.map((item) => item.id), ...blocked.map((item) => item.id)];
+    if (new Set(allIds).size !== allIds.length) throw new Error(`Capture pilot coverage inventory dimension ${dimension.key} contains duplicate IDs.`);
+    return { key: dimension.key as typeof dimensionKeys[number], trustworthyDenominator: dimension.trustworthyDenominator, items, excluded, blocked };
+  });
+  return { revision: integer(input.revision, "manifest.coverageInventory.revision", 1, 1_000_000), fixtureRevision: identifier(input.fixtureRevision, "manifest.coverageInventory.fixtureRevision"), dimensions };
+}
+
+function parseCoverageEntry<K extends "reason" | "code">(value: unknown, field: K, label: string): { id: string } & Record<K, string> {
+  const input = record(value, label);
+  exactKeys(input, ["id", field], label);
+  return { id: text(input.id, `${label}.id`, 500), [field]: text(input[field], `${label}.${field}`, 500) } as { id: string } & Record<K, string>;
 }
 
 export function assertCapturePilotAdapters(manifest: CapturePilotManifest, registry: CapturePilotAdapterRegistry): void {
@@ -235,8 +286,10 @@ function validateScenarioContracts(manifest: CapturePilotManifest): void {
 function isLoopbackHostname(hostname: string): boolean { return hostname === "127.0.0.1" || hostname === "localhost"; }
 function record(value: unknown, label: string): Record<string, unknown> { if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object.`); return value as Record<string, unknown>; }
 function exactKeys(value: Record<string, unknown>, allowed: string[], label: string): void { const unknown = Object.keys(value).find((key) => !allowed.includes(key)); if (unknown) throw new Error(`${label}.${unknown} is not supported.`); const missing = allowed.find((key) => !(key in value)); if (missing) throw new Error(`${label}.${missing} is required.`); }
+function exactOptionalKeys(value: Record<string, unknown>, required: string[], optional: string[], label: string): void { const unknown = Object.keys(value).find((key) => !required.includes(key) && !optional.includes(key)); if (unknown) throw new Error(`${label}.${unknown} is not supported.`); const missing = required.find((key) => !(key in value)); if (missing) throw new Error(`${label}.${missing} is required.`); }
 function text(value: unknown, label: string, max: number): string { if (typeof value !== "string" || !value.trim() || value.length > max) throw new Error(`${label} is invalid.`); return value.trim(); }
 function identifier(value: unknown, label: string): string { const result = text(value, label, 200); if (!/^[a-z0-9][a-z0-9._:-]*$/i.test(result)) throw new Error(`${label} must be an identifier.`); return result; }
 function integer(value: unknown, label: string, min: number, max: number): number { if (!Number.isInteger(value) || (value as number) < min || (value as number) > max) throw new Error(`${label} must be an integer from ${min} to ${max}.`); return value as number; }
 function finiteNumber(value: unknown, label: string, min: number, max: number): number { if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) throw new Error(`${label} must be a number from ${min} to ${max}.`); return value; }
 function stringArray(value: unknown, label: string, max: number): string[] { if (!Array.isArray(value) || value.length < 1 || value.length > max) throw new Error(`${label} must contain 1–${max} strings.`); return value.map((item, index) => text(item, `${label}[${index}]`, 253)); }
+function optionalStringArray(value: unknown, label: string, max: number): string[] { if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must contain 0–${max} strings.`); const output = value.map((item, index) => identifier(item, `${label}[${index}]`)); if (new Set(output).size !== output.length) throw new Error(`${label} must not contain duplicates.`); return output; }

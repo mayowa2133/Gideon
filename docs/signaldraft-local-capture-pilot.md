@@ -34,7 +34,7 @@ Targeted retry remains explicit:
 SIGNALDRAFT_API_TOKEN=gideon-pilot-token pnpm capture:pilot:signaldraft -- --workflow review-sensitive-compensation
 ```
 
-The latest full successful run on July 15, 2026 produced two verified 1440×900 normalized clips, two focused 1080×1920 H.264/AAC derivatives, two editable WebVTT tracks, two private `capture-framing-v1` manifests, two private quality reports, two private JPEG contact sheets, and complete declared goal/flow coverage. Run `2026-07-15T06-09-21-244Z-353f3421-f4c0-4372-86a9-7bc9c3b0e6ef` passed both gates with review warnings for captions that remained visible beyond the preferred six-second range; no output failed. Private output remains below ignored `tmp/capture-pilot/signaldraft/runs` storage.
+The latest full successful run on July 15, 2026 produced two verified 1440×900 normalized clips, two focused 1080×1920 H.264/AAC derivatives, two editable WebVTT tracks, two private `capture-framing-v1` manifests, two private quality reports, two private JPEG contact sheets, and a current versioned bounded coverage snapshot. Run `2026-07-15T06-45-37-346Z-04b089ed-4d32-4f75-af1b-1348374b7f77` passed both gates with review warnings for captions that remained visible beyond the preferred six-second range; no output failed. It covers two of two goals and flows, one persona, the single bounded route, two starting states, two usage sequences, two outcomes, and the observed approval-required failure state. Live send remains explicitly policy-blocked and the untrusted feature-flag denominator remains unknown. Private output remains below ignored `tmp/capture-pilot/signaldraft/runs` storage.
 
 ## Portability finding
 

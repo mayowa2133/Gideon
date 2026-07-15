@@ -2125,6 +2125,21 @@ describe("hosted API foundation", () => {
     const preview = await handleHostedApiRequest({ method: "POST", path: "/api/v1/projects/project-1/flow-executions/execution-1/preview-url", headers, body: {}, nowMs: Date.parse(createdAt) }, api);
     expect(preview).toMatchObject({ status: 200, headers: { "Cache-Control": "private, no-store" }, body: { data: { preview: { url: "https://signed.example.test/clip" } } } });
   });
+
+  it("returns only safe versioned coverage provenance and freshness", async () => {
+    const captureCoverageService = {
+      async latest() { return { schemaVersion: "1" as const, id: "coverage-1", workspaceId: "local-workspace", projectId: "project-1", environmentVersionId: "version-1", calculationVersion: "capture-coverage-v2", basis: { schemaVersion: "1" as const, inventoryVersion: "capture-coverage-inventory-v1" as const, inventoryRevision: 4, inventoryHash: "a".repeat(64), environmentVersionId: "version-1", policyFingerprint: "private-policy-fingerprint", fixtureRevision: "fixture-v4", personaRevisionHash: "b".repeat(64), flowRevisionHash: "c".repeat(64) }, freshness: { status: "stale" as const, reasons: ["flow" as const], evaluatedAt: "2026-07-15T10:00:00.000Z" }, dimensions: [{ key: "route" as const, denominatorSource: "versioned_bounded_inventory", denominatorSources: ["repository_routes@repo-v4"], inventoryRevision: 4, inventoryHash: "a".repeat(64), denominator: 2, coveredIds: ["/"], uncoveredIds: ["/projects"], excluded: [], blocked: [] }], createdAt: "2026-07-15T09:00:00.000Z" }; },
+      async persist(input: { snapshot: unknown }) { return input.snapshot; }
+    } as CaptureCoverageService;
+    const api = testApi({ captureCoverageService });
+    api.store.state.projects = [projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Demo" })];
+    const session = createSignedSession({ secret: "session-secret", userId: "local-user", authSubject: "local:local-user", workspaceId: "local-workspace", csrfToken: "csrf-1", nowMs: Date.parse("2026-07-15T10:00:00.000Z") });
+    const response = await handleHostedApiRequest({ method: "GET", path: "/api/v1/projects/project-1/coverage-snapshots/latest", headers: { cookie: `gideon_session=${session.token}` }, nowMs: Date.parse("2026-07-15T10:00:00.000Z") }, api);
+    expect(response).toMatchObject({ status: 200, body: { data: { coverageSnapshot: { inventory: { version: "capture-coverage-inventory-v1", revision: 4 }, freshness: { status: "stale", reasons: ["flow"] }, dimensions: [{ key: "route", denominatorSources: ["repository_routes@repo-v4"], inventoryRevision: 4 }] } } } });
+    expect(JSON.stringify(response)).not.toContain("private-policy-fingerprint");
+    expect(JSON.stringify(response)).not.toContain("inventoryHash");
+    expect(JSON.stringify(response)).not.toContain("workspaceId");
+  });
 });
 
 function testApi(

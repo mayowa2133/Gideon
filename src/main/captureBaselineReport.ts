@@ -26,6 +26,7 @@ export interface CaptureBaselineConfig {
     requireCaptions: boolean;
     requireQualityArtifacts: boolean;
     allowQualityWarnings: boolean;
+    requireCurrentVersionedCoverage: boolean;
     requireFullDeclaredCoverage: boolean;
   };
 }
@@ -106,6 +107,8 @@ export async function generateCaptureBaselineReport(input: {
       qualityReady: pilots.reduce((sum, pilot) => sum + pilot.workflows.filter((workflow) => workflow.quality?.status === "ready").length, 0),
       qualityWarnings: pilots.reduce((sum, pilot) => sum + pilot.workflows.filter((workflow) => workflow.quality?.status === "warning").length, 0),
       qualityFailed: pilots.reduce((sum, pilot) => sum + pilot.workflows.filter((workflow) => workflow.quality?.status === "failed").length, 0),
+      currentVersionedCoverage: pilots.filter((pilot) => pilot.coverageInventory?.freshness === "current").length,
+      staleOrUnknownCoverage: pilots.filter((pilot) => pilot.coverageInventory?.freshness !== "current").length,
       failures: findings.filter((finding) => finding.severity === "failure").length,
       warnings: findings.filter((finding) => finding.severity === "warning").length
     },
@@ -142,7 +145,7 @@ export function parseCaptureBaselineConfig(value: unknown): CaptureBaselineConfi
     return { key, expectedWorkflowIds };
   });
   const thresholds = record(root.thresholds, "capture baseline config thresholds");
-  const thresholdKeys = ["minimumDurationMs", "maximumDurationMs", "normalizedMinimumWidth", "normalizedMinimumHeight", "verticalWidth", "verticalHeight", "minimumFps", "maximumFps", "requiredVideoCodec", "requiredVerticalAudioCodec", "minimumPointerMoveMs", "minimumTypingDelayMs", "maximumTypingDelayMs", "requirePointer", "requireCaptions", "requireQualityArtifacts", "allowQualityWarnings", "requireFullDeclaredCoverage"];
+  const thresholdKeys = ["minimumDurationMs", "maximumDurationMs", "normalizedMinimumWidth", "normalizedMinimumHeight", "verticalWidth", "verticalHeight", "minimumFps", "maximumFps", "requiredVideoCodec", "requiredVerticalAudioCodec", "minimumPointerMoveMs", "minimumTypingDelayMs", "maximumTypingDelayMs", "requirePointer", "requireCaptions", "requireQualityArtifacts", "allowQualityWarnings", "requireCurrentVersionedCoverage", "requireFullDeclaredCoverage"];
   exactKeys(thresholds, thresholdKeys, "capture baseline config thresholds");
   const parsed: CaptureBaselineConfig["thresholds"] = {
     minimumDurationMs: integer(thresholds.minimumDurationMs, "minimumDurationMs", 1, 3_600_000),
@@ -162,6 +165,7 @@ export function parseCaptureBaselineConfig(value: unknown): CaptureBaselineConfi
     requireCaptions: booleanValue(thresholds.requireCaptions, "requireCaptions"),
     requireQualityArtifacts: booleanValue(thresholds.requireQualityArtifacts, "requireQualityArtifacts"),
     allowQualityWarnings: booleanValue(thresholds.allowQualityWarnings, "allowQualityWarnings"),
+    requireCurrentVersionedCoverage: booleanValue(thresholds.requireCurrentVersionedCoverage, "requireCurrentVersionedCoverage"),
     requireFullDeclaredCoverage: booleanValue(thresholds.requireFullDeclaredCoverage, "requireFullDeclaredCoverage")
   };
   if (parsed.minimumDurationMs >= parsed.maximumDurationMs || parsed.minimumFps > parsed.maximumFps || parsed.minimumTypingDelayMs > parsed.maximumTypingDelayMs) throw new Error("Capture baseline threshold ranges are invalid.");
@@ -197,6 +201,8 @@ async function evaluatePilot(input: PilotInput, config: CaptureBaselineConfig, p
   if (!sameSet(results.map((result) => String(result.workflowId)), input.expectedWorkflowIds)) fail("workflow_selection_mismatch", "The report does not contain exactly the expected workflows.");
   const coverage = record(input.report.coverage, `${input.key} report coverage`);
   const dimensions = array(coverage.dimensions, `${input.key} coverage dimensions`).map((value) => record(value, `${input.key} coverage dimension`));
+  const coverageInventory = safeCoverageInventory(coverage);
+  if (config.thresholds.requireCurrentVersionedCoverage && (coverage.calculationVersion !== "capture-coverage-v2" || coverageInventory?.version !== "capture-coverage-inventory-v1" || coverageInventory.freshness !== "current")) fail("coverage_inventory_not_current", "Coverage must be traceable to a current versioned inventory.");
   if (config.thresholds.requireFullDeclaredCoverage) {
     for (const key of ["goal", "approved_flow"]) {
       const dimension = dimensions.find((candidate) => candidate.key === key);
@@ -264,10 +270,24 @@ async function evaluatePilot(input: PilotInput, config: CaptureBaselineConfig, p
         bytesInspected: integer(repositoryEvidence.bytesInspected, "bytesInspected", 0, 1_000_000_000),
         excludedPaths: integer(repositoryEvidence.excludedPaths, "excludedPaths", 0, 1_000_000)
       },
-      coverage: dimensions.map((dimension) => ({ key: identifier(dimension.key, "coverage key"), denominatorSource: typeof dimension.denominatorSource === "string" ? text(dimension.denominatorSource, "denominatorSource", 200) : undefined, denominator: dimension.denominator === "unknown" ? "unknown" as const : integer(dimension.denominator, "coverage denominator", 0, 100_000), covered: array(dimension.coveredIds, "coveredIds").length, uncovered: array(dimension.uncoveredIds, "uncoveredIds").length, excluded: array(dimension.excluded, "excluded").length, blocked: array(dimension.blocked, "blocked").length })),
+      coverageInventory,
+      coverage: dimensions.map((dimension) => ({ key: identifier(dimension.key, "coverage key"), denominatorSource: typeof dimension.denominatorSource === "string" ? text(dimension.denominatorSource, "denominatorSource", 200) : undefined, denominatorSources: dimension.denominatorSources === undefined ? [] : array(dimension.denominatorSources, "denominatorSources").map((source) => text(source, "denominator source", 500)), inventoryRevision: dimension.inventoryRevision === undefined ? undefined : integer(dimension.inventoryRevision, "coverage inventoryRevision", 1, 1_000_000), denominator: dimension.denominator === "unknown" ? "unknown" as const : integer(dimension.denominator, "coverage denominator", 0, 100_000), covered: array(dimension.coveredIds, "coveredIds").length, uncovered: array(dimension.uncoveredIds, "uncoveredIds").length, excluded: array(dimension.excluded, "excluded").length, blocked: array(dimension.blocked, "blocked").length })),
       workflows
     },
     findings
+  };
+}
+
+function safeCoverageInventory(coverage: Record<string, unknown>): { version: "capture-coverage-inventory-v1"; revision: number; freshness: "current" | "stale" | "unknown"; reasons: string[] } | undefined {
+  if (coverage.basis === undefined && coverage.freshness === undefined) return undefined;
+  const basis = record(coverage.basis, "coverage basis");
+  const freshness = record(coverage.freshness, "coverage freshness");
+  if (basis.inventoryVersion !== "capture-coverage-inventory-v1") throw new Error("Coverage inventory version is invalid.");
+  return {
+    version: "capture-coverage-inventory-v1",
+    revision: integer(basis.inventoryRevision, "coverage inventory revision", 1, 1_000_000),
+    freshness: enumValue(freshness.status, ["current", "stale", "unknown"] as const, "coverage freshness"),
+    reasons: array(freshness.reasons, "coverage freshness reasons").map((reason) => identifier(reason, "coverage freshness reason"))
   };
 }
 

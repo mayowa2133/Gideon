@@ -250,7 +250,32 @@ function QualitySummary({ quality }: { quality: NonNullable<FlowExecutionDto["qu
   return <div className={`quality-summary ${quality.status}`} role={quality.status === "ready" ? undefined : "status"}><div><strong>Video quality</strong><StatusBadge status={quality.status} /></div><small>{findings.length ? findings.map((finding) => finding.code.replace(/_/g, " ")).join(" · ") : "All automated checks passed"}</small></div>;
 }
 
-function CoverageCard({ coverage }: { coverage: CoverageSnapshotDto | null }) { return <section className="card"><div className="card-title"><span className="icon-box">◎</span><div><h3>Coverage</h3><p>Unknown stays unknown when Gideon lacks a denominator.</p></div></div>{coverage ? <div className="coverage-list">{coverage.dimensions.map((dimension) => { const denominator = dimension.denominator; const percent = typeof denominator === "number" && denominator > 0 ? Math.round(dimension.coveredIds.length / denominator * 100) : null; return <div key={dimension.key}><div><strong>{dimension.key.replace(/_/g, " ")}</strong><span>{percent === null ? "Unknown" : `${percent}%`}</span></div><div className="meter"><i style={{ width: `${percent ?? 0}%` }} /></div><small>{dimension.coveredIds.length} covered · {typeof denominator === "number" ? denominator : "unknown"} known</small></div>; })}</div> : <p className="muted">Coverage appears after a completed capture run.</p>}</section>; }
+function CoverageCard({ coverage }: { coverage: CoverageSnapshotDto | null }) {
+  if (!coverage) return <section className="card"><div className="card-title"><span className="icon-box">◎</span><div><h3>Bounded coverage</h3><p>Percentages describe a versioned inventory, never all possible product flows.</p></div></div><p className="muted">Coverage appears after a completed capture run.</p></section>;
+  const freshness = coverage.freshness?.status ?? "unknown";
+  const freshnessDetail = freshness === "stale"
+    ? `Changed: ${coverage.freshness?.reasons.join(", ") || "revision basis"}`
+    : coverage.inventory ? `${coverage.inventory.version} · revision ${coverage.inventory.revision}` : "No versioned revision basis is available";
+  return <section className="card">
+    <div className="card-title"><span className="icon-box">◎</span><div><h3>Bounded coverage</h3><p>Percentages describe a versioned inventory, never all possible product flows.</p></div></div>
+    <div className={`coverage-freshness ${freshness}`} role={freshness === "current" ? undefined : "status"}>
+      <strong>{freshness === "current" ? "Inventory current" : freshness === "stale" ? "Coverage is stale" : "Freshness unknown"}</strong>
+      <small>{freshnessDetail}</small>
+    </div>
+    <div className="coverage-list">{coverage.dimensions.map((dimension) => {
+      const denominator = dimension.denominator;
+      const percent = freshness === "current" && typeof denominator === "number" && denominator > 0 ? Math.round(dimension.coveredIds.length / denominator * 100) : null;
+      const label = freshness === "stale" ? "Stale" : percent === null ? "Unknown" : `${percent}%`;
+      const sources = dimension.denominatorSources?.length ? dimension.denominatorSources.join(" · ") : dimension.denominatorSource?.replace(/_/g, " ") ?? "No trustworthy denominator";
+      return <div key={dimension.key}>
+        <div><strong>{dimension.key.replace(/_/g, " ")}</strong><span>{label}</span></div>
+        <div className="meter"><i style={{ width: `${percent ?? 0}%` }} /></div>
+        <small>{dimension.coveredIds.length} covered · {typeof denominator === "number" ? denominator : "unknown"} known · {sources}{dimension.inventoryRevision ? ` · inventory r${dimension.inventoryRevision}` : ""}</small>
+        {Boolean(dimension.excluded.length || dimension.blocked.length) ? <small>{dimension.excluded.length} excluded · {dimension.blocked.length} blocked</small> : null}
+      </div>;
+    })}</div>
+  </section>;
+}
 
 function PanelHeading({ eyebrow, title, detail, aside, children }: { eyebrow: string; title: string; detail: string; aside?: React.ReactNode; children: React.ReactNode }) { return <><div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{detail}</p></div>{aside}</div>{children}</>; }
 function StatusBadge({ status }: { status: string }) { const tone = /(?:ready|approved|verified|completed|succeeded)/.test(status) ? "good" : /(?:failed|blocked|rejected|revoked)/.test(status) ? "bad" : "neutral"; return <span className={`status-badge ${tone}`}>{status.replace(/_/g, " ")}</span>; }

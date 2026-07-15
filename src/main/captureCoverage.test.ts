@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CapturePersona, FlowExecutionRecord, ProductFlowRevision } from "../shared/productFlowCapture";
 import { calculateCaptureCoverage } from "./captureCoverage";
+import { compileCaptureCoverageInventory, createCoverageRevisionBasis } from "./captureCoverageInventory";
 
 describe("capture coverage", () => {
   it("reports verified approved flows while preserving unknown denominators", () => {
@@ -20,6 +21,19 @@ describe("capture coverage", () => {
     const failed = { ...execution(), id: "execution-2", status: "failed" as const };
     const snapshot = calculateCaptureCoverage({ workspaceId: "workspace-1", projectId: "project-1", environmentVersionId: "version-1", goals: [{ id: "goal-1", flowIds: ["flow-1"] }], approvedFlows: [flow()], personas: [persona()], executions: [stale, failed], visitedRouteIds: [], observedStateIds: [], coveredUsageSequenceIds: [], coveredFeatureFlagIds: [], verifiedOutcomeIds: [], coveredFailureStateIds: [] });
     expect(snapshot.dimensions.find((item) => item.key === "approved_flow")?.uncoveredIds).toEqual(["flow-1"]);
+  });
+
+  it("traces percentages to a versioned inventory and keeps untrusted dimensions unknown", () => {
+    const inventory = compileCaptureCoverageInventory({ revision: 2, dimensions: [
+      { key: "persona", trustworthyDenominator: true, sources: [{ kind: "requested_personas", revision: "personas-v2", ids: ["persona-1"] }] },
+      { key: "route", trustworthyDenominator: true, sources: [{ kind: "repository_routes", revision: "repo-v2", ids: ["/", "/projects", "/admin"] }], excluded: [{ id: "/admin", reason: "Admin-only route." }] },
+      { key: "feature_flag", trustworthyDenominator: false, sources: [{ kind: "declared_feature_flags", revision: "repo-v2", ids: ["new-projects"] }] }
+    ], now: () => "2026-07-15T12:00:00.000Z" });
+    const basis = createCoverageRevisionBasis({ inventory, environmentVersionId: "version-1", policyFingerprint: "policy-v2", fixtureRevision: "fixture-v2", personas: [persona()], flows: [flow()] });
+    const snapshot = calculateCaptureCoverage({ workspaceId: "workspace-1", projectId: "project-1", environmentVersionId: "version-1", goals: [{ id: "goal-1", flowIds: ["flow-1"] }], approvedFlows: [flow()], personas: [persona()], executions: [execution()], visitedRouteIds: ["/", "/projects"], observedStateIds: [], coveredUsageSequenceIds: [], coveredFeatureFlagIds: [], verifiedOutcomeIds: [], coveredFailureStateIds: [], inventory, basis }, { makeId: () => "coverage-v2", now: () => "2026-07-15T12:01:00.000Z" });
+    expect(snapshot).toMatchObject({ calculationVersion: "capture-coverage-v2", basis: { inventoryRevision: 2, inventoryHash: inventory.inventoryHash }, freshness: { status: "current" } });
+    expect(snapshot.dimensions.find((item) => item.key === "route")).toMatchObject({ denominator: 3, denominatorSource: "versioned_bounded_inventory", denominatorSources: ["repository_routes@repo-v2"], inventoryRevision: 2, coveredIds: ["/", "/projects"], excluded: [{ id: "/admin", reason: "Admin-only route." }], uncoveredIds: [] });
+    expect(snapshot.dimensions.find((item) => item.key === "feature_flag")).toMatchObject({ denominator: "unknown", coveredIds: [], uncoveredIds: [] });
   });
 });
 

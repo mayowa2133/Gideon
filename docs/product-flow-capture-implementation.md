@@ -10,7 +10,7 @@ The production architecture does not automate the Claude Code or Codex desktop a
 
 The supported local concierge proofs are documented in [nexusreach-local-capture-pilot.md](./nexusreach-local-capture-pilot.md) and [signaldraft-local-capture-pilot.md](./signaldraft-local-capture-pilot.md). `pnpm capture:pilot` and `pnpm capture:pilot:signaldraft` exercise the real reset, dry-run, recording, verification, normalization, artifact, assembly, and coverage pipeline against two allowlisted products with different UI stacks. They are intentionally headless operator commands; they do not relax the hosted production gates.
 
-The retained runs can be audited without replay or provider access using `pnpm capture:baseline`, documented in [capture-baseline-evidence.md](./capture-baseline-evidence.md). The command probes private media in place, enforces versioned acceptance thresholds, and emits a path-free machine-readable report below ignored `tmp/` storage.
+The retained runs can be audited without replay or provider access using `pnpm capture:baseline`, documented in [capture-baseline-evidence.md](./capture-baseline-evidence.md). The command probes private media in place, enforces versioned acceptance thresholds, and emits a path-free machine-readable report below ignored `tmp/` storage. Coverage denominator provenance and freshness are defined in [capture-coverage-inventory.md](./capture-coverage-inventory.md).
 
 ## Implemented boundaries
 
@@ -35,7 +35,8 @@ The retained runs can be audited without replay or provider access using `pnpm c
 - Repository evidence extraction is read-only and structural. It excludes environment/secret/key files, dependencies, build output, binaries, symlinks, and oversized files and never executes repository code.
 - Declarative Playwright/Cypress manifests import as drafts. Arbitrary test code is never evaluated.
 - Usage evidence drops unknown properties and suppresses low-volume sequences before ranking.
-- Coverage reports dimensions independently. Missing denominators remain `unknown`.
+- Coverage reports dimensions independently against a semantic-hashed `capture-coverage-inventory-v1`. Repository routes, rendered navigation, imported declarative tests, and manifest declarations may contribute bounded evidence; missing or untrusted denominators remain `unknown`.
+- `capture-coverage-v2` binds inventory, environment, policy, fixture, persona, and approved-flow revisions. Reads reevaluate freshness, and the hosted UI suppresses percentages for stale, unknown, or untrusted denominators.
 - Bounded repair changes only locators or wait assertions on failed steps and creates a new draft revision for human review.
 - Capture mutations have CSRF, workspace authorization, strict validation, and per-workspace/user rate limiting. Expensive capture creation requires `Idempotency-Key` and exposes a quota hook before enqueue.
 - Environment validation and discovery are durable asynchronous jobs. Remote discovery refuses a local browser runtime.
@@ -61,7 +62,7 @@ The retained runs can be audited without replay or provider access using `pnpm c
 - `src/main/isolatedCaptureRuntime.ts`: container/microVM client boundary.
 - `src/main/captureNetworkPolicy.ts` and `captureEnvironmentProbe.ts`: SSRF, DNS, redirect, and reachability policy.
 - `src/main/flowDiscovery.ts`, `captureInventoryCrawler.ts`, `repositoryEvidence.ts`, and `testScenarioImport.ts`: discovery inputs.
-- `src/main/captureCoverage.ts`: multi-dimensional coverage calculation.
+- `src/main/captureCoverageInventory.ts` and `captureCoverage.ts`: versioned bounded denominator compilation, semantic identity/freshness, and multi-dimensional coverage calculation.
 - `migrations/0004_product_flow_capture.sql`: PostgreSQL schema.
 - `apps/web`: hosted Next.js project launcher, capture workspace, same-origin API proxy, typed client, unit tests, and Playwright E2E journey.
 - `src/main/nexusReachPilot.ts`: allowlisted loopback-only NexusReach concierge composition and evidence report.

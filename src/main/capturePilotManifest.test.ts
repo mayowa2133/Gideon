@@ -36,7 +36,18 @@ describe("capture pilot manifest", () => {
     expect(() => parseCapturePilotManifest({ ...value, presentation: { ...value.presentation, verticalOutput: { ...value.presentation.verticalOutput, framing: { mode: "automatic_focus", maxZoom: 3, transitionMs: 650 } } } })).toThrow("maxZoom");
     expect(() => parseCapturePilotManifest({ ...value, presentation: { ...value.presentation, verticalOutput: { ...value.presentation.verticalOutput, framing: { mode: "manual", maxZoom: 1.5, transitionMs: 0, manualFocus: { x: 0.8, y: 0, width: 0.3, height: 1 } } } } })).toThrow("inside the normalized frame");
   });
+
+  it("validates versioned coverage declarations and workflow mappings", () => {
+    const value = { ...validManifest(), coverageInventory: coverageInventory() };
+    expect(parseCapturePilotManifest(value).coverageInventory).toMatchObject({ revision: 1, fixtureRevision: "fixture-v1", dimensions: [expect.objectContaining({ key: "outcome", trustworthyDenominator: true })] });
+    expect(() => parseCapturePilotManifest({ ...value, coverageInventory: { ...coverageInventory(), dimensions: [{ ...coverageInventory().dimensions[0], items: [{ id: "completed", workflowIds: ["unknown-flow"] }] }] } })).toThrow("item completed is invalid");
+    expect(() => parseCapturePilotManifest({ ...value, coverageInventory: { ...coverageInventory(), dimensions: [...coverageInventory().dimensions, ...coverageInventory().dimensions] } })).toThrow("dimension 1 is invalid");
+  });
 });
+
+function coverageInventory() {
+  return { revision: 1, fixtureRevision: "fixture-v1", dimensions: [{ key: "outcome", trustworthyDenominator: true, items: [{ id: "completed", workflowIds: ["complete-onboarding"] }], excluded: [], blocked: [] }] };
+}
 
 function validManifest() {
   return {
