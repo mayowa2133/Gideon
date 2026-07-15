@@ -58,6 +58,8 @@ The supported local concierge proof is documented in [nexusreach-local-capture-p
 - `migrations/0004_product_flow_capture.sql`: PostgreSQL schema.
 - `apps/web`: hosted Next.js project launcher, capture workspace, same-origin API proxy, typed client, unit tests, and Playwright E2E journey.
 - `src/main/nexusReachPilot.ts`: allowlisted loopback-only NexusReach concierge composition and evidence report.
+- `src/main/capturePilotManifest.ts`: strict loopback-only pilot manifest and trusted adapter-registry boundary.
+- `src/main/capturePilot.ts`: generic versioned local pilot orchestration shared by registered product adapters.
 
 ## Required production wiring
 
