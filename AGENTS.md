@@ -97,6 +97,7 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm worker:hosted:check
 - pnpm capture:worker:check
 - pnpm capture:pilot
+- pnpm capture:pilot:signaldraft
 - pnpm avatar:worker:check
 - pnpm avatar:worker:canary
 - pnpm release:mac:check

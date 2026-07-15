@@ -8,7 +8,7 @@ This document records what the code now guarantees and what operators must provi
 
 The production architecture does not automate the Claude Code or Codex desktop applications. Those tools are useful for an internal concierge workflow, but their UI sessions, permissions, and recordings are not a stable multi-tenant product runtime. Gideon uses a provider-neutral model API only for bounded discovery/repair proposals and uses deterministic Playwright for the final clean recording. Either OpenAI or Anthropic can implement the reasoning adapter without changing the approved-flow or recording contracts.
 
-The supported local concierge proof is documented in [nexusreach-local-capture-pilot.md](./nexusreach-local-capture-pilot.md). `pnpm capture:pilot` exercises the real reset, dry-run, recording, verification, normalization, artifact, assembly, and coverage pipeline against the allowlisted NexusReach demo. It is intentionally a headless operator command; it does not relax the hosted production gates.
+The supported local concierge proofs are documented in [nexusreach-local-capture-pilot.md](./nexusreach-local-capture-pilot.md) and [signaldraft-local-capture-pilot.md](./signaldraft-local-capture-pilot.md). `pnpm capture:pilot` and `pnpm capture:pilot:signaldraft` exercise the real reset, dry-run, recording, verification, normalization, artifact, assembly, and coverage pipeline against two allowlisted products with different UI stacks. They are intentionally headless operator commands; they do not relax the hosted production gates.
 
 ## Implemented boundaries
 
@@ -58,6 +58,7 @@ The supported local concierge proof is documented in [nexusreach-local-capture-p
 - `migrations/0004_product_flow_capture.sql`: PostgreSQL schema.
 - `apps/web`: hosted Next.js project launcher, capture workspace, same-origin API proxy, typed client, unit tests, and Playwright E2E journey.
 - `src/main/nexusReachPilot.ts`: allowlisted loopback-only NexusReach concierge composition and evidence report.
+- `src/main/signalDraftPilot.ts`: allowlisted Streamlit/FastAPI pilot with isolated SQLite reset, heuristic-only readiness attestation, persisted outcome verification, and a fail-closed pre-approval send check.
 - `src/main/capturePilotManifest.ts`: strict loopback-only pilot manifest and trusted adapter-registry boundary.
 - `src/main/capturePilot.ts`: generic versioned local pilot orchestration shared by registered product adapters.
 - `src/main/capturePresentationRenderer.ts`: receipt-timed caption tracks, safe vertical framing, and explicitly provider-gated optional narration for pilot derivatives.
