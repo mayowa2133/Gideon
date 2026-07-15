@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1",
+  "pilots": [
+    {
+      "key": "nexusreach",
+      "expectedWorkflowIds": [
+        "complete-onboarding",
+        "browse-filter-jobs",
+        "review-saved-contacts",
+        "update-job-tracker",
+        "review-draft-outreach"
+      ]
+    },
+    {
+      "key": "signaldraft",
+      "expectedWorkflowIds": [
+        "analyze-recruiter-outreach",
+        "review-sensitive-compensation"
+      ]
+    }
+  ],
+  "thresholds": {
+    "minimumDurationMs": 5000,
+    "maximumDurationMs": 180000,
+    "normalizedMinimumWidth": 1280,
+    "normalizedMinimumHeight": 720,
+    "verticalWidth": 1080,
+    "verticalHeight": 1920,
+    "minimumFps": 24,
+    "maximumFps": 60,
+    "requiredVideoCodec": "h264",
+    "requiredVerticalAudioCodec": "aac",
+    "minimumPointerMoveMs": 250,
+    "minimumTypingDelayMs": 15,
+    "maximumTypingDelayMs": 80,
+    "requirePointer": true,
+    "requireCaptions": true,
+    "requireFullDeclaredCoverage": true
+  }
+}

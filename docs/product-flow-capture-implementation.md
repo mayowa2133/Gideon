@@ -10,6 +10,8 @@ The production architecture does not automate the Claude Code or Codex desktop a
 
 The supported local concierge proofs are documented in [nexusreach-local-capture-pilot.md](./nexusreach-local-capture-pilot.md) and [signaldraft-local-capture-pilot.md](./signaldraft-local-capture-pilot.md). `pnpm capture:pilot` and `pnpm capture:pilot:signaldraft` exercise the real reset, dry-run, recording, verification, normalization, artifact, assembly, and coverage pipeline against two allowlisted products with different UI stacks. They are intentionally headless operator commands; they do not relax the hosted production gates.
 
+The retained runs can be audited without replay or provider access using `pnpm capture:baseline`, documented in [capture-baseline-evidence.md](./capture-baseline-evidence.md). The command probes private media in place, enforces versioned acceptance thresholds, and emits a path-free machine-readable report below ignored `tmp/` storage.
+
 ## Implemented boundaries
 
 - Runtime-validated flow revisions support only bounded navigation, click, fixture fill/select, approved keys, waits, and observable assertions. Generated code and unknown fields are rejected.
@@ -62,6 +64,7 @@ The supported local concierge proofs are documented in [nexusreach-local-capture
 - `src/main/capturePilotManifest.ts`: strict loopback-only pilot manifest and trusted adapter-registry boundary.
 - `src/main/capturePilot.ts`: generic versioned local pilot orchestration shared by registered product adapters.
 - `src/main/capturePresentationRenderer.ts`: receipt-timed caption tracks, safe vertical framing, and explicitly provider-gated optional narration for pilot derivatives.
+- `src/main/captureBaselineReport.ts`: strict private-artifact selection, FFprobe inspection, versioned baseline thresholds, and redacted cross-product evidence reporting.
 
 ## Required production wiring
 
@@ -86,7 +89,7 @@ The hosted API includes asynchronous environment validation and discovery create
 
 ## Verification
 
-`pnpm test:capture` covers policy, SSRF/DNS/redirect behavior, credentials, real Chromium replay, deterministic crawling, login, real FFmpeg normalization and visual QA, discovery, prompt-like evidence, repair, repository/test import, coverage, queueing, idempotency, cancellation, persistence, isolation manifests, and service scoping. `pnpm test:web` covers the typed client and proxy policy. `pnpm test:e2e` covers session/capability gating and the edit → approve → discover → capture → preview → coverage → assembly journey in a real browser. Tests use synthetic applications/data and no customer media or credentials.
+`pnpm test:capture` covers policy, SSRF/DNS/redirect behavior, credentials, real Chromium replay, deterministic crawling, login, real FFmpeg normalization and visual QA, discovery, prompt-like evidence, repair, repository/test import, coverage, queueing, idempotency, cancellation, persistence, isolation manifests, baseline evidence redaction, and service scoping. `pnpm test:web` covers the typed client and proxy policy. `pnpm test:e2e` covers session/capability gating and the edit → approve → discover → capture → preview → coverage → assembly journey in a real browser. Tests use synthetic applications/data and no customer media or credentials.
 
 ## Honest product copy
 

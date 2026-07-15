@@ -19,6 +19,8 @@ The main testing goal is confidence in the end-to-end promise: a user can upload
 | Capture safety and browser integration | Prove approved flows can be recorded without expanding authority | runtime flow schemas, action/domain/DNS policy, credential grants, Playwright dry run and recording, verification receipt, FFmpeg normalization |
 
 Run the complete structured-capture suite with `pnpm test:capture`. It includes real Chromium and FFmpeg fixtures when the configured local executables are available, plus deterministic tests for provider, queue, persistence, coverage, and isolation boundaries.
+
+Run `pnpm capture:baseline` after successful real-product pilot captures. It probes the retained private artifacts, checks the committed media/presentation/coverage thresholds, and produces an ignored path-free JSON report suitable for comparing later framing and quality changes.
 | Manual QA | Catch visual and content-quality issues | caption safe zones, audio pacing, angle quality, export playback |
 
 ## Required checks in CI
