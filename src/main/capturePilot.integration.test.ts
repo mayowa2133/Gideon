@@ -57,6 +57,7 @@ describe.skipIf(!executablePath)("generic capture pilot", () => {
     expect(resets).toBe(4);
     expect(result.report.results).toHaveLength(2);
     expect(result.report.results[0]).toMatchObject({ workflowId: "complete", execution: { status: "verified" }, verification: { outcome: "done" } });
+    expect(result.report.results[0]?.interactionSummary).toEqual({ counts: { navigate: 0, click: 1, fill: 0, select: 0, key: 0, wait_for: 0 }, presentation: { showPointer: true, pointerMoveMs: 100, typingDelayMs: 0 } });
     expect(result.report.coverage?.dimensions.find((dimension) => dimension.key === "goal")).toMatchObject({ denominator: 2, coveredIds: ["goal:complete", "goal:complete-again"], uncoveredIds: [] });
     expect(result.report.coverage?.dimensions.find((dimension) => dimension.key === "approved_flow")).toMatchObject({ denominator: 2, coveredIds: ["complete", "complete-again"], uncoveredIds: [] });
     await expect(fs.stat(result.report.results[0]!.normalizedClip.localPath!)).resolves.toMatchObject({ size: expect.any(Number) });
@@ -71,7 +72,36 @@ describe.skipIf(!executablePath)("generic capture pilot", () => {
     expect(durable.state.environments).toHaveLength(2);
     const latest = JSON.parse(await fs.readFile(path.join(outputRoot, "latest.json"), "utf8")) as { runRoot: string };
     expect(latest.runRoot).toBe(second.runRoot);
+    const checkpoint = JSON.parse(await fs.readFile(path.join(second.runRoot, "pilot-checkpoint.json"), "utf8")) as { status: string; attempts: Array<{ status: string }> };
+    expect(checkpoint).toMatchObject({ status: "completed", attempts: [{ status: "verified" }, { status: "verified" }] });
+
+    const selected = await runCapturePilot({ manifest, adapters, outputRoot, executablePath, workflowIds: ["complete-again"], now: () => new Date("2026-07-15T03:00:00.000Z") });
+    expect(selected.report.selection).toEqual({ requestedWorkflowIds: ["complete-again"], manifestWorkflowCount: 2 });
+    expect(selected.report.results.map((item) => item.workflowId)).toEqual(["complete-again"]);
+    expect(selected.report.coverage?.dimensions.find((dimension) => dimension.key === "approved_flow")).toMatchObject({ denominator: 1, coveredIds: ["complete-again"], uncoveredIds: [] });
+    expect(resets).toBe(10);
+    await expect(runCapturePilot({ manifest, adapters, outputRoot, executablePath, workflowIds: ["missing"] })).rejects.toThrow("Capture pilot workflows are not registered: missing");
   }, 60_000);
+
+  it("persists a failed workflow checkpoint with bounded retry evidence", async () => {
+    const outputRoot = path.join(root, "failure-output");
+    const manifest = parseCapturePilotManifest(manifestValue(baseUrl, root));
+    const adapters: CapturePilotAdapterRegistry = {
+      startup: { fixture: { approvedRepositoryRoot: root, approvedBaseUrl: baseUrl, async assertReady() {} } },
+      reset: { fixture: { async reset() { throw new Error("Synthetic fixture reset unavailable: password=do-not-store"); } } },
+      verification: { fixture: { async verify() { throw new Error("Verification must not run after reset failure."); } } }
+    };
+
+    await expect(runCapturePilot({ manifest, adapters, outputRoot, executablePath, workflowIds: ["complete"] })).rejects.toThrow("Safe diagnostics are available to operators");
+    const [runDirectory] = await fs.readdir(path.join(outputRoot, "runs"));
+    const runRoot = path.join(outputRoot, "runs", runDirectory!);
+    const checkpoint = JSON.parse(await fs.readFile(path.join(runRoot, "pilot-checkpoint.json"), "utf8")) as { status: string; attempts: Array<{ workflowId: string; status: string; safeError?: string }> };
+    expect(checkpoint).toMatchObject({ status: "failed", attempts: [{ workflowId: "complete", status: "failed", safeError: "Capture execution failed. Safe diagnostics are available to operators." }] });
+    const failure = JSON.parse(await fs.readFile(path.join(runRoot, "pilot-failure.json"), "utf8")) as { selection: { requestedWorkflowIds: string[] }; diagnostics: Array<{ message: string }> };
+    expect(failure.selection.requestedWorkflowIds).toEqual(["complete"]);
+    expect(failure.diagnostics).toEqual([{ workflowId: "complete", message: "Capture worker diagnostic contained sensitive-shaped data and was redacted." }]);
+    expect(JSON.stringify(failure)).not.toContain("do-not-store");
+  }, 15_000);
 });
 
 function manifestValue(baseUrl: string, rootDir: string) {

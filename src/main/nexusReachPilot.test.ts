@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseProductFlowRevision } from "../shared/productFlowCapture";
-import { createNexusReachPilotAdapters, loadNexusReachPilotManifest } from "./nexusReachPilot";
+import { createNexusReachPilotAdapters, loadNexusReachPilotManifest, parseNexusReachPilotArguments } from "./nexusReachPilot";
 import { assertCapturePilotAdapters } from "./capturePilotManifest";
 import { importTestScenarioFlows } from "./testScenarioImport";
 
@@ -38,5 +38,13 @@ describe("NexusReach local capture pilot", () => {
       expect(serializedTargets.some((target) => target.includes(forbidden))).toBe(false);
     }
     expect(actions.filter((action) => action.type === "navigate").every((action) => action.type !== "navigate" || action.path.startsWith("/") && !action.path.startsWith("//"))).toBe(true);
+  });
+
+  it("parses only explicit targeted-retry workflow arguments", () => {
+    expect(parseNexusReachPilotArguments([])).toEqual({});
+    expect(parseNexusReachPilotArguments(["--", "--workflow", "update-job-tracker"])).toEqual({ workflowIds: ["update-job-tracker"] });
+    expect(parseNexusReachPilotArguments(["--workflow", "browse-filter-jobs", "--workflow=review-saved-contacts"])).toEqual({ workflowIds: ["browse-filter-jobs", "review-saved-contacts"] });
+    expect(() => parseNexusReachPilotArguments(["--workflow"])).toThrow("requires a registered workflow id");
+    expect(() => parseNexusReachPilotArguments(["--repeat", "2"])).toThrow("Unsupported capture pilot argument");
   });
 });
