@@ -14,6 +14,7 @@ This audit distinguishes code-complete boundaries from deployment, UX, vendor, a
 | Playwright clean take | Real Chromium dry run and recording implemented and tested | Pin browser-worker image/version and verify on production worker hosts |
 | Container/microVM isolation | Runtime manifest/client boundary, pinned-image and manifest-bound response attestation, and fail-closed remote/config policy implemented | Deploy actual browser pool with non-root/read-only/resource/default-deny-egress controls and retain platform attestation proof |
 | Media normalization and composite source | Real FFmpeg normalization, visual QA, private artifacts, ordered manual assembly job, versioned manifest, and authorized project-store activation implemented | Connect object lifecycle/retention in deployment |
+| Golden capture baseline | Versioned thresholds plus a redacted FFprobe-backed report cover two pilots, seven workflows, landscape/vertical media, captions, pointer/typing presentation, resets, lineage, and declared coverage | Human comprehension and mobile legibility require the later quality-review phase |
 | Persistence and idempotency | Migration, workspace-scoped repositories, atomic run/job create, race recovery implemented | Apply migration to staging PostgreSQL and run concurrent/load/recovery tests |
 | Queue, cancellation, retry, quotas, usage | Dedicated BullMQ adapter, cooperative cancellation, one-flow retry, quota/usage hooks implemented | Connect entitlement ledger, distributed rate limit, worker lease/heartbeat, and fairness scheduler |
 | Deterministic discovery | Rendered inventory, state fingerprints, duplicate route merge, goal ranking, imported tests, durable async job/worker, and create/status/cancel API implemented | Connect the isolated production inventory pool and review UX |
@@ -38,6 +39,7 @@ This audit distinguishes code-complete boundaries from deployment, UX, vendor, a
 - `pnpm test:e2e`: hosted capture workspace real-browser journey and capability fail-closed test.
 - `pnpm build`: Electron main, renderer, MCP, and hosted Next.js production builds.
 - `pnpm capture:worker:check`: deployment configuration gate; production refuses local browser isolation, in-memory secrets, or local artifact storage.
+- `pnpm capture:baseline`: redacted retained-artifact comparison for the registered NexusReach and SignalDraft pilots.
 
 ## Release conclusion
 

@@ -33,6 +33,7 @@ Do not expand the MVP into avatar generation, social posting, autonomous publish
 - Structured product-flow capture plan: docs/product-flow-capture-plan.md
 - Structured capture implementation status: docs/product-flow-capture-implementation.md
 - Structured capture requirement audit: docs/product-flow-capture-requirement-audit.md
+- Structured capture baseline evidence: docs/capture-baseline-evidence.md
 - Tooling research: docs/research/open-source-tools-research.md
 - Build/buy/fork recommendation: docs/research/build-vs-buy-vs-fork.md
 
@@ -98,6 +99,7 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm capture:worker:check
 - pnpm capture:pilot
 - pnpm capture:pilot:signaldraft
+- pnpm capture:baseline
 - pnpm avatar:worker:check
 - pnpm avatar:worker:canary
 - pnpm release:mac:check
