@@ -34,8 +34,8 @@ Targeted retry remains explicit:
 SIGNALDRAFT_API_TOKEN=gideon-pilot-token pnpm capture:pilot:signaldraft -- --workflow review-sensitive-compensation
 ```
 
-The full successful run at `2026-07-15T03:19:15Z` produced two verified 1440×900 normalized clips of about 20 seconds each, two 1080×1920 H.264/AAC derivatives, two editable WebVTT tracks, and complete declared goal/flow coverage. Private output is under `tmp/capture-pilot/signaldraft/runs/2026-07-15T03-19-15-459Z-658d63d2-8369-4ce7-95e8-077dc6df77d4` and remains ignored by Git.
+The latest full successful run on July 15, 2026 produced two verified 1440×900 normalized clips, two focused 1080×1920 H.264/AAC derivatives, two editable WebVTT tracks, two private `capture-framing-v1` manifests, and complete declared goal/flow coverage. Both framing manifests applied four action-aware keyframes without fallback. Private output remains below ignored `tmp/capture-pilot/signaldraft/runs` storage.
 
 ## Portability finding
 
-The first real attempt failed closed because a Streamlit-rendered classification locator was less stable than the API outcome contract. Gideon retained the failure checkpoint, replaced that UI-specific assertion with a stable result heading while keeping API classification verification, and passed both a targeted retry and the full two-flow run. This is useful evidence that UI assertions and persisted business outcomes should remain separate layers.
+The first real attempt failed closed because a Streamlit-rendered classification locator was less stable than the API outcome contract. Gideon retained the failure checkpoint, replaced that UI-specific assertion with a stable result heading while keeping API classification verification, and passed both a targeted retry and the full two-flow run. During the action-aware recapture, current Streamlit rendered heading text in a structure that made an exact text locator ambiguous; the bounded flow was repaired to use the semantic `heading` role and the complete two-flow run passed again. This is useful evidence that accessible roles, UI assertions, and persisted business outcomes should remain separate layers.

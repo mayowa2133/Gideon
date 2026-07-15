@@ -9,6 +9,8 @@ import {
   type AssertionReceipt,
   type AssertionSpec,
   type BrowserExecutionPolicy,
+  type CaptureTargetGeometry,
+  type FlowStepVisualEvidence,
   type FlowExecutionReceipt,
   type FlowStepReceipt,
   type LocatorSpec,
@@ -159,10 +161,11 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
       }
       try {
         await hold(pacing.beforeActionMs);
-        await executeAction(page, step.action, input.fixtureValues, input.policy.baseUrl, presentation);
+        const actionTarget = await executeAction(page, step.action, input.fixtureValues, input.policy.baseUrl, presentation);
         await hold(pacing.afterActionMs);
         const assertions = await evaluateAssertions(page, step.expectedState, input.fixtureValues);
         const passed = assertions.every((assertion) => assertion.passed);
+        const visualEvidence = await captureStepVisualEvidence(page, actionTarget, step.expectedState, assertions);
         stepReceipts.push({
           stepId: step.id,
           status: passed ? "succeeded" : "failed",
@@ -170,7 +173,8 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
           assertions,
           startedAt: stepStartedAt,
           completedAt: now(),
-          safeErrorCode: passed ? undefined : "step_assertion_failed"
+          safeErrorCode: passed ? undefined : "step_assertion_failed",
+          visualEvidence
         });
         if (!passed) break;
       } catch {
@@ -284,19 +288,21 @@ async function executeAction(
   fixtureValues: Record<string, string>,
   baseUrl: string,
   presentation: Required<NonNullable<PlaywrightCaptureExecutorInput["capturePresentation"]>>
-): Promise<void> {
+): Promise<CaptureTargetGeometry | undefined> {
   if (action.type === "navigate") {
     await page.goto(new URL(action.path, baseUrl).toString(), { waitUntil: "domcontentloaded" });
-    return;
+    return undefined;
   }
   if (action.type === "click") {
     const target = locatorFor(page, action.target);
+    const geometry = await visibleGeometry(page, target);
     await movePointerTo(page, target, presentation);
     await target.click();
-    return;
+    return geometry;
   }
   if (action.type === "fill") {
     const target = locatorFor(page, action.target);
+    const geometry = await visibleGeometry(page, target);
     await movePointerTo(page, target, presentation);
     const value = resolveFixture(action.valueRef, fixtureValues);
     if (presentation.typingDelayMs > 0) {
@@ -306,22 +312,25 @@ async function executeAction(
     } else {
       await target.fill(value);
     }
-    return;
+    return geometry;
   }
   if (action.type === "select") {
     const target = locatorFor(page, action.target);
+    const geometry = await visibleGeometry(page, target);
     await movePointerTo(page, target, presentation);
     await target.selectOption(resolveFixture(action.optionRef, fixtureValues));
-    return;
+    return geometry;
   }
   if (action.type === "key") {
     const target = action.target ? locatorFor(page, action.target) : page.locator("body");
+    const geometry = action.target ? await visibleGeometry(page, target) : undefined;
     if (action.target) await movePointerTo(page, target, presentation);
     await target.press(action.key);
-    return;
+    return geometry;
   }
   const receipt = await waitForAssertion(page, action.assertion, fixtureValues);
   if (!receipt?.passed) throw new Error("Wait condition was not satisfied.");
+  return assertionTarget(action.assertion) ? await visibleGeometry(page, locatorFor(page, assertionTarget(action.assertion)!)) : undefined;
 }
 
 async function movePointerTo(page: Page, target: Locator, presentation: Required<NonNullable<PlaywrightCaptureExecutorInput["capturePresentation"]>>): Promise<void> {
@@ -332,6 +341,75 @@ async function movePointerTo(page: Page, target: Locator, presentation: Required
   const steps = Math.max(1, Math.round(presentation.pointerMoveMs / 25));
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps });
   await hold(presentation.pointerMoveMs);
+}
+
+async function captureStepVisualEvidence(
+  page: Page,
+  actionTarget: CaptureTargetGeometry | undefined,
+  expectedState: AssertionSpec[],
+  assertions: AssertionReceipt[]
+): Promise<FlowStepVisualEvidence> {
+  const viewport = await page.evaluate(() => ({
+    width: document.documentElement.clientWidth,
+    height: document.documentElement.clientHeight,
+    scrollX: window.scrollX,
+    scrollY: window.scrollY
+  }));
+  const safeViewport = {
+    width: Math.max(1, Math.round(viewport.width)),
+    height: Math.max(1, Math.round(viewport.height)),
+    scrollX: Math.max(0, Math.round(viewport.scrollX)),
+    scrollY: Math.max(0, Math.round(viewport.scrollY))
+  };
+  let resultTarget: CaptureTargetGeometry | undefined;
+  for (let index = 0; index < expectedState.length; index += 1) {
+    const spec = assertions[index]?.passed ? assertionTarget(expectedState[index]!) : undefined;
+    if (!spec) continue;
+    resultTarget = await visibleGeometry(page, locatorFor(page, spec));
+    if (resultTarget) break;
+  }
+  const modalRegion = await firstVisibleGeometry(page, page.locator('dialog, [role="dialog"], [aria-modal="true"]'));
+  return {
+    schemaVersion: "1",
+    viewport: safeViewport,
+    actionTarget: clampGeometry(actionTarget, safeViewport.width, safeViewport.height),
+    resultTarget: clampGeometry(resultTarget, safeViewport.width, safeViewport.height),
+    modalRegion: clampGeometry(modalRegion, safeViewport.width, safeViewport.height)
+  };
+}
+
+function assertionTarget(assertion: AssertionSpec): LocatorSpec | undefined {
+  return assertion.type === "visible" || assertion.type === "text" || assertion.type === "value" ? assertion.target : undefined;
+}
+
+async function firstVisibleGeometry(page: Page, locator: Locator): Promise<CaptureTargetGeometry | undefined> {
+  const count = Math.min(await locator.count(), 10);
+  for (let index = 0; index < count; index += 1) {
+    const geometry = await visibleGeometry(page, locator.nth(index));
+    if (geometry) return geometry;
+  }
+  return undefined;
+}
+
+async function visibleGeometry(page: Page, target: Locator): Promise<CaptureTargetGeometry | undefined> {
+  try {
+    await target.scrollIntoViewIfNeeded();
+    if (!(await target.isVisible())) return undefined;
+    const box = await target.boundingBox();
+    const viewport = page.viewportSize();
+    return box && viewport ? clampGeometry(box, viewport.width, viewport.height) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function clampGeometry(value: { x: number; y: number; width: number; height: number } | undefined, viewportWidth: number, viewportHeight: number): CaptureTargetGeometry | undefined {
+  if (!value || ![value.x, value.y, value.width, value.height].every(Number.isFinite)) return undefined;
+  const left = Math.max(0, Math.min(viewportWidth - 1, Math.round(value.x)));
+  const top = Math.max(0, Math.min(viewportHeight - 1, Math.round(value.y)));
+  const right = Math.max(left + 1, Math.min(viewportWidth, Math.round(value.x + value.width)));
+  const bottom = Math.max(top + 1, Math.min(viewportHeight, Math.round(value.y + value.height)));
+  return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
 async function waitForAssertion(page: Page, assertion: AssertionSpec, fixtureValues: Record<string, string>, timeoutMs = 10_000): Promise<AssertionReceipt> {

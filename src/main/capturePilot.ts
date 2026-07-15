@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { ArtifactRecord, JobRecord } from "../shared/types";
 import type { CaptureEnvironment, CaptureEnvironmentVersion, CapturePersona, CaptureRun, CoverageSnapshot, FlowExecutionRecord, ProductFlowRevision } from "../shared/productFlowCapture";
-import { parseProductFlowRevision } from "../shared/productFlowCapture";
+import { assertFlowStepVisualEvidence, parseProductFlowRevision } from "../shared/productFlowCapture";
 import { createCaptureCoverageService } from "./captureCoverageService";
 import { assertCapturePilotAdapters, type CapturePilotAdapterRegistry, type CapturePilotManifest } from "./capturePilotManifest";
 import { createCaptureRunCoordinator } from "./captureRunCoordinator";
@@ -109,7 +109,7 @@ export async function runCapturePilot(input: {
   const coverageService = createCaptureCoverageService(repository);
   const persistCoverage = createPostRunCoverageHook({ repository, coverage: coverageService });
   const chrome = input.executablePath ?? process.env.GIDEON_CAPTURE_CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-  const results: Array<{ workflowId: string; flow: ProductFlowRevision; run: CaptureRun; execution: FlowExecutionRecord; normalizedClip: ArtifactRecord; sourceArtifact?: ArtifactRecord; assemblyManifestArtifact?: ArtifactRecord; verification: unknown; interactionSummary: ReturnType<typeof summarizeInteractions>; presentationOutput?: { verticalRender: ArtifactRecord; captions: ArtifactRecord; voiceover?: ArtifactRecord; validation: Awaited<ReturnType<typeof renderCapturePresentation>>["validation"]; cues: Awaited<ReturnType<typeof renderCapturePresentation>>["cues"] } }> = [];
+  const results: Array<{ workflowId: string; flow: ProductFlowRevision; run: CaptureRun; execution: FlowExecutionRecord; normalizedClip: ArtifactRecord; sourceArtifact?: ArtifactRecord; assemblyManifestArtifact?: ArtifactRecord; verification: unknown; interactionSummary: ReturnType<typeof summarizeInteractions>; presentationOutput?: { verticalRender: ArtifactRecord; captions: ArtifactRecord; framingManifest: ArtifactRecord; voiceover?: ArtifactRecord; validation: Awaited<ReturnType<typeof renderCapturePresentation>>["validation"]; framing: Awaited<ReturnType<typeof renderCapturePresentation>>["framingManifest"]; cues: Awaited<ReturnType<typeof renderCapturePresentation>>["cues"] } }> = [];
   const diagnostics: Array<{ workflowId: string; message: string }> = [];
 
   try {
@@ -158,18 +158,21 @@ export async function runCapturePilot(input: {
           receiptStartedAt: receipt.startedAt,
           stepTimings: receipt.steps,
           narration: manifest.presentation.verticalOutput.narration,
+          framing: manifest.presentation.verticalOutput.framing,
           narrationProvider: input.narrationProvider
         });
         const captions = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "caption_track", sourcePath: rendered.captionsPath, originalFileName: `${workflow.id}.vtt`, contentType: "text/vtt" })).artifact;
+        const framingManifest = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "framing_manifest", sourcePath: rendered.framingManifestPath, originalFileName: `${workflow.id}-framing.json`, contentType: "application/json" })).artifact;
         const verticalRender = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "render", sourcePath: rendered.videoPath, originalFileName: `${workflow.id}-vertical.mp4`, contentType: "video/mp4" })).artifact;
         await repository.upsertArtifact(captions);
+        await repository.upsertArtifact(framingManifest);
         await repository.upsertArtifact(verticalRender);
         let voiceover: ArtifactRecord | undefined;
         if (rendered.voiceoverPath) {
           voiceover = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "voiceover", sourcePath: rendered.voiceoverPath, originalFileName: `${workflow.id}-voiceover.wav`, contentType: "audio/wav" })).artifact;
           await repository.upsertArtifact(voiceover);
         }
-        presentationOutput = { verticalRender, captions, voiceover, validation: rendered.validation, cues: rendered.cues };
+        presentationOutput = { verticalRender, captions, framingManifest, voiceover, validation: rendered.validation, framing: rendered.framingManifest, cues: rendered.cues };
       }
       results.push({ workflowId: workflow.id, flow, run: result.run, execution, normalizedClip, sourceArtifact: result.sourceArtifact, assemblyManifestArtifact: result.assemblyManifestArtifact, verification, interactionSummary: summarizeInteractions(flow, manifest.presentation), presentationOutput });
       attempt.status = "verified";
@@ -252,7 +255,9 @@ async function loadCaptureReceiptTiming(repository: LocalCapturePilotRepository,
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Capture presentation step timing is invalid.");
     const step = raw as Record<string, unknown>;
     if (typeof step.stepId !== "string" || typeof step.startedAt !== "string" || typeof step.completedAt !== "string" || !Number.isFinite(Date.parse(step.startedAt)) || !Number.isFinite(Date.parse(step.completedAt))) throw new Error("Capture presentation step timing is invalid.");
-    return { stepId: step.stepId, startedAt: step.startedAt, completedAt: step.completedAt };
+    const visualEvidence = step.visualEvidence;
+    if (visualEvidence !== undefined) assertFlowStepVisualEvidence(visualEvidence as import("../shared/productFlowCapture").FlowStepVisualEvidence);
+    return { stepId: step.stepId, startedAt: step.startedAt, completedAt: step.completedAt, visualEvidence: visualEvidence as import("../shared/productFlowCapture").FlowStepVisualEvidence | undefined };
   });
   return { startedAt: record.startedAt, steps };
 }

@@ -192,6 +192,7 @@ export type ArtifactKind =
   | "verification_receipt"
   | "normalized_flow_clip"
   | "caption_track"
+  | "framing_manifest"
   | "capture_assembly_manifest"
   | "coverage_report"
   | "extracted_audio"

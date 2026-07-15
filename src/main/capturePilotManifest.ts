@@ -40,6 +40,12 @@ export interface CapturePilotManifest {
     verticalOutput: {
       enabled: boolean;
       narration: "none" | "provider";
+      framing: {
+        mode: "full_frame" | "automatic_focus" | "manual";
+        maxZoom: number;
+        transitionMs: number;
+        manualFocus?: { x: number; y: number; width: number; height: number };
+      };
     };
   };
   workflows: Array<{
@@ -151,7 +157,23 @@ function parsePresentation(value: unknown): CapturePilotManifest["presentation"]
   const viewport = record(input.viewport, "manifest.presentation.viewport");
   exactKeys(viewport, ["width", "height"], "manifest.presentation.viewport");
   const verticalOutput = record(input.verticalOutput, "manifest.presentation.verticalOutput");
-  exactKeys(verticalOutput, ["enabled", "narration"], "manifest.presentation.verticalOutput");
+  exactKeys(verticalOutput, ["enabled", "narration", "framing"], "manifest.presentation.verticalOutput");
+  const framing = record(verticalOutput.framing, "manifest.presentation.verticalOutput.framing");
+  const mode = framing.mode;
+  if (!["full_frame", "automatic_focus", "manual"].includes(String(mode))) throw new Error("Capture pilot presentation framing mode is invalid.");
+  exactKeys(framing, mode === "manual" ? ["mode", "maxZoom", "transitionMs", "manualFocus"] : ["mode", "maxZoom", "transitionMs"], "manifest.presentation.verticalOutput.framing");
+  let manualFocus: { x: number; y: number; width: number; height: number } | undefined;
+  if (mode === "manual") {
+    const region = record(framing.manualFocus, "manifest.presentation.verticalOutput.framing.manualFocus");
+    exactKeys(region, ["x", "y", "width", "height"], "manifest.presentation.verticalOutput.framing.manualFocus");
+    manualFocus = {
+      x: finiteNumber(region.x, "manifest.presentation.verticalOutput.framing.manualFocus.x", 0, 1),
+      y: finiteNumber(region.y, "manifest.presentation.verticalOutput.framing.manualFocus.y", 0, 1),
+      width: finiteNumber(region.width, "manifest.presentation.verticalOutput.framing.manualFocus.width", 0.001, 1),
+      height: finiteNumber(region.height, "manifest.presentation.verticalOutput.framing.manualFocus.height", 0.001, 1)
+    };
+    if (manualFocus.x + manualFocus.width > 1 || manualFocus.y + manualFocus.height > 1) throw new Error("Capture pilot manual focus must be inside the normalized frame.");
+  }
   if (typeof input.showPointer !== "boolean") throw new Error("Capture pilot presentation.showPointer must be boolean.");
   if (typeof verticalOutput.enabled !== "boolean" || !["none", "provider"].includes(String(verticalOutput.narration))) throw new Error("Capture pilot presentation.verticalOutput is invalid.");
   return {
@@ -163,7 +185,16 @@ function parsePresentation(value: unknown): CapturePilotManifest["presentation"]
     showPointer: input.showPointer,
     pointerMoveMs: integer(input.pointerMoveMs, "manifest.presentation.pointerMoveMs", 0, 2_000),
     typingDelayMs: integer(input.typingDelayMs, "manifest.presentation.typingDelayMs", 0, 250),
-    verticalOutput: { enabled: verticalOutput.enabled, narration: verticalOutput.narration as "none" | "provider" }
+    verticalOutput: {
+      enabled: verticalOutput.enabled,
+      narration: verticalOutput.narration as "none" | "provider",
+      framing: {
+        mode: mode as "full_frame" | "automatic_focus" | "manual",
+        maxZoom: finiteNumber(framing.maxZoom, "manifest.presentation.verticalOutput.framing.maxZoom", 1, 2),
+        transitionMs: integer(framing.transitionMs, "manifest.presentation.verticalOutput.framing.transitionMs", 0, 2_000),
+        ...(manualFocus ? { manualFocus } : {})
+      }
+    }
   };
 }
 
@@ -203,4 +234,5 @@ function exactKeys(value: Record<string, unknown>, allowed: string[], label: str
 function text(value: unknown, label: string, max: number): string { if (typeof value !== "string" || !value.trim() || value.length > max) throw new Error(`${label} is invalid.`); return value.trim(); }
 function identifier(value: unknown, label: string): string { const result = text(value, label, 200); if (!/^[a-z0-9][a-z0-9._:-]*$/i.test(result)) throw new Error(`${label} must be an identifier.`); return result; }
 function integer(value: unknown, label: string, min: number, max: number): number { if (!Number.isInteger(value) || (value as number) < min || (value as number) > max) throw new Error(`${label} must be an integer from ${min} to ${max}.`); return value as number; }
+function finiteNumber(value: unknown, label: string, min: number, max: number): number { if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) throw new Error(`${label} must be a number from ${min} to ${max}.`); return value; }
 function stringArray(value: unknown, label: string, max: number): string[] { if (!Array.isArray(value) || value.length < 1 || value.length > max) throw new Error(`${label} must contain 1–${max} strings.`); return value.map((item, index) => text(item, `${label}[${index}]`, 253)); }

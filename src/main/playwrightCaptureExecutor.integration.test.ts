@@ -61,6 +61,11 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     });
     expect(result.receipt.status).toBe("verified");
     expect(result.receipt.steps).toHaveLength(3);
+    expect(result.receipt.steps.map((step) => step.visualEvidence)).toEqual([
+      expect.objectContaining({ schemaVersion: "1", viewport: expect.objectContaining({ width: 1440, height: 900 }), actionTarget: expect.objectContaining({ width: expect.any(Number), height: expect.any(Number) }) }),
+      expect.objectContaining({ schemaVersion: "1", actionTarget: expect.objectContaining({ width: expect.any(Number) }), resultTarget: expect.objectContaining({ width: expect.any(Number) }) }),
+      expect.objectContaining({ schemaVersion: "1", actionTarget: expect.objectContaining({ width: expect.any(Number) }), resultTarget: expect.objectContaining({ width: expect.any(Number) }) })
+    ]);
     expect(result.receipt.finalAssertions.every((assertion) => assertion.passed)).toBe(true);
     expect(result.rawCapture).toBeUndefined();
     expect(result.networkReceipts).toEqual([
@@ -82,6 +87,7 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
       now: incrementingClock()
     });
     expect(result.receipt.status).toBe("verified");
+    expect(result.receipt.steps[0]?.visualEvidence?.viewport).toMatchObject({ width: 960, height: 600 });
     expect(result.rawCapture).toMatchObject({ contentType: "video/webm" });
     expect(result.rawCapture!.byteSize).toBeGreaterThan(1_000);
     expect(result.rawCapture!.sha256).toMatch(/^[a-f0-9]{64}$/);
