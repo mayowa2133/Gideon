@@ -162,6 +162,19 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     ]);
   }, 20_000);
 
+  it("rejects action timeouts outside the bounded capture policy", async () => {
+    await expect(executePlaywrightCapture({
+      id: "execution-invalid-timeout",
+      workspaceId: "workspace-1",
+      plan: compileProductFlow(createFlow(), createPolicy(baseUrl)),
+      policy: createPolicy(baseUrl),
+      fixtureValues: { project_name: "Gideon fixture" },
+      outputDir,
+      recordVideo: false,
+      actionTimeoutMs: 499
+    })).rejects.toThrow("actionTimeoutMs must be an integer from 500 to 30000");
+  });
+
   it.each([["/login-state", "login"], ["/loading-state", "loading"]] as const)("classifies %s without retaining page text", async (route, expectedSignal) => {
     const flow = createFlow();
     flow.steps = [{ id: "open-state", intent: "Open the synthetic state.", action: { type: "navigate", path: route }, riskClass: "navigate" }];

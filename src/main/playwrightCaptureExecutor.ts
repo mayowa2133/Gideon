@@ -71,6 +71,7 @@ export interface PlaywrightCaptureExecutorInput {
     pointerMoveMs?: number;
     typingDelayMs?: number;
   };
+  actionTimeoutMs?: number;
   now?: () => string;
 }
 
@@ -78,6 +79,7 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
   verifyCompiledFlowPlan(input.plan);
   const pacing = validateCapturePacing(input.capturePacing);
   const presentation = validateCapturePresentation(input.capturePresentation);
+  const actionTimeoutMs = validateActionTimeout(input.actionTimeoutMs);
   await fs.mkdir(input.outputDir, { recursive: true });
   const now = input.now ?? (() => new Date().toISOString());
   const startedAt = now();
@@ -123,6 +125,7 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
       }
     });
     page = await context.newPage();
+    page.setDefaultTimeout(actionTimeoutMs);
     video = page.video();
     await page.goto(new URL(input.plan.startingState.entryPath, input.policy.baseUrl).toString(), {
       waitUntil: "domcontentloaded"
@@ -227,6 +230,12 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
     if (context) await context.close().catch(() => undefined);
     if (ownsBrowser) await browser.close().catch(() => undefined);
   }
+}
+
+function validateActionTimeout(value: number | undefined): number {
+  const timeout = value ?? 30_000;
+  if (!Number.isInteger(timeout) || timeout < 500 || timeout > 30_000) throw new Error("Capture actionTimeoutMs must be an integer from 500 to 30000 milliseconds.");
+  return timeout;
 }
 
 function validateCapturePacing(input: PlaywrightCaptureExecutorInput["capturePacing"]): Required<NonNullable<PlaywrightCaptureExecutorInput["capturePacing"]>> {
@@ -416,6 +425,7 @@ async function firstVisibleGeometry(page: Page, locator: Locator): Promise<Captu
 
 async function visibleGeometry(page: Page, target: Locator): Promise<CaptureTargetGeometry | undefined> {
   try {
+    if (!(await target.isVisible())) return undefined;
     await target.scrollIntoViewIfNeeded();
     if (!(await target.isVisible())) return undefined;
     const box = await target.boundingBox();

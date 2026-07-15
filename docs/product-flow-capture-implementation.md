@@ -12,6 +12,8 @@ The supported local concierge proofs are documented in [nexusreach-local-capture
 
 The retained runs can be audited without replay or provider access using `pnpm capture:baseline`, documented in [capture-baseline-evidence.md](./capture-baseline-evidence.md). The command probes private media in place, enforces versioned acceptance thresholds, and emits a path-free machine-readable report below ignored `tmp/` storage. Coverage denominator provenance and freshness are defined in [capture-coverage-inventory.md](./capture-coverage-inventory.md).
 
+The hostile synthetic browser target and fail-closed matrix are documented in [hostile-capture-fixture.md](./hostile-capture-fixture.md). `pnpm capture:hostile:check` verifies complex permitted flows and dangerous-action traps without contacting a provider or non-loopback service.
+
 ## Implemented boundaries
 
 - Runtime-validated flow revisions support only bounded navigation, click, fixture fill/select, approved keys, waits, and observable assertions. Generated code and unknown fields are rejected.
@@ -23,6 +25,7 @@ The retained runs can be audited without replay or provider access using `pnpm c
 - Remote capture is refused unless the runtime identifies itself as container or microVM isolated. `local_test` is accepted only for `local_preview` environments. Remote responses must include an attestation bound to the exact declarative manifest hash, declared isolation class, valid runtime instance ID, completion time, and the caller's pinned SHA-256 worker image digest before their browser receipt or recording is trusted.
 - Every flow resets before both dry run and recording. Failed dry runs stop before recording; failed assertions produce review state instead of successful clips.
 - Playwright replay uses fixed viewport, locale, timezone, color scheme, reduced motion, disabled downloads, and per-request network-policy checks.
+- Browser action timeouts are explicit and bounded. Geometry collection checks visibility before attempting scroll alignment, so hidden modals and controls cannot consume the timeout after every step.
 - Successful step receipts include schema-validated geometry-only visual evidence: viewport and optional action, visible-result, and modal bounds. Receipts never add selector values, DOM text, fixture values, or screenshots to framing telemetry; isolated-runtime responses are revalidated before use.
 - Raw WebM, verification receipt, network/action telemetry, normalized H.264 clip, assembly manifest, and composite source recording are private artifacts with hashes and lineage. Explicit assembly jobs preserve the user's selected clip order before activation.
 - Pilot vertical renders compile that evidence into a versioned `capture-framing-v1` manifest. Automatic focus prefers a verified visible result, then a modal, then the action target; it uses a bounded 1–2× source-aspect crop and deterministic interpolated pan window. Missing evidence fails safely to the established full-frame presentation. Operators may explicitly select full-frame or provide a validated normalized manual region.
@@ -57,6 +60,7 @@ The retained runs can be audited without replay or provider access using `pnpm c
 - `src/main/captureAssemblyCoordinator.ts` and `captureAssemblyWorker.ts`: ordered user-selected source assembly and activation.
 - `src/main/captureAudit.ts`, `postRunCoverage.ts`, and `capturePreviewService.ts`: audit, post-run coverage, and signed preview boundaries.
 - `src/main/playwrightCaptureExecutor.ts`: deterministic browser replay.
+- `fixtures/hostile-capture-app` and `src/main/hostileCaptureFixture.ts`: complex adversarial synthetic UI, loopback server, approved/prohibited workflow matrix, and redacted evidence command.
 - `src/main/captureFraming.ts`: privacy-safe focus selection, crop clamping, deterministic pan expressions, and full-frame fallback.
 - `src/main/captureVideoQuality.ts` and `captureQualityThresholds.json`: versioned deterministic frame/presentation quality checks, contact sheets, and ready/warning/failed gating.
 - `src/main/isolatedCaptureRuntime.ts`: container/microVM client boundary.
@@ -95,7 +99,7 @@ The hosted API includes asynchronous environment validation and discovery create
 
 ## Verification
 
-`pnpm test:capture` covers policy, SSRF/DNS/redirect behavior, credentials, real Chromium replay, geometry-only step evidence, framing compilation/fallback, focused FFmpeg rendering, black/blank/frozen/rushed/unreadable/caption-overflow/browser-error quality fixtures, deterministic crawling, login, real FFmpeg normalization, discovery, prompt-like evidence, repair, repository/test import, coverage, queueing, idempotency, cancellation, persistence, isolation manifests, baseline evidence redaction, and service scoping. `pnpm test:web` covers the typed client and proxy policy. `pnpm test:e2e` covers session/capability gating plus safe quality warnings in the edit → approve → discover → capture → preview → coverage → assembly journey. Tests use synthetic applications/data and no customer media or credentials.
+`pnpm test:capture` covers policy, SSRF/DNS/redirect behavior, credentials, real Chromium replay, the hostile complex fixture, dangerous-action side-effect counters, geometry-only step evidence, framing compilation/fallback, focused FFmpeg rendering, black/blank/frozen/rushed/unreadable/caption-overflow/browser-error quality fixtures, deterministic crawling, login, real FFmpeg normalization, discovery, prompt-like evidence, repair, repository/test import, coverage, queueing, idempotency, cancellation, persistence, isolation manifests, baseline evidence redaction, and service scoping. `pnpm test:web` covers the typed client and proxy policy. `pnpm test:e2e` covers session/capability gating plus safe quality warnings in the edit → approve → discover → capture → preview → coverage → assembly journey. Tests use synthetic applications/data and no customer media or credentials.
 
 The quality gate is deterministic evidence, not a human-comprehension claim. Effective UI text is a conservative declared source-text lower bound transformed through the actual crop, caption wrapping is estimated using the fixed overlay typography, and page-state evidence is a safe enum rather than retained page text. OCR, perceptual design review, mobile-device viewing, and human pacing comprehension remain external review activities.
 
