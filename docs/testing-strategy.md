@@ -25,6 +25,8 @@ Run the complete structured-capture suite with `pnpm test:capture`. It includes 
 
 Run `pnpm capture:baseline` after successful real-product pilot captures. It probes retained private media, captions, quality reports, and JPEG contact sheets; requires current versioned coverage inventories; checks committed media/presentation/quality/coverage thresholds; and produces an ignored path-free JSON report suitable for comparing later framing and quality changes. Warning-class quality findings are retained for human review, while any failed gate makes the command fail.
 
+Run `pnpm capture:hostile:check` for the committed complex-fixture matrix. It must verify all five approved Chromium flows, match all seventeen prohibited plans to their expected compile/execution blocker, and prove every server-side danger counter remains zero. Its ignored report is safe aggregate evidence, not a claim that arbitrary product semantics can be inferred exhaustively.
+
 Action-aware pilot profiles use `automatic_focus` with a bounded zoom and transition duration. Unit tests prove target priority, clamping, manual framing, and fallback; the generic pilot integration renders a focused 1080×1920 MP4 and stores its private `framing_manifest` alongside captions and media.
 Quality fixtures deliberately include moving/readable, black, frozen, unreadable, rushed, caption-overflow, browser-error, and lingering-caption inputs. The gate must fail the unsafe fixtures, warn for review-only conditions, store mode-restricted evidence, and omit private paths. These checks do not replace visual inspection or human comprehension testing.
 | Manual QA | Catch visual and content-quality issues | caption safe zones, audio pacing, angle quality, export playback |
