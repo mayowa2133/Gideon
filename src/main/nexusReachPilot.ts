@@ -38,9 +38,32 @@ export function createNexusReachPilotAdapters(): CapturePilotAdapterRegistry {
   };
 }
 
-export async function runNexusReachPilot(input: { outputRoot?: string; executablePath?: string; manifestPath?: string } = {}) {
+export async function runNexusReachPilot(input: { outputRoot?: string; executablePath?: string; manifestPath?: string; workflowIds?: string[] } = {}) {
   const manifest = await loadNexusReachPilotManifest(input.manifestPath);
-  return runCapturePilot({ manifest, adapters: createNexusReachPilotAdapters(), outputRoot: input.outputRoot, executablePath: input.executablePath });
+  return runCapturePilot({ manifest, adapters: createNexusReachPilotAdapters(), outputRoot: input.outputRoot, executablePath: input.executablePath, workflowIds: input.workflowIds });
+}
+
+export function parseNexusReachPilotArguments(argv: string[]): { workflowIds?: string[] } {
+  const workflowIds: string[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index]!;
+    if (argument === "--" && index === 0) continue;
+    if (argument === "--workflow") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) throw new Error("--workflow requires a registered workflow id.");
+      workflowIds.push(value);
+      index += 1;
+      continue;
+    }
+    if (argument.startsWith("--workflow=")) {
+      const value = argument.slice("--workflow=".length);
+      if (!value) throw new Error("--workflow requires a registered workflow id.");
+      workflowIds.push(value);
+      continue;
+    }
+    throw new Error(`Unsupported capture pilot argument: ${argument}`);
+  }
+  return workflowIds.length > 0 ? { workflowIds } : {};
 }
 
 async function approvedReset(scenario: "onboarding" | "returning") {
@@ -116,7 +139,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 async function runCli() {
-  const result = await runNexusReachPilot();
+  const result = await runNexusReachPilot(parseNexusReachPilotArguments(process.argv.slice(2)));
   process.stdout.write(`${JSON.stringify({ ok: true, pilotRoot: result.pilotRoot, runRoot: result.runRoot, clips: result.report.results.map((item) => ({ workflowId: item.workflowId, normalizedClip: item.normalizedClip.localPath, sourceRecording: item.sourceArtifact?.localPath })), coverage: result.report.coverage?.dimensions }, null, 2)}\n`);
 }
 

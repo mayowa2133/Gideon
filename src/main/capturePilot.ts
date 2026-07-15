@@ -27,6 +27,17 @@ export interface CapturePilotState {
   coverage: CoverageSnapshot[];
 }
 
+export interface CapturePilotWorkflowAttempt {
+  workflowId: string;
+  status: "pending" | "running" | "verified" | "failed";
+  startedAt?: string;
+  completedAt?: string;
+  captureRunId?: string;
+  executionId?: string;
+  normalizedClipArtifactId?: string;
+  safeError?: string;
+}
+
 export class LocalCapturePilotRepository {
   readonly state: CapturePilotState;
   constructor(initial?: CapturePilotState, private readonly onMutation?: (state: CapturePilotState) => Promise<void>) { this.state = structuredClone(initial ?? emptyState()); }
@@ -61,8 +72,10 @@ export async function runCapturePilot(input: {
   outputRoot?: string;
   executablePath?: string;
   now?: () => Date;
+  workflowIds?: string[];
 }) {
   const { manifest, adapters } = input;
+  const workflows = selectPilotWorkflows(manifest, input.workflowIds);
   const now = input.now?.() ?? new Date();
   const pilotRoot = path.resolve(input.outputRoot ?? path.join(process.cwd(), "tmp", "capture-pilot", manifest.artifactDirectoryName));
   assertCapturePilotAdapters(manifest, adapters);
@@ -70,6 +83,10 @@ export async function runCapturePilot(input: {
   const runId = `${now.toISOString().replace(/[:.]/g, "-")}-${randomUUID()}`;
   const runRoot = path.join(pilotRoot, "runs", runId);
   await fs.mkdir(runRoot, { recursive: true, mode: 0o700 });
+  const attempts: CapturePilotWorkflowAttempt[] = workflows.map((workflow) => ({ workflowId: workflow.id, status: "pending" }));
+  const selection = { requestedWorkflowIds: workflows.map((workflow) => workflow.id), manifestWorkflowCount: manifest.workflows.length };
+  const writeCheckpoint = async (status: "running" | "completed" | "failed") => writePrivateJson(path.join(runRoot, "pilot-checkpoint.json"), { schemaVersion: "1", manifestKey: manifest.key, runId, status, selection, attempts, updatedAt: new Date().toISOString() });
+  await writeCheckpoint("running");
   const repository = await openDurableRepository(path.join(pilotRoot, "pilot-repository.json"));
   const service = createCaptureApplicationService({ repository });
   const environment = await service.createEnvironment({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, name: manifest.environment.name, type: manifest.environment.type, baseUrl: manifest.environment.baseUrl, allowedDomains: manifest.environment.allowedDomains, resetAdapter: "fixture_api" });
@@ -77,7 +94,7 @@ export async function runCapturePilot(input: {
   const persona = await service.createPersona({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, environmentId: environment.id, key: manifest.persona.key, displayName: manifest.persona.displayName, roleDescription: manifest.persona.roleDescription, fixtureProfileId: manifest.persona.fixtureProfileId });
   const evidence = await extractRepositoryEvidence(manifest.repository);
   const approvedFlows: ProductFlowRevision[] = [];
-  for (const workflow of manifest.workflows) {
+  for (const workflow of workflows) {
     const [imported] = importTestScenarioFlows({ projectId: manifest.projectId, environmentVersionId: validated.version.id, personaId: persona.id, scenarios: [workflow.scenario], makeId: () => workflow.id });
     if (!imported) throw new Error(`Capture pilot workflow ${workflow.id} could not be imported.`);
     const current = await repository.getFlow({ workspaceId: manifest.workspaceId, flowId: workflow.id });
@@ -89,11 +106,15 @@ export async function runCapturePilot(input: {
   const coverageService = createCaptureCoverageService(repository);
   const persistCoverage = createPostRunCoverageHook({ repository, coverage: coverageService });
   const chrome = input.executablePath ?? process.env.GIDEON_CAPTURE_CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-  const results: Array<{ workflowId: string; flow: ProductFlowRevision; run: CaptureRun; execution: FlowExecutionRecord; normalizedClip: ArtifactRecord; sourceArtifact?: ArtifactRecord; assemblyManifestArtifact?: ArtifactRecord; verification: unknown }> = [];
+  const results: Array<{ workflowId: string; flow: ProductFlowRevision; run: CaptureRun; execution: FlowExecutionRecord; normalizedClip: ArtifactRecord; sourceArtifact?: ArtifactRecord; assemblyManifestArtifact?: ArtifactRecord; verification: unknown; interactionSummary: ReturnType<typeof summarizeInteractions> }> = [];
   const diagnostics: Array<{ workflowId: string; message: string }> = [];
 
   try {
-    for (const workflow of manifest.workflows) {
+    for (const workflow of workflows) {
+      const attempt = attempts.find((candidate) => candidate.workflowId === workflow.id)!;
+      attempt.status = "running";
+      attempt.startedAt = new Date().toISOString();
+      await writeCheckpoint("running");
       const flow = approvedFlows.find((candidate) => candidate.id === workflow.id)!;
       let queued: { workspaceId: string; captureRunId: string } | undefined;
       const coordinator = createCaptureRunCoordinator({ repository, queue: { async enqueue(value) { queued = { workspaceId: value.workspaceId, captureRunId: value.captureRunId }; } } });
@@ -114,7 +135,7 @@ export async function runCapturePilot(input: {
         fixtureValuesForPersona: async () => manifest.persona.fixtureValues,
         persistCoverage: async (value) => { await persistCoverage(value); },
         workRoot: path.join(runRoot, "work", workflow.id),
-        onDiagnostic: (error) => diagnostics.push({ workflowId: workflow.id, message: error instanceof Error ? error.message : "Capture worker diagnostic was not an Error." })
+        onDiagnostic: (error) => diagnostics.push({ workflowId: workflow.id, message: safePilotDiagnostic(error) })
       });
       await fs.mkdir(path.join(runRoot, "work", workflow.id), { recursive: true, mode: 0o700 });
       const result = await worker.execute(queued);
@@ -124,10 +145,23 @@ export async function runCapturePilot(input: {
       const normalizedClip = await repository.getArtifact({ workspaceId: manifest.workspaceId, artifactId: execution.normalizedClipArtifactId });
       if (!normalizedClip) throw new Error(`Capture pilot workflow ${workflow.id} normalized clip was not found.`);
       const verification = await adapters.verification[workflow.verificationAdapterId]!.verify({ manifest, workflowId: workflow.id });
-      results.push({ workflowId: workflow.id, flow, run: result.run, execution, normalizedClip, sourceArtifact: result.sourceArtifact, assemblyManifestArtifact: result.assemblyManifestArtifact, verification });
+      results.push({ workflowId: workflow.id, flow, run: result.run, execution, normalizedClip, sourceArtifact: result.sourceArtifact, assemblyManifestArtifact: result.assemblyManifestArtifact, verification, interactionSummary: summarizeInteractions(flow, manifest.presentation) });
+      attempt.status = "verified";
+      attempt.completedAt = new Date().toISOString();
+      attempt.captureRunId = result.run.id;
+      attempt.executionId = execution.id;
+      attempt.normalizedClipArtifactId = normalizedClip.id;
+      await writeCheckpoint("running");
     }
   } catch (error) {
-    await writePrivateJson(path.join(runRoot, "pilot-failure.json"), { schemaVersion: "1", manifestKey: manifest.key, error: error instanceof Error ? error.message : "Capture pilot failed.", diagnostics, state: repository.state, generatedAt: new Date().toISOString() });
+    const running = attempts.find((attempt) => attempt.status === "running");
+    if (running) {
+      running.status = "failed";
+      running.completedAt = new Date().toISOString();
+      running.safeError = safePilotError(error);
+    }
+    await writeCheckpoint("failed");
+    await writePrivateJson(path.join(runRoot, "pilot-failure.json"), { schemaVersion: "1", manifestKey: manifest.key, runId, selection, attempts, error: safePilotError(error), diagnostics, state: repository.state, generatedAt: new Date().toISOString() });
     throw error;
   }
 
@@ -141,11 +175,42 @@ export async function runCapturePilot(input: {
     });
   }
   const coverage = await coverageService.latest({ workspaceId: manifest.workspaceId, projectId: manifest.projectId });
-  const report = { schemaVersion: "1", runId, manifestKey: manifest.key, name: manifest.name, environment: validated.environment, environmentVersion: validated.version, repositoryEvidence: evidence.manifest, persona, results, coverage, generatedAt: new Date().toISOString() };
+  const report = { schemaVersion: "1", runId, manifestKey: manifest.key, name: manifest.name, selection, environment: validated.environment, environmentVersion: validated.version, repositoryEvidence: evidence.manifest, persona, results, coverage, generatedAt: new Date().toISOString() };
   await writePrivateJson(path.join(runRoot, "pilot-report.json"), report);
   await writePrivateJson(path.join(runRoot, "pilot-state.json"), repository.state);
   await writePrivateJson(path.join(pilotRoot, "latest.json"), { schemaVersion: "1", runId, runRoot, reportPath: path.join(runRoot, "pilot-report.json"), updatedAt: new Date().toISOString() });
+  await writeCheckpoint("completed");
   return { pilotRoot, runRoot, report };
+}
+
+function selectPilotWorkflows(manifest: CapturePilotManifest, requested: string[] | undefined): CapturePilotManifest["workflows"] {
+  if (requested === undefined) return manifest.workflows;
+  if (requested.length < 1) throw new Error("Capture pilot workflow selection must not be empty.");
+  const unique = [...new Set(requested)];
+  if (unique.length !== requested.length) throw new Error("Capture pilot workflow selection must not contain duplicates.");
+  const selected = unique.map((id) => manifest.workflows.find((workflow) => workflow.id === id));
+  const missing = unique.filter((_id, index) => !selected[index]);
+  if (missing.length > 0) throw new Error(`Capture pilot workflows are not registered: ${missing.join(", ")}.`);
+  return selected as CapturePilotManifest["workflows"];
+}
+
+function summarizeInteractions(flow: ProductFlowRevision, presentation: CapturePilotManifest["presentation"]) {
+  const counts: Record<string, number> = { navigate: 0, click: 0, fill: 0, select: 0, key: 0, wait_for: 0 };
+  for (const step of flow.steps) counts[step.action.type] = (counts[step.action.type] ?? 0) + 1;
+  return { counts, presentation: { showPointer: presentation.showPointer, pointerMoveMs: presentation.pointerMoveMs, typingDelayMs: presentation.typingDelayMs } };
+}
+
+function safePilotError(error: unknown): string {
+  if (!(error instanceof Error)) return "Capture pilot failed.";
+  const message = error.message.replace(/[\r\n\t]+/g, " ").trim();
+  return message.length > 0 && message.length <= 500 ? message : "Capture pilot failed. Safe diagnostics are available in the private run artifacts.";
+}
+
+function safePilotDiagnostic(error: unknown): string {
+  if (!(error instanceof Error)) return "Capture worker diagnostic was not an Error.";
+  const message = error.message.replace(/[\r\n\t]+/g, " ").trim();
+  if (/(?:password|passcode|secret|token|authorization|cookie|bearer|api[_ -]?key)\s*[:=]/i.test(message)) return "Capture worker diagnostic contained sensitive-shaped data and was redacted.";
+  return message.length > 0 && message.length <= 500 ? message : "Capture worker failed; the diagnostic exceeded the safe reporting limit.";
 }
 
 async function writePrivateJson(filePath: string, value: unknown): Promise<void> { await fs.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 }); await fs.writeFile(filePath, JSON.stringify(value, null, 2), { encoding: "utf8", mode: 0o600 }); }

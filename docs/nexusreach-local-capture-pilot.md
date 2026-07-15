@@ -20,6 +20,14 @@ cd /Users/mayowaadesanya/Documents/Projects/Gideon
 pnpm capture:pilot
 ```
 
+To retry or repeatedly exercise only one previously failing workflow without recapturing the successful workflows, pass its registered manifest ID:
+
+```sh
+pnpm capture:pilot -- --workflow review-draft-outreach
+```
+
+`--workflow` may be repeated for a bounded subset. Unknown, empty, duplicate, and unsupported arguments fail before a browser run starts.
+
 The command loads and runtime-validates `capture-pilots/nexusreach.json`. It refuses target drift from the repository root and loopback origin registered in trusted adapter code, refuses manifest-provided commands, and requires NexusReach to be reachable before capture starts. Each invocation creates an immutable directory below `tmp/capture-pilot/nexusreach/runs` and updates a private `latest.json` pointer without deleting earlier runs.
 
 ## What it composes
@@ -28,7 +36,7 @@ The generic pilot runner creates an in-process local workspace and project, a `l
 
 The capture worker invokes only registered `demo_reset.sh onboarding` or `demo_reset.sh returning` adapters, once before each dry run and once before each recording. It replays the approved flows with the `local_test` Playwright runtime, adding human-readable holds, a rendered arrow cursor with click feedback, smooth movement to each approved target, and character-by-character typing while keeping dry runs fast. It verifies browser outcomes, normalizes each recording to H.264, performs visual QA, creates private source/clip/assembly artifacts, and calculates aggregate pilot coverage. Registered loopback API checks independently verify the persisted synthetic state and restore the tracker fixture after its approved mutation.
 
-The pilot intentionally does not start discovery, upload a resume, connect a network, perform outreach, use external credentials, or access a non-loopback host. The versioned local state and complete report are persisted as `pilot-state.json` and `pilot-report.json`; private failure reports include bounded worker diagnostics, media remains under `private-artifacts`, and all run output is ignored by Git.
+The pilot intentionally does not start discovery, upload a resume, connect a network, perform outreach, use external credentials, or access a non-loopback host. The versioned local state and complete report are persisted as `pilot-state.json` and `pilot-report.json`. An incrementally updated `pilot-checkpoint.json` records pending, running, verified, or failed workflow attempts so an interrupted or failed operator run has an exact targeted-retry scope. Private failure reports include bounded, sensitive-shaped-data-redacted worker diagnostics; media remains under `private-artifacts`, and all run output is ignored by Git. Successful reports also summarize the approved interaction counts and the cursor movement and typing presentation settings used for each clean take.
 
 This first supported command is headless rather than a hosted-UI launcher. The production capture API and review UI remain dependency-gated and unchanged. The local JSON history is an operator aid, not a replacement for the PostgreSQL-backed hosted persistence required before self-service rollout.
 
