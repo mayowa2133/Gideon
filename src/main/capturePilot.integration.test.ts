@@ -58,9 +58,12 @@ describe.skipIf(!executablePath)("generic capture pilot", () => {
     expect(result.report.results).toHaveLength(2);
     expect(result.report.results[0]).toMatchObject({ workflowId: "complete", execution: { status: "verified" }, verification: { outcome: "done" } });
     expect(result.report.results[0]?.interactionSummary).toEqual({ counts: { navigate: 0, click: 1, fill: 0, select: 0, key: 0, wait_for: 0 }, presentation: { showPointer: true, pointerMoveMs: 100, typingDelayMs: 0 } });
+    expect(result.report.results[0]?.presentationOutput).toMatchObject({ validation: { width: 1080, height: 1920, videoCodec: "h264", audioCodec: "aac" }, cues: [{ stepId: "imported-step-1", text: "Complete the fixture." }] });
     expect(result.report.coverage?.dimensions.find((dimension) => dimension.key === "goal")).toMatchObject({ denominator: 2, coveredIds: ["goal:complete", "goal:complete-again"], uncoveredIds: [] });
     expect(result.report.coverage?.dimensions.find((dimension) => dimension.key === "approved_flow")).toMatchObject({ denominator: 2, coveredIds: ["complete", "complete-again"], uncoveredIds: [] });
     await expect(fs.stat(result.report.results[0]!.normalizedClip.localPath!)).resolves.toMatchObject({ size: expect.any(Number) });
+    await expect(fs.stat(result.report.results[0]!.presentationOutput!.verticalRender.localPath!)).resolves.toMatchObject({ size: expect.any(Number) });
+    await expect(fs.readFile(result.report.results[0]!.presentationOutput!.captions.localPath!, "utf8")).resolves.toContain("Complete the fixture.");
     await expect(fs.readFile(sentinel, "utf8")).resolves.toBe("{}");
     const second = await runCapturePilot({ manifest, adapters, outputRoot, executablePath, now: () => new Date("2026-07-15T02:00:00.000Z") });
     expect(second.runRoot).not.toBe(result.runRoot);
@@ -81,7 +84,7 @@ describe.skipIf(!executablePath)("generic capture pilot", () => {
     expect(selected.report.coverage?.dimensions.find((dimension) => dimension.key === "approved_flow")).toMatchObject({ denominator: 1, coveredIds: ["complete-again"], uncoveredIds: [] });
     expect(resets).toBe(10);
     await expect(runCapturePilot({ manifest, adapters, outputRoot, executablePath, workflowIds: ["missing"] })).rejects.toThrow("Capture pilot workflows are not registered: missing");
-  }, 60_000);
+  }, 90_000);
 
   it("persists a failed workflow checkpoint with bounded retry evidence", async () => {
     const outputRoot = path.join(root, "failure-output");
@@ -115,7 +118,7 @@ function manifestValue(baseUrl: string, rootDir: string) {
     repository: { rootDir, maxFiles: 100, maxBytes: 1_000_000 },
     environment: { name: "Fixture", type: "local_preview", baseUrl, allowedDomains: ["localhost"], startupAdapterId: "fixture" },
     persona: { key: "demo", displayName: "Demo", roleDescription: "Synthetic fixture persona.", fixtureProfileId: "fixture:demo", fixtureValues: { result: "Done" } },
-    presentation: { viewport: { width: 960, height: 600 }, initialHoldMs: 1500, beforeActionMs: 200, afterActionMs: 500, finalHoldMs: 1000, showPointer: true, pointerMoveMs: 100, typingDelayMs: 0 },
+    presentation: { viewport: { width: 960, height: 600 }, initialHoldMs: 1500, beforeActionMs: 200, afterActionMs: 500, finalHoldMs: 1000, showPointer: true, pointerMoveMs: 100, typingDelayMs: 0, verticalOutput: { enabled: true, narration: "none" } },
     workflows: [workflow("complete"), workflow("complete-again")]
   };
 }

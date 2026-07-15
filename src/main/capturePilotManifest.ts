@@ -37,6 +37,10 @@ export interface CapturePilotManifest {
     showPointer: boolean;
     pointerMoveMs: number;
     typingDelayMs: number;
+    verticalOutput: {
+      enabled: boolean;
+      narration: "none" | "provider";
+    };
   };
   workflows: Array<{
     id: string;
@@ -143,10 +147,13 @@ function parsePersona(value: unknown): CapturePilotManifest["persona"] {
 
 function parsePresentation(value: unknown): CapturePilotManifest["presentation"] {
   const input = record(value, "manifest.presentation");
-  exactKeys(input, ["viewport", "initialHoldMs", "beforeActionMs", "afterActionMs", "finalHoldMs", "showPointer", "pointerMoveMs", "typingDelayMs"], "manifest.presentation");
+  exactKeys(input, ["viewport", "initialHoldMs", "beforeActionMs", "afterActionMs", "finalHoldMs", "showPointer", "pointerMoveMs", "typingDelayMs", "verticalOutput"], "manifest.presentation");
   const viewport = record(input.viewport, "manifest.presentation.viewport");
   exactKeys(viewport, ["width", "height"], "manifest.presentation.viewport");
+  const verticalOutput = record(input.verticalOutput, "manifest.presentation.verticalOutput");
+  exactKeys(verticalOutput, ["enabled", "narration"], "manifest.presentation.verticalOutput");
   if (typeof input.showPointer !== "boolean") throw new Error("Capture pilot presentation.showPointer must be boolean.");
+  if (typeof verticalOutput.enabled !== "boolean" || !["none", "provider"].includes(String(verticalOutput.narration))) throw new Error("Capture pilot presentation.verticalOutput is invalid.");
   return {
     viewport: { width: integer(viewport.width, "manifest.presentation.viewport.width", 640, 3_840), height: integer(viewport.height, "manifest.presentation.viewport.height", 480, 2_160) },
     initialHoldMs: integer(input.initialHoldMs, "manifest.presentation.initialHoldMs", 0, 5_000),
@@ -155,7 +162,8 @@ function parsePresentation(value: unknown): CapturePilotManifest["presentation"]
     finalHoldMs: integer(input.finalHoldMs, "manifest.presentation.finalHoldMs", 0, 5_000),
     showPointer: input.showPointer,
     pointerMoveMs: integer(input.pointerMoveMs, "manifest.presentation.pointerMoveMs", 0, 2_000),
-    typingDelayMs: integer(input.typingDelayMs, "manifest.presentation.typingDelayMs", 0, 250)
+    typingDelayMs: integer(input.typingDelayMs, "manifest.presentation.typingDelayMs", 0, 250),
+    verticalOutput: { enabled: verticalOutput.enabled, narration: verticalOutput.narration as "none" | "provider" }
   };
 }
 

@@ -140,7 +140,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 
 async function runCli() {
   const result = await runNexusReachPilot(parseNexusReachPilotArguments(process.argv.slice(2)));
-  process.stdout.write(`${JSON.stringify({ ok: true, pilotRoot: result.pilotRoot, runRoot: result.runRoot, clips: result.report.results.map((item) => ({ workflowId: item.workflowId, normalizedClip: item.normalizedClip.localPath, sourceRecording: item.sourceArtifact?.localPath })), coverage: result.report.coverage?.dimensions }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ ok: true, pilotRoot: result.pilotRoot, runRoot: result.runRoot, clips: result.report.results.map((item) => ({ workflowId: item.workflowId, normalizedClip: item.normalizedClip.localPath, verticalRender: item.presentationOutput?.verticalRender.localPath, captions: item.presentationOutput?.captions.localPath, sourceRecording: item.sourceArtifact?.localPath })), coverage: result.report.coverage?.dimensions }, null, 2)}\n`);
 }
 
 if (require.main === module) runCli().catch((error: unknown) => { process.stderr.write(`${error instanceof Error ? error.message : "NexusReach pilot failed."}\n`); process.exitCode = 1; });

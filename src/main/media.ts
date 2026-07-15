@@ -555,6 +555,33 @@ interface ZoomFilterExpressions {
   cropY: string;
 }
 
+export async function createCaptureCaptionOverlaySequence(input: {
+  cues: Array<{ startMs: number; endMs: number; text: string }>;
+  outputDir: string;
+  durationSec: number;
+}): Promise<OverlaySequence> {
+  loadOverlayFont();
+  await fs.mkdir(input.outputDir, { recursive: true });
+  const durationMs = Math.max(1, Math.round(input.durationSec * 1_000));
+  const frameCount = Math.max(1, Math.ceil(input.durationSec * OVERLAY_FRAME_RATE) + 2);
+  for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+    const timestampMs = Math.min(durationMs, Math.round(frameIndex / OVERLAY_FRAME_RATE * 1_000));
+    const image = PImage.make(OUTPUT_WIDTH, OUTPUT_HEIGHT);
+    const context = image.getContext("2d");
+    context.clearRect(0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT);
+    const cue = input.cues.find((candidate) => timestampMs >= candidate.startMs && timestampMs <= candidate.endMs);
+    if (cue) {
+      drawSolidRect(context, 80, 1460, 920, 250, "rgba(9, 16, 31, 0.90)");
+      drawSolidRect(context, 80, 1460, 12, 250, "#4F8CFF");
+      context.fillStyle = "#FFFFFF";
+      context.font = "42pt Arial";
+      drawWrappedText(context, cue.text, 125, 1535, 830, 58, 3);
+    }
+    await PImage.encodePNGToStream(image, createWriteStream(path.join(input.outputDir, `caption-${String(frameIndex).padStart(4, "0")}.png`)));
+  }
+  return { pattern: path.join(input.outputDir, "caption-%04d.png"), frameRate: OVERLAY_FRAME_RATE, frameCount };
+}
+
 async function createTimedOverlaySequence(
   profile: ProductProfile,
   script: ScriptDraft,
