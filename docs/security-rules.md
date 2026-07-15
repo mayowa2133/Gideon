@@ -234,6 +234,7 @@ The post-MVP capture worker adds browser navigation but does not relax the SSRF 
 - Final success requires observable assertions and a versioned verification receipt; model claims of completion are not trusted.
 - Quality telemetry retains only bounded geometry, numeric media/presentation measurements, and safe page-state enums. Page text used to classify loading, login, browser-error, or failure states is never placed in receipts, reports, logs, or hosted API responses.
 - Quality JSON reports and contact sheets are private artifacts. A failed quality gate cannot publish a preview or contribute an assembly source, and baseline evidence must emit no local paths, storage keys, signed URLs, caption text, or product content.
+- Full coverage inventories and revision bases are private evidence. Hosted coverage may expose safe inventory/source revisions, freshness reason codes, opaque coverage IDs, exclusions, and stable blocker codes, but must remove workspace IDs, evidence hashes, policy/persona/flow hashes, local paths, selectors, page text, fixture values, storage keys, and signed URLs.
 
 ## Web security headers
 

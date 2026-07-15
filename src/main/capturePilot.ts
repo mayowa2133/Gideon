@@ -1,10 +1,11 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { ArtifactRecord, JobRecord } from "../shared/types";
 import type { CaptureEnvironment, CaptureEnvironmentVersion, CapturePersona, CaptureRun, CoverageSnapshot, FlowExecutionRecord, ProductFlowRevision } from "../shared/productFlowCapture";
 import { assertFlowStepVisualEvidence, parseProductFlowRevision } from "../shared/productFlowCapture";
 import { createCaptureCoverageService } from "./captureCoverageService";
+import { compileCaptureCoverageInventory, createCoverageRevisionBasis, type CaptureCoverageInventoryDimensionInput } from "./captureCoverageInventory";
 import { assertCapturePilotAdapters, type CapturePilotAdapterRegistry, type CapturePilotManifest } from "./capturePilotManifest";
 import { createCaptureRunCoordinator } from "./captureRunCoordinator";
 import { createCaptureRunWorker } from "./captureRunWorker";
@@ -107,8 +108,8 @@ export async function runCapturePilot(input: {
     approvedFlows.push(await service.setFlowApproval({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, flowId: draft.id, status: "approved", actorUserId: "local-pilot-user" }));
   }
   const storage = new LocalPrivateObjectStorage(path.join(runRoot, "private-artifacts"));
-  const coverageService = createCaptureCoverageService(repository);
-  const persistCoverage = createPostRunCoverageHook({ repository, coverage: coverageService });
+  const workerCoverageService = createCaptureCoverageService(repository);
+  const persistWorkerCoverage = createPostRunCoverageHook({ repository, coverage: workerCoverageService });
   const chrome = input.executablePath ?? process.env.GIDEON_CAPTURE_CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
   const results: Array<{ workflowId: string; flow: ProductFlowRevision; run: CaptureRun; execution: FlowExecutionRecord; normalizedClip: ArtifactRecord; sourceArtifact?: ArtifactRecord; assemblyManifestArtifact?: ArtifactRecord; verification: unknown; interactionSummary: ReturnType<typeof summarizeInteractions>; presentationOutput?: { verticalRender: ArtifactRecord; captions: ArtifactRecord; framingManifest: ArtifactRecord; qualityReport: ArtifactRecord; qualityContactSheet: ArtifactRecord; quality: CaptureVideoQualityReport; voiceover?: ArtifactRecord; validation: Awaited<ReturnType<typeof renderCapturePresentation>>["validation"]; framing: Awaited<ReturnType<typeof renderCapturePresentation>>["framingManifest"]; cues: Awaited<ReturnType<typeof renderCapturePresentation>>["cues"] } }> = [];
   const diagnostics: Array<{ workflowId: string; message: string }> = [];
@@ -137,7 +138,7 @@ export async function runCapturePilot(input: {
         }) },
         resetAdapters: { fixture_api: { async reset() { await reset.reset({ manifest, workflowId: workflow.id }); } } },
         fixtureValuesForPersona: async () => manifest.persona.fixtureValues,
-        persistCoverage: async (value) => { await persistCoverage(value); },
+        persistCoverage: async (value) => { await persistWorkerCoverage(value); },
         workRoot: path.join(runRoot, "work", workflow.id),
         onDiagnostic: (error) => diagnostics.push({ workflowId: workflow.id, message: safePilotDiagnostic(error) })
       });
@@ -177,7 +178,10 @@ export async function runCapturePilot(input: {
         const qualityContactSheet = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "quality_contact_sheet", sourcePath: qualityResult.contactSheetPath, originalFileName: `${workflow.id}-contact-sheet.jpg`, contentType: "image/jpeg" })).artifact;
         await repository.upsertArtifact(qualityReport);
         await repository.upsertArtifact(qualityContactSheet);
-        if (qualityResult.report.status === "failed") throw new Error(`Capture pilot workflow ${workflow.id} failed automated video quality gates.`);
+        if (qualityResult.report.status === "failed") {
+          const failedChecks = qualityResult.report.checks.filter((check) => check.status === "fail").map((check) => check.code).join(",");
+          throw new Error(`Capture pilot workflow ${workflow.id} failed automated video quality gates (${failedChecks || "unknown"}).`);
+        }
         const captions = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "caption_track", sourcePath: rendered.captionsPath, originalFileName: `${workflow.id}.vtt`, contentType: "text/vtt" })).artifact;
         const framingManifest = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "framing_manifest", sourcePath: rendered.framingManifestPath, originalFileName: `${workflow.id}-framing.json`, contentType: "application/json" })).artifact;
         const verticalRender = (await storage.putFile({ workspaceId: manifest.workspaceId, projectId: manifest.projectId, kind: "render", sourcePath: rendered.videoPath, originalFileName: `${workflow.id}-vertical.mp4`, contentType: "video/mp4" })).artifact;
@@ -213,12 +217,17 @@ export async function runCapturePilot(input: {
   }
 
   const lastResult = results.at(-1);
+  const compiledCoverage = manifest.coverageInventory ? compilePilotCoverageInventory({ manifest, repositoryEvidence: evidence.evidence, repositoryEvidenceRevision: evidence.manifest.evidenceHash, persona, approvedFlows, verifiedFlowIds: results.map((result) => result.workflowId) }) : undefined;
+  const basis = lastResult && compiledCoverage ? createCoverageRevisionBasis({ inventory: compiledCoverage.inventory, environmentVersionId: validated.version.id, policyFingerprint: lastResult.run.policyFingerprint, fixtureRevision: manifest.coverageInventory!.fixtureRevision, personas: [persona], flows: approvedFlows }) : undefined;
+  const coverageService = createCaptureCoverageService(repository, { revisionSource: { async getCurrentCoverageBasis() { return basis ?? null; } } });
+  const persistFinalCoverage = createPostRunCoverageHook({ repository, coverage: coverageService });
   if (lastResult) {
-    await persistCoverage({
+    await persistFinalCoverage({
       workspaceId: manifest.workspaceId,
       projectId: manifest.projectId,
       captureRun: lastResult.run,
-      executions: results.map((result) => result.execution)
+      executions: results.map((result) => result.execution),
+      ...(compiledCoverage && basis ? { inventory: compiledCoverage.inventory, basis, evidence: compiledCoverage.covered } : {})
     });
   }
   const coverage = await coverageService.latest({ workspaceId: manifest.workspaceId, projectId: manifest.projectId });
@@ -228,6 +237,59 @@ export async function runCapturePilot(input: {
   await writePrivateJson(path.join(pilotRoot, "latest.json"), { schemaVersion: "1", runId, runRoot, reportPath: path.join(runRoot, "pilot-report.json"), updatedAt: new Date().toISOString() });
   await writeCheckpoint("completed");
   return { pilotRoot, runRoot, report };
+}
+
+function compilePilotCoverageInventory(input: {
+  manifest: CapturePilotManifest;
+  repositoryEvidence: Awaited<ReturnType<typeof extractRepositoryEvidence>>["evidence"];
+  repositoryEvidenceRevision: string;
+  persona: CapturePersona;
+  approvedFlows: ProductFlowRevision[];
+  verifiedFlowIds: string[];
+}) {
+  const declared = new Map(input.manifest.coverageInventory!.dimensions.map((dimension) => [dimension.key, dimension] as const));
+  const routeIdsFromScenarios = [...new Set(input.manifest.workflows.flatMap((workflow) => scenarioRouteIds(workflow.scenario)))];
+  const renderedRouteIds = [...new Set(input.approvedFlows.filter((flow) => input.verifiedFlowIds.includes(flow.id)).flatMap(flowRouteIds))];
+  const dimensions: CaptureCoverageInventoryDimensionInput[] = [{
+    key: "persona",
+    trustworthyDenominator: true,
+    sources: [{ kind: "requested_personas", revision: `${input.persona.id}:${input.persona.revision}`, ids: [input.persona.id] }]
+  }];
+  for (const key of ["route", "state", "usage_sequence", "feature_flag", "outcome", "failure_state"] as const) {
+    const declaration = declared.get(key);
+    const sources: CaptureCoverageInventoryDimensionInput["sources"] = [];
+    if (declaration) sources.push({ kind: "manifest_declared", revision: input.manifest.coverageInventory!.fixtureRevision, ids: declaration.items.map((item) => item.id) });
+    if (key === "route") {
+      sources.push({ kind: "repository_routes", revision: input.repositoryEvidenceRevision, ids: input.repositoryEvidence.routePaths.map((route) => route.path) });
+      sources.push({ kind: "imported_tests", revision: input.manifest.coverageInventory!.fixtureRevision, ids: routeIdsFromScenarios });
+      sources.push({ kind: "rendered_navigation", revision: flowRevisionSource(input.approvedFlows), ids: renderedRouteIds });
+    }
+    if (key === "feature_flag") sources.push({ kind: "declared_feature_flags", revision: input.repositoryEvidenceRevision, ids: input.repositoryEvidence.featureFlagIds });
+    dimensions.push({ key, trustworthyDenominator: declaration?.trustworthyDenominator ?? false, sources, excluded: declaration?.excluded, blocked: declaration?.blocked });
+  }
+  const inventory = compileCaptureCoverageInventory({ revision: input.manifest.coverageInventory!.revision, dimensions });
+  const coveredFor = (key: "state" | "usage_sequence" | "feature_flag" | "outcome" | "failure_state") => (declared.get(key)?.items ?? []).filter((item) => item.workflowIds.some((flowId) => input.verifiedFlowIds.includes(flowId))).map((item) => item.id);
+  return {
+    inventory,
+    covered: {
+      visitedRouteIds: renderedRouteIds,
+      observedStateIds: coveredFor("state"),
+      coveredUsageSequenceIds: coveredFor("usage_sequence"),
+      coveredFeatureFlagIds: coveredFor("feature_flag"),
+      verifiedOutcomeIds: coveredFor("outcome"),
+      coveredFailureStateIds: coveredFor("failure_state")
+    }
+  };
+}
+
+function scenarioRouteIds(scenario: CapturePilotManifest["workflows"][number]["scenario"]): string[] {
+  return [scenario.entryPath, ...scenario.steps.flatMap((step) => step.action.type === "navigate" ? [step.action.path] : []), ...scenario.finalAssertions.flatMap((assertion) => assertion.type === "url" ? [assertion.path] : [])];
+}
+
+function flowRouteIds(flow: ProductFlowRevision): string[] { return [flow.startingState.entryPath, ...flow.steps.flatMap((step) => step.action.type === "navigate" ? [step.action.path] : []), ...flow.finalAssertions.flatMap((assertion) => assertion.type === "url" ? [assertion.path] : [])]; }
+function flowRevisionSource(flows: ProductFlowRevision[]): string {
+  const revisions = flows.map((flow) => `${flow.id}:${flow.revision}`).sort().join(",");
+  return revisions ? createHash("sha256").update(revisions).digest("hex") : "none";
 }
 
 function selectPilotWorkflows(manifest: CapturePilotManifest, requested: string[] | undefined): CapturePilotManifest["workflows"] {

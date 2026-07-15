@@ -37,6 +37,7 @@
     "requireCaptions": true,
     "requireQualityArtifacts": true,
     "allowQualityWarnings": true,
+    "requireCurrentVersionedCoverage": true,
     "requireFullDeclaredCoverage": true
   }
 }

@@ -2,7 +2,7 @@
 
 **Status:** Proposed MVP architecture
 
-**Last updated:** 2026-07-06
+**Last updated:** 2026-07-15
 
 ## Goals
 
@@ -34,6 +34,7 @@ The v2 capture foundation is specified in `docs/product-flow-capture-plan.md`. I
 - Browser WebM is an intermediate private artifact normalized by FFmpeg to a validated H.264 MP4 source clip with checksum lineage.
 - Vertical pilot derivatives compile the receipt geometry into a private, versioned `capture-framing-v1` artifact. Automatic focus uses a bounded source-aspect crop with deterministic transitions and falls back to full-frame when evidence is missing; full-frame and normalized manual-focus profiles are explicit alternatives.
 - Clean-take derivatives run through `capture-video-quality-v1` with committed thresholds before verification. Sampled pixels identify black/blank/frozen/detail conditions, while runtime-validated receipt, framing, caption, and presentation metadata check page-state enums, effective text scaling, caption geometry, pointer/click/typing presentation, action/caption dwell, pacing, and pan speed. Reports and contact sheets are private artifacts; failed quality cannot produce a ready preview or assembly source.
+- `capture-coverage-inventory-v1` compiles bounded persona, route, starting-state, usage-sequence, feature-flag, outcome, and failure-state denominators from versioned sources. `capture-coverage-v2` binds those denominators to the current environment, policy, fixture, persona, and approved-flow revisions; read-time comparison marks snapshots current, stale, or unknown. Numeric percentages are valid only for current trustworthy denominators.
 - Migration `0004_product_flow_capture.sql` implements the workspace-scoped persistence model. The hosted API can expose the reviewed foundation routes only when their services are injected; the remote browser-worker rollout remains gated until isolation, secret-store, audit, and operational checks pass.
 - `apps/web` is the hosted Next.js App Router surface. Browser requests use `/api/gideon/api/v1/*`; a server-only catch-all validates paths, forwards only allowlisted session/CSRF/idempotency headers, caps bodies, disables redirects and caching, and keeps `GIDEON_HOSTED_API_INTERNAL_URL` out of client bundles.
 

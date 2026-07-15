@@ -48,7 +48,7 @@ describe("capture baseline report", () => {
         interactionSummary: { counts: { navigate: 0, click: 1, fill: 1, select: 0, key: 0, wait_for: 1 }, presentation: { showPointer: true, pointerMoveMs: 350, typingDelayMs: 30 } },
         presentationOutput: { verticalRender: vertical, captions, qualityReport: qualityArtifact, qualityContactSheet: contactSheet, quality, validation: { frameQa: { sampledFrames: 3, informativeFrames: 3 } } }
       }],
-      coverage: { dimensions: [
+      coverage: { calculationVersion: "capture-coverage-v2", basis: coverageBasis(), freshness: { status: "current", reasons: [], evaluatedAt: "2026-07-15T01:00:00.000Z" }, dimensions: [
         { key: "goal", denominatorSource: "declared_goals", denominator: 1, coveredIds: ["goal:flow-one"], uncoveredIds: [], excluded: [], blocked: [] },
         { key: "approved_flow", denominatorSource: "approved_flows", denominator: 1, coveredIds: ["flow-one"], uncoveredIds: [], excluded: [], blocked: [] },
         { key: "route", denominator: "unknown", coveredIds: [], uncoveredIds: [], excluded: [], blocked: [] }
@@ -64,7 +64,7 @@ describe("capture baseline report", () => {
       probeMedia: async (filePath) => filePath.endsWith("vertical.mp4") ? { ...landscape, width: 1080, height: 1920, audioCodec: "aac" } : landscape
     });
     expect(result.report.status).toBe("passed");
-    expect(result.report.summary).toMatchObject({ pilots: 1, workflows: 1, verifiedWorkflows: 1, landscapeClips: 1, verticalRenders: 1, captionTracks: 1, qualityReports: 1, qualityContactSheets: 1, qualityReady: 1, qualityWarnings: 0, qualityFailed: 0, failures: 0 });
+    expect(result.report.summary).toMatchObject({ pilots: 1, workflows: 1, verifiedWorkflows: 1, landscapeClips: 1, verticalRenders: 1, captionTracks: 1, qualityReports: 1, qualityContactSheets: 1, qualityReady: 1, qualityWarnings: 0, qualityFailed: 0, currentVersionedCoverage: 1, staleOrUnknownCoverage: 0, failures: 0 });
     const serialized = JSON.stringify(result.report);
     for (const forbidden of [root, "localPath", "storageKey", "localUrl", "file://", "Synthetic step"]) expect(serialized).not.toContain(forbidden);
     expect((await fs.stat(result.outputPath)).mode & 0o777).toBe(0o600);
@@ -97,14 +97,14 @@ describe("capture baseline report", () => {
       schemaVersion: "1", manifestKey: "fixture", runId,
       repositoryEvidence: { extractorVersion: "repository-evidence-v1", evidenceHash: "b".repeat(64), filesInspected: 1, bytesInspected: 1, excludedPaths: 1 },
       results: [{ workflowId: "flow-one", sourceArtifact: source, normalizedClip: normalized, interactionSummary: { counts: { navigate: 0, click: 0, fill: 0, select: 0, key: 0, wait_for: 1 }, presentation: { showPointer: false, pointerMoveMs: 0, typingDelayMs: 0 } }, presentationOutput: { verticalRender: vertical, captions, qualityReport: qualityArtifact, qualityContactSheet: contactSheet, quality, validation: { frameQa: { sampledFrames: 3, informativeFrames: 1 } } } }],
-      coverage: { dimensions: [
+      coverage: { calculationVersion: "capture-coverage-v2", basis: coverageBasis(), freshness: { status: "stale", reasons: ["flow"], evaluatedAt: "2026-07-15T01:00:00.000Z" }, dimensions: [
         { key: "goal", denominator: 1, coveredIds: ["goal:flow-one"], uncoveredIds: [], excluded: [], blocked: [] },
         { key: "approved_flow", denominator: 1, coveredIds: ["flow-one"], uncoveredIds: [], excluded: [], blocked: [] }
       ] }
     });
     const result = await generateCaptureBaselineReport({ repositoryRoot: root, configPath: path.join(root, "config.json"), pilotRoot: path.join(root, "tmp", "capture-pilot"), outputPath: path.join(root, "tmp", "capture-baseline", "report.json"), probeMedia: async () => ({ durationMs: 1_000, width: 320, height: 200, fps: 10, videoCodec: "vp9", audioCodec: null }) });
     expect(result.report.status).toBe("failed");
-    expect(result.report.findings.map((finding) => finding.code)).toEqual(expect.arrayContaining(["duration_out_of_range", "frame_rate_out_of_range", "video_codec_mismatch", "pointer_disabled", "pointer_too_fast", "typing_pacing_out_of_range", "captions_missing", "uninformative_frame", "video_quality_failed"]));
+    expect(result.report.findings.map((finding) => finding.code)).toEqual(expect.arrayContaining(["duration_out_of_range", "frame_rate_out_of_range", "video_codec_mismatch", "pointer_disabled", "pointer_too_fast", "typing_pacing_out_of_range", "captions_missing", "uninformative_frame", "video_quality_failed", "coverage_inventory_not_current"]));
     expect(JSON.stringify(result.report)).not.toContain(root);
   });
 });
@@ -120,7 +120,7 @@ function config() {
       minimumFps: 24, maximumFps: 60,
       requiredVideoCodec: "h264", requiredVerticalAudioCodec: "aac",
       minimumPointerMoveMs: 250, minimumTypingDelayMs: 15, maximumTypingDelayMs: 80,
-      requirePointer: true, requireCaptions: true, requireQualityArtifacts: true, allowQualityWarnings: true, requireFullDeclaredCoverage: true
+      requirePointer: true, requireCaptions: true, requireQualityArtifacts: true, allowQualityWarnings: true, requireCurrentVersionedCoverage: true, requireFullDeclaredCoverage: true
     }
   };
 }
@@ -148,6 +148,10 @@ function qualityReport(status: "ready" | "failed") {
     checks: [{ code: "black_frames", status: checkStatus }],
     reportHash: status === "failed" ? "d".repeat(64) : "c".repeat(64)
   };
+}
+
+function coverageBasis() {
+  return { schemaVersion: "1", inventoryVersion: "capture-coverage-inventory-v1", inventoryRevision: 1, inventoryHash: "e".repeat(64), environmentVersionId: "version-1", policyFingerprint: "policy-v1", fixtureRevision: "fixture-v1", personaRevisionHash: "f".repeat(64), flowRevisionHash: "a".repeat(64) };
 }
 
 async function writeJson(filePath: string, value: unknown) {

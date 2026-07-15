@@ -48,6 +48,36 @@
       "quality": { "minimumSourceTextPx": 12 }
     }
   },
+  "coverageInventory": {
+    "revision": 1,
+    "fixtureRevision": "nexusreach-fixture-v1",
+    "dimensions": [
+      { "key": "route", "trustworthyDenominator": true, "items": [], "excluded": [], "blocked": [] },
+      { "key": "state", "trustworthyDenominator": true, "items": [
+        { "id": "onboarding-empty", "workflowIds": ["complete-onboarding"] },
+        { "id": "returning-populated", "workflowIds": ["browse-filter-jobs", "review-saved-contacts", "update-job-tracker", "review-draft-outreach"] }
+      ], "excluded": [], "blocked": [] },
+      { "key": "usage_sequence", "trustworthyDenominator": true, "items": [
+        { "id": "profile-onboarding", "workflowIds": ["complete-onboarding"] },
+        { "id": "job-search-filter", "workflowIds": ["browse-filter-jobs"] },
+        { "id": "saved-contact-review", "workflowIds": ["review-saved-contacts"] },
+        { "id": "tracker-stage-update", "workflowIds": ["update-job-tracker"] },
+        { "id": "unsent-draft-review", "workflowIds": ["review-draft-outreach"] }
+      ], "excluded": [], "blocked": [] },
+      { "key": "feature_flag", "trustworthyDenominator": false, "items": [], "excluded": [], "blocked": [] },
+      { "key": "outcome", "trustworthyDenominator": true, "items": [
+        { "id": "profile-completed", "workflowIds": ["complete-onboarding"] },
+        { "id": "jobs-filtered", "workflowIds": ["browse-filter-jobs"] },
+        { "id": "contacts-visible", "workflowIds": ["review-saved-contacts"] },
+        { "id": "tracker-updated", "workflowIds": ["update-job-tracker"] },
+        { "id": "draft-remains-unsent", "workflowIds": ["review-draft-outreach"] }
+      ], "excluded": [], "blocked": [] },
+      { "key": "failure_state", "trustworthyDenominator": true, "items": [], "excluded": [], "blocked": [
+        { "id": "external-outreach-send", "code": "policy_denied_external_side_effect" },
+        { "id": "live-job-discovery", "code": "policy_denied_external_side_effect" }
+      ] }
+    ]
+  },
   "workflows": [
     {
       "id": "complete-onboarding",

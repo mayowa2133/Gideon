@@ -528,6 +528,8 @@ These `/api/v1` routes are available only when the structured-capture service is
 
 - Returns the latest workspace/project-scoped multi-dimensional coverage snapshot when the coverage service is configured.
 - A dimension whose inventory is not trustworthy returns `denominator: "unknown"` and never fabricates an uncovered count.
+- Version 2 responses expose safe inventory version/revision, read-time freshness status and reason codes, and each dimension's denominator source kind/revision. Percentages may be calculated only when freshness is `current` and the denominator is numeric.
+- The hosted projection omits workspace IDs, inventory/policy/persona/flow hashes, local paths, object keys, signed URLs, selectors, evidence text, and fixture values.
 
 ### POST `/projects/{projectId}/flow-executions/{executionId}/retry`
 

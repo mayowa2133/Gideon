@@ -89,8 +89,9 @@ export function buildCaptureCaptionCues(input: { flow: ProductFlowRevision; rece
     const fallbackEnd = Math.round((index + 1) * input.durationMs / Math.max(1, input.flow.steps.length));
     const parsedStart = timing ? Date.parse(timing.startedAt) - receiptStart : fallbackStart;
     const parsedEnd = timing ? Date.parse(timing.completedAt) - receiptStart : fallbackEnd;
-    const startMs = clamp(Number.isFinite(parsedStart) ? parsedStart : fallbackStart, 0, Math.max(0, input.durationMs - 250));
-    const endMs = clamp(Math.max(startMs + 750, Number.isFinite(parsedEnd) ? parsedEnd + 500 : fallbackEnd), startMs + 250, input.durationMs);
+    const proposedStart = clamp(Number.isFinite(parsedStart) ? parsedStart : fallbackStart, 0, Math.max(0, input.durationMs - 250));
+    const endMs = clamp(Math.max(proposedStart + 750, Number.isFinite(parsedEnd) ? parsedEnd + 500 : fallbackEnd), proposedStart + 250, input.durationMs);
+    const startMs = endMs - proposedStart < 750 && input.durationMs >= 750 ? Math.max(0, endMs - 750) : proposedStart;
     return { stepId: step.id, startMs: Math.round(startMs), endMs: Math.round(endMs), text: safeCaption(step.intent) };
   });
 }

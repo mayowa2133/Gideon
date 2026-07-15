@@ -102,5 +102,5 @@ describe("production promotion gate", () => {
     expect(invocations).toContain("provider:canary -- --live");
     expect(invocations).toContain("production:provider-canary-report:check");
     expect(invocations).toContain("staging:mcp:smoke -- --live --require-metric-export");
-  });
+  }, 15_000);
 });

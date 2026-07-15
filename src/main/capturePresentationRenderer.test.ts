@@ -24,6 +24,16 @@ describe("capture presentation renderer", () => {
     ]);
   });
 
+  it("shifts a late action cue earlier to preserve the reading minimum", () => {
+    const [cue] = buildCaptureCaptionCues({
+      flow: { ...flow, steps: [flow.steps[0]!] },
+      receiptStartedAt: "2026-07-14T10:00:00.000Z",
+      durationMs: 3_000,
+      stepTimings: [{ stepId: "step-1", startedAt: "2026-07-14T10:00:02.900Z", completedAt: "2026-07-14T10:00:02.950Z" }]
+    });
+    expect(cue).toMatchObject({ startMs: 2_250, endMs: 3_000 });
+  });
+
   it("requires explicit narration provider wiring before media work", async () => {
     await expect(renderCapturePresentation({ sourcePath: "/missing.mp4", outputDir: "/tmp/missing", flow, receiptStartedAt: "2026-07-14T10:00:00.000Z", stepTimings: [], narration: "provider", framing: { mode: "full_frame", maxZoom: 1, transitionMs: 0 } })).rejects.toThrow("requires an explicitly configured provider");
   });

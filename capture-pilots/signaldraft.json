@@ -33,6 +33,31 @@
       "quality": { "minimumSourceTextPx": 12 }
     }
   },
+  "coverageInventory": {
+    "revision": 1,
+    "fixtureRevision": "signaldraft-fixture-v1",
+    "dimensions": [
+      { "key": "route", "trustworthyDenominator": true, "items": [], "excluded": [], "blocked": [] },
+      { "key": "state", "trustworthyDenominator": true, "items": [
+        { "id": "empty-recruiter-message", "workflowIds": ["analyze-recruiter-outreach"] },
+        { "id": "empty-sensitive-message", "workflowIds": ["review-sensitive-compensation"] }
+      ], "excluded": [], "blocked": [] },
+      { "key": "usage_sequence", "trustworthyDenominator": true, "items": [
+        { "id": "recruiter-message-analysis", "workflowIds": ["analyze-recruiter-outreach"] },
+        { "id": "sensitive-message-analysis", "workflowIds": ["review-sensitive-compensation"] }
+      ], "excluded": [], "blocked": [] },
+      { "key": "feature_flag", "trustworthyDenominator": false, "items": [], "excluded": [], "blocked": [] },
+      { "key": "outcome", "trustworthyDenominator": true, "items": [
+        { "id": "recruiter-message-classified", "workflowIds": ["analyze-recruiter-outreach"] },
+        { "id": "sensitive-message-requires-review", "workflowIds": ["review-sensitive-compensation"] }
+      ], "excluded": [], "blocked": [] },
+      { "key": "failure_state", "trustworthyDenominator": true, "items": [
+        { "id": "mock-send-requires-approval", "workflowIds": ["review-sensitive-compensation"] }
+      ], "excluded": [], "blocked": [
+        { "id": "live-send", "code": "policy_denied_external_side_effect" }
+      ] }
+    ]
+  },
   "workflows": [
     {
       "id": "analyze-recruiter-outreach",

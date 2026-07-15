@@ -61,6 +61,10 @@ describe.skipIf(!executablePath)("generic capture pilot", () => {
     expect(result.report.results[0]?.presentationOutput).toMatchObject({ validation: { width: 1080, height: 1920, videoCodec: "h264", audioCodec: "aac" }, framing: { framingVersion: "capture-framing-v1", appliedMode: "focused", keyframes: [{ evidence: "action_target" }] }, framingManifest: { kind: "framing_manifest", contentType: "application/json" }, quality: { qualityVersion: "capture-video-quality-v1", status: expect.stringMatching(/^(ready|warning)$/) }, qualityReport: { kind: "quality_report" }, qualityContactSheet: { kind: "quality_contact_sheet" }, cues: [{ stepId: "imported-step-1", text: "Complete the fixture." }] });
     expect(result.report.coverage?.dimensions.find((dimension) => dimension.key === "goal")).toMatchObject({ denominator: 2, coveredIds: ["goal:complete", "goal:complete-again"], uncoveredIds: [] });
     expect(result.report.coverage?.dimensions.find((dimension) => dimension.key === "approved_flow")).toMatchObject({ denominator: 2, coveredIds: ["complete", "complete-again"], uncoveredIds: [] });
+    expect(result.report.coverage).toMatchObject({ calculationVersion: "capture-coverage-v2", basis: { inventoryVersion: "capture-coverage-inventory-v1", inventoryRevision: 1 }, freshness: { status: "current", reasons: [] } });
+    expect(result.report.coverage?.dimensions.find((dimension) => dimension.key === "route")).toMatchObject({ denominatorSource: "versioned_bounded_inventory", denominator: 1, coveredIds: ["/"], inventoryRevision: 1 });
+    expect(result.report.coverage?.dimensions.find((dimension) => dimension.key === "outcome")).toMatchObject({ denominator: 2, coveredIds: ["complete-outcome", "complete-again-outcome"], uncoveredIds: [] });
+    expect(result.report.coverage?.dimensions.find((dimension) => dimension.key === "failure_state")).toMatchObject({ denominator: 1, blocked: [{ id: "external-send", code: "policy_denied" }] });
     await expect(fs.stat(result.report.results[0]!.normalizedClip.localPath!)).resolves.toMatchObject({ size: expect.any(Number) });
     await expect(fs.stat(result.report.results[0]!.presentationOutput!.verticalRender.localPath!)).resolves.toMatchObject({ size: expect.any(Number) });
     await expect(fs.readFile(result.report.results[0]!.presentationOutput!.captions.localPath!, "utf8")).resolves.toContain("Complete the fixture.");
@@ -82,6 +86,7 @@ describe.skipIf(!executablePath)("generic capture pilot", () => {
     expect(selected.report.selection).toEqual({ requestedWorkflowIds: ["complete-again"], manifestWorkflowCount: 2 });
     expect(selected.report.results.map((item) => item.workflowId)).toEqual(["complete-again"]);
     expect(selected.report.coverage?.dimensions.find((dimension) => dimension.key === "approved_flow")).toMatchObject({ denominator: 1, coveredIds: ["complete-again"], uncoveredIds: [] });
+    expect(selected.report.coverage?.dimensions.find((dimension) => dimension.key === "outcome")).toMatchObject({ denominator: 2, coveredIds: ["complete-again-outcome"], uncoveredIds: ["complete-outcome"] });
     expect(resets).toBe(10);
     await expect(runCapturePilot({ manifest, adapters, outputRoot, executablePath, workflowIds: ["missing"] })).rejects.toThrow("Capture pilot workflows are not registered: missing");
   }, 90_000);
@@ -119,6 +124,12 @@ function manifestValue(baseUrl: string, rootDir: string) {
     environment: { name: "Fixture", type: "local_preview", baseUrl, allowedDomains: ["localhost"], startupAdapterId: "fixture" },
     persona: { key: "demo", displayName: "Demo", roleDescription: "Synthetic fixture persona.", fixtureProfileId: "fixture:demo", fixtureValues: { result: "Done" } },
     presentation: { viewport: { width: 960, height: 600 }, initialHoldMs: 1500, beforeActionMs: 200, afterActionMs: 500, finalHoldMs: 1000, showPointer: true, pointerMoveMs: 250, typingDelayMs: 35, verticalOutput: { enabled: true, narration: "none", framing: { mode: "automatic_focus", maxZoom: 1.6, transitionMs: 650 }, quality: { minimumSourceTextPx: 12 } } },
+    coverageInventory: { revision: 1, fixtureRevision: "fixture-v1", dimensions: [
+      { key: "route", trustworthyDenominator: true, items: [], excluded: [], blocked: [] },
+      { key: "state", trustworthyDenominator: true, items: [{ id: "fixture-ready", workflowIds: ["complete", "complete-again"] }], excluded: [], blocked: [] },
+      { key: "outcome", trustworthyDenominator: true, items: [{ id: "complete-outcome", workflowIds: ["complete"] }, { id: "complete-again-outcome", workflowIds: ["complete-again"] }], excluded: [], blocked: [] },
+      { key: "failure_state", trustworthyDenominator: true, items: [], excluded: [], blocked: [{ id: "external-send", code: "policy_denied" }] }
+    ] },
     workflows: [workflow("complete"), workflow("complete-again")]
   };
 }

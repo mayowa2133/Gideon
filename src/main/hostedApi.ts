@@ -1150,7 +1150,30 @@ async function handleLatestCaptureCoverage(request: HostedApiRequest, dependenci
   const claims = await authorizeCaptureProject(request, dependencies, projectId, false);
   const snapshot = await captureServiceCall(() => dependencies.captureCoverageService!.latest({ workspaceId: claims.workspaceId, projectId }));
   if (!snapshot) throw new ApiError(404, "not_found", "Resource not found.");
-  return jsonResponse(200, { coverageSnapshot: snapshot }, requestId);
+  return jsonResponse(200, { coverageSnapshot: coverageSnapshotResource(snapshot) }, requestId);
+}
+
+function coverageSnapshotResource(snapshot: import("../shared/productFlowCapture").CoverageSnapshot) {
+  return {
+    id: snapshot.id,
+    projectId: snapshot.projectId,
+    environmentVersionId: snapshot.environmentVersionId,
+    calculationVersion: snapshot.calculationVersion,
+    inventory: snapshot.basis ? { version: snapshot.basis.inventoryVersion, revision: snapshot.basis.inventoryRevision } : null,
+    freshness: snapshot.freshness ?? { status: "unknown", reasons: ["legacy_snapshot"], evaluatedAt: snapshot.createdAt },
+    dimensions: snapshot.dimensions.map((dimension) => ({
+      key: dimension.key,
+      denominatorSource: dimension.denominatorSource,
+      denominatorSources: dimension.denominatorSources ?? [],
+      inventoryRevision: dimension.inventoryRevision,
+      denominator: dimension.denominator,
+      coveredIds: dimension.coveredIds,
+      uncoveredIds: dimension.uncoveredIds,
+      excluded: dimension.excluded,
+      blocked: dimension.blocked
+    })),
+    createdAt: snapshot.createdAt
+  };
 }
 
 async function handleRetryCaptureExecution(request: HostedApiRequest, dependencies: HostedApiDependencies, requestId: string, projectId: string, executionId: string): Promise<HostedApiResponse> {
