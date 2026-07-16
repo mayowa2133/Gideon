@@ -59,6 +59,7 @@ export interface PlaywrightCaptureExecutorInput {
   recordVideo: boolean;
   viewport?: { width: number; height: number };
   executablePath?: string;
+  proxyServer?: string;
   browser?: Browser;
   loginAdapter?: CaptureLoginAdapter;
   useCredential?: <T>(grantId: string, consumer: (secret: Readonly<CaptureCredentialSecret>) => Promise<T>) => Promise<T>;
@@ -89,7 +90,11 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
   const now = input.now ?? (() => new Date().toISOString());
   const startedAt = now();
   const ownsBrowser = !input.browser;
-  const browser = input.browser ?? (await chromium.launch({ headless: true, executablePath: input.executablePath }));
+  const browser = input.browser ?? (await chromium.launch({
+    headless: true,
+    executablePath: input.executablePath,
+    proxy: input.proxyServer ? { server: validateProxyServer(input.proxyServer) } : undefined
+  }));
   let context: BrowserContext | undefined;
   let page: Page | undefined;
   let rawVideoPath: string | undefined;
@@ -246,6 +251,13 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
     if (context) await context.close().catch(() => undefined);
     if (ownsBrowser) await browser.close().catch(() => undefined);
   }
+}
+
+function validateProxyServer(value: string): string {
+  const url = new URL(value);
+  if (url.protocol !== "http:" || url.username || url.password || url.search || url.hash) throw new Error("Capture proxy server is invalid.");
+  if (!url.hostname || !url.port) throw new Error("Capture proxy server is invalid.");
+  return url.toString();
 }
 
 function mergeMaskingReceipt(previous: CaptureMaskingReceipt | undefined, current: CaptureMaskingReceipt): CaptureMaskingReceipt {

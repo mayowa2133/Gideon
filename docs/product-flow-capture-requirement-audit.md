@@ -12,7 +12,7 @@ This audit distinguishes code-complete boundaries from deployment, UX, vendor, a
 | Environment DNS/TLS/redirect validation | Implemented and tested | Deploy egress proxy/firewall rules and penetration test DNS rebinding/metadata access |
 | Credential handles | In-memory test vault, external secret-store interface, PostgreSQL metadata adapter, scoped create/revoke API, and login adapter implemented | Select and connect production secret manager; exercise expiry/revoke/rotation incident runbook |
 | Playwright clean take | Real Chromium dry run and recording implemented and tested | Pin browser-worker image/version and verify on production worker hosts |
-| Container/microVM isolation | Runtime manifest/client boundary, pinned-image and manifest-bound response attestation, and fail-closed remote/config policy implemented | Deploy actual browser pool with non-root/read-only/resource/default-deny-egress controls and retain platform attestation proof |
+| Container/microVM isolation | Pinned Playwright image definition, non-root/read-only/capability/resource/tmpfs/no-mount controls, separate CONNECT-only resolved-IP egress proxy, workspace-scoped disposable session state, one-shot worker protocol, static policy gate, and strict manifest/policy/image/cleanup attestation contract implemented and locally tested | Docker engine was unavailable locally: deploy and exercise the actual container, prove firewall/runtime enforcement and container removal, and retain platform attestation proof |
 | Media normalization and composite source | Real FFmpeg normalization, visual QA, private artifacts, ordered manual assembly job, versioned manifest, and authorized project-store activation implemented | Connect object lifecycle/retention in deployment |
 | Golden capture baseline | Versioned thresholds plus a redacted FFprobe-backed report cover two pilots, seven workflows, landscape/vertical media, captions, pointer/typing presentation, resets, quality report/contact-sheet lineage, and current versioned bounded coverage | Human comprehension and mobile-device review remain required |
 | Hostile complex fixture | Committed loopback app covers auth roles, empty/populated/flagged state, complex navigation, virtualized content, forms, files, latency/recovery, unstable IDs, external/popup traps, dangerous controls, prompt injection, and sensitive fields; five approved browser flows pass, seventeen prohibited plans return expected blocker codes, and nine server-side side-effect counters stay zero | Semantic action inference remains bounded to typed plans and reviewed locator/risk policy; expand the corpus with design-partner-specific UI patterns before GA |
@@ -43,6 +43,8 @@ This audit distinguishes code-complete boundaries from deployment, UX, vendor, a
 - `pnpm test:e2e`: hosted capture workspace real-browser journey and capability fail-closed test.
 - `pnpm build`: Electron main, renderer, MCP, and hosted Next.js production builds.
 - `pnpm capture:worker:check`: deployment configuration gate; production refuses local browser isolation, in-memory secrets, or local artifact storage.
+- `pnpm capture:isolation:check`: canonical policy/image/compose/source static enforcement; reports Docker availability separately.
+- `pnpm capture:isolation:runtime:check`: fails unless Docker is available and accepts the Compose definition.
 - `pnpm capture:baseline`: redacted retained-artifact comparison for the registered NexusReach and SignalDraft pilots.
 
 ## Release conclusion

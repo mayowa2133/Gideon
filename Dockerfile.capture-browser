@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.7
+
+ARG PLAYWRIGHT_IMAGE=mcr.microsoft.com/playwright:v1.61.1-noble@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48
+
+FROM ${PLAYWRIGHT_IMAGE} AS build
+USER root
+WORKDIR /app
+ENV CI=true
+
+RUN corepack enable
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY tsconfig.base.json tsconfig.main.json ./
+COPY src ./src
+RUN pnpm build:main
+
+FROM ${PLAYWRIGHT_IMAGE} AS runtime
+USER root
+WORKDIR /app
+ENV NODE_ENV=production \
+    HOME=/work/home \
+    TMPDIR=/work/session/tmp \
+    GIDEON_CAPTURE_RUNTIME_POLICY=/app/config/capture-browser-runtime-policy-v1.json \
+    GIDEON_CAPTURE_RUNTIME_POLICY_VERSION=capture-browser-isolation-v1 \
+    GIDEON_CAPTURE_RUNTIME_POLICY_HASH=8fc8d8b1674a406a2e6d33458f75516a2b1112f1d3a80191500cb846f562bfc5
+
+RUN corepack enable \
+    && mkdir -p /app/config /work \
+    && chown -R pwuser:pwuser /app /work
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --prod --frozen-lockfile
+COPY --from=build /app/dist ./dist
+COPY --chown=pwuser:pwuser config/capture-browser-runtime-policy-v1.json ./config/capture-browser-runtime-policy-v1.json
+
+USER 1001:1001
+ENTRYPOINT ["node", "dist/main/main/captureBrowserWorkerProcess.js"]
+
+FROM runtime AS egress
+ENTRYPOINT ["node", "dist/main/main/captureEgressProxyProcess.js"]

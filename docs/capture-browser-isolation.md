@@ -1,0 +1,9 @@
+# Disposable capture-browser isolation
+
+The local reference runtime is defined by `Dockerfile.capture-browser`, `docker-compose.capture-browser.yml`, and `config/capture-browser-runtime-policy-v1.json`. The image tag and SHA-256 digest are both pinned. The canonical policy hash is `8fc8d8b1674a406a2e6d33458f75516a2b1112f1d3a80191500cb846f562bfc5`.
+
+The browser has only an internal session network. Chromium is launched with `GIDEON_CAPTURE_PROXY_SERVER`; the proxy accepts HTTPS `CONNECT` only, re-applies the application hostname policy, rejects metadata/private/reserved/mixed DNS answers, permits only reviewed ports, and opens the upstream socket to the validated IP. HTTPS path enforcement remains in Playwright's per-request policy because a non-intercepting CONNECT proxy cannot see encrypted paths. Plain HTTP and direct WebSocket egress are denied; secure WebSockets use the same CONNECT boundary.
+
+Each worker request is one declarative, hash-verified manifest plus its separately staged opaque fixture grant. The process creates mode-0700 workspace/execution state and always destroys profile, cookies, cache, clipboard scratch, and temporary state. Approved capture output remains only on the container's bounded `/work` tmpfs long enough for the supervisor to extract it. The supervisor must then remove the container before issuing a trusted version-2 attestation with `runtimeInstance: destroyed`.
+
+Run `pnpm capture:isolation:check` for static enforcement. Run `pnpm capture:isolation:runtime:check` on a host with Docker to require Compose validation. A production exercise must additionally start the pair, run public-allowlist and metadata/private/cross-workspace fixtures, extract the approved artifact, inspect resource/security settings, and prove the container and tmpfs no longer exist. Static success must never be represented as that runtime proof.
