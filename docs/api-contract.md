@@ -492,7 +492,7 @@ These `/api/v1` routes are available only when the structured-capture service is
 
 ### POST `/projects/{projectId}/product-flows/{flowId}/reject`
 
-- Require an empty body and CSRF.
+- Require CSRF and `{ "revision": 3 }`, identifying the exact flow revision the human reviewed. Missing revisions fail validation and stale revisions return `409 revision_conflict`.
 - Create a new immutable flow revision; approval actor/time/revision are server-owned and cannot be supplied by clients.
 - Approval remains distinct from starting a capture run.
 
@@ -540,6 +540,11 @@ These `/api/v1` routes are available only when the structured-capture service is
 
 - Returns safe booleans for validation, credential vault, isolated runtime, discovery, capture, assembly, clip preview, coverage, and audit wiring.
 - `available` is true only when every user-facing dependency is present. Clients must hide the self-service capture entry point when false.
+
+### GET `/openapi/capture.json`
+
+- Returns the authenticated, no-store OpenAPI 3.1 document generated from `CAPTURE_RUNTIME_OPERATIONS`.
+- The checked-in equivalent is `docs/openapi/capture-api.json`, regenerated with `pnpm capture:openapi` and contract-tested for unique operation IDs, revision requirements, and idempotency headers.
 
 - **Configuration:** capture routes return `503 capture_not_configured` unless the application, coordinator, control, isolated runtime, queue, storage, and persistence dependencies required by that route are wired.
 - **Errors:** 404.

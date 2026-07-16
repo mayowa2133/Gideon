@@ -180,6 +180,24 @@ describe("Gideon MCP server tools", () => {
     }
   });
 
+  it("controls structured capture through bounded hosted MCP operations", async () => {
+    const calls: Array<{ method: string; url: string; cookie?: string; csrf?: string; body?: unknown }> = [];
+    const hosted = await startFakeHostedApiServer(calls);
+    try {
+      const common = { hostedApiBaseUrl: hosted.baseUrl, hostedSessionCookie: "gideon_session=session-token", projectId: "project-1" };
+      const capabilities = await callTool("gideon_capture_capabilities", common);
+      expect(capabilities.content[0]?.text).toContain('"capture": true');
+      await callTool("gideon_capture_flow_review", { ...common, action: "approve", flowId: "flow-1", revision: 3 });
+      await callTool("gideon_capture_run_control", { ...common, action: "start", environmentId: "environment-1", flowIds: ["flow-1"], idempotencyKey: "capture-key-1" });
+      const evidence = await callTool("gideon_capture_evidence", { ...common, runId: "capture-1" });
+      expect(evidence.content[0]?.text).toContain("Safe receipts only");
+      expect(calls).toContainEqual(expect.objectContaining({ method: "POST", url: "/api/v1/projects/project-1/product-flows/flow-1/approve", body: { revision: 3 }, csrf: "csrf-hosted" }));
+      expect(JSON.stringify(evidence)).not.toContain("session-token");
+    } finally {
+      await hosted.close();
+    }
+  });
+
   it("retries transient hosted API failures only", async () => {
     const calls: Array<{ method: string; url: string; cookie?: string; csrf?: string; body?: unknown }> = [];
     const hosted = await startFakeHostedApiServer(calls, { transientProjectListFailures: 1 });
@@ -336,6 +354,27 @@ async function startFakeHostedApiServer(
             meta: { requestId: "req_hosted" }
           })
         );
+        return;
+      }
+      if (request.method === "GET" && request.url === "/api/v1/capture-capabilities") {
+        response.end(JSON.stringify({ data: { capture: { available: true, discovery: true, capture: true, coverage: true } }, meta: { requestId: "req_hosted" } }));
+        return;
+      }
+      if (request.method === "POST" && request.url === "/api/v1/projects/project-1/product-flows/flow-1/approve") {
+        response.end(JSON.stringify({ data: { flow: { id: "flow-1", revision: 4, approval: { status: "approved", approvedRevision: 4 } } }, meta: { requestId: "req_hosted" } }));
+        return;
+      }
+      if (request.method === "POST" && request.url === "/api/v1/projects/project-1/capture-runs") {
+        response.statusCode = 202;
+        response.end(JSON.stringify({ data: { captureRun: { id: "capture-1", status: "queued" }, job: { id: "job-capture" }, reused: false }, meta: { requestId: "req_hosted" } }));
+        return;
+      }
+      if (request.method === "GET" && request.url === "/api/v1/projects/project-1/capture-runs/capture-1") {
+        response.end(JSON.stringify({ data: { captureRun: { id: "capture-1", status: "completed" }, executions: [{ id: "execution-1", status: "verified", quality: { status: "ready", checks: [] } }] }, meta: { requestId: "req_hosted" } }));
+        return;
+      }
+      if (request.method === "GET" && request.url === "/api/v1/projects/project-1/coverage-snapshots/latest") {
+        response.end(JSON.stringify({ data: { coverageSnapshot: { id: "coverage-1", dimensions: [{ key: "flow", denominator: 1, coveredIds: ["flow-1"] }] } }, meta: { requestId: "req_hosted" } }));
         return;
       }
       if (request.method === "GET" && request.url === "/api/v1/projects/project-1/mcp-context") {

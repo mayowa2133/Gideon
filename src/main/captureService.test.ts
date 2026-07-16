@@ -168,6 +168,7 @@ describe("capture application service", () => {
       }
     });
     expect(repository.flows.get("flow-1")).toEqual(approved);
+    await expect(service.setFlowApproval({ workspaceId: "workspace-1", projectId: "project-1", flowId: "flow-1", status: "rejected", actorUserId: "user-1", expectedRevision: 1 })).rejects.toThrow("revision conflict");
   });
 });
 
