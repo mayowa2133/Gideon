@@ -8,5 +8,7 @@ describe("capture audit sink", () => {
     await sink.record({ workspaceId: "workspace-1", projectId: "project-1", actorUserId: "user-1", actorType: "local_user", action: "capture_run.start", targetType: "capture_run", targetId: "capture-1", metadata: { flow_count: 3 } });
     expect(events[0]).toMatchObject({ summary: "Started a product flow capture run.", metadata: { flow_count: 3 } });
     await expect(sink.record({ workspaceId: "workspace-1", projectId: "project-1", actorUserId: "user-1", actorType: "local_user", action: "capture_run.start", targetType: "capture_run", metadata: { credential_token: "nope" } })).rejects.toThrow("unsafe");
+    await expect(sink.record({ workspaceId: "workspace-1", projectId: "project-1", actorUserId: "user-1", actorType: "local_user", action: "capture_run.start", targetType: "capture_run", metadata: { message: "password=fixture-secret" } })).rejects.toThrow("value is unsafe");
+    await expect(sink.record({ workspaceId: "workspace-1", projectId: "project-1", actorUserId: "user-1", actorType: "local_user", action: "capture_run.start", targetType: "capture_run", metadata: { storage_key: "private/object" } })).rejects.toThrow("key is unsafe");
   });
 });

@@ -20,6 +20,8 @@ import type { CaptureLoginAdapter } from "./playwrightCaptureExecutor";
 import type { CaptureCredentialVault } from "./captureCredentials";
 import type { CaptureAuditSink } from "./captureAudit";
 import { compileProductFlow, type CompiledFlowPlan } from "./productFlowCompiler";
+import { assertCaptureMaskingReceipt, validateCaptureMaskingPolicy, type CaptureMaskingPolicy } from "./captureMasking";
+import { assertCaptureEvidenceIsRedacted, redactCaptureDiagnostic } from "./captureSupportBundle";
 
 export interface CaptureRunWorkerRepository {
   getCaptureRun(input: { workspaceId: string; captureRunId: string }): Promise<CaptureRun | null>;
@@ -83,6 +85,7 @@ export function createCaptureRunWorker(options: {
     pointer: { showPointer: boolean; pointerMoveMs: number; typingDelayMs: number };
     minimumSourceTextPx: number;
   };
+  maskingPolicy?: CaptureMaskingPolicy;
   onDiagnostic?: (error: unknown) => void;
   shouldCancel?: (input: { workspaceId: string; captureRunId: string; jobId: string }) => Promise<boolean>;
   onCanceledCleanup?: (input: { workspaceId: string; projectId: string; captureRunId: string }) => Promise<void>;
@@ -97,6 +100,7 @@ export function createCaptureRunWorker(options: {
   const validateQuality = options.validateQuality ?? validateCaptureVisualQuality;
   const analyzeQuality = options.analyzeQuality ?? analyzeCaptureVideoQuality;
   const cleanTakePresentation = options.cleanTakePresentation ?? defaultCleanTakePresentation;
+  const maskingPolicy = validateCaptureMaskingPolicy(options.maskingPolicy);
   return {
     async execute(input: { workspaceId: string; captureRunId: string }): Promise<CaptureRunWorkerResult> {
       let run = await options.repository.getCaptureRun(input);
@@ -146,7 +150,10 @@ export function createCaptureRunWorker(options: {
           await reset(options.resetAdapters, { run, environment, version, persona, phase: "dry_run" });
           await assertNotCanceled(options, run);
           const auth = authenticationOptions(options, run, environment, persona);
-          const dry = await execute(options.runtime, { run, plan, policy: browserPolicyForEnvironment(environment), fixtures, outputDir: path.join(root, executionId, "dry"), recordVideo: false, id: `${executionId}:dry`, ...auth });
+          const dry = await execute(options.runtime, { run, plan, policy: browserPolicyForEnvironment(environment), fixtures, outputDir: path.join(root, executionId, "dry"), recordVideo: false, id: `${executionId}:dry`, maskingPolicy, ...auth });
+          assertCaptureEvidenceIsRedacted(dry.receipt);
+          assertCaptureEvidenceIsRedacted(dry.networkReceipts);
+          assertCaptureMaskingReceipt(dry.maskingReceipt, maskingPolicy);
           if (dry.receipt.status !== "verified") {
             const receiptArtifact = await putJson(options.repository, options.storage, run, "verification_receipt", `${executionId}-dry-receipt.json`, dry.receipt, root);
             execution = await options.repository.upsertFlowExecution({ ...execution, status: dry.receipt.status, receiptArtifactId: receiptArtifact.id, blockerCode: dry.receipt.blockerCode ?? "dry_run_failed", updatedAt: now() });
@@ -156,7 +163,10 @@ export function createCaptureRunWorker(options: {
           run = await updateRun(options.repository, run, "recording", now());
           await reset(options.resetAdapters, { run, environment, version, persona, phase: "recording" });
           await assertNotCanceled(options, run);
-          const recorded = await execute(options.runtime, { run, plan, policy: browserPolicyForEnvironment(environment), fixtures, outputDir: path.join(root, executionId, "record"), recordVideo: true, id: `${executionId}:record`, capturePacing: cleanTakePresentation.pacing, capturePresentation: cleanTakePresentation.pointer, ...auth });
+          const recorded = await execute(options.runtime, { run, plan, policy: browserPolicyForEnvironment(environment), fixtures, outputDir: path.join(root, executionId, "record"), recordVideo: true, id: `${executionId}:record`, capturePacing: cleanTakePresentation.pacing, capturePresentation: cleanTakePresentation.pointer, maskingPolicy, ...auth });
+          assertCaptureEvidenceIsRedacted(recorded.receipt);
+          assertCaptureEvidenceIsRedacted(recorded.networkReceipts);
+          assertCaptureMaskingReceipt(recorded.maskingReceipt, maskingPolicy);
           const receiptArtifact = await putJson(options.repository, options.storage, run, "verification_receipt", `${executionId}-receipt.json`, recorded.receipt, root);
           if (recorded.receipt.status !== "verified" || !recorded.rawCapture) {
             await options.repository.upsertFlowExecution({ ...execution, status: recorded.receipt.status === "verified" ? "failed" : recorded.receipt.status, receiptArtifactId: receiptArtifact.id, blockerCode: recorded.receipt.blockerCode ?? "recording_failed", updatedAt: now() });
@@ -200,7 +210,7 @@ export function createCaptureRunWorker(options: {
           }
           const normalizedStored = await options.storage.putFile({ workspaceId: run.workspaceId, projectId: run.projectId, kind: "normalized_flow_clip", sourcePath: normalizedResult.outputPath, originalFileName: `${flow.id}.mp4`, contentType: "video/mp4" });
           await options.repository.upsertArtifact(normalizedStored.artifact);
-          await putJson(options.repository, options.storage, run, "action_telemetry", `${executionId}-normalization.json`, { receipt: recorded.receipt, networkReceipts: recorded.networkReceipts, normalization: normalizedResult.manifest }, root);
+          await putJson(options.repository, options.storage, run, "action_telemetry", `${executionId}-normalization.json`, { receipt: recorded.receipt, maskingReceipt: recorded.maskingReceipt, networkReceipts: recorded.networkReceipts, normalization: normalizedResult.manifest }, root);
           execution = await options.repository.upsertFlowExecution({ ...execution, status: "verified", receiptArtifactId: receiptArtifact.id, rawCaptureArtifactId: rawStored.artifact.id, normalizedClipArtifactId: normalizedStored.artifact.id, quality, updatedAt: now() });
           normalized.push({ path: normalizedResult.outputPath, execution, artifact: normalizedStored.artifact, sha256: normalizedResult.manifest.output.sha256, durationMs: normalizedResult.recording.durationMs });
         }
@@ -248,8 +258,8 @@ async function assertNotCanceled(
   }
 }
 
-async function execute(runtime: CaptureBrowserRuntime, input: { run: CaptureRun; plan: CompiledFlowPlan; policy: ReturnType<typeof browserPolicyForEnvironment>; fixtures: Record<string, string>; outputDir: string; recordVideo: boolean; id: string; capturePacing?: PlaywrightCaptureExecutorInput["capturePacing"]; capturePresentation?: PlaywrightCaptureExecutorInput["capturePresentation"]; loginAdapter?: CaptureLoginAdapter; useCredential?: PlaywrightCaptureExecutorInput["useCredential"] }) {
-  return runtime.execute({ id: input.id, workspaceId: input.run.workspaceId, plan: input.plan, policy: input.policy, fixtureValues: input.fixtures, outputDir: input.outputDir, recordVideo: input.recordVideo, capturePacing: input.capturePacing, capturePresentation: input.capturePresentation, loginAdapter: input.loginAdapter, useCredential: input.useCredential });
+async function execute(runtime: CaptureBrowserRuntime, input: { run: CaptureRun; plan: CompiledFlowPlan; policy: ReturnType<typeof browserPolicyForEnvironment>; fixtures: Record<string, string>; outputDir: string; recordVideo: boolean; id: string; capturePacing?: PlaywrightCaptureExecutorInput["capturePacing"]; capturePresentation?: PlaywrightCaptureExecutorInput["capturePresentation"]; maskingPolicy: CaptureMaskingPolicy; loginAdapter?: CaptureLoginAdapter; useCredential?: PlaywrightCaptureExecutorInput["useCredential"] }) {
+  return runtime.execute({ id: input.id, workspaceId: input.run.workspaceId, plan: input.plan, policy: input.policy, fixtureValues: input.fixtures, outputDir: input.outputDir, recordVideo: input.recordVideo, capturePacing: input.capturePacing, capturePresentation: input.capturePresentation, maskingPolicy: input.maskingPolicy, loginAdapter: input.loginAdapter, useCredential: input.useCredential });
 }
 
 async function reset(
@@ -295,7 +305,7 @@ function parseFlowRevisionIdentity(value: string): { flowId: string; revision: n
 
 function safeWorkerError(error: unknown): Error {
   const allowed = ["not found", "changed", "does not match", "require a container", "invalid"];
-  const message = error instanceof Error ? error.message : "";
+  const message = error instanceof Error ? redactCaptureDiagnostic(error.message) : "";
   return new Error(allowed.some((part) => message.includes(part)) ? message : "Capture execution failed. Safe diagnostics are available to operators.");
 }
 

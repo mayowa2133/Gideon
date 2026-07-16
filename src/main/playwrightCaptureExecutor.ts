@@ -17,8 +17,10 @@ import {
   type ProductFlowAction
 } from "../shared/productFlowCapture";
 import type { CaptureCredentialSecret } from "./captureCredentials";
+import { assertCaptureMaskingReady, installCaptureMasking, validateCaptureMaskingPolicy, type CaptureMaskingPolicy, type CaptureMaskingReceipt } from "./captureMasking";
 import { validateCaptureNetworkDestination, type CaptureNetworkPolicyOptions } from "./captureNetworkPolicy";
 import { verifyCompiledFlowPlan, type CompiledFlowPlan } from "./productFlowCompiler";
+import { assertCaptureEvidenceIsRedacted, redactCaptureDiagnostic } from "./captureSupportBundle";
 
 export interface CaptureLoginAdapter {
   authenticate(input: {
@@ -37,6 +39,7 @@ export interface RawBrowserCaptureArtifact {
 
 export interface PlaywrightCaptureResult {
   receipt: FlowExecutionReceipt;
+  maskingReceipt: CaptureMaskingReceipt;
   rawCapture?: RawBrowserCaptureArtifact;
   networkReceipts: Array<{
     url: string;
@@ -72,6 +75,7 @@ export interface PlaywrightCaptureExecutorInput {
     typingDelayMs?: number;
   };
   actionTimeoutMs?: number;
+  maskingPolicy?: CaptureMaskingPolicy;
   now?: () => string;
 }
 
@@ -80,6 +84,7 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
   const pacing = validateCapturePacing(input.capturePacing);
   const presentation = validateCapturePresentation(input.capturePresentation);
   const actionTimeoutMs = validateActionTimeout(input.actionTimeoutMs);
+  const maskingPolicy = validateCaptureMaskingPolicy(input.maskingPolicy);
   await fs.mkdir(input.outputDir, { recursive: true });
   const now = input.now ?? (() => new Date().toISOString());
   const startedAt = now();
@@ -91,6 +96,7 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
   let video: Video | null = null;
   const networkReceipts = new Map<string, PlaywrightCaptureResult["networkReceipts"][number]>();
   const stepReceipts: FlowStepReceipt[] = [];
+  let maskingReceipt: CaptureMaskingReceipt | undefined;
 
   try {
     context = await browser.newContext({
@@ -104,6 +110,7 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
         ? { dir: input.outputDir, size: input.viewport ?? { width: 1440, height: 900 } }
         : undefined
     });
+    await installCaptureMasking(context, maskingPolicy);
     if (presentation.showPointer) await context.addInitScript(installCapturePointer);
     await context.route("**/*", async (route) => {
       const requestUrl = route.request().url();
@@ -113,8 +120,9 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
       }
       try {
         const receipt = await validateCaptureNetworkDestination(requestUrl, input.policy, input.networkPolicyOptions);
+        const receiptUrl = new URL(receipt.url);
         networkReceipts.set(`${receipt.hostname}:${new URL(receipt.url).port}`, {
-          url: receipt.url,
+          url: `${receiptUrl.origin}${safeReceiptPath(receiptUrl.pathname)}`,
           hostname: receipt.hostname,
           resolvedAddresses: receipt.resolvedAddresses,
           policyVersion: receipt.policyVersion
@@ -130,6 +138,7 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
     await page.goto(new URL(input.plan.startingState.entryPath, input.policy.baseUrl).toString(), {
       waitUntil: "domcontentloaded"
     });
+    maskingReceipt = mergeMaskingReceipt(maskingReceipt, await assertCaptureMaskingReady(page, maskingPolicy));
     await hold(pacing.initialHoldMs);
 
     if (input.plan.startingState.credentialGrantId) {
@@ -142,6 +151,7 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
         credentialGrantId,
         useCredential: (consumer) => input.useCredential!(credentialGrantId, consumer)
       });
+      maskingReceipt = mergeMaskingReceipt(maskingReceipt, await assertCaptureMaskingReady(page, maskingPolicy));
     }
 
     for (const step of input.plan.steps) {
@@ -163,8 +173,10 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
         break;
       }
       try {
+        maskingReceipt = mergeMaskingReceipt(maskingReceipt, await assertCaptureMaskingReady(page, maskingPolicy));
         await hold(pacing.beforeActionMs);
         const actionTarget = await executeAction(page, step.action, input.fixtureValues, input.policy.baseUrl, presentation);
+        maskingReceipt = mergeMaskingReceipt(maskingReceipt, await assertCaptureMaskingReady(page, maskingPolicy));
         await hold(pacing.afterActionMs);
         const assertions = await evaluateAssertions(page, step.expectedState, input.fixtureValues);
         const passed = assertions.every((assertion) => assertion.passed);
@@ -198,11 +210,12 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
     const finalAssertions = allStepsSucceeded
       ? await evaluateAssertions(page, input.plan.finalAssertions, input.fixtureValues)
       : input.plan.finalAssertions.map((assertion) => ({
-          assertion,
+          assertion: redactAssertionForReceipt(assertion),
           passed: false,
           safeMessage: "Final assertion was not evaluated because the flow did not complete."
         }));
     if (allStepsSucceeded && finalAssertions.every((assertion) => assertion.passed)) await hold(pacing.finalHoldMs);
+    maskingReceipt = mergeMaskingReceipt(maskingReceipt, await assertCaptureMaskingReady(page, maskingPolicy));
     await context.close();
     context = undefined;
     if (video) rawVideoPath = await video.path();
@@ -221,8 +234,11 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
       completedAt: now(),
       blockerCode: blocked?.safeErrorCode
     });
+    assertCaptureEvidenceIsRedacted(receipt);
+    assertCaptureEvidenceIsRedacted([...networkReceipts.values()]);
     return {
       receipt,
+      maskingReceipt,
       rawCapture: rawVideoPath ? await describeVideo(rawVideoPath) : undefined,
       networkReceipts: [...networkReceipts.values()]
     };
@@ -230,6 +246,20 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
     if (context) await context.close().catch(() => undefined);
     if (ownsBrowser) await browser.close().catch(() => undefined);
   }
+}
+
+function mergeMaskingReceipt(previous: CaptureMaskingReceipt | undefined, current: CaptureMaskingReceipt): CaptureMaskingReceipt {
+  if (!previous) return current;
+  if (previous.policyHash !== current.policyHash) throw new Error("capture_masking_policy_changed");
+  return {
+    ...current,
+    frameCount: Math.max(previous.frameCount, current.frameCount),
+    matchedElementCount: Math.max(previous.matchedElementCount, current.matchedElementCount),
+    visibleSensitiveElementCount: Math.max(previous.visibleSensitiveElementCount, current.visibleSensitiveElementCount),
+    overlayCount: Math.max(previous.overlayCount, current.overlayCount),
+    canvasCount: Math.max(previous.canvasCount, current.canvasCount),
+    hiddenSensitiveElementCount: Math.max(previous.hiddenSensitiveElementCount, current.hiddenSensitiveElementCount)
+  };
 }
 
 function validateActionTimeout(value: number | undefined): number {
@@ -479,12 +509,36 @@ async function evaluateAssertions(
       passed = false;
     }
     receipts.push({
-      assertion,
+      assertion: redactAssertionForReceipt(assertion),
       passed,
       safeMessage: passed ? "Assertion passed." : "Expected browser state was not observed."
     });
   }
   return receipts;
+}
+
+function redactAssertionForReceipt(assertion: AssertionSpec): AssertionSpec {
+  const safe = structuredClone(assertion);
+  if (safe.type === "url") {
+    safe.path = safeReceiptPath(safe.path);
+    return safe;
+  }
+  if ("target" in safe) {
+    const redacted = redactCaptureDiagnostic(safe.target.value);
+    if (redacted !== safe.target.value) safe.target.value = "[masked]";
+    if (safe.target.scopeName && redactCaptureDiagnostic(safe.target.scopeName) !== safe.target.scopeName) safe.target.scopeName = "[masked]";
+    if (safe.target.destinationPath) safe.target.destinationPath = safeReceiptPath(safe.target.destinationPath);
+  }
+  if (safe.type === "text" && redactCaptureDiagnostic(safe.value) !== safe.value) safe.value = "[masked]";
+  if (safe.type === "value" && redactCaptureDiagnostic(safe.valueRef) !== safe.valueRef) safe.valueRef = "fixture:masked";
+  return safe;
+}
+
+function safeReceiptPath(value: string): string {
+  const pathname = new URL(value, "https://capture.invalid").pathname;
+  let decoded = pathname;
+  try { decoded = decodeURIComponent(pathname); } catch { return "/masked"; }
+  return redactCaptureDiagnostic(decoded) === decoded ? pathname : "/masked";
 }
 
 function locatorFor(page: Page, spec: LocatorSpec): Locator {

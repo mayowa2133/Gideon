@@ -10,6 +10,7 @@ import { compileProductFlow } from "./productFlowCompiler";
 import { browserPolicyForEnvironment } from "./captureService";
 import type { PlaywrightCaptureExecutorInput } from "./playwrightCaptureExecutor";
 import type { CaptureVideoQualityResult } from "./captureVideoQuality";
+import { captureMaskingPolicyHash, defaultCaptureMaskingPolicy } from "./captureMasking";
 
 describe("capture run worker", () => {
   const roots: string[] = [];
@@ -28,7 +29,7 @@ describe("capture run worker", () => {
     const worker = createCaptureRunWorker({
       repository: repo,
       storage: stored,
-      runtime: { isolation: "local_test", async execute(input) { return { receipt: receipt(input, "failed"), networkReceipts: [] }; } },
+      runtime: { isolation: "local_test", async execute(input) { return { receipt: receipt(input, "failed"), maskingReceipt: maskingReceipt(input), networkReceipts: [] }; } },
       resetAdapters: { fixture_api: { async reset() {} } },
       onDiagnostic: (error) => diagnostics.push(error)
     });
@@ -59,7 +60,7 @@ describe("capture run worker", () => {
         isolation: "local_test",
         async execute(input) {
           calls += 1;
-          return { receipt: receipt(input, "verified"), rawCapture: calls === 2 ? { path: raw, contentType: "video/webm", byteSize: 3, sha256: "a".repeat(64) } : undefined, networkReceipts: [] };
+          return { receipt: receipt(input, "verified"), maskingReceipt: maskingReceipt(input), rawCapture: calls === 2 ? { path: raw, contentType: "video/webm", byteSize: 3, sha256: "a".repeat(64) } : undefined, networkReceipts: [] };
         }
       },
       resetAdapters: { fixture_api: { async reset(input) { resets.push(input.phase); } } },
@@ -92,7 +93,7 @@ describe("capture run worker", () => {
     const result = await createCaptureRunWorker({
       repository: repo,
       storage: stored,
-      runtime: { isolation: "local_test", async execute(input) { calls += 1; return { receipt: receipt(input, "verified"), rawCapture: calls === 2 ? { path: raw, contentType: "video/webm", byteSize: 3, sha256: "a".repeat(64) } : undefined, networkReceipts: [] }; } },
+      runtime: { isolation: "local_test", async execute(input) { calls += 1; return { receipt: receipt(input, "verified"), maskingReceipt: maskingReceipt(input), rawCapture: calls === 2 ? { path: raw, contentType: "video/webm", byteSize: 3, sha256: "a".repeat(64) } : undefined, networkReceipts: [] }; } },
       resetAdapters: { fixture_api: { async reset() {} } },
       normalize: async () => ({ outputPath: normalized, recording: recording(), manifest: normalizationManifest() }),
       validateQuality: async () => ({ blackDurationMs: 0, blackRatio: 0 }),
@@ -142,6 +143,10 @@ function approvedFlow(): ProductFlowRevision {
 
 function receipt(input: PlaywrightCaptureExecutorInput, status: "verified" | "failed") {
   return createFlowExecutionReceipt({ id: input.id, workspaceId: input.workspaceId, projectId: input.plan.projectId, flowId: input.plan.flowId, flowRevision: input.plan.flowRevision, environmentVersionId: input.plan.environmentVersionId, compiledPlanHash: input.plan.compiledPlanHash, steps: [{ stepId: "step-1", status: status === "verified" ? "succeeded" : "failed", policyDecision: input.plan.steps[0]!.policyDecision, assertions: [], startedAt: "2026-07-14T10:00:00.000Z", completedAt: "2026-07-14T10:00:01.000Z", safeErrorCode: status === "verified" ? undefined : "test_failed" }], finalAssertions: [{ assertion: { type: "url", path: "/" }, passed: status === "verified", safeMessage: status }], startedAt: "2026-07-14T10:00:00.000Z", completedAt: "2026-07-14T10:00:01.000Z" });
+}
+
+function maskingReceipt(input: PlaywrightCaptureExecutorInput) {
+  return { schemaVersion: "1" as const, policyHash: captureMaskingPolicyHash(input.maskingPolicy ?? defaultCaptureMaskingPolicy()), frameCount: 1, matchedElementCount: 0, visibleSensitiveElementCount: 0, overlayCount: 0, canvasCount: 0, hiddenSensitiveElementCount: 0, status: "active" as const };
 }
 
 function storage(): PrivateObjectStorage & { kinds: ArtifactKind[] } {
