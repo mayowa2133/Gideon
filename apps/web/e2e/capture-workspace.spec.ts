@@ -27,7 +27,9 @@ test("reviews discovered intent before capture and activates an explicit assembl
   await expect(page.getByText("frozen frames")).toBeVisible();
   await page.getByRole("button", { name: "Load framing preview" }).click();
   await expect(page.locator("video")).toHaveAttribute("src", /^data:video\/mp4/);
-  await expect(page.getByText(/Framing preview: full source frame/)).toBeVisible();
+  await expect(page.locator("video")).toHaveAttribute("aria-label", /silent source clip preview/);
+  await expect(page.locator("video")).toHaveAttribute("controls", "");
+  await expect(page.getByText(/Framing preview: silent source clip/)).toBeVisible();
   await expect(page.getByText("100%")).toBeVisible();
   await expect(page.getByText("Inventory current")).toBeVisible();
   await expect(page.getByText(/capture-coverage-inventory-v1 · revision 2/)).toBeVisible();

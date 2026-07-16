@@ -398,6 +398,8 @@ MVP records usage but may not charge. The UX must still fail gracefully at limit
 
 ## Accessibility checklist by flow
 
+The hosted capture workspace provides a first-focus skip link, marks the active workflow stage with `aria-current="step"`, restores focus to the new view heading, announces progress/notices without relying on color, associates disabled setup actions with visible reasons, and honors reduced motion. Its private source-clip preview is explicitly labeled as silent; editable captions belong to the final approved video edit and must be reviewed there.
+
 - Upload zone is a labeled button/input, not drag-only.
 - Progress uses text and `aria-live` with throttled announcements.
 - Stepper communicates current/completed/error states semantically.

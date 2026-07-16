@@ -19,6 +19,7 @@ The exact Phase 6 local verification record is [capture-phase-6-evidence.md](./c
 Pre-frame sensitive-region masking, privacy-safe receipts, and support-bundle redaction are documented in [capture-sensitive-masking.md](./capture-sensitive-masking.md).
 The exact Phase 9 local verification record is [capture-phase-9-evidence.md](./capture-phase-9-evidence.md).
 The supported CLI/MCP/OpenAPI operator surface and exact Phase 10 verification record are [capture-operator-guide.md](./capture-operator-guide.md) and [capture-phase-10-evidence.md](./capture-phase-10-evidence.md).
+The hosted accessibility/responsive contract and exact Phase 11 verification record are [capture-accessibility.md](./capture-accessibility.md) and [capture-phase-11-evidence.md](./capture-phase-11-evidence.md).
 
 ## Implemented boundaries
 
@@ -61,6 +62,7 @@ The supported CLI/MCP/OpenAPI operator surface and exact Phase 10 verification r
 - Clip previews use separately authorized, short-lived, no-store signed URLs for verified normalized clips only.
 - The hosted Next.js workspace lists projects, checks session and capture capabilities, manages environment/persona/disposable-login setup, runs discovery, supports revision-safe proposal edits and approval, launches/cancels capture, previews verified clips, reports honest coverage, retries failed flows, and explicitly orders/activates an assembly.
 - The results workspace labels contained source framing, surfaces safe quality warnings and repair-review blockers, shows versioned coverage denominators, and follows a queued retry as a new capture run instead of leaving the user on stale results.
+- Hosted capture navigation exposes a skip link, semantic current step, view-change heading focus restoration, visible focus rings, live progress/status announcements, associated native validation, disabled-control explanations, labeled silent-source video controls, reduced-motion behavior, and responsive layouts verified at desktop, tablet, and mobile widths.
 - `pnpm capture:operator` supports secret-free manifest assistance, readiness, environment, discovery, review, capture, cancellation, retry, evidence, and bounded cleanup operations through the hosted API without direct database access. Equivalent hosted MCP tools and an authenticated OpenAPI 3.1 endpoint use the same public contracts.
 - Opaque discovery/capture run IDs are retained per project in browser storage so a reload can re-authorize and resume status polling; credentials, media URLs, and signed previews are never persisted there.
 - The browser-facing web app calls a same-origin, path-restricted server proxy. The internal hosted API URL, cookies, CSRF forwarding, response no-store policy, request-size limit, and response-header allowlist stay server-controlled.

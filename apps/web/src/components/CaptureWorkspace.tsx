@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CaptureApi, CaptureApiError, type CaptureCapabilities, type CaptureEnvironmentDto, type CapturePersonaDto, type CaptureRunDto, type CoverageSnapshotDto, type DiscoveryRunDto, type FlowExecutionDto, type ProductFlowDto } from "@/lib/captureApi";
 import { mergeFlowDrafts } from "@/lib/flowDrafts";
 
@@ -28,6 +28,8 @@ export function CaptureWorkspace({ projectId }: { projectId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const contentRef = useRef<HTMLElement>(null);
+  const previousViewRef = useRef<View>(view);
 
   const refreshCatalog = useCallback(async () => {
     const [nextEnvironments, nextPersonas, nextFlows] = await Promise.all([api.listEnvironments(projectId), api.listPersonas(projectId), api.listFlows(projectId)]);
@@ -88,6 +90,12 @@ export function CaptureWorkspace({ projectId }: { projectId: string }) {
     if (captureRun?.status === "completed") void api.latestCoverage(projectId).then(setCoverage).catch(() => undefined);
   }, [captureRun?.status, executions, projectId]);
 
+  useEffect(() => {
+    if (previousViewRef.current === view) return;
+    previousViewRef.current = view;
+    window.requestAnimationFrame(() => contentRef.current?.querySelector<HTMLElement>("h1")?.focus());
+  }, [view]);
+
   const environment = environments.find((item) => item.id === environmentId) ?? null;
   const environmentPersonas = personas.filter((item) => item.environmentId === environmentId && item.status === "active");
   const currentFlows = flows.filter((flow) => !environment?.currentVersionId || flow.environmentVersionId === environment.currentVersionId);
@@ -104,6 +112,7 @@ export function CaptureWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <main className="capture-shell">
+      <a className="skip-link" href="#capture-content">Skip to capture content</a>
       <header className="topbar">
         <div className="brand-row"><span className="brand-mark small" aria-hidden="true">G</span><div><p className="eyebrow">Gideon capture</p><strong>Project {shortId(projectId)}</strong></div></div>
         <div className="privacy-pill"><span /> Safe demo environments only</div>
@@ -112,13 +121,13 @@ export function CaptureWorkspace({ projectId }: { projectId: string }) {
         <aside className="step-rail" aria-label="Capture workflow">
           <p className="rail-title">Workflow</p>
           {(["setup", "discover", "review", "capture", "results"] as View[]).map((item, index) => (
-            <button key={item} className={view === item ? "rail-step active" : "rail-step"} onClick={() => setView(item)} type="button">
+            <button key={item} aria-current={view === item ? "step" : undefined} className={view === item ? "rail-step active" : "rail-step"} onClick={() => setView(item)} type="button">
               <span>{index + 1}</span><div><strong>{labels[item]}</strong><small>{descriptions[item]}</small></div>
             </button>
           ))}
           <div className="rail-note"><strong>Human approval stays required.</strong><p>Discovery can propose. Only you can approve a flow or activate an assembly.</p></div>
         </aside>
-        <section className="content-column">
+        <section className="content-column" id="capture-content" ref={contentRef} tabIndex={-1}>
           {error ? <div className="banner error" role="alert"><strong>Couldn’t complete that action.</strong><span>{error}</span></div> : null}
           {notice ? <div className="banner success" role="status">{notice}</div> : null}
           {view === "setup" ? <SetupPanel projectId={projectId} environments={environments} personas={personas} environmentId={environmentId} setEnvironmentId={setEnvironmentId} busy={busy} act={act} refresh={refreshCatalog} setNotice={setNotice} /> : null}
@@ -157,7 +166,8 @@ function SetupPanel(props: { projectId: string; environments: CaptureEnvironment
           <label>Persona key<input value={personaForm.key} onChange={(event) => setPersonaForm({ ...personaForm, key: event.target.value })} required /></label>
           <label>Display name<input value={personaForm.displayName} onChange={(event) => setPersonaForm({ ...personaForm, displayName: event.target.value })} required /></label>
           <label>Role description<textarea rows={2} value={personaForm.roleDescription} onChange={(event) => setPersonaForm({ ...personaForm, roleDescription: event.target.value })} required /></label>
-          <button className="button secondary" disabled={!selected || selected.status !== "ready" || Boolean(props.busy)} type="submit">Add persona</button>
+          <button aria-describedby={selected?.status === "ready" ? undefined : "persona-disabled-reason"} className="button secondary" disabled={!selected || selected.status !== "ready" || Boolean(props.busy)} type="submit">Add persona</button>
+          {selected?.status !== "ready" ? <small className="disabled-reason" id="persona-disabled-reason">Validate a selected environment before adding a persona.</small> : null}
           <div className="tag-row">{selectedPersonas.map((persona) => <span className="tag" key={persona.id}>{persona.displayName}{persona.credentialGrantId ? " · login ready" : ""}</span>)}</div>
         </form>
         <form className="card form-card sensitive" onSubmit={(event) => { event.preventDefault(); const persona = selectedPersonas[0]; if (!selected || !persona) return; void props.act("create-credential", async () => { const grant = await api.createCredential(props.projectId, { environmentId: selected.id, personaId: persona.id, kind: "username_password", secret: { username: credential.username, password: credential.password }, expiresAt: new Date(Date.now() + credential.hours * 3_600_000).toISOString() }); await api.updatePersona(props.projectId, persona, { credentialGrantId: grant.id }); setCredential({ ...credential, password: "" }); await props.refresh(); props.setNotice("Disposable login stored in the configured vault. Gideon never returns it to the browser."); }); }}>
@@ -165,7 +175,8 @@ function SetupPanel(props: { projectId: string; environments: CaptureEnvironment
           <label>Username<input autoComplete="off" value={credential.username} onChange={(event) => setCredential({ ...credential, username: event.target.value })} /></label>
           <label>Password<input type="password" autoComplete="new-password" value={credential.password} onChange={(event) => setCredential({ ...credential, password: event.target.value })} /></label>
           <label>Expires in<select value={credential.hours} onChange={(event) => setCredential({ ...credential, hours: Number(event.target.value) })}><option value={1}>1 hour</option><option value={4}>4 hours</option><option value={12}>12 hours</option><option value={24}>24 hours</option></select></label>
-          <button className="button ghost" disabled={!selectedPersonas.length || !credential.username || !credential.password || Boolean(props.busy)} type="submit">Store disposable login</button>
+          <button aria-describedby={!selectedPersonas.length || !credential.username || !credential.password ? "credential-disabled-reason" : undefined} className="button ghost" disabled={!selectedPersonas.length || !credential.username || !credential.password || Boolean(props.busy)} type="submit">Store disposable login</button>
+          {!selectedPersonas.length || !credential.username || !credential.password ? <small className="disabled-reason" id="credential-disabled-reason">Add an active persona and enter both disposable login fields to store a grant.</small> : null}
         </form>
       </div>
     </div>
@@ -241,7 +252,7 @@ function ResultsPanel(props: { projectId: string; run: CaptureRunDto | null; exe
     return () => window.clearInterval(timer);
   }, [assemblyJob, props.setNotice]);
   return <PanelHeading eyebrow="Results" title="Review clips, coverage, and the final source" detail="Preview verified clips, choose their order, and explicitly activate one assembly for the existing analysis pipeline." aside={<span className="count-pill">{verified.length}/{props.executions.length} verified</span>}>
-    {!props.run ? <Empty title="No capture results yet" detail="Complete a capture run to review its clips." /> : <><div className="result-grid">{props.executions.map((execution) => { const repairReview = Boolean(execution.blockerCode && /(?:repair|locator|material_application_change)/.test(execution.blockerCode)); return <article className="card result-card" key={execution.id}><div className="flow-head"><div><p className="eyebrow">Attempt {execution.attempt}</p><h3>{flowName(execution.flowId)}</h3></div><StatusBadge status={execution.status} /></div>{execution.quality ? <QualitySummary quality={execution.quality} /> : null}{repairReview ? <InlineWarning text={`Repair review required: ${(execution.blockerCode ?? "flow_changed").replace(/_/g, " ")}. Review the latest draft before approving another revision.`} /> : null}{props.previews[execution.id] ? <><video controls preload="metadata" src={props.previews[execution.id]!.url} /><small className="framing-note">Framing preview: full source frame, fit contained, no crop. Vertical reframing happens only in the approved video edit.</small></> : <div className="preview-placeholder"><span>▶</span><small>{execution.status === "verified" ? "Private preview available" : execution.blockerCode?.replace(/_/g, " ") ?? "No verified clip"}</small></div>}<div className="action-row">{execution.status === "verified" ? <button className="button secondary compact" onClick={() => void props.act(`preview-${execution.id}`, async () => { const preview = await api.createPreview(props.projectId, execution.id); props.setPreviews({ ...props.previews, [execution.id]: preview }); })} type="button">{props.previews[execution.id] ? "Refresh preview" : "Load framing preview"}</button> : <button className="button ghost compact" disabled={Boolean(props.busy)} onClick={() => void props.act(`retry-${execution.id}`, async () => { const result = await api.retryExecution(props.projectId, execution.id); props.onRetry(result.captureRun); props.setNotice(`Retry queued as run ${shortId(result.captureRun.id)}. Tracking the new attempt now.`); })} type="button">{props.busy === `retry-${execution.id}` ? "Queuing retry…" : "Retry flow"}</button>}</div></article>; })}</div><div className="two-column results-bottom"><section className="card"><div className="card-title"><span className="icon-box">↕</span><div><h3>Assembly order</h3><p>Only selected verified clips become the source recording.</p></div></div><div className="assembly-list">{props.assemblyIds.map((id, index) => { const execution = props.executions.find((item) => item.id === id)!; return <div className="assembly-row" key={id}><span>{index + 1}</span><strong>{flowName(execution.flowId)}</strong><div><button aria-label="Move clip up" disabled={index === 0} onClick={() => props.setAssemblyIds(move(props.assemblyIds, index, index - 1))}>↑</button><button aria-label="Move clip down" disabled={index === props.assemblyIds.length - 1} onClick={() => props.setAssemblyIds(move(props.assemblyIds, index, index + 1))}>↓</button><button aria-label="Exclude clip" onClick={() => props.setAssemblyIds(props.assemblyIds.filter((value) => value !== id))}>×</button></div></div>; })}</div>{assemblyJob ? <div className="assembly-status"><span>Assembly</span><StatusBadge status={assemblyJob.status} /><small>{assemblyJob.userMessage}</small></div> : null}<button className="button primary full" disabled={!props.run || !props.assemblyIds.length || Boolean(props.busy) || Boolean(assemblyJob && ["queued", "running"].includes(assemblyJob.status))} onClick={() => void props.act("assemble", async () => { const result = await api.createAssembly(props.projectId, props.run!.id, props.assemblyIds); setAssemblyJob(result.job); props.setNotice("Assembly queued. Gideon will activate it only after deterministic media processing succeeds."); })} type="button">Activate selected assembly</button></section><CoverageCard coverage={props.coverage} /></div></>}
+    {!props.run ? <Empty title="No capture results yet" detail="Complete a capture run to review its clips." /> : <><div className="result-grid">{props.executions.map((execution) => { const repairReview = Boolean(execution.blockerCode && /(?:repair|locator|material_application_change)/.test(execution.blockerCode)); const framingId = `framing-${execution.id}`; return <article className="card result-card" key={execution.id}><div className="flow-head"><div><p className="eyebrow">Attempt {execution.attempt}</p><h3>{flowName(execution.flowId)}</h3></div><StatusBadge status={execution.status} /></div>{execution.quality ? <QualitySummary quality={execution.quality} /> : null}{repairReview ? <InlineWarning text={`Repair review required: ${(execution.blockerCode ?? "flow_changed").replace(/_/g, " ")}. Review the latest draft before approving another revision.`} /> : null}{props.previews[execution.id] ? <><video aria-describedby={framingId} aria-label={`${flowName(execution.flowId)} silent source clip preview`} controls preload="metadata" src={props.previews[execution.id]!.url} /><small className="framing-note" id={framingId}>Framing preview: silent source clip, full source frame, fit contained, no crop. Vertical reframing and caption tracks are reviewed on the approved video edit.</small></> : <div className="preview-placeholder"><span aria-hidden="true">▶</span><small>{execution.status === "verified" ? "Private preview available" : execution.blockerCode?.replace(/_/g, " ") ?? "No verified clip"}</small></div>}<div className="action-row">{execution.status === "verified" ? <button className="button secondary compact" onClick={() => void props.act(`preview-${execution.id}`, async () => { const preview = await api.createPreview(props.projectId, execution.id); props.setPreviews({ ...props.previews, [execution.id]: preview }); })} type="button">{props.previews[execution.id] ? "Refresh preview" : "Load framing preview"}</button> : <button className="button ghost compact" disabled={Boolean(props.busy)} onClick={() => void props.act(`retry-${execution.id}`, async () => { const result = await api.retryExecution(props.projectId, execution.id); props.onRetry(result.captureRun); props.setNotice(`Retry queued as run ${shortId(result.captureRun.id)}. Tracking the new attempt now.`); })} type="button">{props.busy === `retry-${execution.id}` ? "Queuing retry…" : "Retry flow"}</button>}</div></article>; })}</div><div className="two-column results-bottom"><section className="card"><div className="card-title"><span className="icon-box">↕</span><div><h3>Assembly order</h3><p>Only selected verified clips become the source recording.</p></div></div><div className="assembly-list">{props.assemblyIds.map((id, index) => { const execution = props.executions.find((item) => item.id === id)!; return <div className="assembly-row" key={id}><span>{index + 1}</span><strong>{flowName(execution.flowId)}</strong><div><button aria-label="Move clip up" disabled={index === 0} onClick={() => props.setAssemblyIds(move(props.assemblyIds, index, index - 1))}>↑</button><button aria-label="Move clip down" disabled={index === props.assemblyIds.length - 1} onClick={() => props.setAssemblyIds(move(props.assemblyIds, index, index + 1))}>↓</button><button aria-label="Exclude clip" onClick={() => props.setAssemblyIds(props.assemblyIds.filter((value) => value !== id))}>×</button></div></div>; })}</div>{assemblyJob ? <div className="assembly-status"><span>Assembly</span><StatusBadge status={assemblyJob.status} /><small>{assemblyJob.userMessage}</small></div> : null}<button className="button primary full" disabled={!props.run || !props.assemblyIds.length || Boolean(props.busy) || Boolean(assemblyJob && ["queued", "running"].includes(assemblyJob.status))} onClick={() => void props.act("assemble", async () => { const result = await api.createAssembly(props.projectId, props.run!.id, props.assemblyIds); setAssemblyJob(result.job); props.setNotice("Assembly queued. Gideon will activate it only after deterministic media processing succeeds."); })} type="button">Activate selected assembly</button></section><CoverageCard coverage={props.coverage} /></div></>}
   </PanelHeading>;
 }
 
@@ -277,9 +288,9 @@ function CoverageCard({ coverage }: { coverage: CoverageSnapshotDto | null }) {
   </section>;
 }
 
-function PanelHeading({ eyebrow, title, detail, aside, children }: { eyebrow: string; title: string; detail: string; aside?: React.ReactNode; children: React.ReactNode }) { return <><div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{detail}</p></div>{aside}</div>{children}</>; }
+function PanelHeading({ eyebrow, title, detail, aside, children }: { eyebrow: string; title: string; detail: string; aside?: React.ReactNode; children: React.ReactNode }) { return <><div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1 tabIndex={-1}>{title}</h1><p>{detail}</p></div>{aside}</div>{children}</>; }
 function StatusBadge({ status }: { status: string }) { const tone = /(?:ready|approved|verified|completed|succeeded)/.test(status) ? "good" : /(?:failed|blocked|rejected|revoked)/.test(status) ? "bad" : "neutral"; return <span className={`status-badge ${tone}`}>{status.replace(/_/g, " ")}</span>; }
-function Progress({ status, stages }: { status: string; stages: string[] }) { const current = stages.indexOf(status); return <div className="progress-track" aria-label={`Current stage: ${status}`}>{stages.map((stage, index) => <div className={index < current ? "done" : index === current ? "current" : ""} key={stage}><i /><small>{stage.replace(/_/g, " ")}</small></div>)}</div>; }
+function Progress({ status, stages }: { status: string; stages: string[] }) { const current = stages.indexOf(status); return <div className="progress-track" aria-label={`Current stage: ${status}`} aria-live="polite" role="status">{stages.map((stage, index) => <div className={index < current ? "done" : index === current ? "current" : ""} key={stage}><i /><small>{stage.replace(/_/g, " ")}</small></div>)}</div>; }
 function Proof({ title, detail }: { title: string; detail: string }) { return <div className="proof"><span>✓</span><div><strong>{title}</strong><small>{detail}</small></div></div>; }
 function InlineWarning({ text }: { text: string }) { return <p className="inline-warning">{text}</p>; }
 function Empty({ title, detail }: { title: string; detail: string }) { return <div className="empty"><span>◇</span><h3>{title}</h3><p>{detail}</p></div>; }

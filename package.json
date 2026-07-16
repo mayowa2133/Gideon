@@ -68,6 +68,7 @@
     "test:infrastructure": "node scripts/run-local-capture-infrastructure.mjs",
     "test:web": "pnpm --filter @gideon/web test",
     "test:e2e": "playwright test --config apps/web/playwright.config.ts",
+    "test:accessibility": "playwright test --config apps/web/playwright.config.ts apps/web/e2e/accessibility-responsive.spec.ts",
     "test:watch": "vitest",
     "package:mac": "pnpm build && electron-builder --mac dmg zip --config.mac.identity=null --publish=never",
     "package:mac:signed": "pnpm build && electron-builder --mac dmg zip --publish=never",
