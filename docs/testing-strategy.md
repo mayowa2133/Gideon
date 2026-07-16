@@ -406,13 +406,15 @@ Secondary flows:
 
 Hosted client and proxy-policy unit tests run with `pnpm test:web`. Playwright E2E files are excluded from Vitest discovery and included in strict TypeScript checking.
 
+Run `pnpm test:accessibility` for the structured-capture accessibility and responsive gate. It runs axe-core WCAG A/AA checks at 1440×900, 768×1024, and 390×844; rejects document overflow; verifies keyboard focus order, skip navigation, view-change focus restoration, native validation focus, live progress semantics, explicit disabled-control explanations, and reduced-motion behavior; captures ignored local screenshots; and writes a redacted mode-0600 report to `tmp/capture-accessibility/accessibility-evidence.json`.
+
 ## Accessibility testing
 
 Automated checks:
 
-- Basic accessibility scanner in E2E.
-- Keyboard navigation for dashboard, upload, review, editor, and video player controls.
-- Form labels and error messages.
+- axe-core WCAG A/AA scanner at desktop, tablet, and mobile viewports.
+- Keyboard navigation, skip links, logical focus order, and heading focus restoration for the hosted capture workspace.
+- Form labels, native invalid-field focus, status announcements, disabled-state explanations, accessible silent-source video controls, and reduced-motion behavior.
 
 Manual checks:
 
@@ -420,6 +422,7 @@ Manual checks:
 - Modal dialogs trap and restore focus.
 - Timeline and script editor are usable without a mouse.
 - Captions and generated videos are reviewable with assistive technology context.
+- 200–400% zoom/reflow, touch ergonomics, real screen-reader workflows, caption accuracy/comprehension, and display-dependent visual contrast.
 
 ## Performance testing
 

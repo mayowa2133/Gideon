@@ -5,6 +5,7 @@ release/
 .next/
 playwright-report/
 test-results/
+output/playwright/
 .DS_Store
 *.log
 *.tsbuildinfo

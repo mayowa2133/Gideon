@@ -77,6 +77,7 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm test:redis
 - pnpm test:infrastructure
 - pnpm test:e2e
+- pnpm test:accessibility
 - pnpm build
 - pnpm build:web
 - pnpm provider:canary
