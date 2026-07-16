@@ -17,7 +17,7 @@ The hostile synthetic browser target and fail-closed matrix are documented in [h
 Deterministic locator selection, provider budgets, safe page comparison, and revision-bound repair are documented in [capture-discovery-repair.md](./capture-discovery-repair.md).
 The exact Phase 6 local verification record is [capture-phase-6-evidence.md](./capture-phase-6-evidence.md).
 Pre-frame sensitive-region masking, privacy-safe receipts, and support-bundle redaction are documented in [capture-sensitive-masking.md](./capture-sensitive-masking.md).
-The exact Phase 7 local verification record is [capture-phase-7-evidence.md](./capture-phase-7-evidence.md).
+The exact Phase 8 local verification record is [capture-phase-8-evidence.md](./capture-phase-8-evidence.md).
 
 ## Implemented boundaries
 
@@ -28,7 +28,8 @@ The exact Phase 7 local verification record is [capture-phase-7-evidence.md](./c
 - Isolated-runtime fixture values are staged through an opaque scoped grant and never serialized into the manifest. The grant is revoked after success or failure; credential-shaped keys remain forbidden and credentials stay behind the login-adapter vault.
 - Capture-run creation is idempotent. The server compiles current approved flows, hashes policy and plans, estimates quota usage, and atomically persists the generic job and capture run before queueing.
 - BullMQ capture jobs contain only workspace, project, run, and job IDs. Queue retries are bounded.
-- Remote capture is refused unless the runtime identifies itself as container or microVM isolated. `local_test` is accepted only for `local_preview` environments. Remote responses must include an attestation bound to the exact declarative manifest hash, declared isolation class, valid runtime instance ID, completion time, and the caller's pinned SHA-256 worker image digest before their browser receipt or recording is trusted.
+- Remote capture is refused unless the runtime identifies itself as container or microVM isolated. `local_test` is accepted only for `local_preview` environments. Version-2 attestations bind the manifest, workspace, execution, isolation class, exact image digest, canonical runtime-policy hash, start/completion times, terminal success, and destruction of the profile, cookies, clipboard, cache, scratch data, and runtime instance before any browser receipt or recording is trusted.
+- The repository now defines a disposable Playwright container and separate CONNECT-only egress proxy. Static policy enforces non-root UID/GID, read-only roots, no added capabilities, no-new-privileges, bounded tmpfs/CPU/memory/PIDs, no host mounts or container socket, internal-only browser networking, HTTPS allowlists, resolved-IP connection, and metadata/private-address denial. Chromium receives the proxy explicitly at launch.
 - Every flow resets before both dry run and recording. Failed dry runs stop before recording; failed assertions produce review state instead of successful clips.
 - Playwright replay uses fixed viewport, locale, timezone, color scheme, reduced motion, disabled downloads, and per-request network-policy checks.
 - Browser action timeouts are explicit and bounded. Geometry collection checks visibility before attempting scroll alignment, so hidden modals and controls cannot consume the timeout after every step.
@@ -72,7 +73,8 @@ The exact Phase 7 local verification record is [capture-phase-7-evidence.md](./c
 - `fixtures/hostile-capture-app` and `src/main/hostileCaptureFixture.ts`: complex adversarial synthetic UI, loopback server, approved/prohibited workflow matrix, and redacted evidence command.
 - `src/main/captureFraming.ts`: privacy-safe focus selection, crop clamping, deterministic pan expressions, and full-frame fallback.
 - `src/main/captureVideoQuality.ts` and `captureQualityThresholds.json`: versioned deterministic frame/presentation quality checks, contact sheets, and ready/warning/failed gating.
-- `src/main/isolatedCaptureRuntime.ts`: container/microVM client boundary.
+- `src/main/isolatedCaptureRuntime.ts`, `captureBrowserWorkerProcess.ts`, and `captureRuntimeSession.ts`: manifest/attestation boundary, one-shot browser entrypoint, workspace-scoped disposable state, and terminal cleanup.
+- `Dockerfile.capture-browser`, `docker-compose.capture-browser.yml`, `captureEgressProxy.ts`, and `config/capture-browser-runtime-policy-v1.json`: pinned browser image and enforced local isolation/egress definition.
 - `src/main/captureNetworkPolicy.ts` and `captureEnvironmentProbe.ts`: SSRF, DNS, redirect, and reachability policy.
 - `src/main/flowDiscovery.ts`, `captureInventoryCrawler.ts`, `repositoryEvidence.ts`, and `testScenarioImport.ts`: bounded discovery inputs and provider policy.
 - `src/main/captureLocators.ts`, `capturePageComparison.ts`, and `flowRepair.ts`: durable locator selection, safe drift classification, and revision-bound repair.
@@ -91,7 +93,7 @@ The exact Phase 7 local verification record is [capture-phase-7-evidence.md](./c
 
 The code deliberately does not fall back to a local browser for remote products. Production must provide:
 
-1. A browser pool using a pinned SHA-256 image digest, container or microVM isolation, non-root execution, read-only base filesystem, bounded work volume, CPU/memory/PID/time limits, default-deny egress through the policy gateway, and a response attestation bound to each submitted manifest hash.
+1. Deploy and runtime-exercise the supplied browser/proxy definition (or equivalent managed microVM pool), then have the orchestrator return the strict version-2 attestation only after extracting approved artifacts and destroying the runtime instance. Docker was unavailable during local Phase 8 verification, so repository policy and contracts are proven but live container enforcement is not.
 2. PostgreSQL migration `0004_product_flow_capture.sql`, Redis/BullMQ, and private S3/R2 storage.
 3. An external secret-store implementation and credential metadata repository.
 4. Reset adapters and reviewed login adapters for enabled environments.
@@ -100,7 +102,7 @@ The code deliberately does not fall back to a local browser for remote products.
 7. The provided PostgreSQL-backed capture audit sink wiring for environment, credential, discovery, flow approval, run, cancellation, retry, coverage, and assembly actions.
 8. Dashboards and alerts fed by capture observability plus browser-worker and queue metrics.
 
-Run `pnpm capture:worker:check` before starting a worker. Production configuration rejects local-test isolation, in-memory secrets, local artifact storage, loopback or credential-bearing runtime endpoints, unpinned worker images, and missing policy bundle versions.
+Run `pnpm capture:worker:check` before starting a worker and `pnpm capture:isolation:check` to verify the pinned definition. `pnpm capture:isolation:runtime:check` additionally requires a Docker engine and fails when runtime validation cannot execute.
 
 ## API availability
 

@@ -7,7 +7,7 @@ import { stableSerialize, verifyCompiledFlowPlan } from "./productFlowCompiler";
 import { assertCaptureEvidenceIsRedacted } from "./captureSupportBundle";
 
 export interface IsolatedCaptureManifest {
-  schemaVersion: "1";
+  schemaVersion: "2";
   executionId: string;
   workspaceId: string;
   plan: PlaywrightCaptureExecutorInput["plan"];
@@ -20,29 +20,43 @@ export interface IsolatedCaptureManifest {
   capturePresentation?: PlaywrightCaptureExecutorInput["capturePresentation"];
   maskingPolicy: CaptureMaskingPolicy;
   outputHandle: string;
+  runtimePolicyVersion: string;
+  runtimePolicyHash: string;
   manifestHash: string;
+}
+
+export interface IsolatedCaptureAttestation {
+  schemaVersion: "2";
+  manifestHash: string;
+  workspaceId: string;
+  executionId: string;
+  isolation: "container" | "microvm";
+  runtimeInstanceId: string;
+  imageDigest: `sha256:${string}`;
+  runtimePolicyVersion: string;
+  runtimePolicyHash: string;
+  startedAt: string;
+  completedAt: string;
+  terminalState: "succeeded" | "failed";
+  cleanup: { browserProfile: "destroyed"; cookies: "destroyed"; clipboard: "cleared"; cache: "destroyed"; scratch: "destroyed"; runtimeInstance: "destroyed" };
 }
 
 export interface IsolatedCaptureClient {
   isolation: "container" | "microvm";
   expectedImageDigest: `sha256:${string}`;
+  expectedRuntimePolicyVersion: string;
+  expectedRuntimePolicyHash: string;
   prepareFixtureGrant?(input: { executionId: string; workspaceId: string; values: Readonly<Record<string, string>> }): Promise<{ grantId: string }>;
   revokeFixtureGrant?(input: { executionId: string; workspaceId: string; grantId: string }): Promise<void>;
   execute(manifest: IsolatedCaptureManifest): Promise<{
     result: PlaywrightCaptureResult;
-    attestation: {
-      schemaVersion: "1";
-      manifestHash: string;
-      isolation: "container" | "microvm";
-      runtimeInstanceId: string;
-      imageDigest: `sha256:${string}`;
-      completedAt: string;
-    };
+    attestation: IsolatedCaptureAttestation;
   }>;
 }
 
 export function createIsolatedCaptureRuntime(client: IsolatedCaptureClient): CaptureBrowserRuntime {
   assertImageDigest(client.expectedImageDigest);
+  assertPolicyIdentity(client.expectedRuntimePolicyVersion, client.expectedRuntimePolicyHash);
   return {
     isolation: client.isolation,
     async execute(input) {
@@ -60,7 +74,7 @@ export function createIsolatedCaptureRuntime(client: IsolatedCaptureClient): Cap
         grantPrepared = true;
       }
       const withoutHash = {
-        schemaVersion: "1" as const,
+        schemaVersion: "2" as const,
         executionId: input.id,
         workspaceId: input.workspaceId,
         plan: structuredClone(input.plan),
@@ -72,7 +86,9 @@ export function createIsolatedCaptureRuntime(client: IsolatedCaptureClient): Cap
         capturePacing: input.capturePacing ? structuredClone(input.capturePacing) : undefined,
         capturePresentation: input.capturePresentation ? structuredClone(input.capturePresentation) : undefined,
         maskingPolicy: validateCaptureMaskingPolicy(input.maskingPolicy),
-        outputHandle: `capture-output:${input.id}`
+        outputHandle: `capture-output:${input.id}`,
+        runtimePolicyVersion: client.expectedRuntimePolicyVersion,
+        runtimePolicyHash: client.expectedRuntimePolicyHash
       };
       const manifest: IsolatedCaptureManifest = { ...withoutHash, manifestHash: sha256(stableSerialize(withoutHash)) };
       try {
@@ -97,16 +113,35 @@ export function createIsolatedCaptureRuntime(client: IsolatedCaptureClient): Cap
   };
 }
 
+export function verifyIsolatedCaptureManifest(manifest: IsolatedCaptureManifest): void {
+  if (!manifest || manifest.schemaVersion !== "2") throw new Error("Isolated capture manifest schema is invalid.");
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(manifest.executionId) || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(manifest.workspaceId)) throw new Error("Isolated capture manifest scope is invalid.");
+  verifyCompiledFlowPlan(manifest.plan);
+  validateCaptureMaskingPolicy(manifest.maskingPolicy);
+  assertOpaqueFixtureGrant(manifest.fixtureGrantId);
+  if (!Array.isArray(manifest.fixtureKeys) || manifest.fixtureKeys.length > 100 || manifest.fixtureKeys.some((key) => !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(key))) throw new Error("Isolated capture manifest fixture keys are invalid.");
+  assertPolicyIdentity(manifest.runtimePolicyVersion, manifest.runtimePolicyHash);
+  if (manifest.outputHandle !== `capture-output:${manifest.executionId}`) throw new Error("Isolated capture output handle is invalid.");
+  const { manifestHash, ...withoutHash } = manifest;
+  if (!/^[a-f0-9]{64}$/.test(manifestHash) || sha256(stableSerialize(withoutHash)) !== manifestHash) throw new Error("Isolated capture manifest hash is invalid.");
+}
+
 function assertOpaqueFixtureGrant(value: string): string {
   if (typeof value !== "string" || !/^fixture:[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/.test(value) || /password|secret|token|credential|cookie/i.test(value)) throw new Error("Isolated capture fixture grant is invalid.");
   return value;
 }
 
 function assertAttestation(attestation: Awaited<ReturnType<IsolatedCaptureClient["execute"]>>["attestation"], manifest: IsolatedCaptureManifest, client: IsolatedCaptureClient): void {
-  if (attestation.schemaVersion !== "1" || attestation.manifestHash !== manifest.manifestHash) throw new Error("Isolated capture attestation does not match the submitted manifest.");
+  if (attestation.schemaVersion !== "2" || attestation.manifestHash !== manifest.manifestHash || attestation.workspaceId !== manifest.workspaceId || attestation.executionId !== manifest.executionId) throw new Error("Isolated capture attestation does not match the submitted manifest.");
   if (attestation.isolation !== client.isolation || attestation.imageDigest !== client.expectedImageDigest) throw new Error("Isolated capture attestation does not match the pinned runtime.");
-  if (!/^[a-z0-9][a-z0-9._:-]{0,199}$/i.test(attestation.runtimeInstanceId) || !Number.isFinite(Date.parse(attestation.completedAt))) throw new Error("Isolated capture attestation is invalid.");
+  if (attestation.runtimePolicyVersion !== client.expectedRuntimePolicyVersion || attestation.runtimePolicyHash !== client.expectedRuntimePolicyHash) throw new Error("Isolated capture attestation does not match the runtime policy.");
+  if (!/^[a-z0-9][a-z0-9._:-]{0,199}$/i.test(attestation.runtimeInstanceId) || !Number.isFinite(Date.parse(attestation.startedAt)) || !Number.isFinite(Date.parse(attestation.completedAt)) || Date.parse(attestation.completedAt) < Date.parse(attestation.startedAt) || attestation.terminalState !== "succeeded") throw new Error("Isolated capture attestation is invalid.");
+  if (!attestation.cleanup || Object.keys(attestation.cleanup).sort().join(",") !== "browserProfile,cache,clipboard,cookies,runtimeInstance,scratch" || Object.values(attestation.cleanup).some((status) => status !== "destroyed" && status !== "cleared")) throw new Error("Isolated capture runtime teardown is incomplete.");
   assertImageDigest(attestation.imageDigest);
+}
+
+function assertPolicyIdentity(version: string, hash: string): void {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(version) || !/^[a-f0-9]{64}$/.test(hash)) throw new Error("Isolated capture runtime policy identity is invalid.");
 }
 
 function assertImageDigest(value: string): asserts value is `sha256:${string}` {

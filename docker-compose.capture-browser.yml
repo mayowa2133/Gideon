@@ -1,0 +1,64 @@
+services:
+  capture-egress:
+    build:
+      context: .
+      dockerfile: Dockerfile.capture-browser
+      target: egress
+    user: "1001:1001"
+    read_only: true
+    init: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    mem_limit: 134217728
+    cpus: 0.25
+    tmpfs:
+      - /tmp:size=32m,mode=1770,uid=1001,gid=1001,noexec,nosuid,nodev
+    environment:
+      GIDEON_CAPTURE_EGRESS_LISTEN_HOST: 0.0.0.0
+      GIDEON_CAPTURE_EGRESS_LISTEN_PORT: "8080"
+      GIDEON_CAPTURE_BASE_URL: ${GIDEON_CAPTURE_BASE_URL:?set a reviewed HTTPS capture base URL}
+      GIDEON_CAPTURE_ALLOWED_DOMAINS: ${GIDEON_CAPTURE_ALLOWED_DOMAINS:?set reviewed comma-separated domains}
+      GIDEON_CAPTURE_ALLOW_SUBDOMAINS: ${GIDEON_CAPTURE_ALLOW_SUBDOMAINS:-false}
+    networks: [capture-session, capture-public-egress]
+    restart: "no"
+
+  capture-browser:
+    build:
+      context: .
+      dockerfile: Dockerfile.capture-browser
+      target: runtime
+    depends_on: [capture-egress]
+    user: "1001:1001"
+    read_only: true
+    init: true
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 2147483648
+    cpus: 1.0
+    stop_grace_period: 5s
+    shm_size: 268435456
+    tmpfs:
+      - /tmp:size=256m,mode=1770,uid=1001,gid=1001,noexec,nosuid,nodev
+      - /work:size=512m,mode=1770,uid=1001,gid=1001,noexec,nosuid,nodev
+    environment:
+      HTTP_PROXY: http://capture-egress:8080
+      HTTPS_PROXY: http://capture-egress:8080
+      NO_PROXY: ""
+      GIDEON_CAPTURE_PROXY_SERVER: http://capture-egress:8080
+      GIDEON_CAPTURE_RUNTIME_IMAGE_DIGEST: sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48
+      GIDEON_CAPTURE_RUNTIME_POLICY_VERSION: capture-browser-isolation-v1
+      GIDEON_CAPTURE_RUNTIME_POLICY_HASH: 8fc8d8b1674a406a2e6d33458f75516a2b1112f1d3a80191500cb846f562bfc5
+      GIDEON_CAPTURE_WALL_CLOCK_MS: "300000"
+      GIDEON_CAPTURE_MAX_ARTIFACT_BYTES: "524288000"
+    networks: [capture-session]
+    restart: "no"
+
+networks:
+  capture-session:
+    internal: true
+    name: gideon-capture-session
+  capture-public-egress:
+    name: gideon-capture-public-egress

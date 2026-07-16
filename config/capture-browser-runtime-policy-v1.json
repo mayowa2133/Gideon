@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1",
+  "policyVersion": "capture-browser-isolation-v1",
+  "baseImage": {
+    "reference": "mcr.microsoft.com/playwright:v1.61.1-noble",
+    "digest": "sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48"
+  },
+  "identity": { "uid": 1001, "gid": 1001, "nonRoot": true, "noNewPrivileges": true, "dropAllCapabilities": true },
+  "filesystem": {
+    "readOnlyRoot": true,
+    "tmpfs": [
+      { "path": "/tmp", "sizeBytes": 268435456, "mode": "1770", "uid": 1001, "gid": 1001, "noExec": true, "noSuid": true, "noDev": true },
+      { "path": "/work", "sizeBytes": 536870912, "mode": "1770", "uid": 1001, "gid": 1001, "noExec": true, "noSuid": true, "noDev": true }
+    ],
+    "hostMounts": false,
+    "dockerSocket": false
+  },
+  "limits": {
+    "cpus": 1,
+    "memoryBytes": 2147483648,
+    "pids": 256,
+    "wallClockMs": 300000,
+    "maxSteps": 100,
+    "maxScreenshots": 200,
+    "maxArtifactBytes": 524288000
+  },
+  "network": {
+    "proxyOnly": true,
+    "browserNetworkInternal": true,
+    "allowedSchemes": ["https"],
+    "forbiddenCidrs": [
+      "0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12", "192.0.0.0/24", "192.168.0.0/16", "198.18.0.0/15", "224.0.0.0/4", "240.0.0.0/4", "::/128", "::1/128", "fc00::/7", "fe80::/10", "ff00::/8"
+    ],
+    "forbiddenHostnames": ["localhost", "metadata.google.internal", "metadata.azure.internal", "instance-data.ec2.internal"]
+  },
+  "cleanup": {
+    "destroyBrowserProfile": true,
+    "destroyCookies": true,
+    "clearClipboard": true,
+    "destroyCache": true,
+    "destroyScratch": true,
+    "removeContainerAtTerminalState": true
+  }
+}

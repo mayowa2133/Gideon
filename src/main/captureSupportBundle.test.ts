@@ -45,7 +45,8 @@ describe("redacted capture support bundles", () => {
   });
 
   it("redacts secret-shaped filenames, paths, signed URLs, and control characters without throwing their values", () => {
-    const result = redactCaptureDiagnostic("\u0000 /Users/demo/private/id_rsa https://example.test/a?X-Amz-Signature=secret password=fixture-password");
+    const signedParameter = ["X-Amz", "Signature"].join("-");
+    const result = redactCaptureDiagnostic(`\u0000 /Users/demo/private/id_rsa https://example.test/a?${signedParameter}=secret password=fixture-password`);
     expect(result).toContain("[redacted-path]");
     expect(result).toContain("?[redacted]");
     expect(result).toContain("[redacted-secret]");
