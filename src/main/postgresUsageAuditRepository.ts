@@ -33,16 +33,8 @@ export class PostgresUsageAuditRepository {
          $1, $2, $3, $4, $5, $6, $7,
          $8, $9::jsonb, $10
        )
-       on conflict (id) do update set
-         workspace_id = excluded.workspace_id,
-         project_id = excluded.project_id,
-         metric = excluded.metric,
-         quantity = excluded.quantity,
-         unit = excluded.unit,
-         source = excluded.source,
-         idempotency_key = excluded.idempotency_key,
-         record_json = excluded.record_json,
-         created_at = excluded.created_at
+       on conflict (workspace_id, idempotency_key) do update set
+         idempotency_key = excluded.idempotency_key
        returning record_json`,
       [
         event.id,

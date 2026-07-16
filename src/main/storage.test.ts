@@ -34,6 +34,9 @@ describe("local private object storage", () => {
     expect(stored.artifact.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(await fs.readFile(stored.filePath, "utf8")).toBe("private recording bytes");
     expect(stored.fileUrl).toMatch(/^file:\/\//);
+    await expect(storage.deleteObject({ workspaceId: "workspace 2", projectId: "project 1", storageKey: stored.artifact.storageKey })).rejects.toThrow("outside the authorized project scope");
+    await storage.deleteObject({ workspaceId: "workspace 1", projectId: "project 1", storageKey: stored.artifact.storageKey });
+    await expect(fs.stat(stored.filePath)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("stores provider voiceovers as private audio artifacts", async () => {
@@ -274,6 +277,10 @@ describe("local private object storage", () => {
       expect(received.headers.authorization).toContain("AWS4-HMAC-SHA256 Credential=test-key/");
       expect(received.headers["x-amz-content-sha256"]).toBe(stored.artifact.sha256);
       expect(received.body).toBe("cloud recording bytes");
+      await storage.deleteObject({ workspaceId: "workspace 1", projectId: "project 1", storageKey: stored.artifact.storageKey });
+      expect(received.request?.method).toBe("DELETE");
+      expect(received.headers.authorization).toContain("SignedHeaders=host;x-amz-content-sha256;x-amz-date");
+      await expect(fs.stat(stored.filePath)).rejects.toMatchObject({ code: "ENOENT" });
     } finally {
       await received.close();
     }

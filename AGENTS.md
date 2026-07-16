@@ -75,6 +75,7 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm test:capture
 - pnpm test:web
 - pnpm test:redis
+- pnpm test:infrastructure
 - pnpm test:e2e
 - pnpm build
 - pnpm build:web

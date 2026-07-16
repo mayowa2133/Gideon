@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { Queue, Worker, type ConnectionOptions, type JobsOptions } from "bullmq";
 import type { HostedJobQueueService } from "./hostedApi";
 import type { JobKind, QueueRuntimeStats } from "../shared/types";
+import { redactCaptureDiagnostic } from "./captureSupportBundle";
 
 export interface WorkerQueueTask<T> {
   id: string;
@@ -1289,5 +1290,5 @@ function maybeHostedWorkerQueueJobFromBullMqJob(job: BullMqJobLike | unknown): H
 }
 
 function sanitizeQueueError(value: string): string {
-  return value.replace(/(sk|whsec|secret|token|key)_[a-zA-Z0-9_-]+/g, "[redacted]").slice(0, 300) || "Worker queue error.";
+  return redactCaptureDiagnostic(value).replaceAll("[redacted-secret]", "[redacted]").slice(0, 300) || "Worker queue error.";
 }

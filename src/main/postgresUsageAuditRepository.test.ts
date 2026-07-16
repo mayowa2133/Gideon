@@ -19,7 +19,8 @@ describe("PostgresUsageAuditRepository", () => {
 
     expect(saved.id).toBe("usage-1");
     expect(calls[0]?.text).toContain("insert into gideon_usage_events");
-    expect(calls[0]?.text).toContain("on conflict (id) do update");
+    expect(calls[0]?.text).toContain("on conflict (workspace_id, idempotency_key) do update");
+    expect(calls[0]?.text).not.toContain("quantity = excluded.quantity");
     expect(calls[0]?.values?.slice(0, 8)).toEqual([
       "usage-1",
       "workspace-1",
