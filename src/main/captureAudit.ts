@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AuditAction, AuditActorType, AuditEvent, AuditMetadataValue, AuditTargetType } from "../shared/types";
+import { redactCaptureDiagnostic } from "./captureSupportBundle";
 
 export interface CaptureAuditRepository { upsertAuditEvent(event: AuditEvent): Promise<AuditEvent> }
 
@@ -47,8 +48,9 @@ function sanitizeMetadata(value: Record<string, AuditMetadataValue> | undefined)
   if (entries.length > 20) throw new Error("Capture audit metadata is too large.");
   const result: Record<string, AuditMetadataValue> = {};
   for (const [key, item] of entries) {
-    if (!/^[a-z][a-z0-9_]{0,63}$/.test(key) || /(?:secret|token|password|credential|cookie|authorization|url|path|prompt|transcript|object_key)/.test(key)) throw new Error("Capture audit metadata key is unsafe.");
+    if (!/^[a-z][a-z0-9_]{0,63}$/.test(key) || /(?:secret|token|password|credential|cookie|authorization|url|path|prompt|transcript|object_key|storage_key|filename|selector|media|screenshot|frame|html|dom|value)/.test(key)) throw new Error("Capture audit metadata key is unsafe.");
     if (typeof item === "string" && item.length > 200) throw new Error("Capture audit metadata value is too large.");
+    if (typeof item === "string" && redactCaptureDiagnostic(item) !== item) throw new Error("Capture audit metadata value is unsafe.");
     result[key] = item;
   }
   return result;

@@ -14,6 +14,7 @@ import { renderCapturePresentation, type CaptureNarrationProvider, type CaptureS
 import { analyzeCaptureVideoQuality, type CaptureVideoQualityReport } from "./captureVideoQuality";
 import { executePlaywrightCapture } from "./playwrightCaptureExecutor";
 import { createPostRunCoverageHook } from "./postRunCoverage";
+import { redactCaptureDiagnostic } from "./captureSupportBundle";
 import { extractRepositoryEvidence } from "./repositoryEvidence";
 import { LocalPrivateObjectStorage } from "./storage";
 import { importTestScenarioFlows } from "./testScenarioImport";
@@ -212,7 +213,7 @@ export async function runCapturePilot(input: {
       running.safeError = safePilotError(error);
     }
     await writeCheckpoint("failed");
-    await writePrivateJson(path.join(runRoot, "pilot-failure.json"), { schemaVersion: "1", manifestKey: manifest.key, runId, selection, attempts, error: safePilotError(error), diagnostics, state: repository.state, generatedAt: new Date().toISOString() });
+    await writePrivateJson(path.join(runRoot, "pilot-failure.json"), { schemaVersion: "1", manifestKey: manifest.key, runId, selection, attempts, error: safePilotError(error), diagnostics, repositorySummary: summarizeRepositoryState(repository.state), generatedAt: new Date().toISOString() });
     throw error;
   }
 
@@ -309,16 +310,21 @@ function summarizeInteractions(flow: ProductFlowRevision, presentation: CaptureP
   return { counts, presentation: { showPointer: presentation.showPointer, pointerMoveMs: presentation.pointerMoveMs, typingDelayMs: presentation.typingDelayMs } };
 }
 
+function summarizeRepositoryState(state: CapturePilotState) {
+  return { environments: state.environments.length, versions: state.versions.length, personas: state.personas.length, flows: state.flows.length, captureRuns: state.captureRuns.length, executions: state.executions.length, artifacts: state.artifacts.length, jobs: state.jobs.length, coverage: state.coverage.length };
+}
+
 function safePilotError(error: unknown): string {
   if (!(error instanceof Error)) return "Capture pilot failed.";
-  const message = error.message.replace(/[\r\n\t]+/g, " ").trim();
+  const message = redactCaptureDiagnostic(error.message);
   return message.length > 0 && message.length <= 500 ? message : "Capture pilot failed. Safe diagnostics are available in the private run artifacts.";
 }
 
 function safePilotDiagnostic(error: unknown): string {
   if (!(error instanceof Error)) return "Capture worker diagnostic was not an Error.";
-  const message = error.message.replace(/[\r\n\t]+/g, " ").trim();
-  if (/(?:password|passcode|secret|token|authorization|cookie|bearer|api[_ -]?key)\s*[:=]/i.test(message)) return "Capture worker diagnostic contained sensitive-shaped data and was redacted.";
+  const original = error.message.replace(/[\r\n\t]+/g, " ").trim();
+  const message = redactCaptureDiagnostic(original);
+  if (message !== original) return "Capture worker diagnostic contained sensitive-shaped data and was redacted.";
   return message.length > 0 && message.length <= 500 ? message : "Capture worker failed; the diagnostic exceeded the safe reporting limit.";
 }
 

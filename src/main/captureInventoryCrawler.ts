@@ -3,7 +3,9 @@ import { chromium, type Browser } from "playwright";
 import type { BrowserExecutionPolicy } from "../shared/productFlowCapture";
 import { validateCaptureNetworkDestination, type CaptureNetworkPolicyOptions } from "./captureNetworkPolicy";
 import type { AccessibleControlEvidence, RenderedPageEvidence } from "./flowDiscovery";
+import { assertCaptureMaskingReady, installCaptureMasking, validateCaptureMaskingPolicy, type CaptureMaskingPolicy } from "./captureMasking";
 import { stableSerialize } from "./productFlowCompiler";
+import { redactCaptureDiagnostic } from "./captureSupportBundle";
 
 export async function crawlRenderedInventory(input: {
   policy: BrowserExecutionPolicy;
@@ -13,15 +15,18 @@ export async function crawlRenderedInventory(input: {
   executablePath?: string;
   browser?: Browser;
   networkPolicyOptions?: CaptureNetworkPolicyOptions;
+  maskingPolicy?: CaptureMaskingPolicy;
 }): Promise<RenderedPageEvidence[]> {
   if (input.maxPages < 1 || input.maxPages > 100) throw new Error("Inventory page budget must be 1–100.");
   const ownsBrowser = !input.browser;
   const browser = input.browser ?? await chromium.launch({ headless: true, executablePath: input.executablePath });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "en-US", timezoneId: "UTC", reducedMotion: "reduce", acceptDownloads: false });
+  const maskingPolicy = validateCaptureMaskingPolicy(input.maskingPolicy);
   const queue = input.entryPaths.map((entry) => new URL(entry, input.policy.baseUrl).toString());
   const seen = new Set<string>();
   const evidence: RenderedPageEvidence[] = [];
   try {
+    await installCaptureMasking(context, maskingPolicy);
     await context.route("**/*", async (route) => {
       const url = route.request().url();
       if (url.startsWith("data:") || url.startsWith("blob:")) return route.continue();
@@ -39,7 +44,8 @@ export async function crawlRenderedInventory(input: {
       if (seen.has(normalized)) continue;
       seen.add(normalized);
       await page.goto(requested, { waitUntil: "domcontentloaded" });
-      const title = (await page.title()).trim().slice(0, 160) || new URL(page.url()).pathname;
+      await assertCaptureMaskingReady(page, maskingPolicy);
+      const title = redactCaptureDiagnostic((await page.title()).trim().slice(0, 160) || new URL(page.url()).pathname);
       const controls = await collectControls(page, input.maxControlsPerPage ?? 300);
       const structure = await page.locator("body").evaluate((body) => {
         const counts: Record<string, number> = {};
@@ -50,6 +56,7 @@ export async function crawlRenderedInventory(input: {
         return counts;
       });
       const accessibleSummary = controls.map(({ role, name, destinationPath }) => ({ role, name, destinationPath }));
+      await assertCaptureMaskingReady(page, maskingPolicy);
       const screenshotHash = sha256(await page.screenshot({ animations: "disabled", type: "png" }));
       evidence.push({
         id: `page:${sha256(normalized).slice(0, 24)}`,
@@ -79,8 +86,9 @@ async function collectControls(page: import("playwright").Page, limit: number): 
     const tag = element.tagName.toLowerCase();
     const explicitRole = element.getAttribute("role");
     const role = explicitRole === "tab" ? "tab" : tag === "a" ? "link" : tag === "button" ? "button" : tag === "select" ? "combobox" : "textbox";
-    const name = (element.getAttribute("aria-label") || element.getAttribute("title") || (element as HTMLInputElement).placeholder || element.textContent || "").trim().replace(/\s+/g, " ").slice(0, 160);
-    const destinationPath = tag === "a" ? (element as HTMLAnchorElement).href : undefined;
+    const masked = element.getAttribute("data-gideon-masked") === "true";
+    const name = masked ? "Masked control" : (element.getAttribute("aria-label") || element.getAttribute("title") || (element as HTMLInputElement).placeholder || element.textContent || "").trim().replace(/\s+/g, " ").slice(0, 160);
+    const destinationPath = tag === "a" && !masked ? (element as HTMLAnchorElement).href : undefined;
     return { role, name, destinationPath };
   }).filter((control) => control.name), limit) as AccessibleControlEvidence[];
   return raw.map((control) => ({ ...control, destinationPath: control.destinationPath ? inventoryUrl(control.destinationPath) : undefined }));

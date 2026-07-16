@@ -400,6 +400,8 @@ Secondary flows:
 - Durable locator ordering plus real-Chromium missing/hidden/ambiguous, stable-link, and named-landmark resolution.
 - Golden bounded-repair replay for harmless drift, material change, duplicate controls/proposals, unsafe provider fields, prompt-injection text, timeouts, attempt limits, and circuit breakers.
 - Fake discovery providers returning malformed, duplicated, ungrounded, route-drifting, approved, slow, or failed proposals.
+- Real-Chromium privacy masking for autofill, password/token/payment/email/personal-data inputs, hidden fields, visible secret-shaped text, canvas, custom selectors, scroll, responsive resize, modal transitions, invalid selectors, browser errors, PNG pixels, and recorded WebM pixels.
+- Support/report redaction for secret-shaped paths and filenames, traversal, symlinks, signed URLs, object keys, diagnostic values, audit metadata, exclusive no-follow output, and mode-0600 permissions.
 
 Hosted client and proxy-policy unit tests run with `pnpm test:web`. Playwright E2E files are excluded from Vitest discovery and included in strict TypeScript checking.
 

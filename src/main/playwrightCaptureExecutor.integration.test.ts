@@ -52,6 +52,10 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
         response.end(`<!doctype html><html><body><section aria-label="Personal"><button onclick="document.querySelector('output').textContent='Personal'">Continue</button></section><section aria-label="Workspace"><button onclick="document.querySelector('output').textContent='Workspace'">Continue</button></section><output></output></body></html>`);
         return;
       }
+      if (request.url?.startsWith("/privacy-receipt")) {
+        response.end(`<!doctype html><html><body><p>Contact founder@example.test</p></body></html>`);
+        return;
+      }
       if (request.url === "/personal-settings" || request.url === "/workspace-settings") {
         response.end(`<!doctype html><html><body><h1>${request.url === "/workspace-settings" ? "Workspace settings" : "Personal settings"}</h1></body></html>`);
         return;
@@ -225,6 +229,17 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     expect(result.receipt.steps[0]?.visualEvidence?.pageSignal).toBe(expectedSignal);
     expect(JSON.stringify(result.receipt.steps[0]?.visualEvidence)).not.toContain("Password");
     expect(JSON.stringify(result.receipt.steps[0]?.visualEvidence)).not.toContain("Loading fixture");
+  }, 20_000);
+
+  it("redacts sensitive assertion text from receipts while evaluating the approved assertion", async () => {
+    const flow = createFlow();
+    flow.steps = [{ id: "open-private-state", intent: "Open the synthetic private state.", action: { type: "navigate", path: "/privacy-receipt?email=founder%40example.test&token=tok_fixture_123456" }, riskClass: "navigate" }];
+    flow.finalAssertions = [{ type: "text", target: { strategy: "text", value: "founder@example.test" }, value: "founder@example.test" }];
+    const result = await executePlaywrightCapture({ id: "execution-private-receipt", workspaceId: "workspace-1", plan: compileProductFlow(flow, createPolicy(baseUrl)), policy: createPolicy(baseUrl), fixtureValues: {}, outputDir, recordVideo: false, executablePath, now: incrementingClock() });
+    expect(result.receipt.status).toBe("verified");
+    expect(result.receipt.finalAssertions[0]).toMatchObject({ assertion: { target: { value: "[masked]" }, value: "[masked]" }, passed: true });
+    expect(JSON.stringify(result.receipt)).not.toContain("founder@example.test");
+    expect(JSON.stringify(result.networkReceipts)).not.toMatch(/founder|tok_fixture|\?/);
   }, 20_000);
 });
 

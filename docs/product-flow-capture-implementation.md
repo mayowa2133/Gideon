@@ -16,6 +16,8 @@ The hostile synthetic browser target and fail-closed matrix are documented in [h
 
 Deterministic locator selection, provider budgets, safe page comparison, and revision-bound repair are documented in [capture-discovery-repair.md](./capture-discovery-repair.md).
 The exact Phase 6 local verification record is [capture-phase-6-evidence.md](./capture-phase-6-evidence.md).
+Pre-frame sensitive-region masking, privacy-safe receipts, and support-bundle redaction are documented in [capture-sensitive-masking.md](./capture-sensitive-masking.md).
+The exact Phase 7 local verification record is [capture-phase-7-evidence.md](./capture-phase-7-evidence.md).
 
 ## Implemented boundaries
 
@@ -23,12 +25,14 @@ The exact Phase 6 local verification record is [capture-phase-6-evidence.md](./c
 - Human approval is immutable and revision-bound. Compilation fails for drafts, stale approval, stale environment versions, disallowed domains, or elevated risk.
 - Environment validation performs DNS/private-network checks and a pinned-address HTTP/TLS reachability probe. Redirects are revalidated at every hop.
 - Disposable credential grants have a callback-only vault interface. The external-vault adapter persists only metadata and an opaque vault reference; the login adapter resolves the secret only while filling the approved form.
+- Isolated-runtime fixture values are staged through an opaque scoped grant and never serialized into the manifest. The grant is revoked after success or failure; credential-shaped keys remain forbidden and credentials stay behind the login-adapter vault.
 - Capture-run creation is idempotent. The server compiles current approved flows, hashes policy and plans, estimates quota usage, and atomically persists the generic job and capture run before queueing.
 - BullMQ capture jobs contain only workspace, project, run, and job IDs. Queue retries are bounded.
 - Remote capture is refused unless the runtime identifies itself as container or microVM isolated. `local_test` is accepted only for `local_preview` environments. Remote responses must include an attestation bound to the exact declarative manifest hash, declared isolation class, valid runtime instance ID, completion time, and the caller's pinned SHA-256 worker image digest before their browser receipt or recording is trusted.
 - Every flow resets before both dry run and recording. Failed dry runs stop before recording; failed assertions produce review state instead of successful clips.
 - Playwright replay uses fixed viewport, locale, timezone, color scheme, reduced motion, disabled downloads, and per-request network-policy checks.
 - Browser action timeouts are explicit and bounded. Geometry collection checks visibility before attempting scroll alignment, so hidden modals and controls cannot consume the timeout after every step.
+- Every browser and inventory context installs a hash-bound strict masking policy before page creation. Password, token, payment, email, personal-data, visible secret-shaped text, custom selectors, and canvas regions are obscured and continuously realigned; masking is audited before screenshots/actions and at completion, and unavailable/incomplete masking fails closed.
 - Successful step receipts include schema-validated geometry-only visual evidence: viewport and optional action, visible-result, and modal bounds. Receipts never add selector values, DOM text, fixture values, or screenshots to framing telemetry; isolated-runtime responses are revalidated before use.
 - Raw WebM, verification receipt, network/action telemetry, normalized H.264 clip, assembly manifest, and composite source recording are private artifacts with hashes and lineage. Explicit assembly jobs preserve the user's selected clip order before activation.
 - Pilot vertical renders compile that evidence into a versioned `capture-framing-v1` manifest. Automatic focus prefers a verified visible result, then a modal, then the action target; it uses a bounded 1–2× source-aspect crop and deterministic interpolated pan window. Missing evidence fails safely to the established full-frame presentation. Operators may explicitly select full-frame or provide a validated normalized manual region.
@@ -49,6 +53,7 @@ The exact Phase 6 local verification record is [capture-phase-6-evidence.md](./c
 - Environment validation and discovery are durable asynchronous jobs. Remote discovery refuses a local browser runtime.
 - Capture completion automatically persists an honest coverage snapshot; dimensions without a trustworthy inventory remain unknown.
 - Capture audit events use fixed summaries and reject secret-shaped metadata. User actions and worker completion actions retain their actor type.
+- Assertion receipts redact sensitive-shaped text after evaluation. Isolated/local workers reject privacy-unsafe receipts, masking receipts retain counts/hashes only, pilot failure files retain repository counts instead of state, and mode-0600 support reports exclude media, credentials, selectors, private paths, object keys, signed URLs, and raw prompts.
 - Clip previews use separately authorized, short-lived, no-store signed URLs for verified normalized clips only.
 - The hosted Next.js workspace lists projects, checks session and capture capabilities, manages environment/persona/disposable-login setup, runs discovery, supports revision-safe proposal edits and approval, launches/cancels capture, previews verified clips, reports honest coverage, retries failed flows, and explicitly orders/activates an assembly.
 - Opaque discovery/capture run IDs are retained per project in browser storage so a reload can re-authorize and resume status polling; credentials, media URLs, and signed previews are never persisted there.
@@ -71,6 +76,7 @@ The exact Phase 6 local verification record is [capture-phase-6-evidence.md](./c
 - `src/main/captureNetworkPolicy.ts` and `captureEnvironmentProbe.ts`: SSRF, DNS, redirect, and reachability policy.
 - `src/main/flowDiscovery.ts`, `captureInventoryCrawler.ts`, `repositoryEvidence.ts`, and `testScenarioImport.ts`: bounded discovery inputs and provider policy.
 - `src/main/captureLocators.ts`, `capturePageComparison.ts`, and `flowRepair.ts`: durable locator selection, safe drift classification, and revision-bound repair.
+- `src/main/captureMasking.ts` and `captureSupportBundle.ts`: pre-frame visual masking, safe masking attestation, receipt/diagnostic redaction, and private support reports.
 - `src/main/captureCoverageInventory.ts` and `captureCoverage.ts`: versioned bounded denominator compilation, semantic identity/freshness, and multi-dimensional coverage calculation.
 - `migrations/0004_product_flow_capture.sql`: PostgreSQL schema.
 - `apps/web`: hosted Next.js project launcher, capture workspace, same-origin API proxy, typed client, unit tests, and Playwright E2E journey.
