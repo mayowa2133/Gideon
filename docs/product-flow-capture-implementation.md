@@ -14,6 +14,9 @@ The retained runs can be audited without replay or provider access using `pnpm c
 
 The hostile synthetic browser target and fail-closed matrix are documented in [hostile-capture-fixture.md](./hostile-capture-fixture.md). `pnpm capture:hostile:check` verifies complex permitted flows and dangerous-action traps without contacting a provider or non-loopback service.
 
+Deterministic locator selection, provider budgets, safe page comparison, and revision-bound repair are documented in [capture-discovery-repair.md](./capture-discovery-repair.md).
+The exact Phase 6 local verification record is [capture-phase-6-evidence.md](./capture-phase-6-evidence.md).
+
 ## Implemented boundaries
 
 - Runtime-validated flow revisions support only bounded navigation, click, fixture fill/select, approved keys, waits, and observable assertions. Generated code and unknown fields are rejected.
@@ -34,13 +37,14 @@ The hostile synthetic browser target and fail-closed matrix are documented in [h
 - Cooperative cancellation is checked between expensive stages, deletes the private work directory, and exposes cleanup hooks for temporary capabilities.
 - Project deletion has a workspace-scoped transactional PostgreSQL purge path for capture rows and returns opaque vault references for external secret destruction and reconciliation.
 - Deterministic discovery follows rendered same-origin links without clicking controls or submitting forms. It normalizes opaque route IDs and removes query values.
-- Model-guided discovery receives trusted policy separately from untrusted evidence. Outputs remain drafts, are schema validated, cannot self-approve, and cannot exceed allowed risks.
+- Model-guided discovery receives trusted policy separately from untrusted evidence. Outputs remain drafts, are schema validated, cannot self-approve, cannot exceed allowed risks or evidence scope, and are bounded by attempts, timeout, candidate count, duplicate rejection, and a cooling circuit breaker.
 - Repository evidence extraction is read-only and structural. It excludes environment/secret/key files, dependencies, build output, binaries, symlinks, and oversized files and never executes repository code.
 - Declarative Playwright/Cypress manifests import as drafts. Arbitrary test code is never evaluated.
 - Usage evidence drops unknown properties and suppresses low-volume sequences before ranking.
 - Coverage reports dimensions independently against a semantic-hashed `capture-coverage-inventory-v1`. Repository routes, rendered navigation, imported declarative tests, and manifest declarations may contribute bounded evidence; missing or untrusted denominators remain `unknown`.
 - `capture-coverage-v2` binds inventory, environment, policy, fixture, persona, and approved-flow revisions. Reads reevaluate freshness, and the hosted UI suppresses percentages for stale, unknown, or untrusted denominators.
-- Bounded repair changes only locators or wait assertions on failed steps and creates a new draft revision for human review.
+- Action locators are durability-ranked and visible-match counted before recording. Associated labels, stable link destinations, exact accessible roles, test IDs, named landmarks, placeholders, and text are supported; missing, hidden, and ambiguous targets fail with stable codes rather than selecting the first match.
+- Bounded repair compares path, safe accessibility-control similarity, DOM structure, and locally scored screenshots. It changes only a uniquely evidenced locator or wait assertion on a failed step. Every result is a new draft revision; material application changes skip provider repair and require human review.
 - Capture mutations have CSRF, workspace authorization, strict validation, and per-workspace/user rate limiting. Expensive capture creation requires `Idempotency-Key` and exposes a quota hook before enqueue.
 - Environment validation and discovery are durable asynchronous jobs. Remote discovery refuses a local browser runtime.
 - Capture completion automatically persists an honest coverage snapshot; dimensions without a trustworthy inventory remain unknown.
@@ -65,7 +69,8 @@ The hostile synthetic browser target and fail-closed matrix are documented in [h
 - `src/main/captureVideoQuality.ts` and `captureQualityThresholds.json`: versioned deterministic frame/presentation quality checks, contact sheets, and ready/warning/failed gating.
 - `src/main/isolatedCaptureRuntime.ts`: container/microVM client boundary.
 - `src/main/captureNetworkPolicy.ts` and `captureEnvironmentProbe.ts`: SSRF, DNS, redirect, and reachability policy.
-- `src/main/flowDiscovery.ts`, `captureInventoryCrawler.ts`, `repositoryEvidence.ts`, and `testScenarioImport.ts`: discovery inputs.
+- `src/main/flowDiscovery.ts`, `captureInventoryCrawler.ts`, `repositoryEvidence.ts`, and `testScenarioImport.ts`: bounded discovery inputs and provider policy.
+- `src/main/captureLocators.ts`, `capturePageComparison.ts`, and `flowRepair.ts`: durable locator selection, safe drift classification, and revision-bound repair.
 - `src/main/captureCoverageInventory.ts` and `captureCoverage.ts`: versioned bounded denominator compilation, semantic identity/freshness, and multi-dimensional coverage calculation.
 - `migrations/0004_product_flow_capture.sql`: PostgreSQL schema.
 - `apps/web`: hosted Next.js project launcher, capture workspace, same-origin API proxy, typed client, unit tests, and Playwright E2E journey.

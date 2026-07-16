@@ -137,26 +137,69 @@ export interface FlowReasoningProvider {
   }): Promise<unknown[]>;
 }
 
+export class FlowDiscoveryRejectedError extends Error {
+  constructor(readonly code: string, message: string) { super(message); }
+}
+
+export class FlowDiscoveryCircuitBreaker {
+  private failures = 0;
+  private openedAt: number | null = null;
+  constructor(private readonly threshold = 3, private readonly cooldownMs = 60_000) {
+    if (!Number.isInteger(threshold) || threshold < 1 || threshold > 20 || !Number.isInteger(cooldownMs) || cooldownMs < 1_000 || cooldownMs > 3_600_000) throw new Error("Discovery circuit-breaker configuration is invalid.");
+  }
+  assertAvailable(nowMs: number): void {
+    if (this.openedAt === null) return;
+    if (nowMs - this.openedAt >= this.cooldownMs) { this.failures = 0; this.openedAt = null; return; }
+    throw new FlowDiscoveryRejectedError("discovery_circuit_open", "Discovery provider circuit is open.");
+  }
+  success(): void { this.failures = 0; this.openedAt = null; }
+  failure(nowMs: number): void { this.failures += 1; if (this.failures >= this.threshold) this.openedAt = nowMs; }
+}
+
 export async function discoverModelGuidedFlows(input: {
   bundle: DiscoveryEvidenceBundle;
   provider: FlowReasoningProvider;
   promptVersion: string;
-}): Promise<{ candidates: DiscoveredFlowCandidate[]; receipt: { provider: string; model: string; promptVersion: string; evidenceHash: string; promptInjectionSignalIds: string[] } }> {
+  attempt?: number;
+  maxAttempts?: number;
+  timeoutMs?: number;
+  circuitBreaker?: FlowDiscoveryCircuitBreaker;
+  nowMs?: () => number;
+}): Promise<{ candidates: DiscoveredFlowCandidate[]; receipt: { provider: string; model: string; promptVersion: string; evidenceHash: string; promptInjectionSignalIds: string[]; attempt: number; maxAttempts: number; timeoutMs: number; candidateCount: number } }> {
   verifyEvidenceHash(input.bundle);
-  const proposals = await input.provider.propose({
-    trustedInstructions: { schemaVersion: "1", allowedActionTypes: ["navigate", "click", "fill", "select", "key", "wait_for"], allowedRisks: input.bundle.allowedRisks, maxCandidates: input.bundle.maxCandidates },
-    untrustedEvidence: structuredClone(input.bundle)
-  });
-  if (!Array.isArray(proposals) || proposals.length > input.bundle.maxCandidates) throw new Error("Reasoning provider returned an invalid candidate count.");
-  const candidates = proposals.map((proposal, index) => {
-    const flow = parseProductFlowRevision(proposal);
-    if (flow.projectId !== input.bundle.projectId || flow.environmentVersionId !== input.bundle.environmentVersionId) throw new Error("Reasoning provider returned a flow outside the discovery scope.");
-    if (flow.approval.status !== "draft") throw new Error("Reasoning provider cannot approve product flows.");
-    if (!input.bundle.personas.some((persona) => persona.id === flow.personaId)) throw new Error("Reasoning provider returned an unknown persona.");
-    if (flow.steps.some((step) => !input.bundle.allowedRisks.includes(step.riskClass))) throw new Error("Reasoning provider returned a disallowed risk class.");
-    return { id: flow.id, flow, sourceSignals: ["model" as const], ranking: { userPriority: 0, repositorySupport: 0, usageFrequency: 0, marketingProofPotential: 0, riskPenalty: 0, total: 0 }, confidence: 0.5, assumptions: [`Model proposal ${index + 1} requires deterministic dry-run verification.`] };
-  });
-  return { candidates, receipt: { provider: input.provider.provider, model: input.provider.model, promptVersion: input.promptVersion, evidenceHash: input.bundle.evidenceHash, promptInjectionSignalIds: detectPromptInjectionSignals(input.bundle) } };
+  const attempt = whole(input.attempt ?? 1, 1, 100, "attempt");
+  const maxAttempts = whole(input.maxAttempts ?? 2, 1, 5, "maximum attempts");
+  const timeoutMs = whole(input.timeoutMs ?? 8_000, 250, 30_000, "provider timeout");
+  if (attempt > maxAttempts) throw new FlowDiscoveryRejectedError("discovery_attempt_budget_exhausted", "Discovery provider attempt budget is exhausted.");
+  const provider = bounded(input.provider.provider, 100);
+  const model = bounded(input.provider.model, 200);
+  const promptVersion = bounded(input.promptVersion, 100);
+  const nowMs = input.nowMs ?? Date.now;
+  try {
+    input.circuitBreaker?.assertAvailable(nowMs());
+    const proposals = await timeout(input.provider.propose({
+      trustedInstructions: { schemaVersion: "1", allowedActionTypes: ["navigate", "click", "fill", "select", "key", "wait_for"], allowedRisks: input.bundle.allowedRisks, maxCandidates: input.bundle.maxCandidates },
+      untrustedEvidence: structuredClone(input.bundle)
+    }), timeoutMs);
+    if (!Array.isArray(proposals) || proposals.length < 1 || proposals.length > input.bundle.maxCandidates) throw new FlowDiscoveryRejectedError("discovery_invalid_output", "Reasoning provider returned an invalid candidate count.");
+    const candidates = proposals.map((proposal, index) => {
+      let flow: ProductFlowRevision;
+      try { flow = parseProductFlowRevision(proposal); } catch { throw new FlowDiscoveryRejectedError("discovery_invalid_output", "Reasoning provider returned a malformed flow."); }
+      if (flow.projectId !== input.bundle.projectId || flow.environmentVersionId !== input.bundle.environmentVersionId) throw new FlowDiscoveryRejectedError("discovery_scope_expanded", "Reasoning provider returned a flow outside the discovery scope.");
+      if (flow.approval.status !== "draft") throw new FlowDiscoveryRejectedError("discovery_approval_escalation", "Reasoning provider cannot approve product flows.");
+      if (!input.bundle.personas.some((persona) => persona.id === flow.personaId)) throw new FlowDiscoveryRejectedError("discovery_unknown_persona", "Reasoning provider returned an unknown persona.");
+      if (flow.steps.some((step) => !input.bundle.allowedRisks.includes(step.riskClass))) throw new FlowDiscoveryRejectedError("discovery_risk_escalation", "Reasoning provider returned a disallowed risk class.");
+      assertEvidenceGrounded(flow, input.bundle);
+      return { id: flow.id, flow, sourceSignals: ["model" as const], ranking: { userPriority: 0, repositorySupport: 0, usageFrequency: 0, marketingProofPotential: 0, riskPenalty: 0, total: 0 }, confidence: 0.5, assumptions: [`Model proposal ${index + 1} requires deterministic dry-run verification.`] };
+    });
+    if (new Set(candidates.map((candidate) => candidate.id)).size !== candidates.length) throw new FlowDiscoveryRejectedError("discovery_duplicate_candidate", "Reasoning provider returned duplicate flow IDs.");
+    input.circuitBreaker?.success();
+    return { candidates, receipt: { provider, model, promptVersion, evidenceHash: input.bundle.evidenceHash, promptInjectionSignalIds: detectPromptInjectionSignals(input.bundle), attempt, maxAttempts, timeoutMs, candidateCount: candidates.length } };
+  } catch (error) {
+    input.circuitBreaker?.failure(nowMs());
+    if (error instanceof FlowDiscoveryRejectedError) throw error;
+    throw new FlowDiscoveryRejectedError("discovery_provider_failed", "Discovery provider failed.");
+  }
 }
 
 export function detectPromptInjectionSignals(bundle: DiscoveryEvidenceBundle): string[] {
@@ -207,6 +250,24 @@ function normalizeRoute(value: string): string {
   return path.startsWith("/") ? path.slice(0, 2000) : `/${path}`;
 }
 
+function assertEvidenceGrounded(flow: ProductFlowRevision, bundle: DiscoveryEvidenceBundle): void {
+  const evidenceIds = new Set([
+    ...bundle.goals.map((goal) => goal.id),
+    ...bundle.renderedPages.map((page) => page.id),
+    ...(bundle.repository?.routePaths.map((route) => `repo-route:${normalizeRoute(route.path)}`) ?? []),
+    ...(bundle.repository?.tests.map((test) => `repo-test:${test.id}`) ?? []),
+    ...(bundle.usageSequences?.map((sequence) => sequence.id) ?? [])
+  ]);
+  if (flow.sourceEvidenceIds.some((id) => !evidenceIds.has(id))) throw new FlowDiscoveryRejectedError("discovery_ungrounded_evidence", "Reasoning provider cited evidence outside the bounded bundle.");
+  const routes = new Set(routeInventory(bundle).map((route) => route.path));
+  const controls = new Set(bundle.renderedPages.flatMap((page) => page.controls.map((control) => normalizedText(control.name))));
+  for (const step of flow.steps) {
+    const action = step.action;
+    if (action.type === "navigate" && !routes.has(normalizeRoute(action.path))) throw new FlowDiscoveryRejectedError("discovery_route_drift", "Reasoning provider proposed a route absent from bounded evidence.");
+    if ((action.type === "click" || action.type === "fill" || action.type === "select") && (!action.target || !controls.has(normalizedText(action.target.value)))) throw new FlowDiscoveryRejectedError("discovery_control_drift", "Reasoning provider proposed a control absent from bounded evidence.");
+  }
+}
+
 function bestGoalForRoute(goals: DiscoveryEvidenceBundle["goals"], text: string) {
   const words = new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 2));
   return [...goals].sort((left, right) => scoreGoal(right, words) - scoreGoal(left, words))[0];
@@ -217,4 +278,7 @@ function humanizeRoute(route: string) { return route.split("/").filter(Boolean).
 function verifyEvidenceHash(bundle: DiscoveryEvidenceBundle) { const { evidenceHash, ...withoutHash } = bundle; if (sha256(stableSerialize(withoutHash)) !== evidenceHash) throw new Error("Discovery evidence hash does not match its contents."); }
 function bounded(value: string, max: number) { const normalized = value.trim().replace(/[\u0000-\u001f\u007f]/g, " "); if (!normalized || normalized.length > max) throw new Error("Discovery evidence field is invalid."); return normalized; }
 function clamp(value: number, min: number, max: number) { if (!Number.isFinite(value)) return min; return Math.max(min, Math.min(max, Math.trunc(value))); }
+function whole(value: number, min: number, max: number, label: string) { if (!Number.isInteger(value) || value < min || value > max) throw new Error(`Discovery ${label} is invalid.`); return value; }
+function normalizedText(value: string) { return value.trim().replace(/\s+/g, " ").toLowerCase(); }
+function timeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> { return new Promise((resolve, reject) => { const timer = setTimeout(() => reject(new FlowDiscoveryRejectedError("discovery_provider_timeout", "Discovery provider timed out.")), timeoutMs); promise.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); }); }); }
 function sha256(value: string) { return createHash("sha256").update(value).digest("hex"); }

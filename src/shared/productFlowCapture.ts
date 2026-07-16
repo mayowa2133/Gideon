@@ -22,9 +22,12 @@ export type AllowedBrowserKey =
   | "Space";
 
 export interface LocatorSpec {
-  strategy: "role" | "label" | "test_id" | "placeholder" | "text";
+  strategy: "role" | "label" | "test_id" | "stable_link" | "structural" | "placeholder" | "text";
   value: string;
   role?: "button" | "link" | "textbox" | "combobox" | "checkbox" | "radio" | "tab" | "menuitem" | "heading";
+  destinationPath?: string;
+  scopeRole?: "navigation" | "region" | "dialog" | "form" | "main";
+  scopeName?: string;
   exact?: boolean;
 }
 
@@ -368,7 +371,7 @@ export interface FlowExecutionRecord {
   updatedAt: string;
 }
 
-const locatorStrategies = new Set<LocatorSpec["strategy"]>(["role", "label", "test_id", "placeholder", "text"]);
+const locatorStrategies = new Set<LocatorSpec["strategy"]>(["role", "label", "test_id", "stable_link", "structural", "placeholder", "text"]);
 const locatorRoles = new Set<NonNullable<LocatorSpec["role"]>>([
   "button",
   "link",
@@ -380,6 +383,7 @@ const locatorRoles = new Set<NonNullable<LocatorSpec["role"]>>([
   "menuitem",
   "heading"
 ]);
+const locatorScopeRoles = new Set<NonNullable<LocatorSpec["scopeRole"]>>(["navigation", "region", "dialog", "form", "main"]);
 const actionRisks = new Set<BrowserActionRisk>([
   "observe",
   "navigate",
@@ -698,13 +702,26 @@ function validateLocator(value: unknown, path: string, errors: string[]): void {
     errors.push(`${path} must be an object.`);
     return;
   }
-  rejectUnknownKeys(value, ["strategy", "value", "role", "exact"], path, errors);
+  rejectUnknownKeys(value, ["strategy", "value", "role", "destinationPath", "scopeRole", "scopeName", "exact"], path, errors);
   if (!locatorStrategies.has(value.strategy as LocatorSpec["strategy"])) errors.push(`${path}.strategy is invalid.`);
   validateBoundedString(value.value, `${path}.value`, 1, 300, errors);
   if (value.role !== undefined && !locatorRoles.has(value.role as NonNullable<LocatorSpec["role"]>)) {
     errors.push(`${path}.role is invalid.`);
   }
-  if (value.strategy === "role" && value.role === undefined) errors.push(`${path}.role is required for role strategy.`);
+  if (value.scopeRole !== undefined && !locatorScopeRoles.has(value.scopeRole as NonNullable<LocatorSpec["scopeRole"]>)) errors.push(`${path}.scopeRole is invalid.`);
+  if ((value.strategy === "role" || value.strategy === "structural") && value.role === undefined) errors.push(`${path}.role is required for ${String(value.strategy)} strategy.`);
+  if (value.strategy === "stable_link") {
+    if (value.role !== undefined && value.role !== "link") errors.push(`${path}.role must be link for stable_link strategy.`);
+    if (typeof value.destinationPath !== "string" || !/^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]{0,1999}$/.test(value.destinationPath)) errors.push(`${path}.destinationPath is invalid.`);
+  } else if (value.destinationPath !== undefined) {
+    errors.push(`${path}.destinationPath is allowed only for stable_link strategy.`);
+  }
+  if (value.strategy === "structural") {
+    if (value.scopeRole === undefined) errors.push(`${path}.scopeRole is required for structural strategy.`);
+    validateBoundedString(value.scopeName, `${path}.scopeName`, 1, 160, errors);
+  } else if (value.scopeRole !== undefined || value.scopeName !== undefined) {
+    errors.push(`${path} scope fields are allowed only for structural strategy.`);
+  }
   if (value.exact !== undefined && typeof value.exact !== "boolean") errors.push(`${path}.exact must be boolean.`);
 }
 
@@ -769,7 +786,7 @@ function valueReferenceKind(value: string): "fixture" | "credential" | null {
 }
 
 function locatorText(locator: LocatorSpec): string {
-  return `${locator.role ?? ""} ${locator.value}`.trim();
+  return `${locator.scopeRole ?? ""} ${locator.scopeName ?? ""} ${locator.role ?? ""} ${locator.value} ${locator.destinationPath ?? ""}`.trim();
 }
 
 function normalizeHostname(value: string): string {

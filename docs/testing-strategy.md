@@ -397,6 +397,9 @@ Secondary flows:
 - Archived project read-only behavior.
 - Structured capture session/capability initialization and fail-closed missing-isolation behavior.
 - Structured flow edit into a new draft revision, explicit approval, discovery/capture polling, private preview creation, honest coverage, and explicit assembly activation (`pnpm test:e2e`).
+- Durable locator ordering plus real-Chromium missing/hidden/ambiguous, stable-link, and named-landmark resolution.
+- Golden bounded-repair replay for harmless drift, material change, duplicate controls/proposals, unsafe provider fields, prompt-injection text, timeouts, attempt limits, and circuit breakers.
+- Fake discovery providers returning malformed, duplicated, ungrounded, route-drifting, approved, slow, or failed proposals.
 
 Hosted client and proxy-policy unit tests run with `pnpm test:web`. Playwright E2E files are excluded from Vitest discovery and included in strict TypeScript checking.
 

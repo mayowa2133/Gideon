@@ -40,6 +40,22 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
         response.end(`<!doctype html><html><body><div role="progressbar">Loading fixture</div></body></html>`);
         return;
       }
+      if (request.url === "/ambiguous") {
+        response.end(`<!doctype html><html><body><button>Continue</button><button>Continue</button></body></html>`);
+        return;
+      }
+      if (request.url === "/durable") {
+        response.end(`<!doctype html><html><body><nav aria-label="Personal"><a href="/personal-settings">Settings</a></nav><nav aria-label="Workspace"><a href="/workspace-settings">Settings</a></nav></body></html>`);
+        return;
+      }
+      if (request.url === "/structural") {
+        response.end(`<!doctype html><html><body><section aria-label="Personal"><button onclick="document.querySelector('output').textContent='Personal'">Continue</button></section><section aria-label="Workspace"><button onclick="document.querySelector('output').textContent='Workspace'">Continue</button></section><output></output></body></html>`);
+        return;
+      }
+      if (request.url === "/personal-settings" || request.url === "/workspace-settings") {
+        response.end(`<!doctype html><html><body><h1>${request.url === "/workspace-settings" ? "Workspace settings" : "Personal settings"}</h1></body></html>`);
+        return;
+      }
       response.end(`<!doctype html><html><body><a href="/new">New project</a></body></html>`);
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -174,6 +190,31 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
       actionTimeoutMs: 499
     })).rejects.toThrow("actionTimeoutMs must be an integer from 500 to 30000");
   });
+
+  it("detects ambiguous visible locators before executing an action", async () => {
+    const flow = createFlow();
+    flow.startingState.entryPath = "/ambiguous";
+    flow.steps = [{ id: "ambiguous", intent: "Do not guess between duplicate controls.", action: { type: "click", target: { strategy: "role", role: "button", value: "Continue", exact: true } }, riskClass: "navigate" }];
+    flow.finalAssertions = [{ type: "url", path: "/ambiguous" }];
+    const result = await executePlaywrightCapture({ id: "execution-ambiguous", workspaceId: "workspace-1", plan: compileProductFlow(flow, createPolicy(baseUrl)), policy: createPolicy(baseUrl), fixtureValues: {}, outputDir, recordVideo: false, executablePath, actionTimeoutMs: 2_000, now: incrementingClock() });
+    expect(result.receipt).toMatchObject({ status: "failed", steps: [{ status: "failed", safeErrorCode: "locator_ambiguous" }] });
+  }, 10_000);
+
+  it("resolves stable-link and landmark-scoped structural locators", async () => {
+    const stable = createFlow();
+    stable.startingState.entryPath = "/durable";
+    stable.steps = [{ id: "settings", intent: "Open workspace settings.", action: { type: "click", target: { strategy: "stable_link", value: "Settings", destinationPath: "/workspace-settings", exact: true } }, riskClass: "navigate" }];
+    stable.finalAssertions = [{ type: "url", path: "/workspace-settings" }];
+    const stableResult = await executePlaywrightCapture({ id: "execution-stable-link", workspaceId: "workspace-1", plan: compileProductFlow(stable, createPolicy(baseUrl)), policy: createPolicy(baseUrl), fixtureValues: {}, outputDir, recordVideo: false, executablePath, actionTimeoutMs: 2_000, now: incrementingClock() });
+    expect(stableResult.receipt.status).toBe("verified");
+
+    const structural = createFlow();
+    structural.startingState.entryPath = "/structural";
+    structural.steps = [{ id: "workspace-continue", intent: "Continue within the workspace region.", action: { type: "click", target: { strategy: "structural", scopeRole: "region", scopeName: "Workspace", role: "button", value: "Continue", exact: true } }, riskClass: "navigate" }];
+    structural.finalAssertions = [{ type: "text", target: { strategy: "text", value: "Workspace", exact: true }, value: "Workspace" }];
+    const structuralResult = await executePlaywrightCapture({ id: "execution-structural", workspaceId: "workspace-1", plan: compileProductFlow(structural, createPolicy(baseUrl)), policy: createPolicy(baseUrl), fixtureValues: {}, outputDir, recordVideo: false, executablePath, actionTimeoutMs: 2_000, now: incrementingClock() });
+    expect(structuralResult.receipt.status).toBe("verified");
+  }, 15_000);
 
   it.each([["/login-state", "login"], ["/loading-state", "loading"]] as const)("classifies %s without retaining page text", async (route, expectedSignal) => {
     const flow = createFlow();
