@@ -10,6 +10,7 @@ import type {
   ProductFlowRevision
 } from "../shared/productFlowCapture";
 import type { PostgresQuery } from "./persistence";
+import { stableSerialize } from "./productFlowCompiler";
 
 interface JsonRecordRow<T> {
   record_json: T | string;
@@ -228,7 +229,7 @@ export class PostgresCaptureRepository {
       ],
       "product flow revision"
     );
-    if (JSON.stringify(immutableRevision) !== JSON.stringify(input.flow)) {
+    if (stableSerialize(immutableRevision) !== stableSerialize(input.flow)) {
       throw new Error("Product flow revision is immutable.");
     }
     return this.upsertRecord<ProductFlowRevision>(

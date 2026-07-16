@@ -93,6 +93,14 @@ describe("PostgresJobArtifactRepository", () => {
     expect(calls[0]?.values).toEqual(["workspace-1", "export-1"]);
   });
 
+  it("deletes artifacts only through workspace and project scope", async () => {
+    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const repository = new PostgresJobArtifactRepository(createQuery(calls, createArtifact()));
+    await repository.deleteArtifact({ workspaceId: "workspace-1", projectId: "project-1", artifactId: "artifact-1" });
+    expect(calls[0]?.text).toContain("where workspace_id=$1 and project_id=$2 and id=$3");
+    expect(calls[0]?.values).toEqual(["workspace-1", "project-1", "artifact-1"]);
+  });
+
   it("keeps the migration focused on jobs and artifacts", async () => {
     const migrationPath = path.join(process.cwd(), "migrations/0001_hosted_jobs_artifacts.sql");
     const migration = readFileSync(migrationPath, "utf8");

@@ -17,7 +17,7 @@ The hostile synthetic browser target and fail-closed matrix are documented in [h
 Deterministic locator selection, provider budgets, safe page comparison, and revision-bound repair are documented in [capture-discovery-repair.md](./capture-discovery-repair.md).
 The exact Phase 6 local verification record is [capture-phase-6-evidence.md](./capture-phase-6-evidence.md).
 Pre-frame sensitive-region masking, privacy-safe receipts, and support-bundle redaction are documented in [capture-sensitive-masking.md](./capture-sensitive-masking.md).
-The exact Phase 8 local verification record is [capture-phase-8-evidence.md](./capture-phase-8-evidence.md).
+The exact Phase 9 local verification record is [capture-phase-9-evidence.md](./capture-phase-9-evidence.md).
 
 ## Implemented boundaries
 
@@ -41,6 +41,8 @@ The exact Phase 8 local verification record is [capture-phase-8-evidence.md](./c
 - Media processing uses argument-array FFmpeg invocation with no shell interpolation. It verifies checksums and codec/profile and rejects mostly blank captures.
 - Cooperative cancellation is checked between expensive stages, deletes the private work directory, and exposes cleanup hooks for temporary capabilities.
 - Project deletion has a workspace-scoped transactional PostgreSQL purge path for capture rows and returns opaque vault references for external secret destruction and reconciliation.
+- Project deletion now also inventories and transactionally removes scoped job, upload-session, and artifact rows, then reconciles private objects and secrets through provider adapters. Public receipts contain only counts and hashes; failed targets go only to a retry callback. Retention planning supports bounded age, legal hold, missing-object/orphan detection, object-first deletion, and preservation of database lineage on storage failure.
+- Usage recording conflicts on `(workspace_id, idempotency_key)` and returns the original immutable event, so worker retries cannot double-account and one workspace cannot suppress another. Signed preview authorization rechecks both workspace and project on execution and artifact records.
 - Deterministic discovery follows rendered same-origin links without clicking controls or submitting forms. It normalizes opaque route IDs and removes query values.
 - Model-guided discovery receives trusted policy separately from untrusted evidence. Outputs remain drafts, are schema validated, cannot self-approve, cannot exceed allowed risks or evidence scope, and are bounded by attempts, timeout, candidate count, duplicate rejection, and a cooling circuit breaker.
 - Repository evidence extraction is read-only and structural. It excludes environment/secret/key files, dependencies, build output, binaries, symlinks, and oversized files and never executes repository code.
@@ -79,6 +81,7 @@ The exact Phase 8 local verification record is [capture-phase-8-evidence.md](./c
 - `src/main/flowDiscovery.ts`, `captureInventoryCrawler.ts`, `repositoryEvidence.ts`, and `testScenarioImport.ts`: bounded discovery inputs and provider policy.
 - `src/main/captureLocators.ts`, `capturePageComparison.ts`, and `flowRepair.ts`: durable locator selection, safe drift classification, and revision-bound repair.
 - `src/main/captureMasking.ts` and `captureSupportBundle.ts`: pre-frame visual masking, safe masking attestation, receipt/diagnostic redaction, and private support reports.
+- `src/main/captureArtifactReconciliation.ts` and `captureDeletion.ts`: retention/legal-hold planning, drift evidence, object-first lifecycle cleanup, project-graph purge, and safe retry receipts.
 - `src/main/captureCoverageInventory.ts` and `captureCoverage.ts`: versioned bounded denominator compilation, semantic identity/freshness, and multi-dimensional coverage calculation.
 - `migrations/0004_product_flow_capture.sql`: PostgreSQL schema.
 - `apps/web`: hosted Next.js project launcher, capture workspace, same-origin API proxy, typed client, unit tests, and Playwright E2E journey.
@@ -94,7 +97,7 @@ The exact Phase 8 local verification record is [capture-phase-8-evidence.md](./c
 The code deliberately does not fall back to a local browser for remote products. Production must provide:
 
 1. Deploy and runtime-exercise the supplied browser/proxy definition (or equivalent managed microVM pool), then have the orchestrator return the strict version-2 attestation only after extracting approved artifacts and destroying the runtime instance. Docker was unavailable during local Phase 8 verification, so repository policy and contracts are proven but live container enforcement is not.
-2. PostgreSQL migration `0004_product_flow_capture.sql`, Redis/BullMQ, and private S3/R2 storage.
+2. Deploy PostgreSQL migrations, Redis/BullMQ, and private S3/R2 storage. The exact five migrations and real BullMQ paths pass against disposable local PostgreSQL 16 and Redis 8; S3-compatible signing/upload/download/delete behavior passes against an in-process private HTTP fixture, not a deployed MinIO/cloud bucket.
 3. An external secret-store implementation and credential metadata repository.
 4. Reset adapters and reviewed login adapters for enabled environments.
 5. Capture quota/entitlement and usage-recording callbacks.
@@ -112,7 +115,7 @@ The hosted API includes asynchronous environment validation and discovery create
 
 ## Verification
 
-`pnpm test:capture` covers policy, SSRF/DNS/redirect behavior, credentials, real Chromium replay, the hostile complex fixture, dangerous-action side-effect counters, geometry-only step evidence, framing compilation/fallback, focused FFmpeg rendering, black/blank/frozen/rushed/unreadable/caption-overflow/browser-error quality fixtures, deterministic crawling, login, real FFmpeg normalization, discovery, prompt-like evidence, repair, repository/test import, coverage, queueing, idempotency, cancellation, persistence, isolation manifests, baseline evidence redaction, and service scoping. `pnpm test:web` covers the typed client and proxy policy. `pnpm test:e2e` covers session/capability gating plus safe quality warnings in the edit → approve → discover → capture → preview → coverage → assembly journey. Tests use synthetic applications/data and no customer media or credentials.
+`pnpm test:capture` covers policy, SSRF/DNS/redirect behavior, credentials, real Chromium replay, the hostile complex fixture, dangerous-action side-effect counters, geometry-only step evidence, framing compilation/fallback, focused FFmpeg rendering, black/blank/frozen/rushed/unreadable/caption-overflow/browser-error quality fixtures, deterministic crawling, login, real FFmpeg normalization, discovery, prompt-like evidence, repair, repository/test import, coverage, queueing, idempotency, cancellation, persistence, isolation manifests, retention/reconciliation, baseline evidence redaction, and service scoping. `pnpm test:infrastructure` starts disposable PostgreSQL and Redis, applies all migrations, exercises real BullMQ concurrency/failure paths plus the S3-compatible fixture, emits a redacted report, and verifies teardown. `pnpm test:web` covers the typed client and proxy policy. `pnpm test:e2e` covers session/capability gating plus safe quality warnings in the edit → approve → discover → capture → preview → coverage → assembly journey. Tests use synthetic applications/data and no customer media or credentials.
 
 The quality gate is deterministic evidence, not a human-comprehension claim. Effective UI text is a conservative declared source-text lower bound transformed through the actual crop, caption wrapping is estimated using the fixed overlay typography, and page-state evidence is a safe enum rather than retained page text. OCR, perceptual design review, mobile-device viewing, and human pacing comprehension remain external review activities.
 

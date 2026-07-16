@@ -65,6 +65,7 @@ export interface DirectUploadSession {
 
 export interface PrivateObjectStorage {
   putFile(input: PutFileInput): Promise<StoredArtifact>;
+  deleteObject(input: { workspaceId: string; projectId: string; storageKey: string }): Promise<void>;
 }
 
 export type StorageProviderMode = "local_private" | "s3" | "r2";
@@ -235,6 +236,14 @@ export class LocalPrivateObjectStorage implements PrivateObjectStorage {
       }
     };
   }
+
+  async deleteObject(input: { workspaceId: string; projectId: string; storageKey: string }): Promise<void> {
+    assertScopedStorageKey(input);
+    const root = path.resolve(this.rootDir);
+    const target = path.resolve(root, input.storageKey);
+    if (!target.startsWith(`${root}${path.sep}`)) throw new Error("Private artifact storage key escapes its root.");
+    await fs.unlink(target).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
+  }
 }
 
 export class S3CompatibleObjectStorage implements PrivateObjectStorage {
@@ -347,6 +356,16 @@ export class S3CompatibleObjectStorage implements PrivateObjectStorage {
         createdAt: input.now ?? new Date().toISOString()
       }
     };
+  }
+
+  async deleteObject(input: { workspaceId: string; projectId: string; storageKey: string }): Promise<void> {
+    assertScopedStorageKey(input);
+    const target = s3ObjectUrl(this.config.endpoint, this.config.bucket, input.storageKey);
+    await deleteRemoteObject(target, signedDeleteHeaders({ url: target, region: this.config.region, accessKeyId: this.config.accessKeyId, secretAccessKey: this.config.secretAccessKey, now: new Date() }));
+    const cacheRoot = path.resolve(this.config.cacheRootDir);
+    const cachePath = path.resolve(cacheRoot, input.storageKey);
+    if (!cachePath.startsWith(`${cacheRoot}${path.sep}`)) throw new Error("Private artifact cache key escapes its root.");
+    await fs.unlink(cachePath).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
   }
 
   private async uploadObject(input: UploadObjectInput): Promise<void> {
@@ -539,6 +558,20 @@ function signedPutHeaders(input: {
   };
 }
 
+function signedDeleteHeaders(input: { url: URL; region: string; accessKeyId: string; secretAccessKey: string; now: Date }): Record<string, string> {
+  const amzDate = toAmzDate(input.now);
+  const dateStamp = amzDate.slice(0, 8);
+  const payloadHash = createHash("sha256").update("").digest("hex");
+  const headers = { host: input.url.host, "x-amz-content-sha256": payloadHash, "x-amz-date": amzDate };
+  const signedHeaders = Object.keys(headers).sort().join(";");
+  const canonicalHeaders = Object.keys(headers).sort().map((header) => `${header}:${headers[header as keyof typeof headers]}\n`).join("");
+  const credentialScope = `${dateStamp}/${input.region}/s3/aws4_request`;
+  const canonicalRequest = ["DELETE", canonicalUri(input.url.pathname), "", canonicalHeaders, signedHeaders, payloadHash].join("\n");
+  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, credentialScope, createHash("sha256").update(canonicalRequest).digest("hex")].join("\n");
+  const signature = hmac(signingKey(input.secretAccessKey, dateStamp, input.region), stringToSign, "hex");
+  return { Host: headers.host, "X-Amz-Content-Sha256": payloadHash, "X-Amz-Date": amzDate, Authorization: `AWS4-HMAC-SHA256 Credential=${input.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}` };
+}
+
 function signingKey(secretAccessKey: string, dateStamp: string, region: string): Buffer {
   const dateKey = hmac(`AWS4${secretAccessKey}`, dateStamp);
   const regionKey = hmac(dateKey, region);
@@ -581,6 +614,18 @@ async function putStream(url: URL, headers: Record<string, string>, sourcePath: 
     });
     request.on("error", reject);
     void pipeline(createReadStream(sourcePath), request).catch(reject);
+  });
+}
+
+async function deleteRemoteObject(url: URL, headers: Record<string, string>): Promise<void> {
+  const client = url.protocol === "https:" ? https : http;
+  await new Promise<void>((resolve, reject) => {
+    const request = client.request(url, { method: "DELETE", headers }, (response) => {
+      response.resume();
+      response.once("end", () => response.statusCode && response.statusCode >= 200 && response.statusCode < 300 ? resolve() : reject(new Error(`Cloud storage deletion failed with HTTP ${response.statusCode ?? "unknown"}.`)));
+    });
+    request.on("error", reject);
+    request.end();
   });
 }
 
@@ -657,6 +702,11 @@ function clamp(value: number, min: number, max: number): number {
 
 function safePathSegment(value: string): string {
   return value.replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "") || "unknown";
+}
+
+function assertScopedStorageKey(input: { workspaceId: string; projectId: string; storageKey: string }): void {
+  const prefix = `workspaces/${safePathSegment(input.workspaceId)}/projects/${safePathSegment(input.projectId)}/`;
+  if (!input.storageKey.startsWith(prefix) || input.storageKey.includes("..") || input.storageKey.startsWith("/")) throw new Error("Private artifact storage key is outside the authorized project scope.");
 }
 
 function safeFileName(value: string): string {

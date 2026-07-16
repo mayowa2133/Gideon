@@ -26,6 +26,10 @@ The current desktop/hosted-worker implementation still preserves full app-state 
 - `migrations/0001_hosted_jobs_artifacts.sql` creates `gideon_jobs` and `gideon_artifacts`.
 - `migrations/0002_usage_audit_events.sql` creates `gideon_usage_events` and `gideon_audit_events`.
 - `migrations/0003_core_identity_projects.sql` creates `gideon_users`, `gideon_workspaces`, `gideon_workspace_members`, `gideon_projects`, and `gideon_recording_upload_sessions`.
+- `migrations/0004_product_flow_capture.sql` creates the structured capture environment, credential-grant metadata, discovery, UI inventory, immutable flow revision, run, execution, and coverage tables.
+- `migrations/0005_capture_cleanup_tasks.sql` transactionally retains private object/secret cleanup targets and retry state before project-owned rows are removed.
+
+Usage retries resolve on the unique `(workspace_id, idempotency_key)` index and preserve the first immutable event. Project capture deletion removes scoped capture, job, upload-session, and artifact rows transactionally after inventorying object and vault references; external object/secret cleanup failures are handed to a retry/outbox callback and represented publicly only by hashes.
 
 These transition tables intentionally keep `record_json jsonb not null` beside normalized ownership, status, billing, object, and list-query columns. The normalized columns make hosted operations queryable while preserving full record compatibility until the future hosted web/API surface reads and writes through fully relational service repositories.
 

@@ -181,6 +181,7 @@ Test:
 - Idempotent reprocessing.
 - Duplicate job prevention.
 - Optional BullMQ/Redis smoke using `GIDEON_REDIS_URL=redis://... pnpm test:redis` to prove the hosted broker can enqueue, process, and drain analysis/render jobs through a real Redis backend.
+- `pnpm test:infrastructure` provisions private disposable PostgreSQL and Redis instances, applies every migration, runs concurrency, workspace-isolation, rollback, duplicate-accounting, durable interruption, cancellation, retry, lease/heartbeat, signed preview, S3-compatible HTTP lifecycle, deletion, and reconciliation checks, then verifies all temporary service state is removed.
 
 Expected result:
 

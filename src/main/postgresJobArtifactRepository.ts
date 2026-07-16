@@ -199,6 +199,10 @@ export class PostgresJobArtifactRepository {
     return result.rows[0] ? parseRecordJson(result.rows[0].record_json, "artifact") : null;
   }
 
+  async deleteArtifact(input: { workspaceId: string; projectId: string; artifactId: string }): Promise<void> {
+    await this.query("delete from gideon_artifacts where workspace_id=$1 and project_id=$2 and id=$3", [input.workspaceId, input.projectId, input.artifactId]);
+  }
+
   async listProjectArtifacts(input: ListProjectArtifactsInput): Promise<ArtifactRecord[]> {
     const values: unknown[] = [input.workspaceId, input.projectId];
     const kindClause = input.kind ? " and kind = $3" : "";
