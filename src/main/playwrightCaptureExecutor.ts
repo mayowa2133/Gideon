@@ -180,7 +180,7 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
           visualEvidence
         });
         if (!passed) break;
-      } catch {
+      } catch (error) {
         stepReceipts.push({
           stepId: step.id,
           status: "failed",
@@ -188,7 +188,7 @@ export async function executePlaywrightCapture(input: PlaywrightCaptureExecutorI
           assertions: [],
           startedAt: stepStartedAt,
           completedAt: now(),
-          safeErrorCode: "browser_action_failed"
+          safeErrorCode: error instanceof LocatorResolutionError ? error.code : "browser_action_failed"
         });
         break;
       }
@@ -303,14 +303,14 @@ async function executeAction(
     return undefined;
   }
   if (action.type === "click") {
-    const target = locatorFor(page, action.target);
+    const target = await uniqueActionLocator(page, action.target);
     const geometry = await visibleGeometry(page, target);
     await movePointerTo(page, target, presentation);
     await target.click();
     return geometry;
   }
   if (action.type === "fill") {
-    const target = locatorFor(page, action.target);
+    const target = await uniqueActionLocator(page, action.target);
     const geometry = await visibleGeometry(page, target);
     await movePointerTo(page, target, presentation);
     const value = resolveFixture(action.valueRef, fixtureValues);
@@ -324,14 +324,14 @@ async function executeAction(
     return geometry;
   }
   if (action.type === "select") {
-    const target = locatorFor(page, action.target);
+    const target = await uniqueActionLocator(page, action.target);
     const geometry = await visibleGeometry(page, target);
     await movePointerTo(page, target, presentation);
     await target.selectOption(resolveFixture(action.optionRef, fixtureValues));
     return geometry;
   }
   if (action.type === "key") {
-    const target = action.target ? locatorFor(page, action.target) : page.locator("body");
+    const target = action.target ? await uniqueActionLocator(page, action.target) : page.locator("body");
     const geometry = action.target ? await visibleGeometry(page, target) : undefined;
     if (action.target) await movePointerTo(page, target, presentation);
     await target.press(action.key);
@@ -493,8 +493,25 @@ function locatorFor(page: Page, spec: LocatorSpec): Locator {
   }
   if (spec.strategy === "label") return page.getByLabel(spec.value, { exact: spec.exact });
   if (spec.strategy === "test_id") return page.getByTestId(spec.value);
+  if (spec.strategy === "stable_link") return page.getByRole("link", { name: spec.value, exact: spec.exact }).and(page.locator(`a[href=${JSON.stringify(spec.destinationPath)}]`));
+  if (spec.strategy === "structural") return page.getByRole(spec.scopeRole!, { name: spec.scopeName, exact: true }).getByRole(spec.role!, { name: spec.value, exact: spec.exact });
   if (spec.strategy === "placeholder") return page.getByPlaceholder(spec.value, { exact: spec.exact });
   return page.getByText(spec.value, { exact: spec.exact });
+}
+
+class LocatorResolutionError extends Error {
+  constructor(readonly code: "locator_ambiguous" | "locator_not_found" | "locator_not_visible") { super(code); }
+}
+
+async function uniqueActionLocator(page: Page, spec: LocatorSpec): Promise<Locator> {
+  const locator = locatorFor(page, spec);
+  const count = await locator.count();
+  if (count === 0) throw new LocatorResolutionError("locator_not_found");
+  let visible = 0;
+  for (let index = 0; index < Math.min(count, 100); index += 1) if (await locator.nth(index).isVisible()) visible += 1;
+  if (visible === 0) throw new LocatorResolutionError("locator_not_visible");
+  if (visible > 1 || count > 100) throw new LocatorResolutionError("locator_ambiguous");
+  return locator.filter({ visible: true });
 }
 
 function resolveFixture(reference: string, fixtureValues: Record<string, string>): string {

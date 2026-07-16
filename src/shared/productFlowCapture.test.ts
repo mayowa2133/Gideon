@@ -100,6 +100,21 @@ describe("product flow runtime contract", () => {
     flow.finalAssertions = [];
     expect(validateProductFlowRevision(flow)).toContain("finalAssertions must contain 1–50 assertions.");
   });
+
+  it("validates stable-link and named-landmark locator boundaries", () => {
+    const flow = structuredClone(approvedFlow);
+    flow.steps[0]!.action = { type: "click", target: { strategy: "stable_link", value: "Settings", destinationPath: "/workspace/settings", exact: true } };
+    flow.steps[1]!.action = { type: "click", target: { strategy: "structural", scopeRole: "region", scopeName: "Workspace", role: "button", value: "Continue", exact: true } };
+    expect(validateProductFlowRevision(flow)).toEqual([]);
+
+    const unsafe = structuredClone(flow);
+    if (unsafe.steps[0]!.action.type === "click") unsafe.steps[0]!.action.target.destinationPath = "https://evil.test/settings";
+    if (unsafe.steps[1]!.action.type === "click") unsafe.steps[1]!.action.target.scopeName = undefined;
+    expect(validateProductFlowRevision(unsafe)).toEqual(expect.arrayContaining([
+      "steps[0].action.target.destinationPath is invalid.",
+      "steps[1].action.target.scopeName must be 1–160 characters."
+    ]));
+  });
 });
 
 describe("browser action policy", () => {

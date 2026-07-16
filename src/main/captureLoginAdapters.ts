@@ -25,6 +25,8 @@ function locatorFor(page: Page, spec: LocatorSpec): Locator {
   if (spec.strategy === "role") return page.getByRole(spec.role!, { name: spec.value, exact: spec.exact });
   if (spec.strategy === "label") return page.getByLabel(spec.value, { exact: spec.exact });
   if (spec.strategy === "test_id") return page.getByTestId(spec.value);
+  if (spec.strategy === "stable_link") return page.getByRole("link", { name: spec.value, exact: spec.exact }).and(page.locator(`a[href=${JSON.stringify(spec.destinationPath)}]`));
+  if (spec.strategy === "structural") return page.getByRole(spec.scopeRole!, { name: spec.scopeName, exact: true }).getByRole(spec.role!, { name: spec.value, exact: spec.exact });
   if (spec.strategy === "placeholder") return page.getByPlaceholder(spec.value, { exact: spec.exact });
   return page.getByText(spec.value, { exact: spec.exact });
 }
