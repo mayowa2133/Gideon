@@ -39,6 +39,7 @@ import type { CaptureAuditSink } from "./captureAudit";
 import type { CaptureAssemblyCoordinator } from "./captureAssemblyCoordinator";
 import type { CapturePreviewService } from "./capturePreviewService";
 import type { CaptureCredentialVault, CaptureCredentialSecret } from "./captureCredentials";
+import { generateCaptureOpenApi } from "./captureOpenApi";
 import type { CaptureEnvironment, CaptureEnvironmentType } from "../shared/productFlowCapture";
 import type {
   AppState,
@@ -393,6 +394,10 @@ export async function handleHostedApiRequest(
       requiredSession(request, dependencies);
       const capabilities = captureCapabilities(dependencies);
       return jsonResponse(200, { capture: capabilities }, requestId);
+    }
+    if (method === "GET" && path === "/api/v1/openapi/capture.json") {
+      requiredSession(request, dependencies);
+      return jsonResponse(200, { document: generateCaptureOpenApi() }, requestId, { "Cache-Control": "private, no-store" });
     }
     if (method === "POST" && path === "/api/v1/projects") {
       return await handleCreateProject(request, dependencies, requestId);
@@ -1027,14 +1032,16 @@ async function handleProductFlowApproval(
 ): Promise<HostedApiResponse> {
   const service = requiredCaptureService(dependencies);
   const claims = await authorizeCaptureProject(request, dependencies, projectId, true);
-  rejectUnknownKeys(objectBody(request), [], "product flow approval");
+  const body = objectBody(request);
+  rejectUnknownKeys(body, ["revision"], "product flow approval");
   const flow = await captureServiceCall(() =>
     service.setFlowApproval({
       workspaceId: claims.workspaceId,
       projectId,
       flowId,
       status,
-      actorUserId: claims.userId
+      actorUserId: claims.userId,
+      expectedRevision: requiredBoundedInteger(body.revision, "revision", 1, 1_000_000)
     })
   );
   await recordCaptureAudit(dependencies, claims, projectId, status === "approved" ? "product_flow.approve" : "product_flow.reject", "product_flow", flow.id, { revision: flow.revision });
@@ -2646,8 +2653,10 @@ async function captureServiceCall<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
   } catch (error) {
+    if (error instanceof ApiError) throw error;
     const message = error instanceof Error ? error.message : "Capture service operation failed.";
     if (/not found/i.test(message)) throw new ApiError(404, "not_found", "Resource not found.");
+    if (/revision conflict/i.test(message)) throw new ApiError(409, "revision_conflict", "Product flow revision has changed. Review the latest revision before approving.");
     if (/revision must|not current|not ready|revoked|already/i.test(message)) {
       throw new ApiError(409, "state_conflict", message);
     }

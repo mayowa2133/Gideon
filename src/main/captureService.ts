@@ -84,6 +84,7 @@ export interface CaptureApplicationService {
     flowId: string;
     status: "approved" | "rejected";
     actorUserId: string;
+    expectedRevision?: number;
   }): Promise<ProductFlowRevision>;
   listFlows(input: { workspaceId: string; projectId: string }): Promise<ProductFlowRevision[]>;
   getFlow(input: { workspaceId: string; projectId: string; flowId: string }): Promise<ProductFlowRevision>;
@@ -242,6 +243,9 @@ export function createCaptureApplicationService(options: CaptureServiceOptions):
     async setFlowApproval(input) {
       const current = await repository.getFlow({ workspaceId: input.workspaceId, flowId: input.flowId });
       if (!current || current.projectId !== input.projectId) throw new Error("Product flow was not found.");
+      if (input.expectedRevision !== undefined && input.expectedRevision !== current.revision) {
+        throw new Error(`Product flow revision conflict: expected ${input.expectedRevision}, current revision is ${current.revision}. Review the latest revision before approving.`);
+      }
       const environment = await assertFlowOwnership(repository, input, current);
       if (current.approval.status === input.status) return current;
       const updatedAt = now();

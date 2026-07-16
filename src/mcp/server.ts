@@ -196,6 +196,74 @@ const tools = [
       storePath: optionalString("Explicit path to gideon-store.json."),
       ...hostedTransportSchema
     }, ["instruction"])
+  },
+  {
+    name: "gideon_capture_capabilities",
+    description: "Inspect which structured product-capture capabilities are enabled in the hosted Gideon deployment.",
+    inputSchema: objectSchema({ ...hostedTransportSchema })
+  },
+  {
+    name: "gideon_capture_environment",
+    description: "List, create from a secret-free manifest, or validate a structured capture environment.",
+    inputSchema: objectSchema({
+      action: { type: "string", enum: ["list", "create", "validate"] },
+      projectId: { type: "string" },
+      environmentId: optionalString("Environment ID required for validation."),
+      name: optionalString("Environment name required for creation."),
+      environmentType: { type: "string", enum: ["local_preview", "staging", "demo", "production_sandbox"] },
+      baseUrl: optionalString("HTTPS URL, or loopback URL for a managed local preview."),
+      allowedDomains: { type: "array", items: { type: "string" } },
+      resetAdapter: { type: "string", enum: ["none", "fixture_api", "snapshot_restore"] },
+      ...hostedTransportSchema
+    }, ["action", "projectId"])
+  },
+  {
+    name: "gideon_capture_discovery",
+    description: "Start, inspect, or cancel bounded structured flow discovery. This never accepts shell commands or plaintext credentials.",
+    inputSchema: objectSchema({
+      action: { type: "string", enum: ["start", "status", "cancel"] },
+      projectId: { type: "string" },
+      environmentId: optionalString("Environment ID required to start discovery."),
+      runId: optionalString("Discovery run ID required for status or cancellation."),
+      goals: { type: "array", items: { type: "object", required: ["id", "text", "priority"], properties: { id: { type: "string" }, text: { type: "string" }, priority: { type: "number" } }, additionalProperties: false } },
+      maxCandidates: { type: "number" },
+      idempotencyKey: optionalString("Caller-stable key for safe retries."),
+      ...hostedTransportSchema
+    }, ["action", "projectId"])
+  },
+  {
+    name: "gideon_capture_flow_review",
+    description: "List or inspect proposed flows, or approve/reject one exact revision with human-owned provenance.",
+    inputSchema: objectSchema({
+      action: { type: "string", enum: ["list", "inspect", "approve", "reject"] },
+      projectId: { type: "string" },
+      flowId: optionalString("Flow ID required except when listing."),
+      revision: { type: "number", description: "Exact revision required for approve/reject; stale revisions are rejected." },
+      ...hostedTransportSchema
+    }, ["action", "projectId"])
+  },
+  {
+    name: "gideon_capture_run_control",
+    description: "Start, inspect, cancel, retry, or clean up bounded structured capture work through the hosted API.",
+    inputSchema: objectSchema({
+      action: { type: "string", enum: ["start", "status", "cancel", "retry", "cleanup"] },
+      projectId: { type: "string" },
+      environmentId: optionalString("Environment ID required to start."),
+      flowIds: { type: "array", items: { type: "string" } },
+      runId: optionalString("Capture run ID required for status/cancel."),
+      executionId: optionalString("Execution ID required for retry."),
+      idempotencyKey: optionalString("Caller-stable key for safe retries."),
+      ...hostedTransportSchema
+    }, ["action", "projectId"])
+  },
+  {
+    name: "gideon_capture_evidence",
+    description: "Inspect safe capture execution receipts and bounded coverage without returning signed media URLs or credentials.",
+    inputSchema: objectSchema({
+      projectId: { type: "string" },
+      runId: { type: "string" },
+      ...hostedTransportSchema
+    }, ["projectId", "runId"])
   }
 ];
 
@@ -257,6 +325,18 @@ export async function callTool(name: string, args: Record<string, unknown> = {})
       );
     case "gideon_generate_video_edit_plan":
       return textResult(await generateVideoEditPlan(args));
+    case "gideon_capture_capabilities":
+      return textResult(await hostedApiRequest(args, "GET", "/api/v1/capture-capabilities"));
+    case "gideon_capture_environment":
+      return textResult(await captureEnvironmentTool(args));
+    case "gideon_capture_discovery":
+      return textResult(await captureDiscoveryTool(args));
+    case "gideon_capture_flow_review":
+      return textResult(await captureFlowReviewTool(args));
+    case "gideon_capture_run_control":
+      return textResult(await captureRunControlTool(args));
+    case "gideon_capture_evidence":
+      return textResult(await captureEvidenceTool(args));
     default:
       throw new Error(`Unknown Gideon tool: ${name}`);
   }
@@ -500,6 +580,109 @@ async function updateMoment(args: Record<string, unknown>): Promise<Record<strin
   };
 }
 
+function captureProjectPath(args: Record<string, unknown>, suffix: string): string {
+  return `/api/v1/projects/${encodeURIComponent(requireString(args.projectId, "projectId"))}${suffix}`;
+}
+
+async function captureEnvironmentTool(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  const action = requireString(args.action, "action");
+  if (action === "list") return hostedApiRequest(args, "GET", captureProjectPath(args, "/capture-environments"));
+  if (action === "validate") {
+    const id = encodeURIComponent(requireString(args.environmentId, "environmentId"));
+    return hostedApiRequest(args, "POST", captureProjectPath(args, `/capture-environments/${id}/validate`), {}, true, idempotencyHeaders(args, "environment-validation"));
+  }
+  if (action === "create") {
+    return hostedApiRequest(args, "POST", captureProjectPath(args, "/capture-environments"), {
+      name: requireString(args.name, "name"),
+      type: requireEnum(args.environmentType, "environmentType", ["local_preview", "staging", "demo", "production_sandbox"]),
+      baseUrl: requireString(args.baseUrl, "baseUrl"),
+      allowedDomains: requireStringArray(args.allowedDomains, "allowedDomains"),
+      resetAdapter: requireEnum(args.resetAdapter, "resetAdapter", ["none", "fixture_api", "snapshot_restore"])
+    }, true);
+  }
+  throw new Error("action must be list, create, or validate.");
+}
+
+async function captureDiscoveryTool(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  const action = requireString(args.action, "action");
+  if (action === "start") {
+    const goals = Array.isArray(args.goals) ? args.goals : [];
+    if (!goals.length) throw new Error("goals must contain at least one bounded discovery goal.");
+    return hostedApiRequest(args, "POST", captureProjectPath(args, "/discovery-runs"), {
+      environmentId: requireString(args.environmentId, "environmentId"), goals,
+      maxCandidates: optionalSafeInteger(args.maxCandidates, "maxCandidates")
+    }, true, idempotencyHeaders(args, "discovery"));
+  }
+  const runId = encodeURIComponent(requireString(args.runId, "runId"));
+  if (action === "status") return hostedApiRequest(args, "GET", captureProjectPath(args, `/discovery-runs/${runId}`));
+  if (action === "cancel") return hostedApiRequest(args, "POST", captureProjectPath(args, `/discovery-runs/${runId}/cancel`), {}, true);
+  throw new Error("action must be start, status, or cancel.");
+}
+
+async function captureFlowReviewTool(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  const action = requireString(args.action, "action");
+  if (action === "list") return hostedApiRequest(args, "GET", captureProjectPath(args, "/product-flows"));
+  const flowId = encodeURIComponent(requireString(args.flowId, "flowId"));
+  if (action === "inspect") return hostedApiRequest(args, "GET", captureProjectPath(args, `/product-flows/${flowId}`));
+  if (action === "approve" || action === "reject") {
+    return hostedApiRequest(args, "POST", captureProjectPath(args, `/product-flows/${flowId}/${action}`), {
+      revision: requireSafeInteger(args.revision, "revision")
+    }, true);
+  }
+  throw new Error("action must be list, inspect, approve, or reject.");
+}
+
+async function captureRunControlTool(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  const action = requireString(args.action, "action");
+  if (action === "start") {
+    return hostedApiRequest(args, "POST", captureProjectPath(args, "/capture-runs"), {
+      environmentId: requireString(args.environmentId, "environmentId"),
+      flowIds: requireStringArray(args.flowIds, "flowIds")
+    }, true, idempotencyHeaders(args, "capture"));
+  }
+  if (action === "retry") {
+    const executionId = encodeURIComponent(requireString(args.executionId, "executionId"));
+    return hostedApiRequest(args, "POST", captureProjectPath(args, `/flow-executions/${executionId}/retry`), {}, true, idempotencyHeaders(args, "retry"));
+  }
+  const runId = encodeURIComponent(requireString(args.runId, "runId"));
+  if (action === "status") return hostedApiRequest(args, "GET", captureProjectPath(args, `/capture-runs/${runId}`));
+  if (action === "cancel" || action === "cleanup") return hostedApiRequest(args, "POST", captureProjectPath(args, `/capture-runs/${runId}/cancel`), {}, true);
+  throw new Error("action must be start, status, cancel, retry, or cleanup.");
+}
+
+async function captureEvidenceTool(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
+  const runId = encodeURIComponent(requireString(args.runId, "runId"));
+  const capture = await hostedApiRequest(args, "GET", captureProjectPath(args, `/capture-runs/${runId}`));
+  const coverage = await hostedApiRequest(args, "GET", captureProjectPath(args, "/coverage-snapshots/latest"));
+  return {
+    mode: "hosted_api",
+    capture,
+    coverage,
+    note: "Safe receipts only. Signed preview URLs and credential material are intentionally omitted."
+  };
+}
+
+function idempotencyHeaders(args: Record<string, unknown>, prefix: string): Record<string, string> {
+  return { "Idempotency-Key": optionalArgString(args.idempotencyKey) ?? `${prefix}:${randomUUID()}` };
+}
+
+function requireStringArray(value: unknown, field: string): string[] {
+  if (!Array.isArray(value) || !value.length || value.some((entry) => typeof entry !== "string" || !entry.trim())) throw new Error(`${field} must be a non-empty string array.`);
+  return value.map((entry) => (entry as string).trim());
+}
+
+function requireSafeInteger(value: unknown, field: string): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) throw new Error(`${field} must be a positive integer.`);
+  return value;
+}
+
+function optionalSafeInteger(value: unknown, field: string): number | undefined { return value === undefined ? undefined : requireSafeInteger(value, field); }
+
+function requireEnum<T extends string>(value: unknown, field: string, allowed: readonly T[]): T {
+  if (typeof value !== "string" || !allowed.includes(value as T)) throw new Error(`${field} must be one of: ${allowed.join(", ")}.`);
+  return value as T;
+}
+
 async function generateVideoEditPlan(args: Record<string, unknown>): Promise<Record<string, JsonValue>> {
   const instruction = requireString(args.instruction, "instruction");
   let project: GideonProject | undefined;
@@ -564,12 +747,14 @@ async function hostedApiRequest(
   method: "GET" | "POST" | "PATCH",
   apiPath: string,
   body?: Record<string, unknown>,
-  requiresCsrf = false
+  requiresCsrf = false,
+  extraHeaders: Record<string, string> = {}
 ): Promise<Record<string, JsonValue>> {
   const config = requireHostedConfig(args);
   const headers: Record<string, string> = {
     Accept: "application/json",
-    Cookie: config.cookie
+    Cookie: config.cookie,
+    ...extraHeaders
   };
   if (body) {
     headers["Content-Type"] = "application/json";

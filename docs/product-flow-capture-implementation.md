@@ -18,11 +18,12 @@ Deterministic locator selection, provider budgets, safe page comparison, and rev
 The exact Phase 6 local verification record is [capture-phase-6-evidence.md](./capture-phase-6-evidence.md).
 Pre-frame sensitive-region masking, privacy-safe receipts, and support-bundle redaction are documented in [capture-sensitive-masking.md](./capture-sensitive-masking.md).
 The exact Phase 9 local verification record is [capture-phase-9-evidence.md](./capture-phase-9-evidence.md).
+The supported CLI/MCP/OpenAPI operator surface and exact Phase 10 verification record are [capture-operator-guide.md](./capture-operator-guide.md) and [capture-phase-10-evidence.md](./capture-phase-10-evidence.md).
 
 ## Implemented boundaries
 
 - Runtime-validated flow revisions support only bounded navigation, click, fixture fill/select, approved keys, waits, and observable assertions. Generated code and unknown fields are rejected.
-- Human approval is immutable and revision-bound. Compilation fails for drafts, stale approval, stale environment versions, disallowed domains, or elevated risk.
+- Human approval is immutable and revision-bound. HTTP, web, CLI, and MCP approval requests must identify the exact reviewed revision; stale requests fail with `409 revision_conflict`. Compilation fails for drafts, stale approval, stale environment versions, disallowed domains, or elevated risk.
 - Environment validation performs DNS/private-network checks and a pinned-address HTTP/TLS reachability probe. Redirects are revalidated at every hop.
 - Disposable credential grants have a callback-only vault interface. The external-vault adapter persists only metadata and an opaque vault reference; the login adapter resolves the secret only while filling the approved form.
 - Isolated-runtime fixture values are staged through an opaque scoped grant and never serialized into the manifest. The grant is revoked after success or failure; credential-shaped keys remain forbidden and credentials stay behind the login-adapter vault.
@@ -59,6 +60,8 @@ The exact Phase 9 local verification record is [capture-phase-9-evidence.md](./c
 - Assertion receipts redact sensitive-shaped text after evaluation. Isolated/local workers reject privacy-unsafe receipts, masking receipts retain counts/hashes only, pilot failure files retain repository counts instead of state, and mode-0600 support reports exclude media, credentials, selectors, private paths, object keys, signed URLs, and raw prompts.
 - Clip previews use separately authorized, short-lived, no-store signed URLs for verified normalized clips only.
 - The hosted Next.js workspace lists projects, checks session and capture capabilities, manages environment/persona/disposable-login setup, runs discovery, supports revision-safe proposal edits and approval, launches/cancels capture, previews verified clips, reports honest coverage, retries failed flows, and explicitly orders/activates an assembly.
+- The results workspace labels contained source framing, surfaces safe quality warnings and repair-review blockers, shows versioned coverage denominators, and follows a queued retry as a new capture run instead of leaving the user on stale results.
+- `pnpm capture:operator` supports secret-free manifest assistance, readiness, environment, discovery, review, capture, cancellation, retry, evidence, and bounded cleanup operations through the hosted API without direct database access. Equivalent hosted MCP tools and an authenticated OpenAPI 3.1 endpoint use the same public contracts.
 - Opaque discovery/capture run IDs are retained per project in browser storage so a reload can re-authorize and resume status polling; credentials, media URLs, and signed previews are never persisted there.
 - The browser-facing web app calls a same-origin, path-restricted server proxy. The internal hosted API URL, cookies, CSRF forwarding, response no-store policy, request-size limit, and response-header allowlist stay server-controlled.
 
@@ -91,6 +94,7 @@ The exact Phase 9 local verification record is [capture-phase-9-evidence.md](./c
 - `src/main/capturePilot.ts`: generic versioned local pilot orchestration shared by registered product adapters.
 - `src/main/capturePresentationRenderer.ts`: receipt-timed caption tracks, safe vertical framing, and explicitly provider-gated optional narration for pilot derivatives.
 - `src/main/captureBaselineReport.ts`: strict private-artifact selection, FFprobe inspection, quality-report/contact-sheet lineage, versioned baseline thresholds, and redacted cross-product evidence reporting.
+- `src/main/captureOperatorCli.ts` and `captureOpenApi.ts`: hosted operator command client, secret-free manifest boundary, runtime operation registry, and generated OpenAPI contract.
 
 ## Required production wiring
 
@@ -111,7 +115,7 @@ Run `pnpm capture:worker:check` before starting a worker and `pnpm capture:isola
 
 The hosted API supports environment/persona CRUD foundations, flow list/get/revision/approval, capture-run creation, status, and cancellation when services are injected. It returns `503 capture_not_configured` when a deployment has not wired them, preventing the UI from promising capture while an isolated worker is absent.
 
-The hosted API includes asynchronous environment validation and discovery create/status/cancel routes, explicit ordered assembly jobs, signed verified-clip preview URLs, latest coverage, one-flow retry, and a capability endpoint. Every route remains dependency-gated. The hosted review UI exposes capture controls only when `/api/v1/capture-capabilities` returns `available: true`; otherwise it identifies the missing safe runtime dependency without offering recording actions.
+The hosted API includes asynchronous environment validation and discovery create/status/cancel routes, exact-revision flow approval, explicit ordered assembly jobs, signed verified-clip preview URLs, latest coverage, one-flow retry, a capability endpoint, and an authenticated generated capture OpenAPI document. Every route remains dependency-gated. The hosted review UI exposes capture controls only when `/api/v1/capture-capabilities` returns `available: true`; otherwise it identifies the missing safe runtime dependency without offering recording actions.
 
 ## Verification
 

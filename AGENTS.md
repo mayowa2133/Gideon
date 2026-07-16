@@ -102,6 +102,8 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm capture:pilot:signaldraft
 - pnpm capture:baseline
 - pnpm capture:hostile:check
+- pnpm capture:operator
+- pnpm capture:openapi
 - pnpm capture:isolation:check
 - pnpm capture:isolation:runtime:check
 - pnpm avatar:worker:check

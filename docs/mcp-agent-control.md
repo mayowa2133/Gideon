@@ -54,6 +54,14 @@ When these variables are present, MCP tools prefer the hosted API service layer:
 - `gideon_get_audit_log` reads the project-scoped audit events from that context.
 - `gideon_update_script` and `gideon_update_moment` call CSRF-protected hosted edit routes.
 - `gideon_enqueue_analysis` and `gideon_enqueue_render` call the hosted job routes.
+- `gideon_capture_capabilities` inspects dependency readiness.
+- `gideon_capture_environment` lists, creates from bounded fields, or validates an environment.
+- `gideon_capture_discovery` starts, inspects, or cancels bounded discovery.
+- `gideon_capture_flow_review` lists/inspects flows and approves or rejects an exact revision.
+- `gideon_capture_run_control` starts, inspects, cancels, retries, or cleans up capture work.
+- `gideon_capture_evidence` returns safe execution quality and bounded coverage receipts without signed media URLs or credential material.
+
+Structured-capture tools are hosted-only: they never fall back to direct JSON-store writes and never accept process commands or plaintext credentials.
 
 The MCP server can discover the CSRF token from `GET /api/v1/auth/session`, or you can provide `GIDEON_MCP_HOSTED_CSRF_TOKEN`. Hosted project context includes script and moment revisions. Edit tools send a revision precondition automatically unless the agent provides an explicit `revision` argument. Stale edits fail with `409 revision_conflict` instead of overwriting newer user or teammate changes. Hosted HTTP calls retry only transient network, rate-limit, and 5xx/408 failures; auth, validation, missing-precondition, and revision-conflict failures are not retried. This mode keeps workspace authorization, CSRF checks, bounded field updates, job queues, optimistic concurrency, and audit records inside Gideon's authoritative hosted service layer while Codex/Claude Code supplies the reasoning externally. Hosted API sessions emit bounded MCP context and review-edit success/failure metrics so operators can track stale clients, missing revision preconditions, and review health without indexing transcripts, OCR text, scripts, prompts, signed URLs, or object keys.
 

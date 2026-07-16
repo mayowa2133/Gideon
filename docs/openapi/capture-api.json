@@ -1,0 +1,1082 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Gideon Structured Product Capture API",
+    "version": "1.0.0",
+    "description": "Runtime contract for bounded environment discovery, revision review, capture, retry, evidence, and cleanup operations."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/api/v1/capture-capabilities": {
+      "get": {
+        "operationId": "getCaptureCapabilities",
+        "summary": "Inspect enabled capture capabilities",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/capture-environments": {
+      "get": {
+        "operationId": "listCaptureEnvironments",
+        "summary": "List capture environments",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCaptureEnvironment",
+        "summary": "Create a secret-free capture environment",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": "Requires the session CSRF token in X-CSRF-Token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "type": {
+                    "enum": [
+                      "local_preview",
+                      "staging",
+                      "demo",
+                      "production_sandbox"
+                    ]
+                  },
+                  "baseUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "allowedDomains": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "resetAdapter": {
+                    "enum": [
+                      "none",
+                      "fixture_api",
+                      "snapshot_restore"
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "type",
+                  "baseUrl",
+                  "allowedDomains",
+                  "resetAdapter"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/capture-environments/{environmentId}/validate": {
+      "post": {
+        "operationId": "validateCaptureEnvironment",
+        "summary": "Validate reachability and freeze an environment revision",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "environmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": "Requires the session CSRF token in X-CSRF-Token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/discovery-runs": {
+      "post": {
+        "operationId": "startFlowDiscovery",
+        "summary": "Start bounded product-flow discovery",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": "Requires the session CSRF token in X-CSRF-Token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "environmentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "goals": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 600
+                        },
+                        "priority": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text",
+                        "priority"
+                      ]
+                    }
+                  },
+                  "maxCandidates": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  }
+                },
+                "required": [
+                  "environmentId",
+                  "goals"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/discovery-runs/{discoveryRunId}": {
+      "get": {
+        "operationId": "getFlowDiscovery",
+        "summary": "Inspect discovery status",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "discoveryRunId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/discovery-runs/{discoveryRunId}/cancel": {
+      "post": {
+        "operationId": "cancelFlowDiscovery",
+        "summary": "Cancel and clean up discovery work",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "discoveryRunId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": "Requires the session CSRF token in X-CSRF-Token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/product-flows": {
+      "get": {
+        "operationId": "listProductFlows",
+        "summary": "List proposed and reviewed flows",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/product-flows/{flowId}": {
+      "get": {
+        "operationId": "getProductFlow",
+        "summary": "Inspect one flow revision",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/product-flows/{flowId}/approve": {
+      "post": {
+        "operationId": "approveProductFlowRevision",
+        "summary": "Approve exactly one reviewed flow revision",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": "Requires the session CSRF token in X-CSRF-Token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "revision"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/product-flows/{flowId}/reject": {
+      "post": {
+        "operationId": "rejectProductFlowRevision",
+        "summary": "Reject exactly one reviewed flow revision",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "flowId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": "Requires the session CSRF token in X-CSRF-Token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "revision"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/capture-runs": {
+      "post": {
+        "operationId": "startCaptureRun",
+        "summary": "Capture current approved flow revisions",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": "Requires the session CSRF token in X-CSRF-Token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "environmentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "flowIds": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  }
+                },
+                "required": [
+                  "environmentId",
+                  "flowIds"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/capture-runs/{captureRunId}": {
+      "get": {
+        "operationId": "getCaptureRun",
+        "summary": "Inspect run, execution, quality, repair, and artifact receipts",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "captureRunId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/capture-runs/{captureRunId}/cancel": {
+      "post": {
+        "operationId": "cancelCaptureRun",
+        "summary": "Cancel and clean up active capture work",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "captureRunId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": "Requires the session CSRF token in X-CSRF-Token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/flow-executions/{executionId}/retry": {
+      "post": {
+        "operationId": "retryFlowExecution",
+        "summary": "Queue a bounded one-flow retry",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": "Requires the session CSRF token in X-CSRF-Token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/flow-executions/{executionId}/preview-url": {
+      "post": {
+        "operationId": "createFlowExecutionPreview",
+        "summary": "Create a private short-lived clip preview",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": "Requires the session CSRF token in X-CSRF-Token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{projectId}/coverage-snapshots/latest": {
+      "get": {
+        "operationId": "getLatestCaptureCoverage",
+        "summary": "Inspect bounded versioned coverage denominators",
+        "tags": [
+          "Structured product capture"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "202": {
+            "description": "Asynchronous work accepted"
+          },
+          "4XX": {
+            "description": "Actionable validation, authorization, conflict, or state error"
+          },
+          "5XX": {
+            "description": "Safe service error without provider internals"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "gideon_session"
+      }
+    }
+  }
+}

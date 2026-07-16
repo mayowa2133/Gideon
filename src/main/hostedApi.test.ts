@@ -76,6 +76,8 @@ describe("hosted API foundation", () => {
     const session = createSignedSession({ secret: "session-secret", userId: "local-user", authSubject: "local:local-user", workspaceId: "local-workspace", csrfToken: "csrf-1", nowMs: Date.parse("2026-07-14T10:00:00.000Z") });
     const response = await handleHostedApiRequest({ method: "GET", path: "/api/v1/capture-capabilities", headers: { cookie: `gideon_session=${session.token}` }, nowMs: Date.parse("2026-07-14T10:01:00.000Z") }, api);
     expect(response).toMatchObject({ status: 200, body: { data: { capture: { available: false, environmentValidation: false, credentialVault: false, discovery: false, capture: false, assembly: false, clipPreview: false, coverage: false, audit: false, isolatedRuntime: false } } } });
+    const openApi = await handleHostedApiRequest({ method: "GET", path: "/api/v1/openapi/capture.json", headers: { cookie: `gideon_session=${session.token}` }, nowMs: Date.parse("2026-07-14T10:01:00.000Z") }, api);
+    expect(openApi).toMatchObject({ status: 200, headers: { "Cache-Control": "private, no-store" }, body: { data: { document: { openapi: "3.1.0", paths: { "/api/v1/projects/{projectId}/capture-runs": { post: { operationId: "startCaptureRun" } } } } } } });
   });
 
   it("auto-wires configured Stripe billing service into hosted dependencies", () => {
@@ -1952,6 +1954,30 @@ describe("hosted API foundation", () => {
       api
     );
     expect(listed).toMatchObject({ status: 200, body: { data: { environments: [{ id: "environment-1" }] } } });
+  });
+
+  it("requires an exact current revision for product-flow approval", async () => {
+    const calls: unknown[] = [];
+    const baseService = captureServiceFixture();
+    const captureService: CaptureApplicationService = {
+      ...baseService,
+      async setFlowApproval(input) {
+        calls.push(input);
+        if (input.expectedRevision !== 1) throw new Error(`Product flow revision conflict: expected ${input.expectedRevision}, current revision is 1.`);
+        return baseService.setFlowApproval(input);
+      }
+    };
+    const api = testApi({ captureService });
+    api.store.state.projects = [projectFixture({ id: "project-1", workspaceId: "local-workspace", name: "Demo" })];
+    const session = createSignedSession({ secret: "session-secret", userId: "local-user", authSubject: "local:local-user", workspaceId: "local-workspace", csrfToken: "csrf-1", nowMs: Date.parse("2026-07-14T10:00:00.000Z") });
+    const request = { method: "POST", path: "/api/v1/projects/project-1/product-flows/flow-1/approve", headers: { cookie: `gideon_session=${session.token}`, "x-csrf-token": "csrf-1" }, nowMs: Date.parse("2026-07-14T10:01:00.000Z") };
+    const missing = await handleHostedApiRequest({ ...request, body: {} }, api);
+    expect(missing).toMatchObject({ status: 422, body: { error: { code: "validation_failed" } } });
+    const stale = await handleHostedApiRequest({ ...request, body: { revision: 9 } }, api);
+    expect(stale).toMatchObject({ status: 409, body: { error: { code: "revision_conflict" } } });
+    const approved = await handleHostedApiRequest({ ...request, body: { revision: 1 } }, api);
+    expect(approved).toMatchObject({ status: 200, body: { data: { flow: { revision: 2, approval: { status: "approved", approvedRevision: 2 } } } } });
+    expect(calls).toContainEqual(expect.objectContaining({ workspaceId: "local-workspace", projectId: "project-1", flowId: "flow-1", expectedRevision: 1 }));
   });
 
   it("rejects unknown capture fields and converts environment validation failures to safe API errors", async () => {

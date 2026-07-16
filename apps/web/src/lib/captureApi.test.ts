@@ -43,6 +43,9 @@ describe("capture API client", () => {
     expect(calls.at(-1)?.init?.method).toBe("PATCH");
     expect((calls.at(-1)?.init?.headers as Headers).get("x-csrf-token")).toBe("csrf-1");
     expect(JSON.parse(String(calls.at(-1)?.init?.body))).toEqual({ flow });
+    await client.setFlowApproval("project-1", "flow-1", 2, "approve");
+    expect(calls.at(-1)?.url).toContain("/product-flows/flow-1/approve");
+    expect(JSON.parse(String(calls.at(-1)?.init?.body))).toEqual({ revision: 2 });
   });
 });
 
