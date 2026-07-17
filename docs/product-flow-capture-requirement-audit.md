@@ -1,6 +1,6 @@
 # Structured product-flow capture requirement audit
 
-Audited against [product-flow-capture-plan.md](./product-flow-capture-plan.md) on 2026-07-15.
+Audited against [product-flow-capture-plan.md](./product-flow-capture-plan.md) on 2026-07-16.
 
 The concrete local pilot and remaining rollout evidence are recorded in [capture-rollout-audit-2026-07-14.md](./capture-rollout-audit-2026-07-14.md).
 
@@ -29,9 +29,9 @@ This audit distinguishes code-complete boundaries from deployment, UX, vendor, a
 | Self-service HTTP | Async validation/discovery, exact-revision flow review, capture/status/cancel/retry, ordered assembly, signed preview, coverage, audit, capabilities, authenticated OpenAPI, CLI, and hosted MCP operations implemented behind dependency gates; a synthetic command journey and contract tests pass locally | Run the same OpenAPI/command contract suite against deployed staging dependencies |
 | Self-service UI | Hosted Next.js project launcher and connect/discover/edit/exact-revision approve/run/results/framing preview/quality/repair-review/retry-state/coverage/assembly screens implemented; axe WCAG A/AA, keyboard/focus, announcements, validation, disabled explanations, reduced motion, and desktop/tablet/mobile overflow checks pass; capture controls fail closed unless all dependencies are configured | Deploy with the existing auth shell; perform real assistive-technology, zoom/reflow, touch, caption-comprehension, and design-partner usability review |
 | Deletion | Transactional project capture/job/upload/artifact-row purge, secret/object reconciliation, safe hashed failure receipts, bounded retention/legal hold, missing/orphan detection, and object-first deletion pass locally | Connect the retry outbox and production object inventory/lifecycle, then verify cloud purge end to end |
-| Observability and config | Safe aggregate snapshot, production configuration checker, and fail-closed capability endpoint implemented | Export metrics/traces, create dashboards/alerts, support views, capacity and cost SLOs |
+| Observability and config | Safe nine-stage operation schema/wrapper, rolling planning SLOs, executable alert rules, dashboard-as-data contract, private readiness receipt, bounded synthetic concurrency/runaway exercise, deterministic cost model, and six incident state simulations implemented | Wire metric export/paging and support views; validate SLOs, sustained capacity, managed-service failover, real cloud cost, and human response in staging/production |
 | Internal concierge workflow | Supported hosted CLI and MCP operations cover readiness, secret-free environment setup, discovery, exact-revision review, capture, cancellation, retry, safe evidence inspection, and cleanup without direct database access | Exercise the operator checklist against staging SSO and a design-partner sandbox |
-| General availability gates | Not locally satisfiable | Design-partner results, legal/vendor review, external security/privacy review, penetration test, load/cost tests, incident exercises, published limitations |
+| General availability gates | Local synthetic load/cost/failure-state evidence is implemented, but GA is not locally satisfiable | Design-partner results, legal/vendor review, external security/privacy review, penetration test, deployed load/soak and measured cost tests, live incident/paging exercises, published limitations |
 
 ## Automated evidence
 
@@ -50,6 +50,7 @@ This audit distinguishes code-complete boundaries from deployment, UX, vendor, a
 - `pnpm capture:operator -- help`: supported hosted concierge commands; its synthetic connection-to-reviewed-output journey is covered by `captureOperatorCli.test.ts`.
 - `pnpm capture:openapi`: regenerates the authenticated structured-capture OpenAPI 3.1 document from the runtime operation registry.
 - `pnpm test:accessibility`: runs axe WCAG A/AA plus keyboard, focus restoration, validation, announcements, reduced-motion, and responsive overflow checks and emits a redacted ignored report.
+- `pnpm capture:operations:check`: writes a private provider-free report for safe capture metrics, nine planning SLOs/alerts, bounded synthetic load, deterministic cost math, and six incident state simulations. It is not a production capacity benchmark.
 
 ## Release conclusion
 

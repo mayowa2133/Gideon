@@ -20,6 +20,8 @@ Pre-frame sensitive-region masking, privacy-safe receipts, and support-bundle re
 The exact Phase 9 local verification record is [capture-phase-9-evidence.md](./capture-phase-9-evidence.md).
 The supported CLI/MCP/OpenAPI operator surface and exact Phase 10 verification record are [capture-operator-guide.md](./capture-operator-guide.md) and [capture-phase-10-evidence.md](./capture-phase-10-evidence.md).
 The hosted accessibility/responsive contract and exact Phase 11 verification record are [capture-accessibility.md](./capture-accessibility.md) and [capture-phase-11-evidence.md](./capture-phase-11-evidence.md).
+The safe telemetry, SLO, alert, synthetic-load, deterministic-cost, and incident-exercise contract is [capture-operations-readiness.md](./capture-operations-readiness.md); operator response is [capture-incident-runbook.md](./capture-incident-runbook.md).
+The exact Phase 12 local verification record is [capture-phase-12-evidence.md](./capture-phase-12-evidence.md).
 
 ## Implemented boundaries
 
@@ -97,6 +99,7 @@ The hosted accessibility/responsive contract and exact Phase 11 verification rec
 - `src/main/capturePresentationRenderer.ts`: receipt-timed caption tracks, safe vertical framing, and explicitly provider-gated optional narration for pilot derivatives.
 - `src/main/captureBaselineReport.ts`: strict private-artifact selection, FFprobe inspection, quality-report/contact-sheet lineage, versioned baseline thresholds, and redacted cross-product evidence reporting.
 - `src/main/captureOperatorCli.ts` and `captureOpenApi.ts`: hosted operator command client, secret-free manifest boundary, runtime operation registry, and generated OpenAPI contract.
+- `src/main/captureOperationalReadiness.ts` and `captureOperationalReadinessCli.ts`: content-free capture telemetry, executable SLO/alert rules, synthetic concurrency/runaway exercise, deterministic cost estimate, safe incident receipts, and private local readiness report.
 
 ## Required production wiring
 
@@ -109,7 +112,7 @@ The code deliberately does not fall back to a local browser for remote products.
 5. Capture quota/entitlement and usage-recording callbacks.
 6. The provided captured-assembly store activator (or an equivalent transactional project-store adapter) that attaches the composite artifact and marks downstream analysis stale.
 7. The provided PostgreSQL-backed capture audit sink wiring for environment, credential, discovery, flow approval, run, cancellation, retry, coverage, and assembly actions.
-8. Dashboards and alerts fed by capture observability plus browser-worker and queue metrics.
+8. Export the safe capture-operation contract to a production backend and materialize the checked-in dashboard/alert definitions. The local evaluator and report do not prove metric delivery or paging.
 
 Run `pnpm capture:worker:check` before starting a worker and `pnpm capture:isolation:check` to verify the pinned definition. `pnpm capture:isolation:runtime:check` additionally requires a Docker engine and fails when runtime validation cannot execute.
 
@@ -122,6 +125,8 @@ The hosted API includes asynchronous environment validation and discovery create
 ## Verification
 
 `pnpm test:capture` covers policy, SSRF/DNS/redirect behavior, credentials, real Chromium replay, the hostile complex fixture, dangerous-action side-effect counters, geometry-only step evidence, framing compilation/fallback, focused FFmpeg rendering, black/blank/frozen/rushed/unreadable/caption-overflow/browser-error quality fixtures, deterministic crawling, login, real FFmpeg normalization, discovery, prompt-like evidence, repair, repository/test import, coverage, queueing, idempotency, cancellation, persistence, isolation manifests, retention/reconciliation, baseline evidence redaction, and service scoping. `pnpm test:infrastructure` starts disposable PostgreSQL and Redis, applies all migrations, exercises real BullMQ concurrency/failure paths plus the S3-compatible fixture, emits a redacted report, and verifies teardown. `pnpm test:web` covers the typed client and proxy policy. `pnpm test:e2e` covers session/capability gating plus safe quality warnings in the edit → approve → discover → capture → preview → coverage → assembly journey. Tests use synthetic applications/data and no customer media or credentials.
+
+`pnpm capture:operations:check` emits a mode-0600 local readiness receipt covering all nine stages, initial planning SLOs, alerts, 32 synthetic projects at concurrency four, one terminated runaway, deterministic cost math, and six failure-state simulations. It makes zero provider calls and is explicitly not a production capacity, failover, cost, or incident-response certification.
 
 The quality gate is deterministic evidence, not a human-comprehension claim. Effective UI text is a conservative declared source-text lower bound transformed through the actual crop, caption wrapping is estimated using the fixed overlay typography, and page-state evidence is a safe enum rather than retained page text. OCR, perceptual design review, mobile-device viewing, and human pacing comprehension remain external review activities.
 

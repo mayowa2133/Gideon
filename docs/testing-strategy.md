@@ -447,6 +447,12 @@ Set initial internal targets:
 
 Performance tests should be trend-based at first. Hard public SLAs should wait until production data exists.
 
+## Structured capture operational exercises
+
+Run `pnpm capture:operations:check` when changing capture queueing, retries, rendering, storage, deletion, runtime isolation, metrics, alerts, or quotas. The command must cover all nine capture stages, enforce the declared concurrency limit, terminate a deliberate runaway, preserve FIFO start fairness, keep cost estimation deterministic with zero provider calls, and contain worker/queue/database/storage/deletion/teardown failure models without duplicate usage.
+
+The generated mode-0600 report is ignored local evidence. Its timer-based synthetic work is a scheduler contract test, not throughput or saturation evidence. Before rollout, repeat load, soak, dependency failover, paging, recovery, and cost measurements against staging infrastructure and representative product flows.
+
 ## Security testing
 
 Security tests should cover:
