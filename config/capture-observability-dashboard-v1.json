@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1",
+  "id": "capture-operations-v1",
+  "title": "Gideon structured capture operations",
+  "safeDimensions": ["stage", "outcome", "safe_error_code", "attempt", "workspace_id", "project_id", "correlation_id"],
+  "forbiddenDimensions": ["page_text", "transcript", "prompt", "selector", "filename", "object_key", "signed_url", "credential", "cookie", "token"],
+  "panels": [
+    { "title": "Environment validation", "stages": ["environment_validation"], "measures": ["success_rate", "p50_duration_ms", "p95_duration_ms"] },
+    { "title": "Discovery", "stages": ["discovery"], "measures": ["success_rate", "p50_duration_ms", "p95_duration_ms"] },
+    { "title": "Queue and concurrency", "stages": ["queue"], "measures": ["p95_queue_delay_ms", "active", "queued", "concurrency_limited"] },
+    { "title": "Capture runs", "stages": ["capture"], "measures": ["success_rate", "p95_duration_ms", "canceled", "runaway_terminated"] },
+    { "title": "Retries", "stages": ["retry"], "measures": ["attempts", "success_rate", "exhausted"] },
+    { "title": "Rendering", "stages": ["render"], "measures": ["success_rate", "p95_duration_ms"] },
+    { "title": "Private storage", "stages": ["storage"], "measures": ["success_rate", "p95_duration_ms", "bytes"] },
+    { "title": "Deletion and retention", "stages": ["deletion"], "measures": ["success_rate", "pending_cleanup", "oldest_pending_age_ms"] },
+    { "title": "Runtime isolation", "stages": ["runtime_teardown"], "measures": ["success_rate", "attestation_rejected", "artifacts_quarantined"] }
+  ]
+}

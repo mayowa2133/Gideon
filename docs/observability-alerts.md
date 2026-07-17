@@ -2,6 +2,8 @@
 
 Gideon hosted workers emit structured JSON metrics and job observability snapshots. The executable alert catalog lives in `src/main/observability.ts`; this document is the operator-facing runbook for those rules.
 
+Structured product capture adds a content-free nine-stage metric, SLO, and alert contract in `src/main/captureOperationalReadiness.ts`. Its dashboard-as-data definition is `config/capture-observability-dashboard-v1.json`; operating and incident instructions are in [capture-operations-readiness.md](./capture-operations-readiness.md) and [capture-incident-runbook.md](./capture-incident-runbook.md).
+
 ## Dashboard panels
 
 | Panel | Source events | What to show |
@@ -41,5 +43,7 @@ Gideon hosted workers emit structured JSON metrics and job observability snapsho
 ## Implementation notes
 
 `evaluateObservabilityAlerts` accepts recent `JobObservabilitySnapshot` values plus timestamped executor and hosted API metric records. The evaluator returns `ok`, `firing`, or `no_data` per rule. Production integrations can map these results to Datadog, Prometheus Alertmanager, Grafana, Honeycomb triggers, or another observability backend without changing Gideon’s worker/API metric contract.
+
+`evaluateCaptureOperationAlerts` does the same for environment validation, discovery, queue, capture, retry, render, storage, deletion, and runtime teardown. `pnpm capture:operations:check` exercises the safe schema, planning SLOs, alert evaluation, bounded synthetic concurrency, runaway termination, deterministic cost model, and six incident state models without exporting data or contacting paid providers.
 
 Before live promotion, run `pnpm production:observability:check` with `GIDEON_OBSERVABILITY_BACKEND`, metric export URL, dashboard URL, runbook URL, alert route, paging flag, and queue/provider/storage thresholds configured. The check is intentionally provider-neutral: it proves the production observability contract is explicit without reading API keys or exporting private transcripts, prompts, object keys, signed URLs, or provider payloads.

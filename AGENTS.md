@@ -34,6 +34,8 @@ Do not expand the MVP into avatar generation, social posting, autonomous publish
 - Structured capture implementation status: docs/product-flow-capture-implementation.md
 - Structured capture requirement audit: docs/product-flow-capture-requirement-audit.md
 - Structured capture baseline evidence: docs/capture-baseline-evidence.md
+- Structured capture operational readiness: docs/capture-operations-readiness.md
+- Structured capture incident runbook: docs/capture-incident-runbook.md
 - Tooling research: docs/research/open-source-tools-research.md
 - Build/buy/fork recommendation: docs/research/build-vs-buy-vs-fork.md
 
@@ -105,6 +107,7 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm capture:hostile:check
 - pnpm capture:operator
 - pnpm capture:openapi
+- pnpm capture:operations:check
 - pnpm capture:isolation:check
 - pnpm capture:isolation:runtime:check
 - pnpm avatar:worker:check
