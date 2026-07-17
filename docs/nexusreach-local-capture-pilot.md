@@ -1,6 +1,6 @@
 # NexusReach local capture pilot
 
-Status: verified locally on July 15, 2026 against the guarded NexusReach demo environment, including action-aware vertical framing and automated video-quality evidence.
+Status: verified locally through the final July 16, 2026 recapture against the guarded NexusReach demo environment, including action-aware vertical framing and automated video-quality evidence.
 
 This pilot is an internal concierge command for exercising Gideon's real capture pipeline against one explicitly approved loopback product. It does not enable local browser execution for hosted or remote products.
 
@@ -44,7 +44,7 @@ This first supported command is headless rather than a hosted-UI launcher. The p
 
 ## Verified result
 
-The latest pilot completes dry runs and clean recordings for five approved workflows: onboarding, browsing/filtering jobs, reviewing saved contacts, updating the local job tracker, and reviewing a seeded unsent outreach draft. It produces a verified normalized clip, caption track, focused vertical derivative, private framing manifest, private quality report, and private JPEG contact sheet per workflow and independently verifies the expected synthetic API state. Phase 4 run `2026-07-15T06-38-28-916Z-b6bfb8ca-e2e5-4efb-92c3-5067495fe2f0` passed all five gates: four outputs were `ready`, and onboarding was `warning` because a legitimate loading state was observed. No output failed. Its current v2 snapshot covers five of five goals, five of five approved flows, one persona, two starting states, five usage sequences, and five outcomes. The bounded route inventory has 22 traceable entries from manifest, repository, rendered-navigation, and imported-test evidence, six of which these flows verify. Feature-flag coverage remains unknown, while two external-side-effect failure states are explicitly blocked rather than counted as uncovered.
+The latest pilot completes dry runs and clean recordings for five approved workflows: onboarding, browsing/filtering jobs, reviewing saved contacts, updating the local job tracker, and reviewing a seeded unsent outreach draft. It produces a verified normalized clip, caption track, focused vertical derivative, private framing manifest, private quality report, and private JPEG contact sheet per workflow and independently verifies the expected synthetic API state. Final run `2026-07-17T00-18-35-960Z-9fe4ac7c-948d-4560-aa36-8aa95b07b8a0` passed all five gates: four outputs were `ready`, and onboarding was `warning` because a legitimate loading state was observed. No output failed. Its current v2 snapshot covers five of five goals, five of five approved flows, one persona, two starting states, five usage sequences, and five outcomes. The bounded route inventory has 22 traceable entries from manifest, repository, rendered-navigation, and imported-test evidence, six of which these flows verify. Feature-flag coverage remains unknown, while two external-side-effect failure states are explicitly blocked rather than counted as uncovered.
 
 Run `pnpm test:capture` for the capture regression suite. NexusReach's independent smoke suite is:
 

@@ -136,6 +136,8 @@ The hosted entry page lists the signed-in workspace's projects and retains a pro
 7. Results show each clip’s verified/failed/blocked status, automated video-quality status, safe non-pass check codes, and bounded coverage. Each numeric percentage names its versioned denominator source/revision; stale or unknown inventories show their state without a percentage. Excluded and blocked counts remain explicit. Failed-quality clips are not previewable or selectable for assembly; warning clips remain available for explicit human review. Never label unknown product areas as uncovered zero, equate all declared workflows with all possible workflows, or claim complete-product coverage.
 8. The user activates the chosen assembly as the project source recording; the existing moment/script/render/export workflow then continues unchanged.
 
+Approved actions may wait briefly for asynchronously rendered controls, but only within the bounded worker timeout. A missing, hidden, or ambiguous control produces a safe review/retry state; the UI must never imply that the step was recorded successfully.
+
 Editing a proposal creates a new draft revision and invalidates any prior approval. The revised flow must be approved again before capture selection.
 
 If capture services are not wired, hide the choice. Do not expose a button that fails after the user enters environment or credential information.
@@ -399,6 +401,8 @@ MVP records usage but may not charge. The UX must still fail gracefully at limit
 ## Accessibility checklist by flow
 
 The hosted capture workspace provides a first-focus skip link, marks the active workflow stage with `aria-current="step"`, restores focus to the new view heading, announces progress/notices without relying on color, associates disabled setup actions with visible reasons, and honors reduced motion. Its private source-clip preview is explicitly labeled as silent; editable captions belong to the final approved video edit and must be reviewed there.
+
+The final locally verified capability/limitation matrix is [capture-final-delivery-2026-07-16.md](./capture-final-delivery-2026-07-16.md). Product copy must keep implemented-but-not-deployed, externally blocked, and human-evaluation items distinct from locally verified behavior.
 
 - Upload zone is a labeled button/input, not drag-only.
 - Progress uses text and `aria-live` with throttled announcements.

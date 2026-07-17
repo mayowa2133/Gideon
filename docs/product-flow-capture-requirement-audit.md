@@ -4,6 +4,8 @@ Audited against [product-flow-capture-plan.md](./product-flow-capture-plan.md) o
 
 The concrete local pilot and remaining rollout evidence are recorded in [capture-rollout-audit-2026-07-14.md](./capture-rollout-audit-2026-07-14.md).
 
+The superseding final recapture, four-way capability classification, and recommended first external validation are [capture-final-delivery-2026-07-16.md](./capture-final-delivery-2026-07-16.md).
+
 This audit distinguishes code-complete boundaries from deployment, UX, vendor, and evidence gates. A checked code boundary is not permission to advertise general availability.
 
 | Plan area | Repository status | Remaining release evidence |

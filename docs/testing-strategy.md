@@ -453,6 +453,8 @@ Run `pnpm capture:operations:check` when changing capture queueing, retries, ren
 
 The generated mode-0600 report is ignored local evidence. Its timer-based synthetic work is a scheduler contract test, not throughput or saturation evidence. Before rollout, repeat load, soak, dependency failover, paging, recovery, and cost measurements against staging infrastructure and representative product flows.
 
+For a final structured-capture delivery candidate, rerun both registered pilots, `pnpm capture:hostile:check`, and `pnpm capture:baseline`, then run lint, typecheck, capture/full/web/E2E tests, the production build, static isolation, production readiness/observability dry-runs, and the production-shaped capture-worker preflight. Restore generated tracked files and keep private media/reports out of Git. A review warning is not a failure, but it must remain visible and requires human disposition before customer use.
+
 ## Security testing
 
 Security tests should cover:

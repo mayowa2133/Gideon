@@ -22,6 +22,8 @@ The supported CLI/MCP/OpenAPI operator surface and exact Phase 10 verification r
 The hosted accessibility/responsive contract and exact Phase 11 verification record are [capture-accessibility.md](./capture-accessibility.md) and [capture-phase-11-evidence.md](./capture-phase-11-evidence.md).
 The safe telemetry, SLO, alert, synthetic-load, deterministic-cost, and incident-exercise contract is [capture-operations-readiness.md](./capture-operations-readiness.md); operator response is [capture-incident-runbook.md](./capture-incident-runbook.md).
 The exact Phase 12 local verification record is [capture-phase-12-evidence.md](./capture-phase-12-evidence.md).
+The final real-product recapture, limitation matrix, PR ledger, and recommended external validation are [capture-final-delivery-2026-07-16.md](./capture-final-delivery-2026-07-16.md).
+The exact Phase 13 local verification and failure-resolution record is [capture-phase-13-evidence.md](./capture-phase-13-evidence.md).
 
 ## Implemented boundaries
 
@@ -37,6 +39,7 @@ The exact Phase 12 local verification record is [capture-phase-12-evidence.md](.
 - Every flow resets before both dry run and recording. Failed dry runs stop before recording; failed assertions produce review state instead of successful clips.
 - Playwright replay uses fixed viewport, locale, timezone, color scheme, reduced motion, disabled downloads, and per-request network-policy checks.
 - Browser action timeouts are explicit and bounded. Geometry collection checks visibility before attempting scroll alignment, so hidden modals and controls cannot consume the timeout after every step.
+- Browser controls rendered after `DOMContentLoaded` are awaited within that same bounded timeout before uniqueness/visibility evaluation; the final NexusReach recapture found and regression-tested this race.
 - Every browser and inventory context installs a hash-bound strict masking policy before page creation. Password, token, payment, email, personal-data, visible secret-shaped text, custom selectors, and canvas regions are obscured and continuously realigned; masking is audited before screenshots/actions and at completion, and unavailable/incomplete masking fails closed.
 - Successful step receipts include schema-validated geometry-only visual evidence: viewport and optional action, visible-result, and modal bounds. Receipts never add selector values, DOM text, fixture values, or screenshots to framing telemetry; isolated-runtime responses are revalidated before use.
 - Raw WebM, verification receipt, network/action telemetry, normalized H.264 clip, assembly manifest, and composite source recording are private artifacts with hashes and lineage. Explicit assembly jobs preserve the user's selected clip order before activation.
