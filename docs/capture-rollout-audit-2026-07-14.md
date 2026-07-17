@@ -1,5 +1,7 @@
 # Product-flow capture rollout audit — 2026-07-14
 
+Historical snapshot. The superseding final local audit, current recapture IDs, capability matrix, and remaining gates are [capture-final-delivery-2026-07-16.md](./capture-final-delivery-2026-07-16.md).
+
 ## Decision
 
 The local concierge capture path has passed two independent real demo-product pilots and is ready for controlled design-partner use. It is not ready to be advertised as generally available autonomous capture.

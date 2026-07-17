@@ -571,6 +571,11 @@ class LocatorResolutionError extends Error {
 
 async function uniqueActionLocator(page: Page, spec: LocatorSpec): Promise<Locator> {
   const locator = locatorFor(page, spec);
+  try {
+    await locator.first().waitFor({ state: "attached" });
+  } catch {
+    throw new LocatorResolutionError("locator_not_found");
+  }
   const count = await locator.count();
   if (count === 0) throw new LocatorResolutionError("locator_not_found");
   let visible = 0;

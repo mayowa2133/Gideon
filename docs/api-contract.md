@@ -545,6 +545,7 @@ These `/api/v1` routes are available only when the structured-capture service is
 
 - Returns the authenticated, no-store OpenAPI 3.1 document generated from `CAPTURE_RUNTIME_OPERATIONS`.
 - The checked-in equivalent is `docs/openapi/capture-api.json`, regenerated with `pnpm capture:openapi` and contract-tested for unique operation IDs, revision requirements, and idempotency headers.
+- The final local capability and deployment-boundary audit is [capture-final-delivery-2026-07-16.md](./capture-final-delivery-2026-07-16.md). It does not change the route contract or make dependency-gated routes generally available.
 
 - **Configuration:** capture routes return `503 capture_not_configured` unless the application, coordinator, control, isolated runtime, queue, storage, and persistence dependencies required by that route are wired.
 - **Errors:** 404.

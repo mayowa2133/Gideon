@@ -36,6 +36,7 @@ Do not expand the MVP into avatar generation, social posting, autonomous publish
 - Structured capture baseline evidence: docs/capture-baseline-evidence.md
 - Structured capture operational readiness: docs/capture-operations-readiness.md
 - Structured capture incident runbook: docs/capture-incident-runbook.md
+- Structured capture final local delivery: docs/capture-final-delivery-2026-07-16.md
 - Tooling research: docs/research/open-source-tools-research.md
 - Build/buy/fork recommendation: docs/research/build-vs-buy-vs-fork.md
 
