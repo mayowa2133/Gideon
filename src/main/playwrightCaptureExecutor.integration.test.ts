@@ -32,6 +32,10 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
         response.end(`<!doctype html><html><body><p>Loading profile</p><script>setTimeout(() => location.href = '/new', 250)</script></body></html>`);
         return;
       }
+      if (request.url === "/late-control") {
+        response.end(`<!doctype html><html><body><main><p>Loading controls</p></main><script>setTimeout(() => { const button = document.createElement('button'); button.textContent = 'Get started'; button.onclick = () => document.querySelector('main').innerHTML = '<p>Ready</p>'; document.querySelector('main').append(button); }, 250)</script></body></html>`);
+        return;
+      }
       if (request.url === "/login-state") {
         response.end(`<!doctype html><html><body><label>Password <input type="password" /></label></body></html>`);
         return;
@@ -161,6 +165,15 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     expect(result.receipt.status).toBe("verified");
     expect(result.receipt.steps.at(-1)?.status).toBe("succeeded");
   }, 20_000);
+
+  it("waits within the bounded action timeout for asynchronously rendered controls", async () => {
+    const flow = createFlow();
+    flow.startingState.entryPath = "/late-control";
+    flow.steps = [{ id: "start", intent: "Use the control after the application renders.", action: { type: "click", target: { strategy: "role", role: "button", value: "Get started", exact: true } }, riskClass: "navigate" }];
+    flow.finalAssertions = [{ type: "text", target: { strategy: "text", value: "Ready", exact: true }, value: "Ready" }];
+    const result = await executePlaywrightCapture({ id: "execution-late-control", workspaceId: "workspace-1", plan: compileProductFlow(flow, createPolicy(baseUrl)), policy: createPolicy(baseUrl), fixtureValues: {}, outputDir, recordVideo: false, executablePath, actionTimeoutMs: 2_000, now: incrementingClock() });
+    expect(result.receipt).toMatchObject({ status: "verified", steps: [{ status: "succeeded" }] });
+  }, 10_000);
 
   it("returns a failed verification receipt instead of claiming completion", async () => {
     const flow = createFlow();
