@@ -13,6 +13,7 @@ import {
   splitCaptionSegments,
   validateProfile
 } from "../shared/contentEngine";
+import { compileCreativeBlueprint, projectBlueprintOntoEditDecisionList } from "../shared/creativeBlueprint";
 import {
   buildEditDecisionList,
   buildEvidenceClaims,
@@ -1484,6 +1485,33 @@ export class GideonStore {
             completed: renders.filter((render) => render.status === "completed").length,
             failed: renders.filter((render) => render.status === "failed").length
           }
+        }
+      }
+    );
+  }
+
+  async setRenderFinalApproval(projectId: string, renderId: string, approved: boolean): Promise<Project> {
+    return this.updateProject(
+      projectId,
+      (project) => {
+        const render = project.renders.find((candidate) => candidate.id === renderId);
+        if (!render || render.status !== "completed") {
+          throw new Error("Only a completed render can receive final approval.");
+        }
+        if (approved && render.qualityReport && !render.qualityReport.publishable) {
+          throw new Error("Resolve blocking creator-video quality failures before final approval.");
+        }
+        render.finalApproval = { approved, approvedAt: approved ? new Date().toISOString() : undefined };
+        project.updatedAt = new Date().toISOString();
+      },
+      {
+        audit: {
+          actorType: "local_user",
+          action: "render.complete",
+          targetType: "render",
+          targetId: renderId,
+          summary: approved ? "User approved the final creator-video export." : "User removed final creator-video approval.",
+          metadata: { approved }
         }
       }
     );
@@ -2989,7 +3017,17 @@ function normalizeScriptDraft(project: Project, script: ScriptDraft): ScriptDraf
   const cta = script.cta.trim();
   const evidenceClaims = buildEvidenceClaims({ moments, hook, cta, voiceoverText });
   const qualityWarnings = scriptQualityWarnings({ hook, voiceoverText, captions, evidenceClaims });
-  return {
+  const editDecisionList = buildEditDecisionList({
+    profile: project.profile,
+    templateKey,
+    durationMs,
+    captions,
+    visualBeats,
+    hook,
+    cta,
+    moments
+  });
+  const normalizedBase: ScriptDraft = {
     ...script,
     templateKey,
     hook,
@@ -2997,17 +3035,24 @@ function normalizeScriptDraft(project: Project, script: ScriptDraft): ScriptDraf
     captions,
     cta,
     visualBeats,
-    editDecisionList: buildEditDecisionList({
-      profile: project.profile,
-      templateKey,
-      durationMs,
-      captions,
-      visualBeats,
-      hook,
-      cta,
-      moments
-    }),
+    editDecisionList,
     evidenceClaims,
     qualityWarnings
+  };
+  if (!normalizedBase.approved) {
+    return { ...normalizedBase, creativeBlueprint: undefined };
+  }
+  const { blueprint } = compileCreativeBlueprint({
+    profile: project.profile,
+    script: normalizedBase,
+    moments,
+    frameEvidence: project.frameEvidence,
+    recordingPath: project.recording?.filePath,
+    previousBlueprint: script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint
+  });
+  return {
+    ...normalizedBase,
+    creativeBlueprint: blueprint,
+    editDecisionList: projectBlueprintOntoEditDecisionList(editDecisionList, blueprint)
   };
 }

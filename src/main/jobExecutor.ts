@@ -10,8 +10,10 @@ import { createAvatarWorker, type AvatarWorker } from "./avatarWorker";
 import { failJob, startJob, succeedJob, updateJobStage } from "../shared/jobState";
 import { estimateScriptDurationMs } from "../shared/contentEngine";
 import { hasBlockingScriptWarnings } from "../shared/renderTemplates";
+import { evaluateCreatorVideoQuality } from "../shared/creatorVideoQuality";
 import type {
   ArtifactRecord,
+  CreatorVideoQualityReport,
   DetectedMoment,
   FrameEvidence,
   JobEvent,
@@ -350,6 +352,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
           const renderId = makeId();
           const renderStartedAtMs = nowMs();
           let rendered: RenderDraftResult;
+          let qualityReport: CreatorVideoQualityReport | undefined;
           try {
             const avatarPresenterPath = await matchingAvatarPresenterPath(project, script);
             rendered = await renderDraft({
@@ -363,6 +366,31 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
               voiceoverPath: voiceoverPath ?? undefined,
               avatarPresenterPath
             });
+            const blueprint = script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint;
+            if (blueprint) {
+              const presenterEnabled = blueprint.scenes.some((scene) => scene.presenter.visible);
+              const avatarArtifact = latestArtifactForScript(project.artifacts, "avatar_presenter", script.id);
+              qualityReport = evaluateCreatorVideoQuality({
+                blueprint,
+                render: rendered.validation,
+                sourceScript: { id: script.id, updatedAt: script.updatedAt },
+                avatar: {
+                  artifactPresent: !presenterEnabled || Boolean(avatarPresenterPath) || Boolean(project.profile.avatarPresenterId),
+                  consent: project.profile.customAvatarSource?.consent ?? { assetType: "fictional_catalog", status: "not_required" },
+                  performance: avatarArtifact?.avatarPerformance ?? (presenterEnabled ? {
+                    width: 1080,
+                    height: 1920,
+                    fps: 30,
+                    durationMs: blueprint.targetDurationMs,
+                    cropSafeRegion: { x: 0.06, y: 0.04, width: 0.88, height: 0.92 },
+                    backgroundType: avatarPresenterPath ? "baked" : "deterministic_fixture",
+                    status: "completed"
+                  } : undefined),
+                  quality: avatarArtifact?.avatarQualityReport
+                },
+                now: createdAt
+              });
+            }
             emitMetric({
               name: "render_draft_finished",
               projectId,
@@ -409,6 +437,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
             sha256: stored.artifact.sha256,
             sizeBytes: stored.artifact.byteSize,
             validation: rendered.validation,
+            qualityReport,
             createdAt
           });
         } catch (error) {
@@ -560,6 +589,8 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
           originalFileName: `${script.id}-${avatarId}.mp4`,
           contentType: "video/mp4",
           avatarModelReceipt: result.receipt,
+          avatarPerformance: result.performance,
+          avatarQualityReport: result.qualityReport,
           avatarPresenterLineage: {
             sourceScriptId: script.id,
             sourceScriptUpdatedAt: script.updatedAt,

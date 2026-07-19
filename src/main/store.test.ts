@@ -1177,6 +1177,27 @@ describe("GideonStore billing reconciliation", () => {
       )
     ).toBe(true);
   });
+
+  it("persists final render approval and blocks approval when quality gates fail", async () => {
+    const store = new GideonStore();
+    await store.load();
+    const project = await store.createProject({ name: "Approval", profile: profileFixture() });
+    const qualityBase = {
+      schemaVersion: "1" as const,
+      blueprintId: "blueprint-1",
+      generatedAt: "2026-07-18T00:00:00.000Z",
+      gates: [],
+      avatarQuality: { requiresHumanReview: true as const, evaluator: "not_run" as const }
+    };
+    await store.replaceRenders(project.id, [
+      renderFixture({ id: "pass", qualityReport: { ...qualityBase, publishable: true } }),
+      renderFixture({ id: "fail", qualityReport: { ...qualityBase, publishable: false } })
+    ]);
+
+    const approved = await store.setRenderFinalApproval(project.id, "pass", true);
+    expect(approved.renders.find(({ id }) => id === "pass")?.finalApproval?.approved).toBe(true);
+    await expect(store.setRenderFinalApproval(project.id, "fail", true)).rejects.toThrow("quality failures");
+  });
 });
 
 describe("GideonStore relational read paths", () => {

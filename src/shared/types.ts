@@ -282,6 +282,8 @@ export interface ArtifactRecord {
   avatarModelReceipt?: AvatarModelReceipt;
   avatarPresenterLineage?: AvatarPresenterLineage;
   avatarConsentRecord?: AvatarConsentRecord;
+  avatarPerformance?: AvatarPerformanceMetadata;
+  avatarQualityReport?: AvatarQualityReport;
   createdAt: string;
 }
 
@@ -379,6 +381,22 @@ export type CtaStylePreset = "soft_try" | "direct_signup" | "learn_more";
 
 export type MusicMood = "none" | "clean_tech" | "upbeat";
 
+export type CreatorPacePreset = "readable" | "energetic" | "reference_fast";
+
+export type CreatorShotType =
+  | "product_hero"
+  | "product_fullscreen"
+  | "product_mockup"
+  | "presenter_fullscreen"
+  | "presenter_lower_third"
+  | "presenter_with_card"
+  | "split_presenter_product"
+  | "comparison_card"
+  | "kinetic_typography"
+  | "cta_end_card";
+
+export type CreatorCaptionFamily = "kinetic_bold" | "editorial_serif_italic";
+
 export interface BrandKit {
   id?: string;
   productName: string;
@@ -409,6 +427,8 @@ export interface ProductProfile {
   brandPresenterMotion?: BrandPresenterLayer["motion"];
   soundDesignEnabled?: boolean;
   musicMood?: MusicMood;
+  creatorPacePreset?: CreatorPacePreset;
+  pronunciationDictionary?: Record<string, string>;
   brandKit?: BrandKit;
 }
 
@@ -695,7 +715,7 @@ export interface FictionalAvatarPresenter {
 }
 
 export interface AvatarModelReceipt {
-  provider: "sadtalker" | "musetalk" | "talkinghead";
+  provider: "sadtalker" | "musetalk" | "talkinghead" | "deterministic_fixture";
   modelVersion: string;
   modelLicense: string;
   avatarId: FictionalAvatarPresenterId;
@@ -712,6 +732,182 @@ export interface AvatarConsentRecord {
   sourceArtifactId?: string;
   consentPolicyVersion?: "self-avatar-v1";
   subjectRelationship?: "self";
+}
+
+export interface CreatorVideoTemplateSpec {
+  id: string;
+  version: 1;
+  name: string;
+  targetDurationMs: { min: number; default: number; max: number };
+  defaultPacePreset: Exclude<CreatorPacePreset, "reference_fast">;
+  paceRangesWpm: Record<CreatorPacePreset, { min: number; max: number }>;
+  structure: Array<"hook" | "problem" | "demo" | "proof" | "payoff" | "cta">;
+  hookDeadlineMs: number;
+  sceneDurationMs: { min: number; preferred: number; max: number };
+  productProofDwellMs: { min: number; complexMin: number };
+  ctaDurationMs: number;
+  allowedShotTypes: CreatorShotType[];
+  captionFamilies: CreatorCaptionFamily[];
+  transitionPolicy: Array<RenderTransitionCue["kind"]>;
+  presenterRules: {
+    mayHideForProductProof: boolean;
+    maximumConsecutivePresenterScenes: number;
+    allowedLayouts: PresenterCue["layout"][];
+  };
+  safeAreas: {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
+  audio: {
+    targetLufs: number;
+    toleranceLu: number;
+    maxContinuousSilenceMs: number;
+  };
+  qualityGates: CreativeBlueprintQualityPolicy;
+}
+
+export type ProductEvidenceAssetKind =
+  | "screenshot"
+  | "interaction_clip"
+  | "browser_mockup"
+  | "phone_mockup"
+  | "terminal_card"
+  | "before_after_pair"
+  | "feature_card"
+  | "comparison_card"
+  | "product_hero"
+  | "conceptual_card";
+
+export interface ProductEvidenceAsset {
+  id: string;
+  kind: ProductEvidenceAssetKind;
+  label: string;
+  sourceMomentIds: string[];
+  sourceEvidenceIds: string[];
+  supportedClaimIds: string[];
+  sourceStartMs?: number;
+  sourceEndMs?: number;
+  imagePath?: string;
+  imageUrl?: string;
+  clipPath?: string;
+  maskingStatus: "not_required" | "masked" | "needs_review";
+  crop: RenderFocusPoint;
+  readableRegion: { x: number; y: number; width: number; height: number };
+  provenance: "captured_product" | "evidence_derived" | "user_supplied" | "conceptual";
+  approvalStatus: "draft" | "approved" | "rejected";
+  factualUseAllowed: boolean;
+}
+
+export interface PresenterCue {
+  visible: boolean;
+  avatarArtifactId?: string;
+  layout: "fullscreen" | "close_up" | "medium" | "lower_third" | "split_left" | "split_right";
+  crop: RenderFocusPoint;
+  position: "center" | "lower_left" | "lower_right" | "left" | "right";
+  scale: number;
+  expression: "neutral" | "confident" | "excited" | "explanatory";
+  gestureIntent: "none" | "open_hand" | "point" | "emphasis";
+  motionIntensity: "subtle" | "medium" | "energetic";
+  eyeline: "camera" | "product_left" | "product_right";
+  backgroundTreatment: "transparent" | "green_screen" | "baked" | "deterministic_fixture";
+  disclosure: BrandPresenterLayer["disclosure"];
+  sourceScriptId: string;
+  sourceScriptUpdatedAt: string;
+  sourceConsentArtifactId?: string;
+  manuallyOverridden?: boolean;
+}
+
+export interface SceneTypographyCue {
+  family: CreatorCaptionFamily;
+  text: string;
+  emphasizedWords: string[];
+  position: "top" | "center" | "bottom" | "left" | "right";
+  maxLines: number;
+  manuallyOverridden?: boolean;
+}
+
+export interface SceneComposition {
+  id: string;
+  startMs: number;
+  endMs: number;
+  purpose: "hook" | "problem" | "demo" | "proof" | "payoff" | "cta";
+  shotType: CreatorShotType;
+  presenter: PresenterCue;
+  productAssetIds: string[];
+  supportedClaimIds: string[];
+  captions: CaptionSegment[];
+  typography: SceneTypographyCue[];
+  background: { kind: "brand" | "light" | "dark" | "product_blur"; color?: string };
+  transition: { kind: RenderTransitionCue["kind"] | "none"; durationMs: number };
+  focus: RenderFocusPoint;
+  minimumReadableDwellMs: number;
+  audioCues: RenderSfxCue[];
+  manuallyOverridden?: boolean;
+}
+
+export interface CreativeBlueprintQualityPolicy {
+  requireEvidenceBackedClaims: boolean;
+  requireCaptionSafeArea: boolean;
+  requireAudioAlignment: boolean;
+  requireCta: boolean;
+  requireAvatarDisclosure: boolean;
+  maxVisualChangesPerTenSeconds: number;
+  minProductTextScale: number;
+}
+
+export interface CreativeBlueprint {
+  schemaVersion: "1";
+  id: string;
+  templateId: string;
+  templateVersion: number;
+  targetDurationMs: number;
+  pacePreset: CreatorPacePreset;
+  estimatedWordsPerMinute: number;
+  hook: string;
+  cta: string;
+  brandKit: BrandKit;
+  claimIds: string[];
+  productAssets: ProductEvidenceAsset[];
+  scenes: SceneComposition[];
+  renderPolicy: {
+    canvas: { width: 1080; height: 1920; fps: 30 };
+    targetLufs: number;
+    loudnessToleranceLu: number;
+    ctaDurationMs: number;
+  };
+  qualityPolicy: CreativeBlueprintQualityPolicy;
+  compiledAt: string;
+}
+
+export interface AvatarPerformanceMetadata {
+  width: number;
+  height: number;
+  fps: number;
+  durationMs: number;
+  cropSafeRegion: { x: number; y: number; width: number; height: number };
+  backgroundType: "transparent" | "green_screen" | "baked" | "deterministic_fixture";
+  wordTimings?: CaptionSegment["words"];
+  phonemeTimings?: Array<{ startMs: number; endMs: number; phoneme: string }>;
+  expressionTags?: Array<{ startMs: number; endMs: number; expression: PresenterCue["expression"] }>;
+  gestureTags?: Array<{ startMs: number; endMs: number; gesture: PresenterCue["gestureIntent"] }>;
+  status: "completed" | "failed";
+  failureCode?: string;
+}
+
+export interface AvatarQualityReport {
+  lipSyncScore?: number;
+  mouthDeformationScore?: number;
+  identityStabilityScore?: number;
+  blinkAndHeadMotionScore?: number;
+  handDeformationScore?: number;
+  segmentationHaloScore?: number;
+  temporalFlickerScore?: number;
+  pronunciationScore?: number;
+  emotionalAppropriatenessScore?: number;
+  requiresHumanReview: true;
+  evaluator: "external_model" | "human" | "not_run";
 }
 
 export interface EditDecisionList {
@@ -746,6 +942,7 @@ export interface EditDecisionList {
     requireCaptionSafeArea: boolean;
     requireAudioAlignment: boolean;
   };
+  creativeBlueprint?: CreativeBlueprint;
 }
 
 export interface EvidenceClaim {
@@ -769,6 +966,7 @@ export interface ScriptDraft {
   cta: string;
   visualBeats: VisualBeat[];
   editDecisionList?: EditDecisionList;
+  creativeBlueprint?: CreativeBlueprint;
   evidenceClaims?: EvidenceClaim[];
   qualityWarnings?: ScriptQualityWarning[];
   approved: boolean;
@@ -790,6 +988,53 @@ export interface RenderValidation {
     maxLuma: number;
     minLumaStandardDeviation: number;
   };
+  audioQa?: {
+    integratedLufs: number;
+    loudnessRangeLu: number;
+    maxContinuousSilenceMs: number;
+    targetLufs: number;
+    withinTarget: boolean;
+  };
+}
+
+export type CreatorVideoQualityGateCode =
+  | "output_format"
+  | "duration"
+  | "audio_presence"
+  | "audio_loudness"
+  | "audio_silence"
+  | "frame_signal"
+  | "caption_safe_area"
+  | "caption_overflow"
+  | "product_scale"
+  | "scene_dwell"
+  | "visual_cut_rate"
+  | "repeated_product_asset"
+  | "cta"
+  | "claim_evidence"
+  | "presenter_caption_collision"
+  | "avatar_disclosure"
+  | "avatar_lineage"
+  | "avatar_consent"
+  | "avatar_artifact"
+  | "avatar_crop_signal"
+  | "avatar_background"
+  | "avatar_subjective_quality";
+
+export interface CreatorVideoQualityGateResult {
+  code: CreatorVideoQualityGateCode;
+  status: "pass" | "warning" | "fail" | "requires_external_review";
+  message: string;
+  sceneIds?: string[];
+}
+
+export interface CreatorVideoQualityReport {
+  schemaVersion: "1";
+  blueprintId: string;
+  generatedAt: string;
+  publishable: boolean;
+  gates: CreatorVideoQualityGateResult[];
+  avatarQuality: AvatarQualityReport;
 }
 
 export interface RenderedVideo {
@@ -805,6 +1050,11 @@ export interface RenderedVideo {
   sizeBytes?: number;
   error?: string;
   validation?: RenderValidation;
+  qualityReport?: CreatorVideoQualityReport;
+  finalApproval?: {
+    approved: boolean;
+    approvedAt?: string;
+  };
   createdAt: string;
 }
 

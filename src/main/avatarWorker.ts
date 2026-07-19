@@ -2,7 +2,13 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { fictionalAvatarPresenterCatalog } from "../shared/renderTemplates";
-import type { AvatarConsentRecord, AvatarModelReceipt, FictionalAvatarPresenterId } from "../shared/types";
+import type {
+  AvatarConsentRecord,
+  AvatarModelReceipt,
+  AvatarPerformanceMetadata,
+  AvatarQualityReport,
+  FictionalAvatarPresenterId
+} from "../shared/types";
 
 export type AvatarWorkerProvider = "disabled" | "sadtalker" | "musetalk";
 
@@ -27,6 +33,8 @@ export interface AvatarWorkerRequest {
 export interface AvatarWorkerResult {
   outputPath: string;
   receipt: AvatarModelReceipt;
+  performance?: AvatarPerformanceMetadata;
+  qualityReport?: AvatarQualityReport;
 }
 
 export interface AvatarWorker {
@@ -148,7 +156,39 @@ export function parseAvatarWorkerResult(
   ) {
     throw new Error("Avatar worker receipt does not match the approved request.");
   }
-  return { outputPath: input.outputPath, receipt };
+  if (result.performance) {
+    validateAvatarPerformanceMetadata(result.performance, input.durationMs);
+  }
+  return {
+    outputPath: input.outputPath,
+    receipt,
+    performance: result.performance,
+    qualityReport: result.qualityReport
+  };
+}
+
+export function validateAvatarPerformanceMetadata(metadata: AvatarPerformanceMetadata, expectedDurationMs: number): void {
+  if (metadata.status !== "completed") {
+    throw new Error("Avatar worker did not return a completed performance.");
+  }
+  if (
+    !Number.isFinite(metadata.width) || metadata.width < 360 || metadata.width > 4096 ||
+    !Number.isFinite(metadata.height) || metadata.height < 360 || metadata.height > 4096 ||
+    !Number.isFinite(metadata.fps) || metadata.fps < 20 || metadata.fps > 60 ||
+    !Number.isFinite(metadata.durationMs) || Math.abs(metadata.durationMs - expectedDurationMs) > 1_500
+  ) {
+    throw new Error("Avatar worker performance dimensions, frame rate, or duration are invalid.");
+  }
+  const region = metadata.cropSafeRegion;
+  if (
+    region.x < 0 || region.y < 0 || region.width <= 0 || region.height <= 0 ||
+    region.x + region.width > 1 || region.y + region.height > 1
+  ) {
+    throw new Error("Avatar worker crop-safe region is invalid.");
+  }
+  if (metadata.backgroundType === "transparent" && metadata.width < 720) {
+    throw new Error("Transparent avatar output is too small for multi-layout composition.");
+  }
 }
 
 function runAvatarProcess(commandPath: string, args: string[]): Promise<{ stdout: string; stderr: string }> {

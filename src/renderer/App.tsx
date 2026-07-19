@@ -6,6 +6,8 @@ import type {
   BrandKit,
   CaptionStylePreset,
   ContentConcept,
+  CreatorPacePreset,
+  CreatorShotType,
   CreatorTemplateKey,
   CtaStylePreset,
   DetectedMoment,
@@ -59,6 +61,11 @@ const ctaStyles: CtaStylePreset[] = ["soft_try", "direct_signup", "learn_more"];
 const musicMoods: MusicMood[] = ["none", "clean_tech", "upbeat"];
 const presenterPositions = ["lower_right", "lower_left"] as const;
 const presenterMotions = ["caption_sync", "idle_bob"] as const;
+const creatorPacePresets: CreatorPacePreset[] = ["readable", "energetic", "reference_fast"];
+const creatorShotTypes: CreatorShotType[] = [
+  "product_hero", "product_fullscreen", "product_mockup", "presenter_fullscreen", "presenter_lower_third",
+  "presenter_with_card", "split_presenter_product", "comparison_card", "kinetic_typography", "cta_end_card"
+];
 const fictionalAvatarPreviewUrls: Partial<Record<NonNullable<ProductProfile["avatarPresenterId"]>, string>> = {
   orbit: new URL("../../assets/avatar-catalog/orbit.png", import.meta.url).toString(),
   nova: new URL("../../assets/avatar-catalog/nova.png", import.meta.url).toString()
@@ -1091,6 +1098,9 @@ function ProjectWorkspace({
         <RenderGallery
           project={project}
           exporting={busy === "exporting"}
+          onApproval={(renderId, approved) =>
+            void runAction("exporting", () => window.gideon.setRenderFinalApproval(project.id, renderId, approved))
+          }
           onExport={(renderId) =>
             void runAction("exporting", async () => {
               const exported = await window.gideon.exportVideo(project.id, renderId);
@@ -1320,6 +1330,19 @@ function ProfileForm({
           {creatorTemplatePack.map((template) => (
             <option key={template.key} value={template.key}>
               {template.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Video pace
+        <select
+          value={profile.creatorPacePreset ?? "energetic"}
+          onChange={(event) => update("creatorPacePreset", event.target.value as CreatorPacePreset)}
+        >
+          {creatorPacePresets.map((preset) => (
+            <option key={preset} value={preset}>
+              {preset === "readable" ? "Readable · 145–160 WPM" : preset === "energetic" ? "Energetic · 160–175 WPM" : "Reference-fast · 200–235 WPM"}
             </option>
           ))}
         </select>
@@ -1862,6 +1885,62 @@ function ScriptEditor({
     );
   }
 
+  function updateBlueprintScene(
+    scriptId: string,
+    sceneId: string,
+    updater: (scene: NonNullable<ScriptDraft["creativeBlueprint"]>["scenes"][number]) => NonNullable<ScriptDraft["creativeBlueprint"]>["scenes"][number]
+  ): void {
+    setScripts(scripts.map((script) => {
+      const blueprint = script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint;
+      if (script.id !== scriptId || !blueprint) return script;
+      const nextBlueprint = {
+        ...blueprint,
+        scenes: blueprint.scenes.map((scene) => scene.id === sceneId ? { ...updater(scene), manuallyOverridden: true } : scene)
+      };
+      return {
+        ...script,
+        creativeBlueprint: nextBlueprint,
+        editDecisionList: script.editDecisionList ? { ...script.editDecisionList, creativeBlueprint: nextBlueprint } : script.editDecisionList
+      };
+    }));
+  }
+
+  function regenerateBlueprintScene(scriptId: string, sceneId: string): void {
+    setScripts(scripts.map((script) => {
+      const blueprint = script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint;
+      if (script.id !== scriptId || !blueprint) return script;
+      const nextBlueprint = {
+        ...blueprint,
+        scenes: blueprint.scenes.map((scene) => scene.id === sceneId ? { ...scene, manuallyOverridden: false } : scene)
+      };
+      return {
+        ...script,
+        creativeBlueprint: nextBlueprint,
+        editDecisionList: script.editDecisionList ? { ...script.editDecisionList, creativeBlueprint: nextBlueprint } : script.editDecisionList
+      };
+    }));
+  }
+
+  function updateBlueprintAsset(
+    scriptId: string,
+    assetId: string,
+    changes: Partial<NonNullable<ScriptDraft["creativeBlueprint"]>["productAssets"][number]>
+  ): void {
+    setScripts(scripts.map((script) => {
+      const blueprint = script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint;
+      if (script.id !== scriptId || !blueprint) return script;
+      const nextBlueprint = {
+        ...blueprint,
+        productAssets: blueprint.productAssets.map((asset) => asset.id === assetId ? { ...asset, ...changes } : asset)
+      };
+      return {
+        ...script,
+        creativeBlueprint: nextBlueprint,
+        editDecisionList: script.editDecisionList ? { ...script.editDecisionList, creativeBlueprint: nextBlueprint } : script.editDecisionList
+      };
+    }));
+  }
+
   return (
     <div className="script-stack">
       {scripts.map((script, index) => {
@@ -1958,6 +2037,143 @@ function ScriptEditor({
               <span>{readyAvatarScriptIds.has(script.id) ? "avatar clip ready" : "static presenter"}</span>
               <span>{script.approved ? "approved" : "needs approval"}</span>
             </div>
+            {(script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint) ? (
+              <div className="creative-blueprint-review">
+                <div className="section-heading compact-heading">
+                  <div>
+                    <p className="eyebrow">Creative blueprint</p>
+                    <h4>Scene-by-scene direction</h4>
+                  </div>
+                  <span>
+                    {(script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint)?.pacePreset.replace(/_/g, " ")} ·{" "}
+                    {Math.round(((script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint)?.targetDurationMs ?? 0) / 100) / 10}s
+                  </span>
+                </div>
+                <div className="blueprint-asset-list">
+                  {(script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint)!.productAssets.map((asset) => (
+                    <div className="blueprint-asset-row" key={`${script.id}-${asset.id}`}>
+                      <span>{asset.label} · {asset.kind.replace(/_/g, " ")}</span>
+                      <div className="blueprint-asset-controls">
+                        <select
+                          aria-label={`Masking for ${asset.label}`}
+                          value={asset.maskingStatus}
+                          onChange={(event) => updateBlueprintAsset(script.id, asset.id, {
+                            maskingStatus: event.target.value as typeof asset.maskingStatus,
+                            approvalStatus: event.target.value === "needs_review" ? "draft" : asset.approvalStatus
+                          })}
+                        >
+                          <option value="needs_review">Masking review needed</option>
+                          <option value="masked">Sensitive data masked</option>
+                          <option value="not_required">No sensitive data</option>
+                        </select>
+                        <select
+                          aria-label={`Approval for ${asset.label}`}
+                          value={asset.approvalStatus}
+                          onChange={(event) => updateBlueprintAsset(script.id, asset.id, { approvalStatus: event.target.value as typeof asset.approvalStatus })}
+                        >
+                          <option value="draft">Needs review</option>
+                          <option value="approved" disabled={!asset.factualUseAllowed || asset.maskingStatus === "needs_review"}>Approved</option>
+                          <option value="rejected">Rejected</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="blueprint-scene-list">
+                  {(script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint)!.scenes.map((scene) => {
+                    const blueprint = (script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint)!;
+                    return (
+                      <div className="blueprint-scene" key={`${script.id}-${scene.id}`}>
+                        <div className="blueprint-scene-heading">
+                          <strong>{scene.id.replace("scene-", "Scene ")} · {scene.purpose}</strong>
+                          <small>{(scene.startMs / 1000).toFixed(1)}–{(scene.endMs / 1000).toFixed(1)}s</small>
+                        </div>
+                        <div className="focus-control-grid">
+                          <label>
+                            Shot
+                            <select
+                              value={scene.shotType}
+                              onChange={(event) => updateBlueprintScene(script.id, scene.id, (current) => ({
+                                ...current,
+                                shotType: event.target.value as CreatorShotType
+                              }))}
+                            >
+                              {creatorShotTypes.map((shotType) => <option key={shotType} value={shotType}>{shotType.replace(/_/g, " ")}</option>)}
+                            </select>
+                          </label>
+                          <label>
+                            Presenter layout
+                            <select
+                              disabled={!scene.presenter.visible}
+                              value={scene.presenter.layout}
+                              onChange={(event) => updateBlueprintScene(script.id, scene.id, (current) => ({
+                                ...current,
+                                presenter: { ...current.presenter, layout: event.target.value as typeof current.presenter.layout, manuallyOverridden: true }
+                              }))}
+                            >
+                              {(["fullscreen", "close_up", "medium", "lower_third", "split_left", "split_right"] as const).map((layout) => (
+                                <option key={layout} value={layout}>{layout.replace(/_/g, " ")}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="checkbox-row">
+                            <input
+                              checked={scene.presenter.visible}
+                              onChange={(event) => updateBlueprintScene(script.id, scene.id, (current) => ({
+                                ...current,
+                                presenter: { ...current.presenter, visible: event.target.checked, manuallyOverridden: true }
+                              }))}
+                              type="checkbox"
+                            />
+                            Presenter visible
+                          </label>
+                          <label>
+                            Product asset
+                            <select
+                              value={scene.productAssetIds[0] ?? ""}
+                              onChange={(event) => updateBlueprintScene(script.id, scene.id, (current) => ({
+                                ...current,
+                                productAssetIds: event.target.value ? [event.target.value] : []
+                              }))}
+                            >
+                              <option value="">No product asset</option>
+                              {blueprint.productAssets.filter((asset) => asset.approvalStatus !== "rejected").map((asset) => (
+                                <option key={asset.id} value={asset.id}>{asset.label} · {asset.kind.replace(/_/g, " ")}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            Text position
+                            <select
+                              value={scene.typography[0]?.position ?? "top"}
+                              onChange={(event) => updateBlueprintScene(script.id, scene.id, (current) => ({
+                                ...current,
+                                typography: current.typography.map((cue, cueIndex) => cueIndex === 0 ? {
+                                  ...cue,
+                                  position: event.target.value as typeof cue.position,
+                                  manuallyOverridden: true
+                                } : cue)
+                              }))}
+                            >
+                              {(["top", "center", "bottom", "left", "right"] as const).map((position) => <option key={position} value={position}>{position}</option>)}
+                            </select>
+                          </label>
+                          <button className="secondary compact" onClick={() => regenerateBlueprintScene(script.id, scene.id)} type="button">
+                            Re-plan this scene
+                          </button>
+                        </div>
+                        <small>
+                          Claims: {scene.supportedClaimIds.length ? scene.supportedClaimIds.join(", ") : "none"} ·{" "}
+                          {scene.manuallyOverridden ? "manual override preserved" : "automatic"}
+                        </small>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <p className="subtle-note">Approve and save this script to compile its scene-level CreativeBlueprint.</p>
+            )}
             {avatarClipUrls.get(script.id) ? (
               <video
                 className="avatar-clip-preview"
@@ -2118,10 +2334,12 @@ function ScriptEditor({
 function RenderGallery({
   project,
   exporting,
+  onApproval,
   onExport
 }: {
   project: Project;
   exporting: boolean;
+  onApproval: (renderId: string, approved: boolean) => void;
   onExport: (renderId: string) => void;
 }): JSX.Element {
   if (project.renders.length === 0) {
@@ -2143,9 +2361,26 @@ function RenderGallery({
               {render.validation.videoCodec}/{render.validation.audioCodec}
             </p>
           ) : null}
+          {render.qualityReport ? (
+            <div className="quality-warning-list">
+              <small>{render.qualityReport.publishable ? "Automated quality gates passed." : "Blocking quality failures remain."}</small>
+              {render.qualityReport.gates
+                .filter((gate) => gate.status !== "pass")
+                .map((gate) => <small key={`${render.id}-${gate.code}`}>{gate.code.replace(/_/g, " ")}: {gate.message}</small>)}
+            </div>
+          ) : null}
           {render.storageKey ? <p className="storage-key">Private storage: {render.storageKey}</p> : null}
+          <label className="checkbox-row">
+            <input
+              checked={render.finalApproval?.approved ?? false}
+              disabled={render.status !== "completed" || Boolean(render.qualityReport && !render.qualityReport.publishable)}
+              onChange={(event) => onApproval(render.id, event.target.checked)}
+              type="checkbox"
+            />
+            Final export approved
+          </label>
           <div className="action-row">
-            <button className="secondary" disabled={render.status !== "completed" || exporting} onClick={() => onExport(render.id)} type="button">
+            <button className="secondary" disabled={render.status !== "completed" || exporting || !(render.finalApproval?.approved ?? false)} onClick={() => onExport(render.id)} type="button">
               Export MP4
             </button>
             {render.outputPath ? (

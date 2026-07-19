@@ -6,7 +6,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { pathToFileURL } from "node:url";
-import type { ArtifactKind, ArtifactProvider, ArtifactRecord, AvatarModelReceipt, AvatarPresenterLineage } from "../shared/types";
+import type { ArtifactKind, ArtifactProvider, ArtifactRecord, AvatarModelReceipt, AvatarPerformanceMetadata, AvatarPresenterLineage, AvatarQualityReport } from "../shared/types";
 
 export interface PutFileInput {
   workspaceId: string;
@@ -17,6 +17,8 @@ export interface PutFileInput {
   contentType?: string;
   avatarModelReceipt?: AvatarModelReceipt;
   avatarPresenterLineage?: AvatarPresenterLineage;
+  avatarPerformance?: AvatarPerformanceMetadata;
+  avatarQualityReport?: AvatarQualityReport;
   now?: string;
 }
 
@@ -232,6 +234,8 @@ export class LocalPrivateObjectStorage implements PrivateObjectStorage {
         localUrl: fileUrl,
         avatarModelReceipt: input.avatarModelReceipt,
         avatarPresenterLineage: input.avatarPresenterLineage,
+        avatarPerformance: input.avatarPerformance,
+        avatarQualityReport: input.avatarQualityReport,
         createdAt: input.now ?? new Date().toISOString()
       }
     };
@@ -315,6 +319,8 @@ export class S3CompatibleObjectStorage implements PrivateObjectStorage {
         localUrl: fileUrl,
         avatarModelReceipt: input.avatarModelReceipt,
         avatarPresenterLineage: input.avatarPresenterLineage,
+        avatarPerformance: input.avatarPerformance,
+        avatarQualityReport: input.avatarQualityReport,
         createdAt: input.now ?? new Date().toISOString()
       }
     };
