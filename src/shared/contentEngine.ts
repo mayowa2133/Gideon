@@ -126,6 +126,8 @@ export function createDefaultProfile(): ProductProfile {
     brandPresenterMotion: "caption_sync",
     soundDesignEnabled: false,
     musicMood: "none",
+    creatorPacePreset: "energetic",
+    pronunciationDictionary: {},
     brandKit: createDefaultBrandKit(productName)
   };
 }

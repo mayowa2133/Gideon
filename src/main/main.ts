@@ -408,6 +408,9 @@ function registerIpcHandlers(): void {
     async (_event, projectId: string, scriptId: string, voiceoverMode: "regenerate" | "reuse") =>
       enqueueRenderFromControl(projectId, "local_user", { scriptIds: [scriptId], voiceoverMode })
   );
+  ipcMain.handle("render:approve", async (_event, projectId: string, renderId: string, approved: boolean) =>
+    store.setRenderFinalApproval(projectId, renderId, approved)
+  );
 
   ipcMain.handle("job:cancel", async (_event, projectId: string, jobId: string) => {
     const project = await store.requestJobCancel(projectId, jobId);

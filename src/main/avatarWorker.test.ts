@@ -6,6 +6,7 @@ import {
   createAvatarWorker,
   loadAvatarWorkerConfig,
   parseAvatarWorkerResult,
+  validateAvatarPerformanceMetadata,
   validateAvatarWorkerRequest
 } from "./avatarWorker";
 
@@ -78,6 +79,27 @@ describe("avatar worker boundary", () => {
       GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED: "true"
     }));
     await expect(worker.render(request)).rejects.toThrow("not installed");
+  });
+
+  it("validates optional multi-layout avatar performance metadata", () => {
+    expect(() => validateAvatarPerformanceMetadata({
+      width: 1080,
+      height: 1920,
+      fps: 30,
+      durationMs: 12_000,
+      cropSafeRegion: { x: 0.15, y: 0.08, width: 0.7, height: 0.84 },
+      backgroundType: "green_screen",
+      status: "completed"
+    }, 12_000)).not.toThrow();
+    expect(() => validateAvatarPerformanceMetadata({
+      width: 320,
+      height: 320,
+      fps: 12,
+      durationMs: 3_000,
+      cropSafeRegion: { x: 0, y: 0, width: 2, height: 1 },
+      backgroundType: "transparent",
+      status: "completed"
+    }, 12_000)).toThrow("dimensions");
   });
 
   it("accepts only a matching isolated-worker receipt", async () => {

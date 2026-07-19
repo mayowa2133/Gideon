@@ -11,13 +11,16 @@ import type {
   DetectedMoment,
   EditDecisionList,
   ProductProfile,
+  ProductEvidenceAsset,
   RecordingMetadata,
   RenderFocusPoint,
   RenderOverlayCue,
   RenderValidation,
+  SceneComposition,
   ScriptDraft
 } from "../shared/types";
 import { estimateScriptDurationMs } from "../shared/contentEngine";
+import { validateCreativeBlueprint } from "../shared/creativeBlueprint";
 import {
   brandKitIdForProductName,
   buildEditDecisionList,
@@ -34,6 +37,7 @@ const SUPPORTED_EXTENSIONS = new Set([".mp4", ".mov", ".webm"]);
 const OUTPUT_WIDTH = 1080;
 const OUTPUT_HEIGHT = 1920;
 const OVERLAY_FRAME_RATE = 4;
+const overlayImageCache = new Map<string, Awaited<ReturnType<typeof PImage.decodePNGFromStream>>>();
 
 interface ProbeStream {
   codec_type?: string;
@@ -196,21 +200,14 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   const audioInput = input.voiceoverPath ?? (voiceCreated ? voicePath : audioPath);
   const presenterInputIndex = input.avatarPresenterPath ? 2 : undefined;
   const audioInputIndex = input.avatarPresenterPath ? 3 : 2;
-  const presenterPosition = editDecisionList.presenter.position === "lower_left" ? "70" : "650";
-  const presenterStartSec = (editDecisionList.presenter.startMs / 1000).toFixed(3);
-  const presenterEndSec = (editDecisionList.presenter.endMs / 1000).toFixed(3);
+  const presenterFilters = presenterInputIndex
+    ? buildGeneratedPresenterFilters(editDecisionList, presenterInputIndex, sourceDurationSec)
+    : { filters: [] as string[], outputLabel: "base" };
   const filter = [
     timeline.filter,
-    ...(presenterInputIndex
-      ? [
-          `[${presenterInputIndex}:v]fps=30,scale=360:360:force_original_aspect_ratio=increase,crop=360:360,` +
-          `trim=duration=${sourceDurationSec.toFixed(3)},setpts=PTS-STARTPTS[presenter]`,
-          `[base][presenter]overlay=x=${presenterPosition}:y=1030:shortest=1:` +
-          `enable='between(t,${presenterStartSec},${presenterEndSec})'[base_with_presenter]`
-        ]
-      : []),
+    ...presenterFilters.filters,
     "[1:v]fps=30,format=rgba[overlay]",
-    `[${presenterInputIndex ? "base_with_presenter" : "base"}][overlay]overlay=0:0:shortest=1[v]`,
+    `[${presenterFilters.outputLabel}][overlay]overlay=0:0:shortest=1[v]`,
     buildAudioMixFilter(editDecisionList, sourceDurationSec, audioInputIndex)
   ].join(";");
 
@@ -261,6 +258,7 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     outputPath
   ], 180_000);
 
+  await normalizeRenderedAudio(outputPath);
   const validation = await validateRenderedVideo(outputPath);
   validateRenderedTimeline(validation, sourceDurationSec);
   return {
@@ -268,6 +266,43 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     outputUrl: pathToFileURL(outputPath).toString(),
     validation
   };
+}
+
+export async function normalizeRenderedAudio(outputPath: string, targetLufs = -14): Promise<void> {
+  const parsed = path.parse(outputPath);
+  let currentPath = outputPath;
+  const temporaryPaths: string[] = [];
+  try {
+    let measured = await inspectRenderedAudioQa(currentPath, targetLufs);
+    for (let pass = 0; pass < 3 && Math.abs(measured.integratedLufs - targetLufs) > 0.5; pass += 1) {
+      const adjustmentDb = targetLufs - measured.integratedLufs;
+      const normalizedPath = path.join(parsed.dir, `${parsed.name}.audio-normalized-${pass}${parsed.ext}`);
+      temporaryPaths.push(normalizedPath);
+      await runCommand(resolveFfmpeg(), [
+        "-hide_banner", "-loglevel", "error", "-y", "-i", currentPath,
+        "-map", "0:v:0", "-map", "0:a:0",
+        "-c:v", "copy",
+        "-af", `volume=${adjustmentDb.toFixed(2)}dB,alimiter=limit=0.8414:level=false`,
+        "-c:a", "aac", "-b:a", "160k",
+        "-movflags", "+faststart",
+        normalizedPath
+      ], 120_000);
+      currentPath = normalizedPath;
+      measured = await inspectRenderedAudioQa(currentPath, targetLufs);
+    }
+    if (!measured.withinTarget || Math.abs(measured.integratedLufs - targetLufs) > 0.5) {
+      throw new Error(
+        `Rendered audio normalization missed the ${targetLufs} LUFS target (measured ${measured.integratedLufs} LUFS).`
+      );
+    }
+    if (currentPath !== outputPath) {
+      await fs.rename(currentPath, outputPath);
+    }
+  } catch (error) {
+    throw error;
+  } finally {
+    await Promise.all(temporaryPaths.map((temporaryPath) => fs.rm(temporaryPath, { force: true })));
+  }
 }
 
 function validateRenderedTimeline(validation: RenderValidation, expectedDurationSec: number): void {
@@ -302,6 +337,7 @@ export async function validateRenderedVideo(outputPath: string): Promise<RenderV
     throw new Error("Rendered video duration is invalid.");
   }
   const frameQa = await inspectRenderedFrameQa(outputPath, durationMs);
+  const audioQa = await inspectRenderedAudioQa(outputPath);
   return {
     width: videoStream.width,
     height: videoStream.height,
@@ -309,8 +345,41 @@ export async function validateRenderedVideo(outputPath: string): Promise<RenderV
     videoCodec: videoStream.codec_name ?? "unknown",
     audioCodec: audioStream?.codec_name ?? null,
     fastStart: true,
-    frameQa
+    frameQa,
+    audioQa
   };
+}
+
+export function parseRenderedAudioQa(log: string, targetLufs = -14): NonNullable<RenderValidation["audioQa"]> {
+  const integratedMatches = [...log.matchAll(/I:\s*(-?\d+(?:\.\d+)?)\s+LUFS/g)];
+  const rangeMatches = [...log.matchAll(/LRA:\s*(\d+(?:\.\d+)?)\s+LU/g)];
+  const silenceDurationsMs = [...log.matchAll(/silence_duration:\s*(\d+(?:\.\d+)?)/g)]
+    .map((match) => Number(match[1]) * 1_000)
+    .filter(Number.isFinite);
+  const integratedLufs = Number(integratedMatches.at(-1)?.[1] ?? Number.NaN);
+  const loudnessRangeLu = Number(rangeMatches.at(-1)?.[1] ?? 0);
+  if (!Number.isFinite(integratedLufs)) {
+    throw new Error("Rendered audio loudness could not be measured.");
+  }
+  return {
+    integratedLufs: roundMetric(integratedLufs),
+    loudnessRangeLu: roundMetric(loudnessRangeLu),
+    maxContinuousSilenceMs: Math.round(Math.max(0, ...silenceDurationsMs)),
+    targetLufs,
+    withinTarget: Math.abs(integratedLufs - targetLufs) <= 1.5
+  };
+}
+
+async function inspectRenderedAudioQa(
+  outputPath: string,
+  targetLufs = -14
+): Promise<NonNullable<RenderValidation["audioQa"]>> {
+  const result = await runCommand(resolveFfmpeg(), [
+    "-hide_banner", "-nostats", "-i", outputPath,
+    "-af", "ebur128=framelog=verbose,silencedetect=noise=-35dB:d=0.25",
+    "-f", "null", "-"
+  ], 120_000);
+  return parseRenderedAudioQa(result.stderr, targetLufs);
 }
 
 interface RenderFrameLumaSample {
@@ -519,9 +588,10 @@ export function buildAudioMixFilter(editDecisionList: EditDecisionList, duration
     layerLabels.push(`[sfx${index}]`);
   });
   if (layerLabels.length === 1) {
-    filters.push("[voice]anull[a]");
+    filters.push("[voice]loudnorm=I=-14:TP=-1.5:LRA=7[a]");
   } else {
-    filters.push(`${layerLabels.join("")}amix=inputs=${layerLabels.length}:duration=first:dropout_transition=0,atrim=0:${duration},asetpts=N/SR/TB[a]`);
+    filters.push(`${layerLabels.join("")}amix=inputs=${layerLabels.length}:duration=first:dropout_transition=0,` +
+      `atrim=0:${duration},asetpts=N/SR/TB,loudnorm=I=-14:TP=-1.5:LRA=7[a]`);
   }
   return filters.join(";");
 }
@@ -628,24 +698,29 @@ async function createTimedOverlayFrame(
   const activeCta = activeOverlayCue(editDecisionList.overlays, "cta", timestampMs);
   const activeCaption = activeCaptionAt(editDecisionList.captions, timestampMs);
   const activeWordIndex = activeCaption ? activeWordIndexAt(activeCaption, timestampMs) : -1;
+  const blueprintScene = editDecisionList.creativeBlueprint?.scenes.find((scene) => isCueActive(scene, timestampMs));
 
   context.clearRect(0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT);
-  drawFocusFrame(context, brandKit, timestampMs);
-  drawTemplateChrome(context, editDecisionList, script, {
-    showCta: Boolean(activeCta && activeCta.position !== "center"),
-    showPresenterHook: Boolean(activeHook)
-  });
-  if (isPresenterTemplate) {
-    if (hasGeneratedPresenter && isCueActive(editDecisionList.presenter, timestampMs)) {
-      drawGeneratedPresenterDisclosure(context, editDecisionList.presenter);
-    } else if (!hasGeneratedPresenter) {
-      await drawBrandPresenter(
-        context,
-        brandKit,
-        editDecisionList.presenter,
-        timestampMs,
-        Boolean(activeCaption && activeWordIndex >= 0)
-      );
+  if (blueprintScene) {
+    await drawBlueprintScene(context, editDecisionList, blueprintScene, timestampMs, hasGeneratedPresenter);
+  } else {
+    drawFocusFrame(context, brandKit, timestampMs);
+    drawTemplateChrome(context, editDecisionList, script, {
+      showCta: Boolean(activeCta && activeCta.position !== "center"),
+      showPresenterHook: Boolean(activeHook)
+    });
+    if (isPresenterTemplate) {
+      if (hasGeneratedPresenter && isCueActive(editDecisionList.presenter, timestampMs)) {
+        drawGeneratedPresenterDisclosure(context, editDecisionList.presenter);
+      } else if (!hasGeneratedPresenter) {
+        await drawBrandPresenter(
+          context,
+          brandKit,
+          editDecisionList.presenter,
+          timestampMs,
+          Boolean(activeCaption && activeWordIndex >= 0)
+        );
+      }
     }
   }
 
@@ -658,37 +733,190 @@ async function createTimedOverlayFrame(
     drawWrappedText(context, brandKit.tagline, 110, 203, 760, 28, 1);
   }
 
-  if (activeHook) {
+  if (activeHook && !blueprintScene) {
     drawHookOverlay(context, activeHook, editDecisionList, timestampMs);
   }
 
   drawTransitionCue(context, editDecisionList, timestampMs);
-  drawVisualBeatCallouts(context, editDecisionList, timestampMs);
-  drawCursorEmphasis(context, editDecisionList, timestampMs);
+  if (!blueprintScene || !["presenter_fullscreen", "kinetic_typography", "cta_end_card"].includes(blueprintScene.shotType)) {
+    drawVisualBeatCallouts(context, editDecisionList, timestampMs);
+    drawCursorEmphasis(context, editDecisionList, timestampMs);
+  }
 
   if (activeCaption) {
-    const generatedPresenterOnLeft = hasGeneratedPresenter && editDecisionList.presenter.position === "lower_left";
-    const captionX = generatedPresenterOnLeft ? 470 : 130;
-    const captionWidth = hasGeneratedPresenter ? 480 : (isPresenterTemplate ? 700 : 820);
+    const captionLayout = blueprintCaptionLayout(blueprintScene, hasGeneratedPresenter, editDecisionList);
     context.font = brandKit.captionStyle === "educational_stack" ? "39pt Arial" : "46pt Arial";
     drawCaptionWithWordHighlight(
       context,
       activeCaption,
       activeWordIndex,
-      captionX,
-      1360,
-      captionWidth,
+      captionLayout.x,
+      captionLayout.y,
+      captionLayout.width,
       58,
       brandKit,
       brandKit.captionStyle === "educational_stack" ? 3 : 2
     );
   }
 
-  if (activeCta) {
+  if (activeCta && !blueprintScene) {
     drawCtaOverlay(context, activeCta, brandKit);
   }
 
   await PImage.encodePNGToStream(image, createWriteStream(outputPath));
+}
+
+async function drawBlueprintScene(
+  context: OverlayContext,
+  editDecisionList: EditDecisionList,
+  scene: SceneComposition,
+  timestampMs: number,
+  hasGeneratedPresenter: boolean
+): Promise<void> {
+  const brand = editDecisionList.brandKit;
+  if (scene.background.kind === "dark" || scene.shotType === "cta_end_card") {
+    drawSolidRect(context, 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT, "rgba(5, 7, 13, 0.90)");
+  } else if (scene.background.kind === "light" || scene.shotType === "kinetic_typography") {
+    drawSolidRect(context, 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT, "rgba(247, 248, 243, 0.96)");
+  } else if (scene.background.kind === "brand") {
+    drawSolidRect(context, 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT, alpha(brand.backgroundColor, 0.82));
+  } else {
+    drawSolidRect(context, 0, 0, OUTPUT_WIDTH, 300, "rgba(247, 248, 243, 0.94)");
+    drawSolidRect(context, 0, 1540, OUTPUT_WIDTH, 380, "rgba(5, 7, 13, 0.78)");
+  }
+
+  const asset = scene.productAssetIds
+    .map((id) => editDecisionList.creativeBlueprint?.productAssets.find((candidate) => candidate.id === id))
+    .find((candidate): candidate is ProductEvidenceAsset => Boolean(candidate));
+  await drawBlueprintProductTreatment(context, scene, asset, brand);
+
+  if (scene.presenter.visible) {
+    if (hasGeneratedPresenter) {
+      drawBlueprintPresenterDisclosure(context, scene);
+    } else {
+      await drawBlueprintPresenter(context, editDecisionList, scene, timestampMs);
+    }
+  }
+  drawBlueprintTypography(context, scene, brand);
+  drawSceneProgress(context, scene, editDecisionList.durationMs, brand);
+}
+
+async function drawBlueprintProductTreatment(
+  context: OverlayContext,
+  scene: SceneComposition,
+  asset: ProductEvidenceAsset | undefined,
+  brand: BrandKit
+): Promise<void> {
+  if (scene.shotType === "product_fullscreen" || scene.shotType === "product_hero") {
+    drawRectOutline(context, 52, 330, 976, 1120, 5, alpha(brand.primaryColor, 0.82));
+    return;
+  }
+  if (!["product_mockup", "presenter_with_card", "split_presenter_product", "comparison_card"].includes(scene.shotType)) {
+    return;
+  }
+  const splitLeft = scene.presenter.layout === "split_left";
+  const x = scene.shotType === "split_presenter_product" ? (splitLeft ? 530 : 70) : 90;
+  const y = scene.shotType === "presenter_with_card" ? 170 : 360;
+  const width = scene.shotType === "split_presenter_product" ? 480 : 900;
+  const height = scene.shotType === "presenter_with_card" ? 720 : 940;
+  drawPanel(context, x, y, width, height, "rgba(255,255,255,0.96)");
+  drawRectOutline(context, x, y, width, height, 5, alpha(brand.accentColor, 0.78));
+  const imagePath = asset?.imagePath;
+  if (imagePath) {
+    await drawImageInRect(context, imagePath, x + 28, y + 74, width - 56, height - 150);
+  }
+  context.fillStyle = "#10131D";
+  context.font = "26pt Arial";
+  drawWrappedText(context, asset?.label ?? (scene.shotType === "comparison_card" ? "Evidence-backed comparison" : "Product proof"), x + 34, y + 48, width - 68, 34, 2);
+  if (!asset?.factualUseAllowed) {
+    context.fillStyle = "#9A3412";
+    context.font = "17pt Arial";
+    context.fillText("CONCEPTUAL — VERIFY BEFORE FACTUAL USE", x + 34, y + height - 28);
+  }
+}
+
+async function drawBlueprintPresenter(
+  context: OverlayContext,
+  editDecisionList: EditDecisionList,
+  scene: SceneComposition,
+  timestampMs: number
+): Promise<void> {
+  const layout = scene.presenter.layout;
+  const bob = Math.sin(timestampMs / (scene.presenter.motionIntensity === "energetic" ? 95 : 220)) * (scene.presenter.motionIntensity === "subtle" ? 3 : 8);
+  const rect = presenterRect(layout, bob);
+  const avatarPath = catalogAvatarPath(editDecisionList.presenter.avatarId);
+  drawPanel(context, rect.x, rect.y, rect.width, rect.height, "rgba(12,18,28,0.72)");
+  const drew = await drawImageInRect(context, avatarPath, rect.x, rect.y, rect.width, rect.height);
+  if (!drew) {
+    context.fillStyle = editDecisionList.brandKit.primaryColor;
+    context.font = "72pt Arial";
+    context.fillText(initials(editDecisionList.brandKit.productName), rect.x + rect.width * 0.38, rect.y + rect.height * 0.5);
+  }
+  drawBlueprintPresenterDisclosure(context, scene);
+}
+
+function presenterRect(layout: SceneComposition["presenter"]["layout"], bob: number): { x: number; y: number; width: number; height: number } {
+  if (layout === "fullscreen") return { x: 90, y: 330 + bob, width: 900, height: 1320 };
+  if (layout === "close_up") return { x: 80, y: 500 + bob, width: 920, height: 1040 };
+  if (layout === "lower_third") return { x: 610, y: 1110 + bob, width: 400, height: 650 };
+  if (layout === "split_left") return { x: 35, y: 540 + bob, width: 470, height: 980 };
+  if (layout === "split_right") return { x: 575, y: 540 + bob, width: 470, height: 980 };
+  return { x: 260, y: 700 + bob, width: 560, height: 850 };
+}
+
+function drawBlueprintPresenterDisclosure(context: OverlayContext, scene: SceneComposition): void {
+  const rect = presenterRect(scene.presenter.layout, 0);
+  const x = clamp(rect.x, 40, 690);
+  const y = Math.min(1800, rect.y + rect.height - 54);
+  drawPanel(context, x, y, 350, 44, "rgba(5, 7, 13, 0.82)");
+  context.fillStyle = "rgba(255,255,255,0.94)";
+  context.font = "14pt Arial";
+  context.fillText(scene.presenter.disclosure.toLowerCase(), x + 18, y + 29);
+}
+
+function drawBlueprintTypography(context: OverlayContext, scene: SceneComposition, brand: BrandKit): void {
+  for (const cue of scene.typography.slice(0, 2)) {
+    const placement = typographyPlacement(cue.position, scene.presenter.layout);
+    const editorial = cue.family === "editorial_serif_italic";
+    context.fillStyle = scene.background.kind === "light" ? "#10131D" : "#FFFFFF";
+    context.font = editorial ? "58pt Arial" : "48pt Arial";
+    drawWrappedText(context, cue.text, placement.x, placement.y, placement.width, editorial ? 68 : 58, cue.maxLines);
+    if (cue.emphasizedWords.length > 0) {
+      drawSolidRect(context, placement.x, placement.y + cue.maxLines * 66 + 18, Math.min(placement.width, 410), 8, alpha(brand.primaryColor, 0.92));
+    }
+  }
+}
+
+function typographyPlacement(
+  position: SceneComposition["typography"][number]["position"],
+  presenterLayout: SceneComposition["presenter"]["layout"]
+): { x: number; y: number; width: number } {
+  if (position === "left") return { x: 75, y: 260, width: presenterLayout === "split_right" ? 430 : 760 };
+  if (position === "right") return { x: 570, y: 260, width: 430 };
+  if (position === "center") return { x: 110, y: 760, width: 860 };
+  if (position === "bottom") return { x: 110, y: 1650, width: 860 };
+  return { x: 110, y: 165, width: 860 };
+}
+
+function drawSceneProgress(context: OverlayContext, scene: SceneComposition, durationMs: number, brand: BrandKit): void {
+  drawSolidRect(context, 70, 1840, 940, 5, "rgba(255,255,255,0.18)");
+  drawSolidRect(context, 70, 1840, 940 * clamp(scene.endMs / durationMs, 0, 1), 5, alpha(brand.primaryColor, 0.9));
+}
+
+function blueprintCaptionLayout(
+  scene: SceneComposition | undefined,
+  hasGeneratedPresenter: boolean,
+  editDecisionList: EditDecisionList
+): { x: number; y: number; width: number } {
+  if (!scene) {
+    const presenterOnLeft = hasGeneratedPresenter && editDecisionList.presenter.position === "lower_left";
+    return { x: presenterOnLeft ? 470 : 130, y: 1360, width: hasGeneratedPresenter ? 480 : (editDecisionList.presenter.enabled ? 700 : 820) };
+  }
+  if (scene.presenter.visible && scene.presenter.layout === "split_left") return { x: 570, y: 1500, width: 430 };
+  if (scene.presenter.visible && scene.presenter.layout === "split_right") return { x: 80, y: 1500, width: 430 };
+  if (scene.presenter.visible && scene.presenter.layout === "lower_third") return { x: 90, y: 1420, width: 470 };
+  if (scene.shotType === "cta_end_card") return { x: 160, y: 1620, width: 760 };
+  return { x: 120, y: 1550, width: 840 };
 }
 
 function overlayFrameName(frameIndex: number): string {
@@ -1218,6 +1446,16 @@ export function validateRenderManifest(editDecisionList: EditDecisionList): void
   validateTimedCueCollection("Cursor", cursorCues, editDecisionList.durationMs);
   validateSfxCueTimings(editDecisionList.sfx, editDecisionList.durationMs);
   validatePresenterTiming(editDecisionList.presenter, editDecisionList.durationMs);
+  if (editDecisionList.creativeBlueprint) {
+    const blueprint = editDecisionList.creativeBlueprint;
+    if (blueprint.targetDurationMs !== editDecisionList.durationMs) {
+      throw new Error("CreativeBlueprint duration does not match the render manifest.");
+    }
+    const blockingIssue = validateCreativeBlueprint(blueprint).find((issue) => issue.severity === "blocking");
+    if (blockingIssue) {
+      throw new Error(`CreativeBlueprint is not renderable: ${blockingIssue.message}`);
+    }
+  }
   editDecisionList.sourceSegments.forEach((segment, index) => {
     validateFocusPoint(`Source segment ${index + 1}`, segment.focus);
   });
@@ -1349,7 +1587,7 @@ function validateCaptionAudioAlignment(captions: CaptionSegment[], durationMs: n
   const firstCaption = sorted[0]!;
   const lastCaption = sorted[sorted.length - 1]!;
   const maxLeadInMs = 1_500;
-  const maxTrailingSilenceMs = Math.min(3_000, Math.max(1_500, Math.round(durationMs * 0.18)));
+  const maxTrailingSilenceMs = editDecisionListCtaTailMs(captions, durationMs);
   const maxCaptionGapMs = 3_000;
   if (firstCaption.startMs > maxLeadInMs) {
     throw new Error("Caption timing starts too late for voiceover alignment.");
@@ -1364,6 +1602,14 @@ function validateCaptionAudioAlignment(captions: CaptionSegment[], durationMs: n
       throw new Error(`Caption ${index + 1} has a gap too large for voiceover alignment.`);
     }
   }
+}
+
+function editDecisionListCtaTailMs(captions: CaptionSegment[], durationMs: number): number {
+  const lastCaptionEndMs = Math.max(0, ...captions.map((caption) => caption.endMs));
+  const observedTailMs = durationMs - lastCaptionEndMs;
+  return observedTailMs >= 4_000 && observedTailMs <= 5_000
+    ? 5_000
+    : Math.min(3_000, Math.max(1_500, Math.round(durationMs * 0.18)));
 }
 
 function validateCaptionSafeAreas(editDecisionList: EditDecisionList): void {
@@ -1526,6 +1772,59 @@ function buildVideoTimelineFilter(
   };
 }
 
+export function buildGeneratedPresenterFilters(
+  editDecisionList: EditDecisionList,
+  presenterInputIndex: number,
+  durationSec: number
+): { filters: string[]; outputLabel: string } {
+  const blueprintScenes = editDecisionList.creativeBlueprint?.scenes.filter((scene) => scene.presenter.visible) ?? [];
+  if (blueprintScenes.length === 0) {
+    const position = editDecisionList.presenter.position === "lower_left" ? 70 : 650;
+    const startSec = (editDecisionList.presenter.startMs / 1000).toFixed(3);
+    const endSec = (editDecisionList.presenter.endMs / 1000).toFixed(3);
+    return {
+      filters: [
+        `[${presenterInputIndex}:v]fps=30,scale=360:360:force_original_aspect_ratio=increase,crop=360:360,` +
+          `trim=duration=${durationSec.toFixed(3)},setpts=PTS-STARTPTS[presenter]`,
+        `[base][presenter]overlay=x=${position}:y=1030:shortest=1:` +
+          `enable='between(t,${startSec},${endSec})'[base_with_presenter]`
+      ],
+      outputLabel: "base_with_presenter"
+    };
+  }
+  const filters: string[] = [
+    `[${presenterInputIndex}:v]fps=30,trim=duration=${durationSec.toFixed(3)},setpts=PTS-STARTPTS[presenter_source]`,
+    `[presenter_source]split=${blueprintScenes.length}${blueprintScenes.map((_scene, index) => `[presenter_branch_${index}]`).join("")}`
+  ];
+  let baseLabel = "base";
+  blueprintScenes.forEach((scene, index) => {
+    const rect = presenterVideoRect(scene.presenter.layout);
+    const keyFilter = scene.presenter.backgroundTreatment === "green_screen" || scene.presenter.backgroundTreatment === "deterministic_fixture"
+      ? ",chromakey=0x00FF00:0.18:0.08,format=rgba"
+      : ",format=rgba";
+    filters.push(
+      `[presenter_branch_${index}]scale=${rect.width}:${rect.height}:force_original_aspect_ratio=increase,` +
+      `crop=${rect.width}:${rect.height}${keyFilter}[presenter_scene_${index}]`
+    );
+    const outputLabel = `base_presenter_${index}`;
+    filters.push(
+      `[${baseLabel}][presenter_scene_${index}]overlay=x=${rect.x}:y=${rect.y}:shortest=1:` +
+      `enable='between(t,${(scene.startMs / 1000).toFixed(3)},${(scene.endMs / 1000).toFixed(3)})'[${outputLabel}]`
+    );
+    baseLabel = outputLabel;
+  });
+  return { filters, outputLabel: baseLabel };
+}
+
+function presenterVideoRect(layout: SceneComposition["presenter"]["layout"]): { x: number; y: number; width: number; height: number } {
+  if (layout === "fullscreen") return { x: 0, y: 0, width: 1080, height: 1920 };
+  if (layout === "close_up") return { x: 0, y: 220, width: 1080, height: 1700 };
+  if (layout === "lower_third") return { x: 620, y: 1000, width: 430, height: 765 };
+  if (layout === "split_left") return { x: 0, y: 470, width: 520, height: 925 };
+  if (layout === "split_right") return { x: 560, y: 470, width: 520, height: 925 };
+  return { x: 220, y: 590, width: 640, height: 1138 };
+}
+
 function normalizedSourceSegments(
   editDecisionList: EditDecisionList,
   recordingDurationMs: number,
@@ -1545,7 +1844,7 @@ function normalizedSourceSegments(
         }
       ];
   let timelineCursorMs = 0;
-  return sourceSegments.slice(0, 8).map((segment) => {
+  return sourceSegments.slice(0, 30).map((segment) => {
     const desiredDurationMs = Math.max(750, segment.timelineEndMs - segment.timelineStartMs);
     const maxSourceStartMs = Math.max(0, recordingDurationMs - 500);
     const sourceStartMs = clamp(segment.sourceStartMs, 0, maxSourceStartMs);
@@ -1657,6 +1956,42 @@ async function drawLogoImage(
       ? await PImage.decodeJPEGFromStream(stream)
       : await PImage.decodePNGFromStream(stream);
     context.drawImage(image, x, y, size, size);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function drawImageInRect(
+  context: OverlayContext,
+  imagePath: string | undefined,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): Promise<boolean> {
+  if (!imagePath || !path.isAbsolute(imagePath) || !existsSync(imagePath)) {
+    return false;
+  }
+  try {
+    let image = overlayImageCache.get(imagePath);
+    if (!image) {
+      const extension = path.extname(imagePath).toLowerCase();
+      const stream = createReadStream(imagePath);
+      image = extension === ".jpg" || extension === ".jpeg"
+        ? await PImage.decodeJPEGFromStream(stream)
+        : await PImage.decodePNGFromStream(stream);
+      if (overlayImageCache.size >= 24) {
+        overlayImageCache.clear();
+      }
+      overlayImageCache.set(imagePath, image);
+    }
+    const imageWidth = Number((image as { width?: number }).width ?? width);
+    const imageHeight = Number((image as { height?: number }).height ?? height);
+    const scale = Math.min(width / imageWidth, height / imageHeight);
+    const drawWidth = imageWidth * scale;
+    const drawHeight = imageHeight * scale;
+    context.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
     return true;
   } catch {
     return false;
