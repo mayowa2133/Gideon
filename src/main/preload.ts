@@ -52,10 +52,14 @@ const api = {
     ipcRenderer.invoke("scripts:regenerate", projectId, scriptId),
   updateScripts: (projectId: string, scripts: ScriptDraft[]): Promise<Project> =>
     ipcRenderer.invoke("scripts:update", projectId, scripts),
+  updateCreativeBlueprint: (projectId: string, scriptId: string, blueprint: NonNullable<ScriptDraft["creativeBlueprint"]>): Promise<Project> =>
+    ipcRenderer.invoke("blueprint:update", projectId, scriptId, blueprint),
   chooseBrandLogo: (): Promise<{ logoPath: string; logoUrl: string } | null> => ipcRenderer.invoke("brand:choose-logo"),
   renderSelected: (projectId: string): Promise<Project> => ipcRenderer.invoke("render:selected", projectId),
   renderScript: (projectId: string, scriptId: string, voiceoverMode: "regenerate" | "reuse"): Promise<Project> =>
     ipcRenderer.invoke("render:script", projectId, scriptId, voiceoverMode),
+  renderScene: (projectId: string, scriptId: string, sceneId: string): Promise<Project> =>
+    ipcRenderer.invoke("render:scene", projectId, scriptId, sceneId),
   setRenderFinalApproval: (projectId: string, renderId: string, approved: boolean): Promise<Project> =>
     ipcRenderer.invoke("render:approve", projectId, renderId, approved),
   regenerateVoiceover: (projectId: string, scriptId: string): Promise<Project> =>

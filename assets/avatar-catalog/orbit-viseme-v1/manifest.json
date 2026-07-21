@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "orbit",
+  "version": "orbit-viseme-v1",
+  "generatedBy": "OpenAI image generation derived from the approved Orbit fictional catalog asset",
+  "provenance": "gideon_fictional_catalog",
+  "commercialApproved": true,
+  "disclosure": "AI-generated brand presenter",
+  "canvas": { "width": 418, "height": 418 },
+  "cropSafeRegion": { "x": 0.08, "y": 0.02, "width": 0.84, "height": 0.98 },
+  "anchor": { "x": 0.5, "y": 0.98 },
+  "supportedExpressions": ["neutral", "explanatory", "blink"],
+  "backgroundType": "green_screen",
+  "chromaKey": "0x00FF00",
+  "mouthFrames": {
+    "X": "X.png",
+    "A": "A.png",
+    "B": "B.png",
+    "C": "C.png",
+    "D": "D.png",
+    "E": "E.png",
+    "F": "F.png",
+    "G": "G.png",
+    "H": "G.png"
+  },
+  "blinkFrame": "blink.png",
+  "sheet": "sheet.png",
+  "licenseFile": "LICENSE.md",
+  "sheetSha256": "492ccbe5e4b2f374180f9d230cbf2180b35be208b90e4a086124d6f288b02e9d",
+  "frameSha256": {
+    "X.png": "6bcca4a042c6a860445210adc3d9a0fb70c4bc079ef46dd3b160e1c64f9915ed",
+    "A.png": "594923c605365c1a7e6c9fcf59d11aab68bea2b5518280371a6e337bb9fe9ebb",
+    "B.png": "cd8708d427448a968b72ea8a47e950ad5f69aa2c20615c85ee4cf49a18ad79e4",
+    "C.png": "c66f0c7701890fc1c4f10118453dd1cc4ed8b7e5a0d44bf34574ad170fb528fd",
+    "D.png": "730aba1bf1066045b9426ea6b162142e094411dad567dfb81cb5eae07616839a",
+    "E.png": "f85e74828da6a21687546748916143d1989abc5f1f82e9f7a026d640c1b06de3",
+    "F.png": "7ed031c5ed11a4c7ec0122fd2c27d3326b021a607cbc128211d791efae8509b4",
+    "G.png": "325f842acb9a70fbf50cc7e070f0346c25f06c35e4e19a9303b2ec76dfa09c9a",
+    "blink.png": "c485f1263f4d6ec9ea5c4cb6ea70a6d69e955b5b41de5a68a4bde5c642de46b6"
+  }
+}

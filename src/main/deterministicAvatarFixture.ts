@@ -44,7 +44,7 @@ export async function createDeterministicAvatarFixture(input: {
     "-loop", "1", "-i", sourceImagePath,
     "-filter_complex",
     `[1:v]scale=720:720:force_original_aspect_ratio=decrease,format=rgba[avatar];` +
-      `[0:v][avatar]overlay=x=(W-w)/2:y=H-h-180+10*sin(2*PI*t/2.4):shortest=1,format=yuv420p[v]`,
+      `[0:v][avatar]overlay=x=(W-w)/2+16*sin(2*PI*t/3.1):y=H-h-180+36*sin(2*PI*t/2.4):shortest=1,format=yuv420p[v]`,
     "-map", "[v]", "-t", durationSec, "-r", "30",
     "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
     "-movflags", "+faststart", input.outputPath
@@ -54,7 +54,7 @@ export async function createDeterministicAvatarFixture(input: {
     outputPath: input.outputPath,
     receipt: {
       provider: "deterministic_fixture",
-      modelVersion: "synthetic-layout-fixture-v1",
+      modelVersion: "synthetic-layout-fixture-v2-motion",
       modelLicense: "test-fixture-only",
       avatarId,
       avatarProvenance: "gideon_fictional_catalog",

@@ -20,9 +20,10 @@ const request = {
 };
 
 describe("avatar worker boundary", () => {
-  it("stays disabled unless an explicit approved model is configured", () => {
+  it("defaults to the approved free local viseme renderer", () => {
     const config = loadAvatarWorkerConfig({});
-    expect(() => validateAvatarWorkerRequest(request, config)).toThrow("disabled");
+    expect(config).toMatchObject({ provider: "viseme2d", approvedForCommercialUse: true });
+    expect(() => validateAvatarWorkerRequest(request, config)).not.toThrow();
   });
 
   it("accepts only approved fictional avatars and private paths", () => {

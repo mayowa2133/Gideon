@@ -202,6 +202,9 @@ export type ArtifactKind =
   | "voiceover"
   | "avatar_source_image"
   | "avatar_presenter"
+  | "product_evidence_asset"
+  | "scene_render_segment"
+  | "scene_render_manifest"
   | "render"
   | "export";
 
@@ -284,7 +287,42 @@ export interface ArtifactRecord {
   avatarConsentRecord?: AvatarConsentRecord;
   avatarPerformance?: AvatarPerformanceMetadata;
   avatarQualityReport?: AvatarQualityReport;
+  creatorVideoLineage?: CreatorVideoArtifactLineage;
+  voiceoverProvenance?: VoiceoverProvenance;
   createdAt: string;
+}
+
+export interface CreatorVideoArtifactLineage {
+  schemaVersion: "1";
+  artifactRole: "product_evidence" | "scene_segment" | "scene_manifest";
+  scriptId: string;
+  cacheKey: string;
+  sourceArtifactId?: string;
+  sourceSha256: string;
+  sceneId?: string;
+  productAssetId?: string;
+  sourceMomentIds?: string[];
+  sourceEvidenceIds?: string[];
+  supportedClaimIds?: string[];
+  maskingStatus?: ProductEvidenceAsset["maskingStatus"];
+  approvalStatus?: ProductEvidenceAsset["approvalStatus"];
+  readableRegion?: ProductEvidenceAsset["readableRegion"];
+  crop?: RenderFocusPoint;
+  producerVersion: string;
+}
+
+export interface PronunciationEntry {
+  term: string;
+  pronunciation: string;
+}
+
+export interface VoiceoverProvenance {
+  schemaVersion: "1";
+  sourceScriptId: string;
+  sourceScriptUpdatedAt: string;
+  pronunciationDictionaryHash: string;
+  pronunciationMode: "provider_native" | "text_substitution" | "none";
+  speechInputHash: string;
 }
 
 export interface AvatarPresenterLineage {
@@ -338,6 +376,7 @@ export interface JobRecord {
   leaseExpiresAt?: string;
   renderScope?: {
     scriptIds?: string[];
+    sceneIds?: string[];
     voiceoverMode?: "regenerate" | "reuse";
   };
 }
@@ -422,6 +461,7 @@ export interface ProductProfile {
   defaultTemplateKey?: CreatorTemplateKey;
   brandPresenterEnabled?: boolean;
   avatarPresenterId?: FictionalAvatarPresenterId;
+  avatarPresenterMode?: "local_animated" | "photorealistic_gpu" | "static";
   customAvatarSource?: CustomAvatarSource;
   brandPresenterPosition?: BrandPresenterLayer["position"];
   brandPresenterMotion?: BrandPresenterLayer["motion"];
@@ -715,9 +755,15 @@ export interface FictionalAvatarPresenter {
 }
 
 export interface AvatarModelReceipt {
-  provider: "sadtalker" | "musetalk" | "talkinghead" | "deterministic_fixture";
+  provider: "viseme2d" | "sadtalker" | "musetalk" | "talkinghead" | "deterministic_fixture";
   modelVersion: string;
   modelLicense: string;
+  generatorVersion?: string;
+  avatarPackVersion?: string;
+  avatarPackSha256?: string;
+  cueEngine?: "rhubarb" | "energy_fallback";
+  cueEngineVersion?: string;
+  sourceAudioSha256?: string;
   avatarId: FictionalAvatarPresenterId;
   avatarProvenance: BrandPresenterLayer["provenance"] | "user_authorized_likeness";
   disclosure: BrandPresenterLayer["disclosure"];
@@ -792,6 +838,9 @@ export interface ProductEvidenceAsset {
   imagePath?: string;
   imageUrl?: string;
   clipPath?: string;
+  clipUrl?: string;
+  contentHash?: string;
+  factoryVersion?: string;
   maskingStatus: "not_required" | "masked" | "needs_review";
   crop: RenderFocusPoint;
   readableRegion: { x: number; y: number; width: number; height: number };
@@ -876,6 +925,7 @@ export interface CreativeBlueprint {
     targetLufs: number;
     loudnessToleranceLu: number;
     ctaDurationMs: number;
+    mode?: "production" | "debug";
   };
   qualityPolicy: CreativeBlueprintQualityPolicy;
   compiledAt: string;
@@ -942,6 +992,27 @@ export interface EditDecisionList {
     requireCaptionSafeArea: boolean;
     requireAudioAlignment: boolean;
   };
+  visualPresentation?: {
+    cursorStyle: "arrow";
+    movementCount: number;
+    longTraversalCount: number;
+    shortTraversalCount: number;
+    clickCount: number;
+    typingSequences: Array<{
+      id: string;
+      fieldKind: "safe_text";
+      value: string;
+      startMs: number;
+      endMs: number;
+      characterDelayMs: number;
+      postEntryDwellMs: number;
+      savedStateVisible: boolean;
+      cancelled: boolean;
+    }>;
+    checkedStrings: string[];
+    minimumRenderedTextPx: number;
+    forbiddenPatterns: string[];
+  };
   creativeBlueprint?: CreativeBlueprint;
 }
 
@@ -995,6 +1066,141 @@ export interface RenderValidation {
     targetLufs: number;
     withinTarget: boolean;
   };
+  temporalQa?: RenderTemporalQa;
+  layoutQa?: RenderLayoutQa;
+  typographyQa?: RenderTypographyQa;
+  visualReadinessQa?: RenderVisualReadinessQa;
+}
+
+export interface VisualQaFinding {
+  code: string;
+  reason: string;
+  sceneIds: string[];
+  elementIds: string[];
+  timestampsMs: number[];
+  threshold?: string;
+}
+
+export interface RenderVisualReadinessQa {
+  schemaVersion: "1";
+  result: "pass" | "fail";
+  cta: {
+    result: "pass" | "fail";
+    text: string;
+    sceneId?: string;
+    rectangle?: { x: number; y: number; width: number; height: number };
+    font: string;
+    contrastRatio: number;
+    visibleInterval?: { startMs: number; endMs: number };
+    sampleTimestampsMs: number[];
+    informativeSamples: number;
+  };
+  interactions: {
+    result: "pass" | "fail";
+    cursorStyle: "arrow" | "unknown";
+    pointerHotspot: { x: number; y: number };
+    movementCount: number;
+    longTraversalCount: number;
+    shortTraversalCount: number;
+    clickCount: number;
+    typingSequenceCount: number;
+    secretsRedacted: boolean;
+  };
+  productionPresentation: {
+    result: "pass" | "fail";
+    mode: "production" | "debug";
+    forbiddenPatterns: string[];
+  };
+  readability: {
+    result: "pass" | "fail";
+    minimumRenderedTextPx: number;
+    checkedStrings: string[];
+    failingSceneIds: string[];
+  };
+  presenterExposure: {
+    result: "pass" | "fail";
+    minimumAverageLuma: number;
+    sampledSceneIds: string[];
+    failingSceneIds: string[];
+  };
+  treatments: {
+    result: "pass" | "fail";
+    populatedKinds: ProductEvidenceAsset["kind"][];
+    emptyAssetIds: string[];
+  };
+  transitions: {
+    result: "pass" | "fail";
+    sampleTimestampsMs: number[];
+    failingSceneIds: string[];
+    clippedElementIds: string[];
+  };
+  findings: VisualQaFinding[];
+}
+
+export interface RenderTemporalQa {
+  schemaVersion: "1";
+  sampledFrameCount: number;
+  repeatedFrameRatio: number;
+  longestUnexpectedFrozenIntervalMs: number;
+  affectedSceneIds: string[];
+  staleLoopSceneIds: string[];
+  blackSceneIds: string[];
+  blankSceneIds: string[];
+  thresholds: { repeatedDifference: number; maxRepeatedFrameRatio: number; maxFrozenIntervalMs: number };
+  result: "pass" | "warning" | "fail";
+}
+
+export interface NormalizedRect { x: number; y: number; width: number; height: number }
+
+export interface SceneLayoutReceipt {
+  sceneId: string;
+  textKind: "caption" | "typography";
+  chosen: NormalizedRect;
+  reserved: Array<{ kind: "presenter" | "product" | "disclosure" | "cta" | "platform_safe_area"; rect: NormalizedRect }>;
+  collisionFree: boolean;
+  scale: number;
+  lines: number;
+}
+
+export interface RenderLayoutQa {
+  schemaVersion: "1";
+  placements: SceneLayoutReceipt[];
+  impossibleSceneIds: string[];
+}
+
+export interface RenderTypographyQa {
+  schemaVersion: "1";
+  kinetic: { requestedFamily: string; resolvedFamily: string; fontFile?: string; fallbackUsed: boolean };
+  editorial: { requestedFamily: string; resolvedFamily: string; fontFile?: string; fallbackUsed: boolean; italic: true };
+}
+
+export interface SceneRenderCacheEntry {
+  sceneId: string;
+  cacheKey: string;
+  sha256: string;
+  durationMs: number;
+  status: "rendered" | "reused";
+  dependencySceneIds: string[];
+  fileName: string;
+}
+
+export interface SceneRenderCacheReport {
+  schemaVersion: "1";
+  rendererVersion: string;
+  scriptId: string;
+  requestedSceneIds: string[];
+  regeneratedSceneIds: string[];
+  reusedSceneIds: string[];
+  entries: SceneRenderCacheEntry[];
+  validation: {
+    boundaryFrames: boolean;
+    transitionContinuity: boolean;
+    timestampContinuity: boolean;
+    audioContinuity: boolean;
+    captionAlignment: boolean;
+    totalDuration: boolean;
+    codecCompatibility: boolean;
+  };
 }
 
 export type CreatorVideoQualityGateCode =
@@ -1004,6 +1210,7 @@ export type CreatorVideoQualityGateCode =
   | "audio_loudness"
   | "audio_silence"
   | "frame_signal"
+  | "temporal_signal"
   | "caption_safe_area"
   | "caption_overflow"
   | "product_scale"
@@ -1019,6 +1226,13 @@ export type CreatorVideoQualityGateCode =
   | "avatar_artifact"
   | "avatar_crop_signal"
   | "avatar_background"
+  | "visible_cta"
+  | "interaction_presentation"
+  | "production_presentation"
+  | "product_readability"
+  | "presenter_exposure"
+  | "treatment_completeness"
+  | "transition_safety"
   | "avatar_subjective_quality";
 
 export interface CreatorVideoQualityGateResult {
@@ -1026,12 +1240,17 @@ export interface CreatorVideoQualityGateResult {
   status: "pass" | "warning" | "fail" | "requires_external_review";
   message: string;
   sceneIds?: string[];
+  elementIds?: string[];
+  timestampsMs?: number[];
+  threshold?: string;
 }
 
 export interface CreatorVideoQualityReport {
   schemaVersion: "1";
   blueprintId: string;
   generatedAt: string;
+  structurallyPublishable: boolean;
+  humanReviewReady: boolean;
   publishable: boolean;
   gates: CreatorVideoQualityGateResult[];
   avatarQuality: AvatarQualityReport;
@@ -1051,6 +1270,7 @@ export interface RenderedVideo {
   error?: string;
   validation?: RenderValidation;
   qualityReport?: CreatorVideoQualityReport;
+  sceneCache?: SceneRenderCacheReport;
   finalApproval?: {
     approved: boolean;
     approvedAt?: string;
@@ -1099,6 +1319,15 @@ export interface PlatformInfo {
   ffmpegAvailable: boolean;
   ffprobeAvailable: boolean;
   sayAvailable: boolean;
+  localAvatar: {
+    available: boolean;
+    cueExtractorAvailable: boolean;
+    primaryCueExtractorAvailable: boolean;
+    fallbackCueExtractorAvailable: boolean;
+    orbitPackAvailable: boolean;
+    novaPackAvailable: boolean;
+    message: string;
+  };
   openAiConfigured: boolean;
   openAiLlmModel: string | null;
   openAiTranscriptionModel: string | null;

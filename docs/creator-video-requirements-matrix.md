@@ -1,6 +1,6 @@
 # Creator-video requirements matrix
 
-Updated: 2026-07-18
+Updated: 2026-07-19
 
 Status meanings:
 
@@ -19,24 +19,26 @@ Status meanings:
 | Evidence-grounded direction | Claim IDs resolve to approved evidence assets; missing support is blocking | Complete — local | compiler and quality tests | Product owner approves factual evidence |
 | Deterministic planning | Stable IDs/timing/layout choices, CTA reservation, presenter/product alternation, manual override preservation | Complete — local | deterministic recompilation tests | None |
 | Product asset records | Screenshot, clip, mockup, terminal, phone, before/after, feature/comparison/hero/conceptual kinds with lineage and approval | Complete — local | `creativeBlueprint.test.ts` | User approves captured assets |
-| Product asset materialization | FFmpeg screenshots, trimmed clips, before/after composition, masks and path-free manifest | Complete — local | `productAssetFactory.test.ts`; benchmark | None for local fixtures |
+| Product asset materialization | Normal render jobs materialize approved/mask-cleared media, persist private lineage, and reuse deterministic source/evidence/crop/mask cache keys | Complete — local | factory, storage, normal job integration, benchmark | None for local fixtures |
 | Cursor/click/typing policy | Existing capture telemetry/cues are retained and used only when explanatory | Complete — local | Existing capture presentation tests | Product-specific allowed actions |
 | Avatar contract | Performance metadata, crop/matte, timing/tags, receipt, status/failure, consent and script lineage | Complete — local | `avatarWorker.test.ts` | Provider/model choice |
 | Deterministic avatar fixture | Green-screen 1080×1920/30 fixture exercises multiple compositions and hidden scenes | Complete — local | fixture tests and benchmark | Not evidence of realism |
 | Real avatar quality | Typed lip-sync/deformation/stability/flicker/pronunciation/emotion report | External canary | Contract/type checks | Provider, GPU/model, legal and human acceptance |
-| Scene-aware compositor | Per-scene visibility/crops, product-only/split/card layouts, chroma key/fallback, text, CTA, transitions/SFX | Complete — local | renderer tests and benchmark | Final brand styling |
-| Caption/typography system | Kinetic bold and editorial serif/italic, word highlight, emphasis, placement, safe layouts and CTA | Complete — local | compiler/renderer/quality tests | Accessibility threshold |
+| Scene-aware compositor | Per-scene visibility/crops, product-only/split/card layouts, ten distinct asset treatments, chroma key/fallback, text, CTA, transitions/SFX | Complete — local | renderer treatment tests and benchmark contact sheet | Final brand styling |
+| Caption/typography system | Distinct kinetic bold and resolved system serif-italic faces, word highlight, emphasis, rectangle placement, metadata and CTA | Complete — local | typography resolver/compiler/renderer tests; benchmark | Accessibility and bundled-font licensing choice |
 | Pacing | Readable, energetic and explicit reference-fast; narration estimate, proof dwell and CTA reservation | Complete — local | compiler tests and readable/energetic benchmark plans | Default pace choice |
-| Pronunciation dictionary | Editable product-profile contract | Complete — local | profile/type checks | Selected TTS must honor it |
+| Pronunciation dictionary | Validated provider-neutral entries affect speech input only; fallback substitution, provenance hashes, and voice/avatar invalidation | Complete — local | pronunciation, provider and job tests | Audible provider/human acceptance |
 | Audio | Mixed narration/music/SFX, measured post-encode normalization, missing/silence/loudness checks | Complete — local | parser tests; benchmark measured −14 LUFS | Voice selection |
-| Media quality | Format/duration/audio/frame-signal gates | Complete — local | `creatorVideoQuality.test.ts`; ffprobe benchmark | Production thresholds |
-| Structural quality | Dwell, cut rate, repetition, CTA, evidence, text/collision gates | Complete — local | quality tests | Human creative approval |
+| Media quality | Format/duration/audio/frame signal plus scene-aware black/blank/frozen/stale-loop gates and static-scene policy | Complete — local | temporal fixtures, quality tests, ffprobe benchmark | Production threshold calibration |
+| Structural quality | Dwell, cut rate, repetition, CTA, evidence, and actual presenter/product/text rectangle intersections | Complete — local | layout and quality tests | Human creative approval; provider landmarks optional |
+| Human visual readiness | Separate encoded-pixel outcome covers visible CTA, production-overlay exclusion, interaction presentation, readability, presenter exposure, populated treatments, and transition safety | Complete — local | visual-readiness positive/negative tests; readable benchmark reports and evidence sheets | Subjective final approval only |
+| Pointer, clicks, and typing | Native arrow with tip hotspot, eased long/short motion, click feedback, progressive safe-field typing, dwell, cancellation, and redaction | Complete — local | interaction unit tests and benchmark motion/typing strips | Product-specific action approval for real captures |
 | Avatar safety quality | Disclosure, consent, lineage, artifact, crop/FPS/duration and matte gates | Complete — local | avatar and quality tests | Real artifact canary |
-| Scene review | Pace and scene inspection/editing for shot, asset, presenter and text; evidence/override visibility | Complete — local | Renderer type check | UX acceptance |
-| Single-scene revision | Blueprint scene can be replanned while other manual overrides persist | Complete — local | preservation/replan logic tests | None |
-| Single-scene encoded rerender cache | Final export currently recomposes the full timeline | Deferred | Not implemented | Choose cache/storage complexity budget |
-| Local benchmark | Synthetic source, screenshot/clip, 10 shot types, fixture avatar, captions/type, CTA, final render/contact sheet/report | Complete — local | 1080×1920 H.264/AAC and ffprobe/audio QA | Subjective review never inferred |
-| Path/privacy hygiene | Benchmark report uses basenames, media under ignored `tmp/`, mode 0600 | Complete — local | final diff/status audit | None |
+| Scene review | Screenshot/playable-clip preview, treatment/source/claim/evidence/masking/factual state, conceptual warning, compatible replacement, scene edit and override visibility | Complete — local | Renderer type check/build | UX acceptance |
+| Single-scene revision | UI saves manual override and starts a scoped scene render with visible job/cache receipt | Complete — local | job scope and renderer build | None |
+| Single-scene encoded rerender cache | Versioned content-addressed H.264/AAC segments; requested scene plus transition neighbors regenerate, unchanged hashes reuse, atomic splice validates continuity | Complete — local | cache key/hash/failure/cold/partial tests and benchmark report | None |
+| Local benchmark | Readable canonical render covers a realistic seeded contact workflow, interaction cues, all asset kinds, both type families, pronunciation, collision, encoded visual QA, cold cache and partial reuse | Complete — local | final MP4, overview/key/motion/typing/CTA sheets, manifests, separate quality reports, path-free JSON | Subjective review never inferred |
+| Path/privacy hygiene | Benchmark report uses safe relative artifact paths, media remains under ignored `tmp/`, and report/media outputs use mode 0600 | Complete — local | artifact-existence, path-safety, final diff/status audit | None |
 | Production deployment | Contracts are provider-neutral; no infrastructure was modified | User confirmation | Existing production checks available | Infrastructure and spending authorization |
 
 ## Later confirmations
@@ -181,12 +183,6 @@ Each item below is deliberately actionable. Codex cannot make identity, consent,
 - **Pass/fail:** encryption/access/retention/deletion, retries/idempotency, metrics/alerts, secret isolation, capacity, backup/recovery, and end-to-end render all meet the approved SLO and policy.
 - **Unlocks:** controlled staging rollout, then separately authorized production promotion.
 
-## Explicit local follow-ups
+## Remaining non-local work
 
-These are engineering improvements Codex can implement later without redefining product policy:
-
-1. Cache encoded scene segments by blueprint/asset/avatar/audio hash and splice only changed scenes, with boundary-frame and audio-continuity validation.
-2. Add full-timeline perceptual-hash frozen-frame detection rather than representative frame sampling.
-3. Add segmentation-aware face/product collision maps when a real avatar provider supplies masks/landmarks.
-4. Add a UI panel that renders every `CreatorVideoQualityGateResult` and records final-export approval.
-5. Add a first-class package script for the creator benchmark after the iCloud-placeholder repository metadata is fully hydrated.
+No locally achievable item from the gap-closing goal remains deferred. The only remaining work is represented by the 13 confirmation categories above: identity, provider, GPU/model access, credentials, consent, voice policy, visual identity, default pace, CTA policy, product access, legal approval, production infrastructure, and human quality approval. Provider segmentation/landmarks may later refine the already-functional deterministic collision rectangles; production media and human review may recalibrate the already-functional temporal thresholds.

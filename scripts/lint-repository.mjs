@@ -7,6 +7,7 @@ import path from "node:path";
 const rootDir = path.resolve(process.env.GIDEON_LINT_ROOT?.trim() || process.cwd());
 const errors = [];
 const warnings = [];
+const datalessFiles = listDatalessFiles(rootDir);
 const secretRules = [
   {
     label: "private key material",
@@ -135,6 +136,10 @@ function checkTextFilePolicy(fileList) {
     if (!isTextCandidate(file, absolutePath)) {
       continue;
     }
+    if (datalessFiles.has(file)) {
+      warnings.push(`${file} is an iCloud dataless placeholder and was not read; hydrate it to include it in repository-wide content checks.`);
+      continue;
+    }
     const text = fs.readFileSync(absolutePath, "utf8");
     const lines = text.split(/\r?\n/);
     lines.forEach((line, index) => {
@@ -177,6 +182,10 @@ function checkCompletionEstimateSync() {
   if (!fs.existsSync(readmePath) || !fs.existsSync(auditPath)) {
     return;
   }
+  if (datalessFiles.has("README.md") || datalessFiles.has("docs/production-readiness-audit.md")) {
+    warnings.push("README/audit completion-estimate synchronization was skipped because one input is an iCloud dataless placeholder.");
+    return;
+  }
   const readmeEstimate = readCompletionEstimate(fs.readFileSync(readmePath, "utf8"));
   const auditEstimate = readCompletionEstimate(fs.readFileSync(auditPath, "utf8"));
   if (!readmeEstimate || !auditEstimate) {
@@ -185,6 +194,19 @@ function checkCompletionEstimateSync() {
   }
   if (readmeEstimate !== auditEstimate) {
     errors.push(`README/audit completion estimates differ: README=${readmeEstimate}%, audit=${auditEstimate}%.`);
+  }
+}
+
+function listDatalessFiles(root) {
+  if (process.platform !== "darwin") return new Set();
+  try {
+    return new Set(execFileSync("find", [root, "-flags", "+dataless", "-print"], { encoding: "utf8", maxBuffer: 10 * 1024 * 1024 })
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((filePath) => path.relative(root, filePath).split(path.sep).join("/")));
+  } catch {
+    warnings.push("Could not inventory iCloud dataless placeholders; lint will use normal reads.");
+    return new Set();
   }
 }
 

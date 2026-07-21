@@ -1327,6 +1327,27 @@ export class GideonStore {
     );
   }
 
+  async updateMaterializedProductAssets(projectId: string, scriptId: string, assets: NonNullable<ScriptDraft["creativeBlueprint"]>["productAssets"]): Promise<Project> {
+    return this.updateProject(projectId, (project) => {
+      const script = project.scripts.find((candidate) => candidate.id === scriptId);
+      if (!script?.creativeBlueprint) throw new Error("CreativeBlueprint not found for product asset materialization.");
+      script.creativeBlueprint.productAssets = structuredClone(assets);
+      if (script.editDecisionList?.creativeBlueprint) script.editDecisionList.creativeBlueprint.productAssets = structuredClone(assets);
+      project.updatedAt = new Date().toISOString();
+    }, { audit: { actorType: "system", action: "scripts.update", targetType: "script", targetId: scriptId, summary: "Materialized approved creator-video product evidence.", metadata: { scriptId, assets: assets.length } } });
+  }
+
+  async updateCreativeBlueprint(projectId: string, scriptId: string, blueprint: NonNullable<ScriptDraft["creativeBlueprint"]>): Promise<Project> {
+    return this.updateProject(projectId, (project) => {
+      const script = project.scripts.find((candidate) => candidate.id === scriptId);
+      if (!script?.approved) throw new Error("Approve the script before saving scene direction.");
+      if (blueprint.schemaVersion !== "1" || blueprint.scenes.some((scene) => scene.presenter.sourceScriptId !== script.id || scene.presenter.sourceScriptUpdatedAt !== script.updatedAt)) throw new Error("Scene direction does not match the approved script lineage.");
+      script.creativeBlueprint = structuredClone(blueprint);
+      if (script.editDecisionList) script.editDecisionList.creativeBlueprint = structuredClone(blueprint);
+      project.updatedAt = new Date().toISOString();
+    }, { audit: { action: "scripts.update", targetType: "script", targetId: scriptId, summary: "Updated CreativeBlueprint scene direction without changing approved narration lineage.", metadata: { scriptId, scenes: blueprint.scenes.length } } });
+  }
+
   async updateScriptForSession(input: {
     userId: string;
     workspaceId: string;
@@ -2915,6 +2936,9 @@ function normalizeProfile(profile: ProductProfile): ProductProfile {
   const productName = (profile.productName ?? "").trim();
   const brandPresenterPosition = profile.brandPresenterPosition === "lower_left" ? "lower_left" : "lower_right";
   const brandPresenterMotion = profile.brandPresenterMotion === "idle_bob" ? "idle_bob" : "caption_sync";
+  const avatarPresenterMode = ["local_animated", "photorealistic_gpu", "static"].includes(profile.avatarPresenterMode ?? "")
+    ? profile.avatarPresenterMode
+    : "local_animated";
   return {
     productName,
     targetCustomer: (profile.targetCustomer ?? "").trim(),
@@ -2932,6 +2956,7 @@ function normalizeProfile(profile: ProductProfile): ProductProfile {
     avatarPresenterId: ["logo_head", "orbit", "nova"].includes(profile.avatarPresenterId ?? "")
       ? profile.avatarPresenterId
       : "logo_head",
+    avatarPresenterMode,
     customAvatarSource: normalizeCustomAvatarSource(profile.customAvatarSource),
     brandPresenterPosition,
     brandPresenterMotion,

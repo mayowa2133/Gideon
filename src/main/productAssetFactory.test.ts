@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildProductAssetCommands } from "./productAssetFactory";
+import { buildProductAssetCommands, productAssetFactoryCacheKey } from "./productAssetFactory";
 import type { ProductEvidenceAsset } from "../shared/types";
 
 function asset(kind: ProductEvidenceAsset["kind"], id = kind): ProductEvidenceAsset {
@@ -32,7 +32,7 @@ describe("product asset factory", () => {
     expect(commands).toHaveLength(9);
     expect(commands.find(({ assetId }) => assetId === "interaction_clip")?.args).toEqual(expect.arrayContaining(["-t", "3.000", "-c:v", "libx264", "+faststart"]));
     expect(commands.find(({ assetId }) => assetId === "before_after_pair")?.args.join(" ")).toContain("hstack=inputs=2");
-    expect(commands.find(({ assetId }) => assetId === "screenshot")?.args.join(" ")).toContain("drawbox=x=108:y=384:w=324:h=192");
+    expect(commands.find(({ assetId }) => assetId === "screenshot")?.args.join(" ")).toContain("drawbox=x=128:y=144:w=384:h=72");
     expect(commands.every(({ outputPath }) => outputPath.startsWith("/safe/assets/"))).toBe(true);
   });
 
@@ -48,5 +48,14 @@ describe("product asset factory", () => {
       assets: [asset("screenshot")],
       maskRegionsByAssetId: { screenshot: [{ x: 0.9, y: 0, width: 0.2, height: 0.2 }] }
     })).toThrow("normalized rectangles");
+  });
+
+  it("invalidates materialized evidence when source, crop, evidence, or masking changes", () => {
+    const input = { recordingPath: "/safe/source.mp4", outputDir: "/safe/assets", sourceSha256: "source-a", assets: [asset("screenshot")], maskRegionsByAssetId: {} };
+    const initial = productAssetFactoryCacheKey(input);
+    expect(productAssetFactoryCacheKey({ ...input, sourceSha256: "source-b" })).not.toBe(initial);
+    expect(productAssetFactoryCacheKey({ ...input, assets: [{ ...asset("screenshot"), crop: { x: .4, y: .5, scale: 1.2 } }] })).not.toBe(initial);
+    expect(productAssetFactoryCacheKey({ ...input, assets: [{ ...asset("screenshot"), sourceEvidenceIds: ["evidence-2"] }] })).not.toBe(initial);
+    expect(productAssetFactoryCacheKey({ ...input, maskRegionsByAssetId: { screenshot: [{ x: .1, y: .1, width: .2, height: .1 }] } })).not.toBe(initial);
   });
 });

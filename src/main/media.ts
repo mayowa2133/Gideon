@@ -6,6 +6,8 @@ import path from "node:path";
 import os from "node:os";
 import * as PImage from "pureimage";
 import type {
+  AvatarModelReceipt,
+  AvatarPerformanceMetadata,
   BrandKit,
   CaptionSegment,
   DetectedMoment,
@@ -21,6 +23,14 @@ import type {
 } from "../shared/types";
 import { estimateScriptDurationMs } from "../shared/contentEngine";
 import { validateCreativeBlueprint } from "../shared/creativeBlueprint";
+import { calculateBlueprintLayout, choosePlacement } from "../shared/creatorVideoLayout";
+import { inspectCreatorVideoTemporalQa } from "./creatorVideoTemporalQuality";
+import { buildVisualReadinessQa, treatmentContentLines } from "./creatorVideoVisualReadiness";
+import { executeSceneRenderCache, type SceneCacheContext } from "./sceneRenderCache";
+import { checkViseme2dAssetPacks } from "./viseme2dAvatarWorker";
+import { normalizePronunciationDictionary, pronunciationDictionaryHash } from "../shared/pronunciation";
+import { CLICK_FEEDBACK_MS, easePointerPosition } from "../shared/creatorVideoInteraction";
+import { createHash } from "node:crypto";
 import {
   brandKitIdForProductName,
   buildEditDecisionList,
@@ -38,6 +48,7 @@ const OUTPUT_WIDTH = 1080;
 const OUTPUT_HEIGHT = 1920;
 const OVERLAY_FRAME_RATE = 4;
 const overlayImageCache = new Map<string, Awaited<ReturnType<typeof PImage.decodePNGFromStream>>>();
+let typographyReceipt: NonNullable<RenderValidation["typographyQa"]> | undefined;
 
 interface ProbeStream {
   codec_type?: string;
@@ -57,6 +68,13 @@ interface ProbeResult {
   };
 }
 
+export interface AvatarPresenterInput {
+  path: string;
+  provider: AvatarModelReceipt["provider"];
+  backgroundType: AvatarPerformanceMetadata["backgroundType"];
+  cropSafeRegion: AvatarPerformanceMetadata["cropSafeRegion"];
+}
+
 interface RenderDraftInput {
   projectId: string;
   projectDir: string;
@@ -66,20 +84,49 @@ interface RenderDraftInput {
   moment?: DetectedMoment;
   title: string;
   voiceoverPath?: string;
+  avatarPresenter?: AvatarPresenterInput;
+  /** @deprecated Use avatarPresenter so render metadata remains explicit. */
   avatarPresenterPath?: string;
+  sceneIds?: string[];
+  sceneCacheContext?: Partial<SceneCacheContext>;
+  skipBlueprintValidation?: boolean;
+  skipPostRenderQa?: boolean;
 }
 
 export async function getToolAvailability(): Promise<{
   ffmpegAvailable: boolean;
   ffprobeAvailable: boolean;
   sayAvailable: boolean;
+  localAvatar: {
+    available: boolean;
+    cueExtractorAvailable: boolean;
+    primaryCueExtractorAvailable: boolean;
+    fallbackCueExtractorAvailable: boolean;
+    orbitPackAvailable: boolean;
+    novaPackAvailable: boolean;
+    message: string;
+  };
 }> {
-  const [ffmpegAvailable, ffprobeAvailable, sayAvailable] = await Promise.all([
+  const [ffmpegAvailable, ffprobeAvailable, sayAvailable, packs] = await Promise.all([
     commandExists(resolveFfmpeg()),
     commandExists(resolveFfprobe()),
-    commandExists("/usr/bin/say")
+    commandExists("/usr/bin/say"),
+    checkViseme2dAssetPacks(process.env.GIDEON_VISEME_ASSET_ROOT?.trim())
   ]);
-  return { ffmpegAvailable, ffprobeAvailable, sayAvailable };
+  const available = ffmpegAvailable && ffprobeAvailable && packs.orbitPackAvailable && packs.novaPackAvailable;
+  return {
+    ffmpegAvailable,
+    ffprobeAvailable,
+    sayAvailable,
+    localAvatar: {
+      available,
+      cueExtractorAvailable: true,
+      primaryCueExtractorAvailable: false,
+      fallbackCueExtractorAvailable: true,
+      ...packs,
+      message: available ? "Local animated presenters are ready and run without an API or GPU." : packs.message
+    }
+  };
 }
 
 export async function probeRecording(filePath: string): Promise<RecordingMetadata> {
@@ -166,6 +213,17 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   outputPath: string;
   outputUrl: string;
   validation: RenderValidation;
+  sceneCache?: import("../shared/types").SceneRenderCacheReport;
+}> {
+  const blueprint = input.script.creativeBlueprint ?? input.script.editDecisionList?.creativeBlueprint;
+  if (blueprint && !input.skipBlueprintValidation) return renderDraftWithSceneCache(input, blueprint);
+  return renderDraftWhole(input);
+}
+
+async function renderDraftWhole(input: RenderDraftInput): Promise<{
+  outputPath: string;
+  outputUrl: string;
+  validation: RenderValidation;
 }> {
   const renderDir = path.join(input.projectDir, "renders", input.script.id);
   await fs.mkdir(renderDir, { recursive: true });
@@ -174,22 +232,23 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   const voicePath = path.join(renderDir, "voiceover.aiff");
   const audioPath = path.join(renderDir, "audio.m4a");
   const editDecisionList = ensureEditDecisionList(input.profile, input.script, input.moment);
+  const avatarPresenter = normalizedAvatarPresenter(input);
   const durationMs = Math.min(
     editDecisionList.durationMs,
     input.recording.durationMs,
     60_000
   );
-  const timeline = buildVideoTimelineFilter(editDecisionList, input.recording.durationMs, durationMs);
+  const timeline = buildVideoTimelineFilter(editDecisionList, input.recording.durationMs, durationMs, input.skipBlueprintValidation ? 0.1 : 8);
   const sourceDurationSec = timeline.durationSec;
 
-  validateRenderManifest(editDecisionList);
+  validateRenderManifest(editDecisionList, input.skipBlueprintValidation);
   const overlaySequence = await createTimedOverlaySequence(
     input.profile,
     input.script,
     editDecisionList,
     overlayDir,
     sourceDurationSec,
-    Boolean(input.avatarPresenterPath)
+    Boolean(avatarPresenter)
   );
   validateOverlaySequenceForRender(overlaySequence, sourceDurationSec);
   const voiceCreated = input.voiceoverPath ? true : await createVoiceover(input.script.voiceoverText, voicePath);
@@ -198,21 +257,22 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
   }
 
   const audioInput = input.voiceoverPath ?? (voiceCreated ? voicePath : audioPath);
-  const presenterInputIndex = input.avatarPresenterPath ? 2 : undefined;
-  const audioInputIndex = input.avatarPresenterPath ? 3 : 2;
+  const presenterInputIndex = avatarPresenter ? 2 : undefined;
+  const audioInputIndex = avatarPresenter ? 3 : 2;
   const presenterFilters = presenterInputIndex
-    ? buildGeneratedPresenterFilters(editDecisionList, presenterInputIndex, sourceDurationSec)
+    ? buildGeneratedPresenterFilters(editDecisionList, presenterInputIndex, sourceDurationSec, avatarPresenter, "base_decorated")
     : { filters: [] as string[], outputLabel: "base" };
   const filter = [
     timeline.filter,
-    ...presenterFilters.filters,
     "[1:v]fps=30,format=rgba[overlay]",
-    `[${presenterFilters.outputLabel}][overlay]overlay=0:0:shortest=1[v]`,
+    avatarPresenter ? "[base][overlay]overlay=0:0:shortest=1[base_decorated]" : "[base][overlay]overlay=0:0:shortest=1[v]",
+    ...presenterFilters.filters,
+    ...(avatarPresenter ? [`[${presenterFilters.outputLabel}]null[v]`] : []),
     buildAudioMixFilter(editDecisionList, sourceDurationSec, audioInputIndex)
   ].join(";");
 
-  const presenterInputArgs = input.avatarPresenterPath
-    ? ["-stream_loop", "-1", "-i", input.avatarPresenterPath]
+  const presenterInputArgs = avatarPresenter
+    ? ["-stream_loop", "-1", "-i", avatarPresenter.path]
     : [];
 
   await runCommand(resolveFfmpeg(), [
@@ -258,8 +318,8 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     outputPath
   ], 180_000);
 
-  await normalizeRenderedAudio(outputPath);
-  const validation = await validateRenderedVideo(outputPath);
+  if (!input.skipPostRenderQa) await normalizeRenderedAudio(outputPath);
+  const validation = input.skipPostRenderQa ? await probeBasicRenderValidation(outputPath) : await validateRenderedVideo(outputPath, editDecisionList.creativeBlueprint, editDecisionList);
   validateRenderedTimeline(validation, sourceDurationSec);
   return {
     outputPath,
@@ -267,6 +327,79 @@ export async function renderDraft(input: RenderDraftInput): Promise<{
     validation
   };
 }
+
+async function renderDraftWithSceneCache(input: RenderDraftInput, blueprint: import("../shared/types").CreativeBlueprint): Promise<{ outputPath: string; outputUrl: string; validation: RenderValidation; sceneCache: import("../shared/types").SceneRenderCacheReport }> {
+  const renderDir = path.join(input.projectDir, "renders", input.script.id);
+  const cacheDir = path.join(input.projectDir, "scene-cache", input.script.id);
+  await fs.mkdir(renderDir, { recursive: true, mode: 0o700 });
+  const outputPath = path.join(renderDir, safeFileName(`${input.title}.mp4`));
+  const fullVoiceoverPath = await ensureSceneCacheVoiceover(input, cacheDir, blueprint.targetDurationMs / 1000);
+  const editDecisionList = ensureEditDecisionList(input.profile, input.script, input.moment);
+  validateRenderManifest(editDecisionList);
+  const context: SceneCacheContext = {
+    sourceRecordingHash: input.sceneCacheContext?.sourceRecordingHash ?? input.recording.sha256 ?? await hashFile(input.recording.filePath),
+    productAssetHashes: input.sceneCacheContext?.productAssetHashes ?? Object.fromEntries(blueprint.productAssets.map((asset) => [asset.id, asset.contentHash ?? "unmaterialized"])),
+    avatarHash: input.sceneCacheContext?.avatarHash ?? (normalizedAvatarPresenter(input) ? await hashFile(normalizedAvatarPresenter(input)!.path) : "deterministic-fixture"),
+    narrationHash: input.sceneCacheContext?.narrationHash ?? await hashFile(fullVoiceoverPath),
+    pronunciationDictionaryHash: input.sceneCacheContext?.pronunciationDictionaryHash ?? pronunciationDictionaryHash(normalizePronunciationDictionary(input.profile.pronunciationDictionary))
+  };
+  const sceneCache = await executeSceneRenderCache({
+    scriptId: input.script.id,
+    blueprint,
+    cacheDir,
+    outputPath,
+    requestedSceneIds: input.sceneIds,
+    context,
+    renderSegment: async (scene, temporaryPath) => {
+      const localized = localizeSceneRender(input.script, editDecisionList, blueprint, scene);
+      const sceneAudio = path.join(cacheDir, `.audio-${safeFileName(scene.id)}-${process.pid}.m4a`);
+      await runCommand(resolveFfmpeg(), ["-hide_banner", "-loglevel", "error", "-y", "-ss", (scene.startMs / 1000).toFixed(3), "-i", fullVoiceoverPath, "-t", ((scene.endMs - scene.startMs) / 1000).toFixed(3), "-c:a", "aac", "-b:a", "160k", sceneAudio]);
+      try {
+        const rendered = await renderDraftWhole({ ...input, projectDir: path.join(cacheDir, "work"), script: localized, title: scene.id, voiceoverPath: sceneAudio, sceneIds: undefined, skipBlueprintValidation: true, skipPostRenderQa: true });
+        await fs.copyFile(rendered.outputPath, temporaryPath);
+      } finally { await fs.rm(sceneAudio, { force: true }); }
+    },
+    spliceSegments: async (segmentPaths, temporaryOutput) => spliceSceneSegments(segmentPaths, temporaryOutput),
+    validateSplice: async (temporaryOutput, entries) => validateSceneSplice(temporaryOutput, entries, blueprint)
+  });
+  await normalizeRenderedAudio(outputPath, blueprint.renderPolicy.targetLufs);
+  const validation = await validateRenderedVideo(outputPath, blueprint, editDecisionList);
+  validateRenderedTimeline(validation, blueprint.targetDurationMs / 1000);
+  return { outputPath, outputUrl: pathToFileURL(outputPath).toString(), validation, sceneCache };
+}
+
+async function ensureSceneCacheVoiceover(input: RenderDraftInput, cacheDir: string, durationSec: number): Promise<string> {
+  if (input.voiceoverPath) return input.voiceoverPath;
+  await fs.mkdir(cacheDir, { recursive: true, mode: 0o700 });
+  const voicePath = path.join(cacheDir, "narration.aiff");
+  if (await fileExists(voicePath)) return voicePath;
+  if (!await createVoiceover(input.script.voiceoverText, voicePath)) {
+    const silent = path.join(cacheDir, "narration.m4a");
+    await createSilentAudio(silent, durationSec);
+    return silent;
+  }
+  return voicePath;
+}
+
+function localizeSceneRender(script: ScriptDraft, edit: EditDecisionList, blueprint: import("../shared/types").CreativeBlueprint, scene: SceneComposition): ScriptDraft {
+  const offset = scene.startMs; const duration = scene.endMs - scene.startMs;
+  const shift = <T extends { startMs: number; endMs: number }>(cue: T): T => ({ ...cue, startMs: Math.max(0, cue.startMs - offset), endMs: Math.min(duration, cue.endMs - offset) });
+  const sourceSegments = edit.sourceSegments.filter((segment) => segment.timelineEndMs > scene.startMs && segment.timelineStartMs < scene.endMs).map((segment) => ({ ...segment, timelineStartMs: Math.max(0, segment.timelineStartMs - offset), timelineEndMs: Math.min(duration, segment.timelineEndMs - offset) }));
+  const localizeCaption = (caption: CaptionSegment): CaptionSegment => ({ ...shift(caption), words: caption.words?.filter((word) => word.endMs > offset && word.startMs < scene.endMs).map((word) => shift(word)) });
+  const localScene: SceneComposition = { ...structuredClone(scene), startMs: 0, endMs: duration, captions: scene.captions.filter((caption) => caption.endMs > offset && caption.startMs < scene.endMs).map(localizeCaption), transition: { ...scene.transition }, audioCues: scene.audioCues.map((cue) => ({ ...cue, startMs: Math.max(0, cue.startMs - offset) })) };
+  const localBlueprint = { ...structuredClone(blueprint), id: `${blueprint.id}:${scene.id}`, targetDurationMs: duration, scenes: [localScene], renderPolicy: { ...blueprint.renderPolicy, ctaDurationMs: scene.purpose === "cta" ? duration : 0 } };
+  const filterCues = <T extends { startMs: number; endMs: number }>(items: T[]) => items.filter((cue) => cue.endMs > offset && cue.startMs < scene.endMs).map(shift);
+  const localCaptions = edit.captions.filter((caption) => caption.endMs > offset && caption.startMs < scene.endMs).map(localizeCaption);
+  const localEdit: EditDecisionList = { ...structuredClone(edit), durationMs: duration, sourceSegments: sourceSegments.length ? sourceSegments : [{ ...edit.sourceSegments[0]!, timelineStartMs: 0, timelineEndMs: duration }], zooms: filterCues(edit.zooms), transitions: filterCues(edit.transitions), captions: localCaptions, overlays: filterCues(edit.overlays), callouts: filterCues(edit.callouts), cursorCues: filterCues(edit.cursorCues), sfx: edit.sfx.filter((cue) => cue.startMs >= offset && cue.startMs < scene.endMs).map((cue) => ({ ...cue, startMs: cue.startMs - offset })), presenter: { ...edit.presenter, startMs: 0, endMs: duration }, qualityGates: { ...edit.qualityGates, requireCaptionSafeArea: localCaptions.length > 0 && edit.qualityGates.requireCaptionSafeArea, requireAudioAlignment: localCaptions.length > 0 && edit.qualityGates.requireAudioAlignment }, creativeBlueprint: localBlueprint };
+  return { ...script, captions: localEdit.captions, editDecisionList: localEdit, creativeBlueprint: localBlueprint };
+}
+
+async function spliceSceneSegments(segmentPaths: string[], outputPath: string): Promise<void> { const listPath = `${outputPath}.txt`; const escape = (value: string) => value.replace(/'/g, "'\\''"); await fs.writeFile(listPath, segmentPaths.map((file) => `file '${escape(file)}'`).join("\n"), { mode: 0o600 }); try { await runCommand(resolveFfmpeg(), ["-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", "-movflags", "+faststart", "-f", "mp4", outputPath], 180_000); } finally { await fs.rm(listPath, { force: true }); } }
+async function validateSceneSplice(outputPath: string, entries: import("../shared/types").SceneRenderCacheEntry[], blueprint: import("../shared/types").CreativeBlueprint): Promise<import("../shared/types").SceneRenderCacheReport["validation"]> { const output = await ffprobe(outputPath); const video = output.streams?.find((stream) => stream.codec_type === "video"); const audio = output.streams?.find((stream) => stream.codec_type === "audio"); const duration = Number(output.format?.duration ?? 0) * 1000; const expected = entries.reduce((total, entry) => total + entry.durationMs, 0); const boundaries = await validateBoundaryFrames(outputPath, entries); const captionsAligned = blueprint.scenes.every((scene) => scene.captions.every((caption) => caption.startMs >= 0 && caption.endMs <= blueprint.targetDurationMs && caption.startMs < scene.endMs && caption.endMs > scene.startMs && (caption.words ?? []).every((word) => word.startMs >= caption.startMs && word.endMs <= caption.endMs))); return { boundaryFrames: boundaries, transitionContinuity: boundaries && entries.every((entry) => entry.dependencySceneIds.every((id) => blueprint.scenes.some((scene) => scene.id === id))), timestampContinuity: Math.abs(duration - expected) <= Math.max(250, entries.length * 30), audioContinuity: Boolean(audio), captionAlignment: captionsAligned, totalDuration: Math.abs(duration - blueprint.targetDurationMs) <= Math.max(250, entries.length * 30), codecCompatibility: video?.codec_name === "h264" && audio?.codec_name === "aac" }; }
+async function validateBoundaryFrames(outputPath: string, entries: import("../shared/types").SceneRenderCacheEntry[]): Promise<boolean> { let cursor = 0; for (const entry of entries.slice(0, -1)) { cursor += entry.durationMs; for (const delta of [-34, 34]) { try { await runCommand(resolveFfmpeg(), ["-hide_banner", "-loglevel", "error", "-ss", (Math.max(0, cursor + delta) / 1000).toFixed(3), "-i", outputPath, "-frames:v", "1", "-f", "null", "-"], 30_000); } catch { return false; } } } return true; }
+async function hashFile(filePath: string): Promise<string> { return createHash("sha256").update(await fs.readFile(filePath)).digest("hex"); }
+async function fileExists(filePath: string): Promise<boolean> { try { await fs.access(filePath); return true; } catch { return false; } }
+async function probeBasicRenderValidation(outputPath: string): Promise<RenderValidation> { const probe = await ffprobe(outputPath); const video = probe.streams?.find((stream) => stream.codec_type === "video"); const audio = probe.streams?.find((stream) => stream.codec_type === "audio"); return { width: video?.width ?? 0, height: video?.height ?? 0, durationMs: Math.round(Number(probe.format?.duration ?? 0) * 1000), videoCodec: video?.codec_name ?? "unknown", audioCodec: audio?.codec_name ?? null, fastStart: true }; }
 
 export async function normalizeRenderedAudio(outputPath: string, targetLufs = -14): Promise<void> {
   const parsed = path.parse(outputPath);
@@ -316,7 +449,7 @@ function validateRenderedTimeline(validation: RenderValidation, expectedDuration
   }
 }
 
-export async function validateRenderedVideo(outputPath: string): Promise<RenderValidation> {
+export async function validateRenderedVideo(outputPath: string, blueprint?: import("../shared/types").CreativeBlueprint, editDecisionList?: EditDecisionList): Promise<RenderValidation> {
   const probe = await ffprobe(outputPath);
   const videoStream = probe.streams?.find((stream) => stream.codec_type === "video");
   const audioStream = probe.streams?.find((stream) => stream.codec_type === "audio");
@@ -338,6 +471,10 @@ export async function validateRenderedVideo(outputPath: string): Promise<RenderV
   }
   const frameQa = await inspectRenderedFrameQa(outputPath, durationMs);
   const audioQa = await inspectRenderedAudioQa(outputPath);
+  const temporalQa = blueprint ? await inspectCreatorVideoTemporalQa(outputPath, blueprint) : undefined;
+  const placements = blueprint ? calculateBlueprintLayout(blueprint) : [];
+  const resolvedTypography = blueprint ? resolveOverlayTypography() : undefined;
+  const visualReadinessQa = blueprint ? await inspectVisualReadinessQa(outputPath, blueprint, editDecisionList) : undefined;
   return {
     width: videoStream.width,
     height: videoStream.height,
@@ -346,7 +483,11 @@ export async function validateRenderedVideo(outputPath: string): Promise<RenderV
     audioCodec: audioStream?.codec_name ?? null,
     fastStart: true,
     frameQa,
-    audioQa
+    audioQa,
+    temporalQa,
+    typographyQa: resolvedTypography,
+    visualReadinessQa,
+    ...(blueprint ? { layoutQa: { schemaVersion: "1", placements, impossibleSceneIds: [...new Set(placements.filter((placement) => !placement.collisionFree).map(({ sceneId }) => sceneId))] } as const } : {})
   };
 }
 
@@ -484,6 +625,62 @@ function isInformativeFrameSample(sample: RenderFrameLumaSample): boolean {
 
 function roundMetric(value: number): number {
   return Number(value.toFixed(2));
+}
+
+async function inspectVisualReadinessQa(
+  outputPath: string,
+  blueprint: import("../shared/types").CreativeBlueprint,
+  editDecisionList?: EditDecisionList
+): Promise<NonNullable<RenderValidation["visualReadinessQa"]>> {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-visual-qa-"));
+  try {
+    const ctaScene = blueprint.scenes.find((scene) => scene.purpose === "cta" && scene.shotType === "cta_end_card");
+    const ctaTimestamps = ctaScene
+      ? [ctaScene.startMs + 500, Math.round((ctaScene.startMs + ctaScene.endMs) / 2), ctaScene.endMs - 150]
+      : [];
+    let ctaInformativeSamples = 0;
+    for (const [index, timestampMs] of ctaTimestamps.entries()) {
+      const sample = await sampleVideoRegion(outputPath, tempDir, `cta-${index}`, timestampMs, { x: 175, y: 775, width: 730, height: 205 });
+      if (isInformativeFrameSample(sample) && sample.averageLuma >= 80) ctaInformativeSamples += 1;
+    }
+
+    const presenterAverageLumaByScene: Record<string, number> = {};
+    for (const scene of blueprint.scenes.filter(({ presenter }) => presenter.visible)) {
+      const rect = presenterVideoRect(scene.presenter.layout);
+      const sample = await sampleVideoRegion(outputPath, tempDir, `presenter-${scene.id}`, Math.round((scene.startMs + scene.endMs) / 2), rect);
+      presenterAverageLumaByScene[scene.id] = roundMetric(sample.averageLuma);
+    }
+
+    const transitionSignalFailures: Array<{ sceneId: string; timestampMs: number; elementId: string }> = [];
+    for (const scene of blueprint.scenes.slice(1)) {
+      for (const timestampMs of [Math.max(0, scene.startMs - 100), scene.startMs, Math.min(blueprint.targetDurationMs - 1, scene.startMs + 100)]) {
+        const sample = await sampleVideoRegion(outputPath, tempDir, `boundary-${scene.id}-${timestampMs}`, timestampMs, { x: 0, y: 0, width: 1080, height: 1920 });
+        if (!isInformativeFrameSample(sample) || sample.averageLuma < 10) transitionSignalFailures.push({ sceneId: scene.id, timestampMs, elementId: "canvas-signal" });
+      }
+    }
+    return buildVisualReadinessQa({ blueprint, editDecisionList, ctaInformativeSamples, presenterAverageLumaByScene, transitionSignalFailures });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function sampleVideoRegion(
+  outputPath: string,
+  tempDir: string,
+  name: string,
+  timestampMs: number,
+  rect: { x: number; y: number; width: number; height: number }
+): Promise<RenderFrameLumaSample> {
+  const framePath = path.join(tempDir, `${safeFileName(name)}.png`);
+  const x = Math.max(0, Math.min(1079, Math.round(rect.x)));
+  const y = Math.max(0, Math.min(1919, Math.round(rect.y)));
+  const width = Math.max(1, Math.min(1080 - x, Math.round(rect.width)));
+  const height = Math.max(1, Math.min(1920 - y, Math.round(rect.height)));
+  await runCommand(resolveFfmpeg(), [
+    "-hide_banner", "-loglevel", "error", "-y", "-ss", (Math.max(0, timestampMs) / 1_000).toFixed(3),
+    "-i", outputPath, "-frames:v", "1", "-vf", `crop=${width}:${height}:${x}:${y},scale=32:32,format=rgba`, framePath
+  ], 30_000);
+  return readPngLumaSample(framePath);
 }
 
 export async function extractAudioForTranscription(recording: RecordingMetadata, projectDir: string): Promise<string> {
@@ -745,6 +942,10 @@ async function createTimedOverlayFrame(
 
   if (activeCaption) {
     const captionLayout = blueprintCaptionLayout(blueprintScene, hasGeneratedPresenter, editDecisionList);
+    const lineHeight = 58;
+    const maxLines = brandKit.captionStyle === "educational_stack" ? 3 : 2;
+    const backdrop = captionBackdropRect(captionLayout, lineHeight, maxLines);
+    drawPanel(context, backdrop.x, backdrop.y, backdrop.width, backdrop.height, "rgba(5,7,13,.82)");
     context.font = brandKit.captionStyle === "educational_stack" ? "39pt Arial" : "46pt Arial";
     drawCaptionWithWordHighlight(
       context,
@@ -753,9 +954,9 @@ async function createTimedOverlayFrame(
       captionLayout.x,
       captionLayout.y,
       captionLayout.width,
-      58,
+      lineHeight,
       brandKit,
-      brandKit.captionStyle === "educational_stack" ? 3 : 2
+      maxLines
     );
   }
 
@@ -774,8 +975,12 @@ async function drawBlueprintScene(
   hasGeneratedPresenter: boolean
 ): Promise<void> {
   const brand = editDecisionList.brandKit;
+  const asset = scene.productAssetIds
+    .map((id) => editDecisionList.creativeBlueprint?.productAssets.find((candidate) => candidate.id === id))
+    .find((candidate): candidate is ProductEvidenceAsset => Boolean(candidate));
+  const temporalProduct = asset?.kind === "interaction_clip";
   if (scene.background.kind === "dark" || scene.shotType === "cta_end_card") {
-    drawSolidRect(context, 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT, "rgba(5, 7, 13, 0.90)");
+    drawSolidRect(context, 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT, temporalProduct ? "rgba(5, 7, 13, 0.12)" : "rgba(5, 7, 13, 0.90)");
   } else if (scene.background.kind === "light" || scene.shotType === "kinetic_typography") {
     drawSolidRect(context, 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT, "rgba(247, 248, 243, 0.96)");
   } else if (scene.background.kind === "brand") {
@@ -785,10 +990,7 @@ async function drawBlueprintScene(
     drawSolidRect(context, 0, 1540, OUTPUT_WIDTH, 380, "rgba(5, 7, 13, 0.78)");
   }
 
-  const asset = scene.productAssetIds
-    .map((id) => editDecisionList.creativeBlueprint?.productAssets.find((candidate) => candidate.id === id))
-    .find((candidate): candidate is ProductEvidenceAsset => Boolean(candidate));
-  await drawBlueprintProductTreatment(context, scene, asset, brand);
+  await drawBlueprintProductTreatment(context, scene, asset, brand, timestampMs, editDecisionList.creativeBlueprint?.renderPolicy.mode === "debug");
 
   if (scene.presenter.visible) {
     if (hasGeneratedPresenter) {
@@ -797,42 +999,164 @@ async function drawBlueprintScene(
       await drawBlueprintPresenter(context, editDecisionList, scene, timestampMs);
     }
   }
-  drawBlueprintTypography(context, scene, brand);
+  drawBlueprintTypography(context, scene, brand, asset);
+  if (scene.shotType === "cta_end_card") drawBlueprintCta(context, editDecisionList, scene);
   drawSceneProgress(context, scene, editDecisionList.durationMs, brand);
+}
+
+function drawBlueprintCta(context: OverlayContext, editDecisionList: EditDecisionList, scene: SceneComposition): void {
+  const text = editDecisionList.creativeBlueprint?.cta.trim()
+    || editDecisionList.overlays.find((cue) => cue.kind === "cta")?.text.trim()
+    || "Review the scenes, then render your product.";
+  const x = 110;
+  const y = 660;
+  const width = 860;
+  const height = 430;
+  drawPanel(context, x, y, width, height, "rgba(248,250,252,0.98)");
+  drawSolidRect(context, x, y, 16, height, editDecisionList.brandKit.primaryColor);
+  context.fillStyle = "#3F4A5A";
+  context.font = "22pt Arial";
+  context.fillText("NEXT STEP", x + 72, y + 62);
+  context.fillStyle = "#0B1220";
+  context.font = "46pt Arial";
+  drawWrappedText(context, text, x + 72, y + 145, width - 144, 62, 3);
+  drawPanel(context, x + 72, y + height - 104, 310, 62, editDecisionList.brandKit.primaryColor);
+  context.fillStyle = "#10131D";
+  context.font = "22pt Arial";
+  context.fillText("REVIEW & RENDER", x + 104, y + height - 64);
+  if (editDecisionList.creativeBlueprint?.renderPolicy.mode === "debug") {
+    drawRectOutline(context, x, y, width, height, 4, "#3B82F6");
+    context.fillStyle = "#3B82F6";
+    context.font = "16pt monospace";
+    context.fillText(`DEBUG CTA ${scene.id}`, x + 520, y + height - 62);
+  }
 }
 
 async function drawBlueprintProductTreatment(
   context: OverlayContext,
   scene: SceneComposition,
   asset: ProductEvidenceAsset | undefined,
-  brand: BrandKit
+  brand: BrandKit,
+  timestampMs: number,
+  debug = false
 ): Promise<void> {
-  if (scene.shotType === "product_fullscreen" || scene.shotType === "product_hero") {
-    drawRectOutline(context, 52, 330, 976, 1120, 5, alpha(brand.primaryColor, 0.82));
-    return;
-  }
-  if (!["product_mockup", "presenter_with_card", "split_presenter_product", "comparison_card"].includes(scene.shotType)) {
-    return;
-  }
+  if (!asset && !["product_fullscreen", "product_hero"].includes(scene.shotType)) return;
   const splitLeft = scene.presenter.layout === "split_left";
   const x = scene.shotType === "split_presenter_product" ? (splitLeft ? 530 : 70) : 90;
   const y = scene.shotType === "presenter_with_card" ? 170 : 360;
   const width = scene.shotType === "split_presenter_product" ? 480 : 900;
   const height = scene.shotType === "presenter_with_card" ? 720 : 940;
-  drawPanel(context, x, y, width, height, "rgba(255,255,255,0.96)");
-  drawRectOutline(context, x, y, width, height, 5, alpha(brand.accentColor, 0.78));
-  const imagePath = asset?.imagePath;
-  if (imagePath) {
-    await drawImageInRect(context, imagePath, x + 28, y + 74, width - 56, height - 150);
+  const treatment = productTreatmentSpec(asset?.kind ?? "screenshot");
+  if (treatment.opaquePanel) drawPanel(context, x, y, width, height, treatment.background);
+  if (treatment.device === "browser") {
+    drawPanel(context, x, y, width, height, "rgba(255,255,255,0.98)");
+    drawSolidRect(context, x, y, width, 70, "#E9ECF2");
+    ["#EF4444", "#F59E0B", "#22C55E"].forEach((color, index) => drawSolidRect(context, x + 28 + index * 34, y + 25, 16, 16, color));
+    drawPanel(context, x + 142, y + 17, width - 172, 38, "#FFFFFF");
+  } else if (treatment.device === "phone") {
+    drawPanel(context, x + width * .2, y, width * .6, height, "#080A0F");
+    drawPanel(context, x + width * .23, y + 24, width * .54, height - 48, "#FFFFFF");
+    drawPanel(context, x + width * .41, y + 10, width * .18, 22, "#080A0F");
+  } else if (treatment.device === "terminal") {
+    drawPanel(context, x, y, width, height, "#07110B");
+    drawSolidRect(context, x, y, width, 62, "#17231B");
+    const lines = asset ? treatmentContentLines(asset) : ["$ verify product evidence", "evidence: linked", "claims: supported", "status: verified output"];
+    const progress = Math.max(0, Math.min(1, (timestampMs - scene.startMs) / Math.max(1, scene.endMs - scene.startMs)));
+    const visibleLines = Math.max(1, Math.min(lines.length, Math.ceil(progress * lines.length)));
+    context.fillStyle = "#75F59A"; context.font = "23pt monospace";
+    lines.slice(0, visibleLines).forEach((line, index) => context.fillText(line, x + 42, y + 132 + index * 66));
+    drawPanel(context, x + 38, y + 440, width - 76, 330, "rgba(18,39,27,.92)");
+    context.fillStyle = "#A7F3D0"; context.font = "18pt monospace";
+    context.fillText("VALIDATION RECEIPT", x + 70, y + 500);
+    context.fillStyle = "#E7FBEF"; context.font = "24pt GideonKinetic";
+    context.fillText("Source evidence linked", x + 70, y + 572);
+    context.fillText("Lifecycle value retained", x + 70, y + 640);
+    context.fillText("Save confirmation observed", x + 70, y + 708);
+  } else if (treatment.device === "before_after") {
+    drawPanel(context, x, y, width, height, "rgba(255,255,255,.98)");
+    drawSolidRect(context, x + width / 2 - 2, y + 70, 4, height - 110, brand.accentColor);
+    context.fillStyle = "#6B7280"; context.font = productTreatmentFont("GideonKinetic", 20);
+    context.fillText("BEFORE", x + 30, y + 48); context.fillText("AFTER", x + width / 2 + 30, y + 48);
+  } else if (treatment.device === "comparison") {
+    drawPanel(context, x, y, width, height, treatment.background);
+    drawSolidRect(context, x + width / 2 - 2, y + 90, 4, height - 150, alpha(brand.accentColor, .7));
+    context.fillStyle = "#10131D"; context.font = productTreatmentFont("GideonKinetic", 22);
+    context.fillText("EVIDENCE", x + 32, y + 58); context.fillText(asset?.factualUseAllowed ? "VERIFIED" : "CONCEPT", x + width / 2 + 32, y + 58);
+  } else if (treatment.device === "hero") {
+    drawPanel(context, x, y, width, height, alpha(brand.backgroundColor, .95));
+    drawSolidRect(context, x, y, 18, height, brand.primaryColor);
+    context.fillStyle = "#FFFFFF"; context.font = productTreatmentFont("GideonEditorial", 44);
+    drawWrappedText(context, brand.productName, x + 50, y + 78, width - 100, 58, 2);
+  } else if (treatment.device === "conceptual") {
+    drawPanel(context, x, y, width, height, "rgba(255,247,237,.98)");
+    drawSolidRect(context, x, y, 12, height, "#C2410C");
+    context.fillStyle = "#9A3412"; context.font = productTreatmentFont("GideonKinetic", 25); context.fillText("CONCEPTUAL VISUAL", x + 34, y + 52);
+    context.fillStyle = "#431407"; context.font = productTreatmentFont("GideonEditorial", 38);
+    drawWrappedText(context, asset?.label ?? "Proposed product direction", x + 54, y + 180, width - 108, 54, 4);
+    context.fillStyle = "#7C2D12"; context.font = "22pt Arial";
+    drawWrappedText(context, "A labelled direction for review — not captured factual evidence.", x + 54, y + 430, width - 108, 34, 3);
+    const lines = asset ? treatmentContentLines(asset).slice(1) : ["Proposed direction", "Not captured product evidence", "Human approval required"];
+    lines.forEach((line, index) => {
+      const cardY = y + 575 + index * 92;
+      drawPanel(context, x + 54, cardY, width - 108, 68, index === 2 ? "rgba(154,52,18,.12)" : "rgba(255,255,255,.76)");
+      context.fillStyle = "#431407"; context.font = "21pt GideonKinetic";
+      context.fillText(`${index + 1}. ${line}`, x + 82, cardY + 43);
+    });
+  } else if (treatment.device === "feature") {
+    drawPanel(context, x, y, width, height, "rgba(248,250,252,.98)");
+    drawSolidRect(context, x + 28, y + 90, 12, height - 150, brand.primaryColor);
+    context.fillStyle = "#10131D"; context.font = productTreatmentFont("GideonKinetic", 28);
+    drawWrappedText(context, `✓ ${asset?.label ?? "Evidence-backed feature"}`, x + 65, y + 130, width - 105, 48, 4);
+    const lines = asset ? treatmentContentLines(asset).slice(1) : ["Focused field update", "Evidence remains linked", "Saved result stays visible"];
+    lines.forEach((line, index) => {
+      const cardY = y + 330 + index * 150;
+      drawPanel(context, x + 72, cardY, width - 144, 112, "rgba(255,255,255,.98)");
+      drawPanel(context, x + 94, cardY + 25, 62, 62, brand.primaryColor);
+      context.fillStyle = "#10131D"; context.font = productTreatmentFont("GideonKinetic", 23);
+      context.fillText(String(index + 1), x + 116, cardY + 65);
+      context.font = "24pt GideonKinetic";
+      context.fillText(line, x + 186, cardY + 66);
+    });
   }
-  context.fillStyle = "#10131D";
-  context.font = "26pt Arial";
-  drawWrappedText(context, asset?.label ?? (scene.shotType === "comparison_card" ? "Evidence-backed comparison" : "Product proof"), x + 34, y + 48, width - 68, 34, 2);
+  const imagePath = asset?.imagePath;
+  if (imagePath && !["terminal", "feature", "conceptual"].includes(treatment.device)) {
+    const insetX = treatment.device === "phone" ? x + width * .25 : x + 28;
+    const insetWidth = treatment.device === "phone" ? width * .5 : width - 56;
+    await drawImageInRect(context, imagePath, insetX, y + 84, insetWidth, height - 170);
+  }
+  if (treatment.device !== "conceptual") {
+    context.fillStyle = "#10131D";
+    context.font = productTreatmentFont("GideonKinetic", 26);
+    drawWrappedText(context, asset?.label ?? (scene.shotType === "comparison_card" ? "Evidence-backed comparison" : "Product proof"), x + 34, y + 48, width - 68, 34, 2);
+  }
   if (!asset?.factualUseAllowed) {
     context.fillStyle = "#9A3412";
     context.font = "17pt Arial";
     context.fillText("CONCEPTUAL — VERIFY BEFORE FACTUAL USE", x + 34, y + height - 28);
   }
+  if (debug) {
+    drawRectOutline(context, treatment.device === "phone" ? x + width * .2 : x, y, treatment.device === "phone" ? width * .6 : width, height, 4, "#3B82F6");
+    context.fillStyle = "#3B82F6"; context.font = "16pt monospace"; context.fillText(`DEBUG ${scene.id}`, x + 18, y + height - 56);
+  }
+}
+
+export function productTreatmentSpec(kind: ProductEvidenceAsset["kind"]): { device: "clean" | "temporal" | "browser" | "phone" | "terminal" | "before_after" | "feature" | "comparison" | "hero" | "conceptual"; opaquePanel: boolean; background: string } {
+  switch (kind) {
+    case "screenshot": return { device: "clean", opaquePanel: true, background: "rgba(255,255,255,.98)" };
+    case "interaction_clip": return { device: "temporal", opaquePanel: false, background: "transparent" };
+    case "browser_mockup": return { device: "browser", opaquePanel: true, background: "#FFFFFF" };
+    case "phone_mockup": return { device: "phone", opaquePanel: false, background: "#080A0F" };
+    case "terminal_card": return { device: "terminal", opaquePanel: true, background: "#07110B" };
+    case "before_after_pair": return { device: "before_after", opaquePanel: true, background: "#FFFFFF" };
+    case "feature_card": return { device: "feature", opaquePanel: true, background: "#F8FAFC" };
+    case "comparison_card": return { device: "comparison", opaquePanel: true, background: "#F8FAFC" };
+    case "product_hero": return { device: "hero", opaquePanel: true, background: "#10131D" };
+    case "conceptual_card": return { device: "conceptual", opaquePanel: true, background: "#FFF7ED" };
+  }
+}
+
+export function productTreatmentFont(family: "GideonKinetic" | "GideonEditorial", sizePt: number): string {
+  return `${sizePt}pt ${family}`;
 }
 
 async function drawBlueprintPresenter(
@@ -867,20 +1191,21 @@ function presenterRect(layout: SceneComposition["presenter"]["layout"], bob: num
 function drawBlueprintPresenterDisclosure(context: OverlayContext, scene: SceneComposition): void {
   const rect = presenterRect(scene.presenter.layout, 0);
   const x = clamp(rect.x, 40, 690);
-  const y = Math.min(1800, rect.y + rect.height - 54);
+  const y = Math.max(235, Math.min(1800, rect.y - 58));
   drawPanel(context, x, y, 350, 44, "rgba(5, 7, 13, 0.82)");
   context.fillStyle = "rgba(255,255,255,0.94)";
   context.font = "14pt Arial";
   context.fillText(scene.presenter.disclosure.toLowerCase(), x + 18, y + 29);
 }
 
-function drawBlueprintTypography(context: OverlayContext, scene: SceneComposition, brand: BrandKit): void {
+function drawBlueprintTypography(context: OverlayContext, scene: SceneComposition, brand: BrandKit, asset?: ProductEvidenceAsset): void {
   for (const cue of scene.typography.slice(0, 2)) {
-    const placement = typographyPlacement(cue.position, scene.presenter.layout);
+    const receipt = choosePlacement(scene, asset, "typography", cue.position, cue.maxLines);
+    const placement = { x: receipt.chosen.x * OUTPUT_WIDTH, y: receipt.chosen.y * OUTPUT_HEIGHT, width: receipt.chosen.width * OUTPUT_WIDTH };
     const editorial = cue.family === "editorial_serif_italic";
     context.fillStyle = scene.background.kind === "light" ? "#10131D" : "#FFFFFF";
-    context.font = editorial ? "58pt Arial" : "48pt Arial";
-    drawWrappedText(context, cue.text, placement.x, placement.y, placement.width, editorial ? 68 : 58, cue.maxLines);
+    context.font = editorial ? "italic 58pt GideonEditorial" : "bold 48pt GideonKinetic";
+    drawWrappedText(context, cue.text, placement.x, placement.y, placement.width, editorial ? 72 : 58, cue.maxLines);
     if (cue.emphasizedWords.length > 0) {
       drawSolidRect(context, placement.x, placement.y + cue.maxLines * 66 + 18, Math.min(placement.width, 410), 8, alpha(brand.primaryColor, 0.92));
     }
@@ -912,11 +1237,27 @@ function blueprintCaptionLayout(
     const presenterOnLeft = hasGeneratedPresenter && editDecisionList.presenter.position === "lower_left";
     return { x: presenterOnLeft ? 470 : 130, y: 1360, width: hasGeneratedPresenter ? 480 : (editDecisionList.presenter.enabled ? 700 : 820) };
   }
+  const asset = scene.productAssetIds.map((id) => editDecisionList.creativeBlueprint?.productAssets.find((candidate) => candidate.id === id)).find(Boolean);
+  const receipt = choosePlacement(scene, asset, "caption", "bottom", 2);
+  if (receipt.collisionFree) return { x: receipt.chosen.x * OUTPUT_WIDTH, y: receipt.chosen.y * OUTPUT_HEIGHT, width: receipt.chosen.width * OUTPUT_WIDTH };
   if (scene.presenter.visible && scene.presenter.layout === "split_left") return { x: 570, y: 1500, width: 430 };
   if (scene.presenter.visible && scene.presenter.layout === "split_right") return { x: 80, y: 1500, width: 430 };
   if (scene.presenter.visible && scene.presenter.layout === "lower_third") return { x: 90, y: 1420, width: 470 };
   if (scene.shotType === "cta_end_card") return { x: 160, y: 1620, width: 760 };
   return { x: 120, y: 1550, width: 840 };
+}
+
+export function captionBackdropRect(
+  layout: { x: number; y: number; width: number },
+  lineHeight: number,
+  maxLines: number
+): { x: number; y: number; width: number; height: number } {
+  return {
+    x: Math.max(0, layout.x - 22),
+    y: Math.max(0, layout.y - lineHeight),
+    width: Math.min(OUTPUT_WIDTH - Math.max(0, layout.x - 22), layout.width + 44),
+    height: lineHeight * maxLines + 20
+  };
 }
 
 function overlayFrameName(frameIndex: number): string {
@@ -1054,6 +1395,7 @@ function drawTransitionCue(context: OverlayContext, editDecisionList: EditDecisi
   }
   const flashAlpha = transition.kind === "snap_cut" ? 0.18 * (1 - progress) : 0.1 * (1 - progress);
   drawSolidRect(context, 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT, alpha(color, flashAlpha));
+  if (editDecisionList.creativeBlueprint?.renderPolicy.mode !== "debug") return;
   drawPanel(context, 74, 438, 214, 58, alpha(color, transition.kind === "snap_cut" ? 0.88 : 0.72));
   context.fillStyle = transition.emphasis === "primary" ? "#10131D" : "#FFFFFF";
   context.font = "22pt Arial";
@@ -1118,25 +1460,35 @@ function drawArrowHead(
 }
 
 function drawCursorEmphasis(context: OverlayContext, editDecisionList: EditDecisionList, timestampMs: number): void {
-  const activeCursorCue = activeCursorCuesAt(editDecisionList.cursorCues ?? [], timestampMs)[0];
+  const cursorCues = editDecisionList.cursorCues ?? [];
+  const activeCursorCue = activeCursorCuesAt(cursorCues, timestampMs)[0];
   if (activeCursorCue) {
-    const anchor = activeCursorCue.anchor;
-    const x = 90 + anchor.x * 900;
-    const y = 500 + anchor.y * 600;
-    const entrance = clamp((timestampMs - activeCursorCue.startMs) / 180, 0, 1);
-    const radius = activeCursorCue.kind === "click_target"
-      ? 22 + Math.sin(timestampMs / 110) * 8
-      : 16 + Math.sin(timestampMs / 150) * 5;
-    context.fillStyle = alpha(editDecisionList.brandKit.accentColor, 0.36 + entrance * 0.42);
-    context.beginPath();
-    context.arc(x, y, radius + 22 * entrance, 0, Math.PI * 2);
-    context.fill();
-    drawRectOutline(context, x - 42, y - 42, 84, 84, activeCursorCue.kind === "click_target" ? 4 : 2, "rgba(255,255,255,0.72)");
+    const cueIndex = cursorCues.findIndex((cue) => cue.id === activeCursorCue.id);
+    const previousAnchor = cueIndex > 0 ? cursorCues[cueIndex - 1]!.anchor : activeCursorCue.anchor;
+    const movementProgress = clamp(
+      (timestampMs - activeCursorCue.startMs) / Math.max(1, (activeCursorCue.endMs - activeCursorCue.startMs) * 0.62),
+      0,
+      1
+    );
+    const pointer = easePointerPosition(
+      { x: 90 + previousAnchor.x * 900, y: 500 + previousAnchor.y * 600 },
+      { x: 90 + activeCursorCue.anchor.x * 900, y: 500 + activeCursorCue.anchor.y * 600 },
+      movementProgress
+    );
+    const clickStartMs = activeCursorCue.endMs - CLICK_FEEDBACK_MS;
+    if (activeCursorCue.kind === "click_target" && timestampMs >= clickStartMs) {
+      const progress = clamp((timestampMs - clickStartMs) / CLICK_FEEDBACK_MS, 0, 1);
+      context.fillStyle = alpha(editDecisionList.brandKit.accentColor, 0.48 * (1 - progress));
+      context.beginPath();
+      context.arc(pointer.x, pointer.y, 12 + progress * 28, 0, Math.PI * 2);
+      context.fill();
+    }
+    drawNativeArrowPointer(context, pointer.x, pointer.y);
     if (activeCursorCue.label) {
-      drawPanel(context, x + 28, y - 54, 260, 56, "rgba(5, 7, 13, 0.82)");
+      drawPanel(context, pointer.x + 28, pointer.y - 54, 260, 56, "rgba(5, 7, 13, 0.82)");
       context.fillStyle = "#ffffff";
       context.font = "20pt Arial";
-      drawWrappedText(context, activeCursorCue.label, x + 48, y - 19, 220, 24, 1);
+      drawWrappedText(context, activeCursorCue.label, pointer.x + 48, pointer.y - 19, 220, 24, 1);
     }
     return;
   }
@@ -1148,12 +1500,25 @@ function drawCursorEmphasis(context: OverlayContext, editDecisionList: EditDecis
   const anchor = activeCallout.anchor;
   const x = 90 + anchor.x * 900;
   const y = 500 + anchor.y * 600;
-  const radius = 24 + Math.sin(timestampMs / 130) * 7;
-  context.fillStyle = alpha(editDecisionList.brandKit.accentColor, 0.88);
-  context.beginPath();
-  context.arc(x, y, radius, 0, Math.PI * 2);
-  context.fill();
-  drawRectOutline(context, x - 44, y - 44, 88, 88, 3, "rgba(255,255,255,0.72)");
+  drawNativeArrowPointer(context, x, y);
+}
+
+function drawNativeArrowPointer(context: OverlayContext, tipX: number, tipY: number): void {
+  const draw = (scale: number, color: string): void => {
+    context.fillStyle = color;
+    context.beginPath();
+    context.moveTo(tipX, tipY);
+    context.lineTo(tipX + 13 * scale, tipY + 42 * scale);
+    context.lineTo(tipX + 23 * scale, tipY + 30 * scale);
+    context.lineTo(tipX + 35 * scale, tipY + 55 * scale);
+    context.lineTo(tipX + 47 * scale, tipY + 49 * scale);
+    context.lineTo(tipX + 34 * scale, tipY + 25 * scale);
+    context.lineTo(tipX + 51 * scale, tipY + 23 * scale);
+    context.closePath();
+    context.fill();
+  };
+  draw(1.12, "rgba(3,7,18,0.96)");
+  draw(0.93, "rgba(255,255,255,0.98)");
 }
 
 async function drawBrandPresenter(
@@ -1432,7 +1797,7 @@ function ensureEditDecisionList(
   });
 }
 
-export function validateRenderManifest(editDecisionList: EditDecisionList): void {
+export function validateRenderManifest(editDecisionList: EditDecisionList, skipBlueprintValidation = false): void {
   if (editDecisionList.durationMs < 1_000 || editDecisionList.durationMs > 60_000) {
     throw new Error("Render manifest duration is outside the supported short-form range.");
   }
@@ -1446,7 +1811,7 @@ export function validateRenderManifest(editDecisionList: EditDecisionList): void
   validateTimedCueCollection("Cursor", cursorCues, editDecisionList.durationMs);
   validateSfxCueTimings(editDecisionList.sfx, editDecisionList.durationMs);
   validatePresenterTiming(editDecisionList.presenter, editDecisionList.durationMs);
-  if (editDecisionList.creativeBlueprint) {
+  if (editDecisionList.creativeBlueprint && !skipBlueprintValidation) {
     const blueprint = editDecisionList.creativeBlueprint;
     if (blueprint.targetDurationMs !== editDecisionList.durationMs) {
       throw new Error("CreativeBlueprint duration does not match the render manifest.");
@@ -1728,25 +2093,49 @@ function wrapText(context: OverlayContext, text: string, maxWidth: number): stri
 }
 
 function loadOverlayFont(): void {
-  const candidates = [
-    "/System/Library/Fonts/Supplemental/Arial.ttf",
+  resolveOverlayTypography();
+}
+
+export function resolveOverlayTypography(): NonNullable<RenderValidation["typographyQa"]> {
+  if (typographyReceipt) return typographyReceipt;
+  const kinetic = registerFirstFont("GideonKinetic", [
     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-    "/System/Library/Fonts/Helvetica.ttc"
-  ];
-  for (const candidate of candidates) {
-    try {
-      PImage.registerFont(candidate, "Arial").loadSync();
-      return;
-    } catch {
-      // Try the next system font.
-    }
+    "/Library/Fonts/Arial Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial.ttf"
+  ]);
+  const editorial = registerFirstFont("GideonEditorial", [
+    "/System/Library/Fonts/Supplemental/Georgia Italic.ttf",
+    "/System/Library/Fonts/Supplemental/Times New Roman Italic.ttf",
+    "/System/Library/Fonts/Supplemental/STIXTwoText-Italic.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Italic.ttf",
+    kinetic.file
+  ].filter((candidate): candidate is string => Boolean(candidate)));
+  // Legacy overlays retain the established Arial alias while blueprint typography uses explicit families.
+  if (kinetic.file) {
+    try { PImage.registerFont(kinetic.file, "Arial").loadSync(); } catch { /* already registered or unsupported */ }
   }
+  typographyReceipt = {
+    schemaVersion: "1",
+    kinetic: { requestedFamily: "kinetic_bold", resolvedFamily: "GideonKinetic", fontFile: kinetic.file ? path.basename(kinetic.file) : undefined, fallbackUsed: kinetic.index > 0 },
+    editorial: { requestedFamily: "editorial_serif_italic", resolvedFamily: "GideonEditorial", fontFile: editorial.file ? path.basename(editorial.file) : undefined, fallbackUsed: editorial.index > 0, italic: true }
+  };
+  return typographyReceipt;
+}
+
+function registerFirstFont(family: string, candidates: string[]): { file?: string; index: number } {
+  for (const [index, candidate] of candidates.entries()) {
+    if (!existsSync(candidate)) continue;
+    try { PImage.registerFont(candidate, family).loadSync(); return { file: candidate, index }; } catch { /* try deterministic fallback */ }
+  }
+  return { index: candidates.length };
 }
 
 function buildVideoTimelineFilter(
   editDecisionList: EditDecisionList,
   recordingDurationMs: number,
-  fallbackDurationMs: number
+  fallbackDurationMs: number,
+  minimumDurationSec = 8
 ): { filter: string; durationSec: number } {
   const segments = normalizedSourceSegments(editDecisionList, recordingDurationMs, fallbackDurationMs);
   const segmentFilters = segments.map((segment, index) => {
@@ -1768,43 +2157,49 @@ function buildVideoTimelineFilter(
   const durationMs = segments.reduce((total, segment) => total + Math.max(1, segment.timelineEndMs - segment.timelineStartMs), 0);
   return {
     filter: [...segmentFilters, concat].join(";"),
-    durationSec: Math.max(8, Math.min(60, durationMs / 1000))
+    durationSec: Math.max(minimumDurationSec, Math.min(60, durationMs / 1000))
   };
 }
 
 export function buildGeneratedPresenterFilters(
   editDecisionList: EditDecisionList,
   presenterInputIndex: number,
-  durationSec: number
+  durationSec: number,
+  avatarPresenter?: Pick<AvatarPresenterInput, "backgroundType">,
+  baseInputLabel = "base"
 ): { filters: string[]; outputLabel: string } {
+  const hasBlueprint = Boolean(editDecisionList.creativeBlueprint);
   const blueprintScenes = editDecisionList.creativeBlueprint?.scenes.filter((scene) => scene.presenter.visible) ?? [];
+  const sourceKeyFilter = avatarPresenter?.backgroundType === "green_screen" || avatarPresenter?.backgroundType === "deterministic_fixture"
+    ? ",chromakey=0x00FF00:0.18:0.08,format=rgba"
+    : ",format=rgba";
+  if (hasBlueprint && blueprintScenes.length === 0) {
+    return { filters: [], outputLabel: baseInputLabel };
+  }
   if (blueprintScenes.length === 0) {
     const position = editDecisionList.presenter.position === "lower_left" ? 70 : 650;
     const startSec = (editDecisionList.presenter.startMs / 1000).toFixed(3);
     const endSec = (editDecisionList.presenter.endMs / 1000).toFixed(3);
     return {
       filters: [
-        `[${presenterInputIndex}:v]fps=30,scale=360:360:force_original_aspect_ratio=increase,crop=360:360,` +
+        `[${presenterInputIndex}:v]fps=30${sourceKeyFilter},scale=360:360:force_original_aspect_ratio=increase,crop=360:360,` +
           `trim=duration=${durationSec.toFixed(3)},setpts=PTS-STARTPTS[presenter]`,
-        `[base][presenter]overlay=x=${position}:y=1030:shortest=1:` +
+        `[${baseInputLabel}][presenter]overlay=x=${position}:y=1030:shortest=1:` +
           `enable='between(t,${startSec},${endSec})'[base_with_presenter]`
       ],
       outputLabel: "base_with_presenter"
     };
   }
   const filters: string[] = [
-    `[${presenterInputIndex}:v]fps=30,trim=duration=${durationSec.toFixed(3)},setpts=PTS-STARTPTS[presenter_source]`,
+    `[${presenterInputIndex}:v]fps=30${sourceKeyFilter},trim=duration=${durationSec.toFixed(3)},setpts=PTS-STARTPTS[presenter_source]`,
     `[presenter_source]split=${blueprintScenes.length}${blueprintScenes.map((_scene, index) => `[presenter_branch_${index}]`).join("")}`
   ];
-  let baseLabel = "base";
+  let baseLabel = baseInputLabel;
   blueprintScenes.forEach((scene, index) => {
     const rect = presenterVideoRect(scene.presenter.layout);
-    const keyFilter = scene.presenter.backgroundTreatment === "green_screen" || scene.presenter.backgroundTreatment === "deterministic_fixture"
-      ? ",chromakey=0x00FF00:0.18:0.08,format=rgba"
-      : ",format=rgba";
     filters.push(
       `[presenter_branch_${index}]scale=${rect.width}:${rect.height}:force_original_aspect_ratio=increase,` +
-      `crop=${rect.width}:${rect.height}${keyFilter}[presenter_scene_${index}]`
+      `crop=${rect.width}:${rect.height},format=rgba[presenter_scene_${index}]`
     );
     const outputLabel = `base_presenter_${index}`;
     filters.push(
@@ -1814,6 +2209,17 @@ export function buildGeneratedPresenterFilters(
     baseLabel = outputLabel;
   });
   return { filters, outputLabel: baseLabel };
+}
+
+function normalizedAvatarPresenter(input: RenderDraftInput): AvatarPresenterInput | undefined {
+  if (input.avatarPresenter) return input.avatarPresenter;
+  if (!input.avatarPresenterPath) return undefined;
+  return {
+    path: input.avatarPresenterPath,
+    provider: "deterministic_fixture",
+    backgroundType: "baked",
+    cropSafeRegion: { x: 0, y: 0, width: 1, height: 1 }
+  };
 }
 
 function presenterVideoRect(layout: SceneComposition["presenter"]["layout"]): { x: number; y: number; width: number; height: number } {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { compileCreativeBlueprint } from "./creativeBlueprint";
 import { evaluateCreatorVideoQuality } from "./creatorVideoQuality";
-import type { DetectedMoment, ProductProfile, RenderValidation, ScriptDraft } from "./types";
+import type { DetectedMoment, ProductProfile, RenderValidation, RenderVisualReadinessQa, ScriptDraft } from "./types";
 
 const updatedAt = "2026-07-18T00:00:00.000Z";
 const profile: ProductProfile = {
@@ -61,6 +61,21 @@ function render(durationMs: number): RenderValidation {
     fastStart: true,
     frameQa: { sampledFrames: 3, informativeFrames: 3, averageLuma: 40, minLuma: 4, maxLuma: 240, minLumaStandardDeviation: 12 },
     audioQa: { integratedLufs: -14, loudnessRangeLu: 4, maxContinuousSilenceMs: 300, targetLufs: -14, withinTarget: true }
+    ,temporalQa: { schemaVersion: "1", sampledFrameCount: 80, repeatedFrameRatio: .12, longestUnexpectedFrozenIntervalMs: 400, affectedSceneIds: [], staleLoopSceneIds: [], blackSceneIds: [], blankSceneIds: [], thresholds: { repeatedDifference: .8, maxRepeatedFrameRatio: .72, maxFrozenIntervalMs: 1500 }, result: "pass" },
+    visualReadinessQa: passingVisualQa()
+  };
+}
+
+function passingVisualQa(): RenderVisualReadinessQa {
+  return {
+    schemaVersion: "1", result: "pass",
+    cta: { result: "pass", text: "Try the product", sceneId: "scene-cta", rectangle: { x: 110, y: 660, width: 860, height: 430 }, font: "GideonKinetic", contrastRatio: 15, visibleInterval: { startMs: 1, endMs: 2 }, sampleTimestampsMs: [1, 2, 3], informativeSamples: 3 },
+    interactions: { result: "pass", cursorStyle: "arrow", pointerHotspot: { x: 1, y: 1 }, movementCount: 2, longTraversalCount: 1, shortTraversalCount: 1, clickCount: 2, typingSequenceCount: 1, secretsRedacted: true },
+    productionPresentation: { result: "pass", mode: "production", forbiddenPatterns: [] },
+    readability: { result: "pass", minimumRenderedTextPx: 24, checkedStrings: ["one", "two", "three"], failingSceneIds: [] },
+    presenterExposure: { result: "pass", minimumAverageLuma: 32, sampledSceneIds: ["scene-1"], failingSceneIds: [] },
+    treatments: { result: "pass", populatedKinds: ["screenshot", "interaction_clip", "browser_mockup", "phone_mockup", "terminal_card", "before_after_pair", "feature_card", "comparison_card", "product_hero", "conceptual_card"], emptyAssetIds: [] },
+    transitions: { result: "pass", sampleTimestampsMs: [], failingSceneIds: [], clippedElementIds: [] }, findings: []
   };
 }
 
@@ -87,8 +102,33 @@ describe("creator video quality gates", () => {
       now: "2026-07-18T01:00:00.000Z"
     });
     expect(report.gates.filter(({ status }) => status === "fail")).toEqual([]);
+    expect(report.structurallyPublishable).toBe(true);
+    expect(report.humanReviewReady).toBe(true);
     expect(report.publishable).toBe(true);
     expect(report.gates.find(({ code }) => code === "avatar_subjective_quality")?.status).toBe("requires_external_review");
+  });
+
+  it("does not mistake a reserved CTA for an encoded visible CTA", () => {
+    const { script, blueprint } = buildFixture();
+    const failedVisual = passingVisualQa();
+    failedVisual.result = "fail";
+    failedVisual.cta.result = "fail";
+    failedVisual.cta.informativeSamples = 0;
+    failedVisual.findings = [{ code: "visible_cta", reason: "CTA drawing disabled", sceneIds: [blueprint.scenes.at(-1)!.id], elementIds: ["cta-copy"], timestampsMs: failedVisual.cta.sampleTimestampsMs, threshold: "3 informative samples" }];
+    const report = evaluateCreatorVideoQuality({
+      blueprint,
+      render: { ...render(blueprint.targetDurationMs), visualReadinessQa: failedVisual },
+      sourceScript: { id: script.id, updatedAt: script.updatedAt },
+      avatar: {
+        artifactPresent: true,
+        consent: { assetType: "fictional_catalog", status: "not_required" },
+        performance: { width: 1080, height: 1920, fps: 30, durationMs: blueprint.targetDurationMs, cropSafeRegion: { x: .1, y: .05, width: .8, height: .9 }, backgroundType: "green_screen", status: "completed" }
+      }
+    });
+    expect(report.structurallyPublishable).toBe(true);
+    expect(report.humanReviewReady).toBe(false);
+    expect(report.publishable).toBe(false);
+    expect(report.gates.find(({ code }) => code === "visible_cta")).toMatchObject({ status: "fail", timestampsMs: failedVisual.cta.sampleTimestampsMs });
   });
 
   it("blocks stale lineage, missing evidence, invalid consent, and bad media", () => {

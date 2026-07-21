@@ -214,6 +214,9 @@ export function compileCreativeBlueprint(input: CompileCreativeBlueprintInput): 
       imagePath: previous.imagePath ?? asset.imagePath,
       imageUrl: previous.imageUrl ?? asset.imageUrl,
       clipPath: previous.clipPath ?? asset.clipPath,
+      clipUrl: previous.clipUrl ?? asset.clipUrl,
+      contentHash: previous.contentHash,
+      factoryVersion: previous.factoryVersion,
       crop: previous.crop,
       readableRegion: previous.readableRegion
     } : asset;
@@ -356,7 +359,8 @@ export function compileCreativeBlueprint(input: CompileCreativeBlueprintInput): 
       canvas: { width: 1080, height: 1920, fps: 30 },
       targetLufs: template.audio.targetLufs,
       loudnessToleranceLu: template.audio.toleranceLu,
-      ctaDurationMs: template.ctaDurationMs
+      ctaDurationMs: template.ctaDurationMs,
+      mode: "production"
     },
     qualityPolicy,
     compiledAt: input.script.updatedAt

@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
+import { pathToFileURL } from "node:url";
 import type { ProductEvidenceAsset } from "../shared/types";
 
 export interface ProductAssetMaskRegion {
@@ -16,13 +18,19 @@ export interface ProductAssetFactoryInput {
   assets: ProductEvidenceAsset[];
   maskRegionsByAssetId?: Record<string, ProductAssetMaskRegion[]>;
   ffmpegPath?: string;
+  sourceSha256?: string;
 }
 
 export interface ProductAssetFactoryReceipt {
   schemaVersion: "1";
   assets: ProductEvidenceAsset[];
   manifestPath: string;
+  cacheKey: string;
+  renderedAssetIds: string[];
+  reusedAssetIds: string[];
 }
+
+export const PRODUCT_ASSET_FACTORY_VERSION = "product-assets-v3-readable-landscape";
 
 export interface ProductAssetCommand {
   assetId: string;
@@ -36,33 +44,53 @@ export async function materializeProductEvidenceAssets(input: ProductAssetFactor
   }
   await fs.mkdir(input.outputDir, { recursive: true, mode: 0o700 });
   const commands = buildProductAssetCommands(input);
+  const cacheKey = productAssetFactoryCacheKey(input);
+  const manifestPath = path.join(input.outputDir, "product-assets.json");
+  const previous = await readReusableManifest(manifestPath, cacheKey);
+  const reusedAssetIds: string[] = [];
+  const renderedAssetIds: string[] = [];
   for (const command of commands) {
+    const expectedHash = previous?.contentHashes.get(command.assetId);
+    if (expectedHash && await exists(command.outputPath) && await sha256File(command.outputPath) === expectedHash) { reusedAssetIds.push(command.assetId); continue; }
     await runCommand(input.ffmpegPath ?? "ffmpeg", command.args);
     await fs.chmod(command.outputPath, 0o600);
+    renderedAssetIds.push(command.assetId);
   }
   const outputs = new Map(commands.map((command) => [command.assetId, command.outputPath]));
-  const assets = input.assets.map((asset) => {
+  const assets = await Promise.all(input.assets.map(async (asset) => {
     const outputPath = outputs.get(asset.id);
     if (!outputPath) return asset;
     const isClip = asset.kind === "interaction_clip";
     const maskRegions = input.maskRegionsByAssetId?.[asset.id] ?? [];
+    const contentHash = await sha256File(outputPath);
     return {
       ...asset,
-      ...(isClip ? { clipPath: outputPath } : { imagePath: outputPath }),
+      ...(isClip ? { clipPath: outputPath, clipUrl: pathToFileURL(outputPath).toString() } : { imagePath: outputPath, imageUrl: pathToFileURL(outputPath).toString() }),
+      contentHash,
+      factoryVersion: PRODUCT_ASSET_FACTORY_VERSION,
       maskingStatus: maskRegions.length > 0 ? "masked" as const : asset.maskingStatus
     };
-  });
-  const manifestPath = path.join(input.outputDir, "product-assets.json");
+  }));
   const manifest = {
     schemaVersion: "1",
+    factoryVersion: PRODUCT_ASSET_FACTORY_VERSION,
+    cacheKey,
+    assetIds: commands.map(({ assetId }) => assetId),
     assets: assets.map((asset) => ({
       ...asset,
       imagePath: asset.imagePath ? path.basename(asset.imagePath) : undefined,
-      clipPath: asset.clipPath ? path.basename(asset.clipPath) : undefined
+      imageUrl: undefined,
+      clipPath: asset.clipPath ? path.basename(asset.clipPath) : undefined,
+      clipUrl: undefined
     }))
   };
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), { encoding: "utf8", mode: 0o600 });
-  return { schemaVersion: "1", assets, manifestPath };
+  return { schemaVersion: "1", assets, manifestPath, cacheKey, renderedAssetIds, reusedAssetIds };
+}
+
+export function productAssetFactoryCacheKey(input: ProductAssetFactoryInput): string {
+  const relevant = input.assets.filter((asset) => asset.provenance !== "conceptual" && asset.approvalStatus !== "rejected").map((asset) => ({ id: asset.id, kind: asset.kind, sourceStartMs: asset.sourceStartMs, sourceEndMs: asset.sourceEndMs, sourceMomentIds: asset.sourceMomentIds, sourceEvidenceIds: asset.sourceEvidenceIds, supportedClaimIds: asset.supportedClaimIds, maskingStatus: asset.maskingStatus, crop: asset.crop, readableRegion: asset.readableRegion, approvalStatus: asset.approvalStatus, factualUseAllowed: asset.factualUseAllowed, masks: input.maskRegionsByAssetId?.[asset.id] ?? [] }));
+  return createHash("sha256").update(JSON.stringify({ version: PRODUCT_ASSET_FACTORY_VERSION, sourceSha256: input.sourceSha256 ?? "unknown", assets: relevant })).digest("hex");
 }
 
 export function buildProductAssetCommands(input: ProductAssetFactoryInput): ProductAssetCommand[] {
@@ -78,7 +106,7 @@ export function buildProductAssetCommands(input: ProductAssetFactoryInput): Prod
         outputPath,
         args: [
           "-hide_banner", "-loglevel", "error", "-y", "-ss", startSec.toFixed(3), "-i", input.recordingPath,
-          "-t", durationSec.toFixed(3), "-vf", `${portraitFilter()}${mask}`,
+          "-t", durationSec.toFixed(3), "-vf", `${productFrameFilter()}${mask}`,
           "-an", "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outputPath
         ]
       }];
@@ -87,9 +115,9 @@ export function buildProductAssetCommands(input: ProductAssetFactoryInput): Prod
     if (asset.kind === "before_after_pair") {
       const endSec = Math.max(startSec + 0.25, (asset.sourceEndMs ?? (asset.sourceStartMs ?? 0) + 2_500) / 1_000);
       const pairFilter = [
-        "[0:v]scale=520:920:force_original_aspect_ratio=decrease,pad=520:920:(ow-iw)/2:(oh-ih)/2:color=0x101319[a]",
-        "[1:v]scale=520:920:force_original_aspect_ratio=decrease,pad=520:920:(ow-iw)/2:(oh-ih)/2:color=0x101319[b]",
-        `[a][b]hstack=inputs=2,pad=1080:1920:20:500:color=0x0b0e13${mask}[out]`
+        "[0:v]scale=620:620:force_original_aspect_ratio=decrease,pad=620:620:(ow-iw)/2:(oh-ih)/2:color=0x101319[a]",
+        "[1:v]scale=620:620:force_original_aspect_ratio=decrease,pad=620:620:(ow-iw)/2:(oh-ih)/2:color=0x101319[b]",
+        `[a][b]hstack=inputs=2,pad=1280:720:20:50:color=0x0b0e13${mask}[out]`
       ].join(";");
       return [{
         assetId: asset.id,
@@ -106,20 +134,20 @@ export function buildProductAssetCommands(input: ProductAssetFactoryInput): Prod
       outputPath,
       args: [
         "-hide_banner", "-loglevel", "error", "-y", "-ss", startSec.toFixed(3), "-i", input.recordingPath,
-        "-frames:v", "1", "-vf", `${portraitFilter()}${mask}`, outputPath
+        "-frames:v", "1", "-vf", `${productFrameFilter()}${mask}`, outputPath
       ]
     }];
   });
 }
 
-function portraitFilter(): string {
-  return "scale=1000:1760:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=0x0b0e13";
+function productFrameFilter(): string {
+  return "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=0x0b0e13";
 }
 
 function maskFilter(regions: ProductAssetMaskRegion[]): string {
   return regions.map((region) => {
     validateUnitRect(region);
-    return `,drawbox=x=${Math.round(region.x * 1080)}:y=${Math.round(region.y * 1920)}:w=${Math.round(region.width * 1080)}:h=${Math.round(region.height * 1920)}:color=black@1:t=fill`;
+    return `,drawbox=x=${Math.round(region.x * 1280)}:y=${Math.round(region.y * 720)}:w=${Math.round(region.width * 1280)}:h=${Math.round(region.height * 720)}:color=black@1:t=fill`;
   }).join("");
 }
 
@@ -144,3 +172,7 @@ async function runCommand(command: string, args: string[]): Promise<void> {
     child.once("close", (code) => code === 0 ? resolve() : reject(new Error(`Product asset generation failed (${code ?? "unknown"}): ${stderr}`)));
   });
 }
+
+async function readReusableManifest(manifestPath: string, cacheKey: string): Promise<{ contentHashes: Map<string, string> } | undefined> { try { const value = JSON.parse(await fs.readFile(manifestPath, "utf8")) as { cacheKey?: string; assets?: Array<{ id?: unknown; contentHash?: unknown }> }; if (value.cacheKey !== cacheKey || !Array.isArray(value.assets)) return undefined; const hashes = value.assets.filter((asset): asset is { id: string; contentHash: string } => typeof asset.id === "string" && /^[a-f0-9]{64}$/.test(String(asset.contentHash))).map((asset) => [asset.id, asset.contentHash] as const); return hashes.length === value.assets.length ? { contentHashes: new Map(hashes) } : undefined; } catch { return undefined; } }
+async function exists(filePath: string): Promise<boolean> { try { await fs.access(filePath); return true; } catch { return false; } }
+async function sha256File(filePath: string): Promise<string> { return createHash("sha256").update(await fs.readFile(filePath)).digest("hex"); }

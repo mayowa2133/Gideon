@@ -254,12 +254,14 @@ Page-level layout: selected concepts as tabs/left rail; structured editor center
 
 - Inline editing with autosave and character/estimated-duration feedback.
 - Generated scripts start unapproved. A render job cannot start until at least one script tied to a selected concept is explicitly approved, saved, and free of blocking quality warnings.
+- In CreativeBlueprint review, screenshot assets show thumbnails and interaction assets show playable private previews with treatment, source, evidence, masking, approval, and conceptual/factual state. A user may select another compatible approved asset. “Regenerate encoded scene” saves manual edits, queues that scene ID with its script ID, preserves the override, and later shows regenerated versus reused scene IDs.
 - Forbidden generic phrase warnings explain the issue and suggest a specific rewrite.
 - Unsupported claim, missing evidence, and caption safe-area overflow warnings block approval until edited or explicitly confirmed with added context.
 - `Regenerate section` opens a small instruction field and affects only that section.
 - `Preview voice` may synthesize a short sample subject to usage limits.
 - Each approved draft can regenerate only its private voiceover, re-render on its own with its validated prior voiceover, or render with a fresh voiceover, without replacing other completed drafts.
-- Presenter-enabled approved drafts can generate or regenerate a private avatar clip. The status distinguishes a generated clip that matches the current script/source revision from the deterministic fallback presenter.
+- Presenter setup offers “Local animated — Free”, “Photorealistic — Requires GPU”, and “Static presenter”. Local animated is the default, explains that Orbit/Nova run privately on-device without an API/GPU, and keeps imported self portraits static rather than substituting a likeness.
+- Presenter-enabled approved drafts can generate or regenerate a private clip through “Generate presenter preview”. Generated, generating, failed, and stale job/artifact states use the existing job history and lineage matching; previews remain paused and user-controlled. Final rendering automatically refreshes missing/stale local clips.
 - A matching generated clip appears as a paused, user-controlled video preview in the script review surface. It does not autoplay or load the full media until the user plays it.
 - Voiceover toggle: AI voice, source audio only, or voiceover plus ducked source audio if supported.
 - `Approve & render drafts` summarizes the approved script, template, brand kit, sound-design setting, caption style, and evidence-backed visual plan versions that will be used.
@@ -275,6 +277,8 @@ User edits are first-class versions. Regeneration never overwrites without an ex
 - Cancel affects only the chosen render unless `Cancel all` is explicitly selected.
 
 ## Preview generated videos
+
+The review surface shows structural publishability and human-review readiness as separate states. Human readiness includes encoded CTA visibility, recognizable pointer/click/typing presentation, production-overlay exclusion, known-label readability, presenter exposure, populated treatments, and transition safety. Failures link to bounded scene IDs and timestamps with readable explanations. Older renders without an encoded visual receipt are labelled as needing regeneration, and final approval remains disabled until both automated states pass.
 
 ### Video gallery
 

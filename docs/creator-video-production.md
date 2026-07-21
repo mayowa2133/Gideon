@@ -1,6 +1,6 @@
 # Creator-led product video production
 
-Status: local structural implementation complete; real avatar quality and production-provider readiness require later confirmation.
+Status: all locally achievable structural and visual-readiness work is implemented. The deterministic benchmark passes both readiness states; real avatar quality, subjective human approval, brand acceptance, licensing, provider credentials, and production infrastructure still require external confirmation.
 
 ## Scope and reference grammar
 
@@ -52,7 +52,9 @@ The compiler flags claims without evidence, reserves the CTA, gives complex proo
 
 The scene compositor supplies the designed browser, terminal, phone, feature, comparison, and hero framing. A conceptual asset is never materialized as factual proof. Rejected assets are skipped. Quantitative or comparative copy remains blocked unless an approved factual asset supports its claim.
 
-Cursor, click, and typing cues remain evidence-driven. Gideon shows them when they explain an interaction; it does not invent continuous purposeless pointer movement.
+Normal render jobs run this factory before composition. Required factual assets must be approved with masking review resolved. The deterministic cache includes source checksum, evidence/claim lineage, crop/readable region, masking inputs, approval, and factory version. Matching private artifacts are reused; changed source, evidence, crop, or masking state invalidates them. Artifact lineage retains source, moment, evidence, claim, approval, masking, crop, content-hash, and factory details. All ten asset kinds have distinct treatments: clean screenshot, temporal interaction clip, browser chrome, portrait phone, monospace terminal, labeled before/after, feature, evidence/concept comparison, branded hero, and conceptual warning.
+
+Cursor, click, and typing cues remain evidence-driven. Production renders use a code-native black-and-white arrow with a `(1, 1)` tip hotspot, cubic eased travel, pre-click dwell, separate click feedback, and progressive safe-field typing at a readable character cadence. Secret-shaped values are redacted. Gideon shows interaction cues when they explain an action; it does not invent continuous purposeless pointer movement.
 
 ## Avatar provider contract
 
@@ -64,52 +66,72 @@ Existing lineage checks reject stale script/avatar combinations. Consent may be 
 
 ## Scene-aware renderer
 
-The renderer consumes the blueprint and composes each scene independently while exporting one deterministic 1080×1920, 30 fps H.264/AAC file. It supports scene-dependent presenter visibility/crop/position, chroma key, baked-background fallback, product-only proof, split layouts, floating product frames, branded backgrounds, captions, editorial headings, CTA rendering, snap/match/wipe transitions, focus changes, and click/pop/whoosh cues.
+The renderer encodes each blueprint scene as an independent 1080×1920, 30 fps H.264/AAC segment. The content-addressed key covers complete scene composition and direct transition dependencies, template/blueprint version, source checksum, product hashes, avatar hash, narration range/hash, pronunciation hash, captions/typography, render policy, and renderer version. A cold render encodes all scenes. A scoped render encodes the requested scene and direct transition neighbors, reuses other segments byte-for-byte, and atomically splices them. Failed/canceled work uses temporary paths and does not replace the prior final render or cache manifest.
+
+Before replacement, Gideon verifies decodable boundary frames, transition dependencies, timestamp/audio continuity, caption ranges, total duration, and codec compatibility. The compositor supports scene-dependent presenter visibility/crop/position, chroma key, baked fallback, product-only proof, split layouts, floating frames, branded backgrounds, captions, CTA, transitions, focus changes, and SFX. Background dimming is applied before the presenter is composited, so it cannot darken the presenter layer. `renderPolicy.mode` is explicitly `production` or `debug`; normal jobs and the canonical benchmark use production mode, while diagnostic geometry remains available in metadata and debug renders.
 
 Audio layers are mixed and normalized, then the encoded result is measured. If the result misses the target, bounded measured gain passes correct it. The limiter has automatic gain restoration disabled so the final correction is not undone.
 
-The two editable typography families are kinetic bold captions and editorial serif/italic headings. Text supports word highlighting, emphasized keywords, brand colors, per-scene placement, line limits, dwell, safe regions, deterministic font fallback, and CTA treatment.
+The two editable typography families are kinetic bold and a genuine serif italic. Editorial fallback order is system Georgia Italic, Times New Roman Italic, STIX Two Text Italic, DejaVu Serif Italic, then the kinetic face; kinetic independently prefers Arial Bold or DejaVu Sans Bold. Render metadata records resolved family, font basename, italic flag, and fallback state. Bundling a production font remains subject to licence approval.
+
+Text placement uses normalized rectangles. Presenter layouts, disclosure, CTA controls, platform safe bounds, and each product asset's readable region are reserved. Caption/heading candidates are tried deterministically with bounded scale reduction; chosen rectangles and collision inputs are stored in validation metadata. An impossible placement fails final approval. Provider landmarks may refine these rectangles later.
 
 ## Review and revision
 
-The script review screen exposes pace and every compiled scene. A user can inspect timing, purpose, claim/evidence IDs, shot type, presenter visibility/layout, product asset, text position, and manual-override state. Editing a scene marks it as a manual override, and later recompilation preserves it. Replanning one scene clears only that scene's override and does not regenerate the approved script or the rest of the blueprint. A final export still composes the complete timeline; true cached per-scene media replacement is listed as an explicit local limitation below.
+The script review screen exposes pace, every scene, image/video asset previews, visual treatment, source moment/time, claim/evidence lineage, masking, approval, factual eligibility, conceptual warnings, and compatible approved replacements. Editing a scene marks it as a manual override, and recompilation preserves it. “Regenerate encoded scene” saves the blueprint, retains that override, and launches a scoped job. The resulting render lists requested, regenerated, and reused scene IDs.
 
 Script approval, avatar generation, rendering, and export remain separate operations. Blocking script warnings prevent provider work. The quality report is designed to be displayed alongside scene warnings and final-render approval.
 
 ## Quality gates
 
-`evaluateCreatorVideoQuality` emits a versioned report and a publishable decision. Local gates cover:
+`evaluateCreatorVideoQuality` emits a versioned report with separate `structurallyPublishable` and `humanReviewReady` outcomes. The compatibility `publishable` field is true only when both automated outcomes pass; the UI still requires explicit final human approval before export. Local gates cover:
 
 - 1080×1920 H.264/AAC and duration drift;
 - missing audio, loudness, and excessive silence;
 - black/blank/low-signal sampled frames;
+- scene-aware repeated-frame ratio, longest unexpected freeze, affected scenes, and stale-loop detection; static CTA/type scenes are allowed, while unexpected product/presenter freezes fail;
 - text safe-layout and overflow risks;
 - minimum product scale and scene dwell;
 - excessive cuts and three-scene asset repetition;
 - missing CTA;
 - unsupported or unapproved claim evidence;
-- deterministic presenter/text collisions;
+- actual presenter/product/disclosure/CTA/text rectangle intersections;
 - avatar disclosure, script lineage, consent, artifact presence, crop/frame metadata, and matte/background declaration.
+- encoded CTA presence at the beginning, middle, and end of its visible interval, including exact copy, bounds, font, contrast, dwell, and sample timestamps;
+- arrow movement, tip-aligned clicks, progressive typing, completion dwell, and secret redaction receipts;
+- production-mode exclusion of diagnostic guides, timecodes, and known test patterns;
+- known product-label readability and minimum rendered text size;
+- presenter-region exposure, all ten populated treatments, and transition-boundary safety at approximately −100/0/+100 ms.
 
-Avatar lip sync, mouth/hand deformation, identity stability, blinking/head motion, segmentation halo, temporal flicker, pronunciation, and emotional fit have typed report fields but remain `requires_external_review` until a genuine model-backed canary and human review exist.
+Pronunciation dictionaries accept at most 64 normalized printable term/value pairs. The approved script and captions never change. Entries affect synthesis input only through provider-native support when safely available, or deterministic boundary-aware substitution otherwise. Voiceover provenance stores dictionary and speech-input hashes; changes invalidate reusable voiceover and dependent avatar lineage.
+
+Avatar lip sync, deformation, identity stability, blinking/head motion, segmentation halo, temporal flicker, audible pronunciation quality, and emotional fit remain `requires_external_review` until a genuine model-backed canary and human review exist.
 
 ## Local benchmark
 
-Build main-process code and run:
+Run the first-class command; the default directory is ignored:
 
 ```bash
-pnpm build:main
-node dist/main/main/creatorVideoBenchmarkCli.js --output-dir "$PWD/tmp/creator-video-benchmark"
+pnpm creator-video:benchmark
+pnpm creator-video:benchmark --output-dir "$PWD/tmp/creator-video-benchmark-custom"
 ```
 
-The benchmark synthesizes a safe product capture, materializes a screenshot and trimmed interaction clip, compiles readable and energetic plans, uses a deterministic green-screen avatar, renders word-timed captions and editorial typography, writes a CTA, validates the final export, and generates a contact sheet and path-free JSON report.
+The benchmark renders the `readable` plan as its canonical output and also compiles the energetic plan for comparison. Its local seeded NexusReach-style workflow opens Contacts, types “Maya Chen” progressively, opens the record, changes Lifecycle stage to Qualified, saves, and shows “Changes saved.” It exercises four eased arrow movements (one long and three short), three clicks, safe typing, all ten populated treatments, exact CTA rendering, presenter exposure, production-overlay exclusion, every transition boundary, pronunciation, both type families, cold rendering, and single-scene regeneration/cache reuse. It uses audible local narration when macOS `say` is available and never claims subjective avatar equivalence or photorealism.
 
 Expected artifacts:
 
-- `tmp/creator-video-benchmark/renders/benchmark-script/creator-video-energetic.mp4`
+- `tmp/creator-video-benchmark/renders/benchmark-script/creator-video-readable.mp4`
 - `tmp/creator-video-benchmark/creator-video-contact-sheet.jpg`
+- `tmp/creator-video-benchmark/creator-video-key-frames.jpg`
+- `tmp/creator-video-benchmark/creator-video-interaction-motion-strip.jpg`
+- `tmp/creator-video-benchmark/creator-video-typing-sequence.jpg`
+- `tmp/creator-video-benchmark/creator-video-cta-samples.jpg`
 - `tmp/creator-video-benchmark/creator-video-benchmark.json`
 - `tmp/creator-video-benchmark/product-assets/product-assets.json`
+- `tmp/creator-video-benchmark/scene-cache-report.json`
+- `tmp/creator-video-benchmark/creator-video-structural-quality-report.json`
+- `tmp/creator-video-benchmark/creator-video-visual-readiness-report.json`
+- `tmp/creator-video-benchmark/creator-video-quality-report.json`
 
 Generated benchmark media lives under ignored `tmp/` and must not be committed.
 
@@ -128,11 +150,13 @@ Then render the benchmark with the returned presenter artifact and run the same 
 ## Current limitations
 
 - The deterministic avatar fixture is intentionally synthetic and cannot prove real-avatar quality.
-- Product card shells are deterministic renderer treatments; a brand designer has not approved their final visual identity.
-- The current review action replans a single scene, but final media rendering still rebuilds the complete timeline. Per-scene encoded caching and splice validation remain a local optimization, not a correctness blocker.
-- Frame-signal QA samples representative frames; exhaustive frozen-frame detection should add perceptual hashes across the full output before high-volume production.
-- Text collision checks use deterministic declared layouts, not face/object segmentation from a real avatar provider.
-- Pronunciation dictionaries are stored and exposed, but actual pronunciation depends on the selected TTS/provider canary.
+- Product treatments are deterministic and distinct, but final visual identity lacks brand approval.
+- Temporal QA uses dense scene-aware perceptual differences, not every encoded frame; production thresholds need corpus calibration.
+- Known-label readability uses deterministic fixture geometry and receipts rather than general-purpose OCR; real-product corpus calibration remains useful.
+- Collision checks use deterministic crop-safe rectangles, not provider face/object segmentation.
+- Pronunciation substitution executes locally, but audible quality needs the selected provider canary and human review.
+- A cold scene cache costs more than a monolithic draft; revisions gain the reuse benefit.
+- A scoped product-scene regeneration still rebuilds the complete timeline-wide interaction overlay before reusing unaffected encoded scene segments; this is correct but leaves a performance optimisation opportunity.
 - No provider cost, retention, region, rate limit, commercial licence, or production SLA is asserted locally.
 
 ## Production-readiness checklist
@@ -144,6 +168,11 @@ Then render the benchmark with the returned presenter artifact and run the same 
 - [x] Scene-aware compositor and deterministic vertical export.
 - [x] Captions, editorial typography, SFX, loudness normalization, and post-render validation.
 - [x] Local structural benchmark and path-free report.
+- [x] Encoded scene cache, scoped regeneration, atomic splice, and UI receipt.
+- [x] Production asset materialization, private lineage, previews, and distinct treatments.
+- [x] Temporal QA, rectangle collision metadata, real serif italic resolution, and pronunciation execution.
+- [x] Separate structural and encoded visual-readiness outcomes with negative regressions.
+- [x] Seeded workflow, arrow/click/typing presentation, production/debug policy, readable product framing, presenter exposure, visible CTA, populated treatments, and transition sampling.
 - [ ] Genuine avatar/provider canary accepted.
 - [ ] Voice, visual identity, CTA, pace, and human acceptance policies approved.
 - [ ] Provider/model/licence review completed.

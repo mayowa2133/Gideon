@@ -2,6 +2,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { fictionalAvatarPresenterCatalog } from "../shared/renderTemplates";
+import { createViseme2dAvatarWorker } from "./viseme2dAvatarWorker";
 import type {
   AvatarConsentRecord,
   AvatarModelReceipt,
@@ -10,7 +11,7 @@ import type {
   FictionalAvatarPresenterId
 } from "../shared/types";
 
-export type AvatarWorkerProvider = "disabled" | "sadtalker" | "musetalk";
+export type AvatarWorkerProvider = "disabled" | "viseme2d" | "sadtalker" | "musetalk";
 
 export interface AvatarWorkerConfig {
   provider: AvatarWorkerProvider;
@@ -18,6 +19,9 @@ export interface AvatarWorkerConfig {
   modelLicense?: string;
   approvedForCommercialUse: boolean;
   commandPath?: string;
+  visemeAssetRoot?: string;
+  ffmpegPath?: string;
+  ffprobePath?: string;
 }
 
 export interface AvatarWorkerRequest {
@@ -45,12 +49,21 @@ export type AvatarProcessRunner = (commandPath: string, args: string[]) => Promi
 
 export function loadAvatarWorkerConfig(env: NodeJS.ProcessEnv = process.env): AvatarWorkerConfig {
   const provider = env.GIDEON_AVATAR_WORKER_PROVIDER?.trim().toLowerCase();
+  const resolvedProvider: AvatarWorkerProvider = provider === undefined || provider === ""
+    ? "viseme2d"
+    : provider === "viseme2d" || provider === "sadtalker" || provider === "musetalk" || provider === "disabled"
+      ? provider
+      : "disabled";
+  const local = resolvedProvider === "viseme2d";
   return {
-    provider: provider === "sadtalker" || provider === "musetalk" ? provider : "disabled",
-    modelVersion: cleanOptional(env.GIDEON_AVATAR_MODEL_VERSION),
-    modelLicense: cleanOptional(env.GIDEON_AVATAR_MODEL_LICENSE),
-    approvedForCommercialUse: env.GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED === "true",
-    commandPath: cleanAbsolutePath(env.GIDEON_AVATAR_WORKER_COMMAND)
+    provider: resolvedProvider,
+    modelVersion: local ? "viseme2d-renderer-v1" : cleanOptional(env.GIDEON_AVATAR_MODEL_VERSION),
+    modelLicense: local ? "Gideon project-owned fictional sprite assets" : cleanOptional(env.GIDEON_AVATAR_MODEL_LICENSE),
+    approvedForCommercialUse: local || env.GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED === "true",
+    commandPath: cleanAbsolutePath(env.GIDEON_AVATAR_WORKER_COMMAND),
+    visemeAssetRoot: cleanAbsolutePath(env.GIDEON_VISEME_ASSET_ROOT),
+    ffmpegPath: cleanAbsolutePath(env.GIDEON_FFMPEG_PATH),
+    ffprobePath: cleanAbsolutePath(env.GIDEON_FFPROBE_PATH)
   };
 }
 
@@ -72,6 +85,9 @@ export function validateAvatarWorkerRequest(input: AvatarWorkerRequest, config: 
     throw new Error("Avatar worker requires private local artifact paths.");
   }
   if (input.sourceImagePath) {
+    if (config.provider === "viseme2d") {
+      throw new Error("Local animated presenters do not transform custom portraits; the authorized portrait remains static.");
+    }
     if (!path.isAbsolute(input.sourceImagePath)) {
       throw new Error("Custom avatar source must use a private local path.");
     }
@@ -106,6 +122,15 @@ export function createAvatarWorker(
   config = loadAvatarWorkerConfig(),
   runProcess: AvatarProcessRunner = runAvatarProcess
 ): AvatarWorker {
+  if (config.provider === "viseme2d") {
+    const worker = createViseme2dAvatarWorker(config);
+    return {
+      async render(input): Promise<AvatarWorkerResult> {
+        validateAvatarWorkerRequest(input, config);
+        return worker.render(input);
+      }
+    };
+  }
   return {
     async render(input): Promise<AvatarWorkerResult> {
       validateAvatarWorkerRequest(input, config);
