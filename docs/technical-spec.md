@@ -465,6 +465,14 @@ Progress is stage plus optional units (`bytes`, `frames`, `segments`) and bounde
 
 API sets `cancel_requested_at`; worker checks between safe phases and terminates child process group. Partial objects use a temporary prefix and are deleted. Reservations are settled/refunded according to completed provider work.
 
+## Creator-video scene and evidence artifacts
+
+Creator renders use a versioned scene-segment cache. Segment identity derives from complete scene/transition composition plus recording, product, avatar, narration, pronunciation, typography, and policy hashes. Scoped jobs include one script ID and scene IDs; transition neighbors regenerate and other valid segments are byte-reused. Segments, the splice, and manifest are staged privately and committed only after boundary, continuity, duration, alignment, and codec checks. Scene segments/manifests are private versioned artifacts with project/workspace lineage.
+
+Final validation separates `structurallyPublishable` from `humanReviewReady`. Structural checks cover output format, timing, audio, temporal signal, layout, evidence, and avatar lineage. Human-readiness checks consume encoded-frame and render receipts for exact CTA visibility, arrow/click/typing presentation, production-mode debug/timecode exclusion, known product-label readability, presenter-region exposure, populated treatment content, and transition safety at approximately −100/0/+100 ms. Findings carry bounded scene/element IDs, timestamps, thresholds, and reasons. A missing visual receipt never inherits a structural pass; older renders must be regenerated before final approval.
+
+Approved product evidence is materialized in the asynchronous render job before composition. Derived artifacts are content addressed by source/evidence/crop/masking inputs, persisted privately, and conceptual/rejected evidence can never become factual proof.
+
 ## Video processing architecture
 
 ### Ingest and validation
@@ -783,7 +791,11 @@ Detailed rules live in [security-rules.md](./security-rules.md). Baseline:
 
 ### Avatar worker boundary
 
-The default avatar renderer is deterministic. Optional external avatar workers are disabled unless all of the following are set: `GIDEON_AVATAR_WORKER_PROVIDER` (`sadtalker` or `musetalk`), `GIDEON_AVATAR_MODEL_VERSION`, `GIDEON_AVATAR_MODEL_LICENSE`, and `GIDEON_AVATAR_MODEL_COMMERCIAL_APPROVED=true`. The runtime accepts an approved fictional catalog avatar or a private project-owned portrait with matching active likeness consent; it validates private local audio/output/source paths, a short-form duration, and the required `AI-generated brand presenter` disclosure before invoking a provider. An uninstalled provider fails closed; Gideon must not download model weights at runtime, accept portrait URLs, or accept reference voice clips from this boundary.
+The default avatar renderer is `viseme2d`, a completely local CPU implementation for the bundled Orbit and Nova fictional presenters. It validates a mono/stereo 16-bit PCM WAV, derives bounded 80 ms energy mouth cues plus deterministic blink cues, reuses fixed hashed sprite states, and renders a 720×720/30 fps green-screen MP4 with FFmpeg. Receipts bind the renderer, pack version/hash, cue engine/version, and source-audio hash. The packaged packs include project-owned licence/provenance metadata, crop/anchor data, expressions, and hashes. No API key, network, Docker container, model weights, or GPU is involved.
+
+The product defaults to “Local animated — Free”; missing/stale clips are generated during final render. Staleness includes the script revision, current voiceover artifact, selected presenter, sprite-pack version, and source/consent lineage. The final renderer receives an explicit presenter descriptor and keys green only when artifact metadata says `green_screen`. An actively consented custom portrait is passed to the same compositor as a baked static image in free/static mode and is never silently replaced with a fictional person.
+
+Optional external workers remain available when `GIDEON_AVATAR_WORKER_PROVIDER` is `sadtalker` or `musetalk` and the pinned model version, reviewed licence, commercial approval, and command are configured. The runtime accepts an approved fictional catalog avatar or a private project-owned portrait with matching active likeness consent; it validates private local audio/output/source paths, duration, and the required `AI-generated brand presenter` disclosure. An uninstalled provider fails closed; Gideon never downloads model weights at runtime, accepts portrait URLs, or accepts reference voice clips from this boundary.
 
 `docker-compose.avatar-worker.yml` defines the isolated SadTalker implementation: non-root, read-only filesystem, no runtime network, GPU reservation, a writable private `/work` mount, a read-only fictional asset catalog, and separate read-only mounts for SadTalker checkpoints and required facexlib alignment/detection weights. The catalog hashes and provenance are recorded in `assets/avatar-catalog/manifest.json`; the worker validates its output receipt before Gideon imports the MP4 as a private `avatar_presenter` artifact.
 
@@ -791,7 +803,7 @@ The default avatar renderer is deterministic. Optional external avatar workers a
 
 Both containers use a bounded no-exec tmpfs, derive job-specific result directories from server-generated output names, and remove provider intermediates after moving the final MP4. This prevents concurrent jobs from reading or replacing one another's temporary output.
 
-Avatar generation is a separate cancellable `avatar` job. It requires one approved script and a validated private voiceover, emits only a private `avatar_presenter` artifact, and retains the provider/model/license/avatar/disclosure receipt with that artifact. The source may be an approved fictional catalog presenter or a private project-owned portrait carrying active self/authorized-likeness consent. Failed or unconfigured workers do not alter the approved script or existing render.
+Explicit avatar generation remains a separate cancellable `avatar` job for preview and GPU providers. It requires one approved script and a validated private voiceover, emits only a private `avatar_presenter` artifact, and retains the provider/model/license/avatar/disclosure receipt with that artifact. Final rendering automatically creates a missing or stale `viseme2d` artifact because that path has no provider/GPU cost. Failed workers do not alter the approved script or existing render.
 
 Custom portrait consent uses the versioned `self-avatar-v1` statement and requires the uploader to attest that the portrait depicts them. The source artifact and profile pointer must carry identical consent timestamps, policy version, subject relationship, and artifact ID. Revocation marks the source artifact consent as revoked, clears the active profile pointer, invalidates matching generated clips, and prevents future worker requests.
 

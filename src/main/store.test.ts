@@ -1017,6 +1017,18 @@ describe("GideonStore billing reconciliation", () => {
     expect(updated.renders).toEqual([]);
   });
 
+  it("saves a manual CreativeBlueprint scene without invalidating approved narration lineage", async () => {
+    const store = new GideonStore(); await store.load();
+    const project = await store.createProject({ name: "Scene revision", profile: profileFixture() });
+    await store.updateMoments(project.id, [{ id: "moment-1", label: "Proof", startMs: 0, endMs: 5000, evidence: "Visible proof", sourceEvidenceIds: ["evidence-1"], confidence: .9, enabled: true }]);
+    await store.generateConcepts(project.id); const generated = await store.generateScripts(project.id); const draft = generated.scripts[0]!;
+    const approved = (await store.updateScripts(project.id, [{ ...draft, approved: true, voiceoverText: `${draft.voiceoverText} ${Array(80).fill("evidence").join(" ")}` }])).scripts[0]!;
+    const blueprint = structuredClone(approved.creativeBlueprint!); blueprint.scenes[0]!.shotType = "kinetic_typography"; blueprint.scenes[0]!.manuallyOverridden = true;
+    const saved = await store.updateCreativeBlueprint(project.id, approved.id, blueprint);
+    expect(saved.scripts[0]?.updatedAt).toBe(approved.updatedAt);
+    expect(saved.scripts[0]?.creativeBlueprint?.scenes[0]).toMatchObject({ shotType: "kinetic_typography", manuallyOverridden: true });
+  });
+
   it("refreshes script render manifests and clears renders after profile brand changes", async () => {
     const store = new GideonStore();
     await store.load();

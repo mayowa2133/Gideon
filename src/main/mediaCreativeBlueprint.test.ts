@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { compileCreativeBlueprint, projectBlueprintOntoEditDecisionList } from "../shared/creativeBlueprint";
 import { buildEditDecisionList, buildVisualBeatsForTemplate } from "../shared/renderTemplates";
 import type { DetectedMoment, ProductProfile, ScriptDraft } from "../shared/types";
-import { buildGeneratedPresenterFilters, parseRenderedAudioQa, validateRenderManifest } from "./media";
+import { buildGeneratedPresenterFilters, captionBackdropRect, parseRenderedAudioQa, validateRenderManifest } from "./media";
 
 const profile: ProductProfile = {
   productName: "Gideon Fixture",
@@ -72,7 +72,7 @@ function projectedEdl() {
 describe("scene-aware CreativeBlueprint rendering", () => {
   it("compiles independent presenter branches for full, lower-third, split, hidden, and CTA scenes", () => {
     const edl = projectedEdl();
-    const result = buildGeneratedPresenterFilters(edl, 2, edl.durationMs / 1_000);
+    const result = buildGeneratedPresenterFilters(edl, 2, edl.durationMs / 1_000, { backgroundType: "green_screen" });
     const filter = result.filters.join(";");
     expect(filter).toContain("chromakey=0x00FF00");
     expect(filter).toContain("scale=1080:1920");
@@ -81,6 +81,25 @@ describe("scene-aware CreativeBlueprint rendering", () => {
     expect(filter).toContain("enable='between(t,");
     expect(result.outputLabel).toMatch(/^base_presenter_/);
     expect(edl.creativeBlueprint?.scenes.some((scene) => !scene.presenter.visible)).toBe(true);
+  });
+
+  it("does not fall back to the global presenter for a blueprint-local hidden scene", () => {
+    const edl = projectedEdl();
+    edl.creativeBlueprint = {
+      ...edl.creativeBlueprint!,
+      scenes: [{ ...edl.creativeBlueprint!.scenes[0]!, presenter: { ...edl.creativeBlueprint!.scenes[0]!.presenter, visible: false } }]
+    };
+    const result = buildGeneratedPresenterFilters(edl, 2, edl.durationMs / 1_000, { backgroundType: "green_screen" }, "base_decorated");
+    expect(result).toEqual({ filters: [], outputLabel: "base_decorated" });
+  });
+
+  it("keeps the caption contrast backing inside the vertical canvas", () => {
+    expect(captionBackdropRect({ x: 120, y: 1550, width: 840 }, 58, 2)).toEqual({
+      x: 98,
+      y: 1492,
+      width: 884,
+      height: 136
+    });
   });
 
   it("validates the projected scene timeline and rejects a mismatched blueprint duration", () => {

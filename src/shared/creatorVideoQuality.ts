@@ -60,6 +60,13 @@ export function evaluateCreatorVideoQuality(input: CreatorVideoQualityInput): Cr
     "Sampled frames contain usable visual signal.",
     "Black, blank, or low-signal sampled frames were detected."
   );
+  add(
+    "temporal_signal",
+    Boolean(render?.temporalQa && render.temporalQa.result !== "fail"),
+    "Final-render temporal signal passes scene-aware frozen and stale-loop checks.",
+    "Unexpected black, blank, frozen, or stale-loop output was detected.",
+    render?.temporalQa ? [...new Set([...render.temporalQa.affectedSceneIds, ...render.temporalQa.staleLoopSceneIds, ...render.temporalQa.blackSceneIds, ...render.temporalQa.blankSceneIds])] : undefined
+  );
 
   const captionUnsafe = blueprint.scenes.filter((scene) =>
     scene.typography.some((cue) => cue.position === "bottom" && scene.presenter.visible && scene.presenter.layout === "lower_third")
@@ -118,6 +125,32 @@ export function evaluateCreatorVideoQuality(input: CreatorVideoQualityInput): Cr
     "A complete CTA end card is reserved.",
     "The blueprint is missing its reserved CTA end card."
   );
+  const visual = render?.visualReadinessQa;
+  const addVisual = (
+    code: CreatorVideoQualityGateResult["code"],
+    ok: boolean,
+    pass: string,
+    fail: string,
+    findingCode: string
+  ): void => {
+    const findings = visual?.findings.filter((finding) => finding.code === findingCode) ?? [];
+    gates.push({
+      code,
+      status: ok ? "pass" : "fail",
+      message: ok ? pass : fail,
+      sceneIds: [...new Set(findings.flatMap(({ sceneIds }) => sceneIds))],
+      elementIds: [...new Set(findings.flatMap(({ elementIds }) => elementIds))],
+      timestampsMs: [...new Set(findings.flatMap(({ timestampsMs }) => timestampsMs))],
+      threshold: findings.find(({ threshold }) => threshold)?.threshold
+    });
+  };
+  addVisual("visible_cta", visual?.cta.result === "pass", "The encoded CTA is visible throughout its required samples.", "The encoded CTA is missing, clipped, obscured, or insufficiently contrasted.", "visible_cta");
+  addVisual("interaction_presentation", visual?.interactions.result === "pass", "Pointer motion, click feedback, and progressive typing are demonstrated.", "A recognizable pointer, clicks, or progressive typing evidence is missing.", "interaction_presentation");
+  addVisual("production_presentation", visual?.productionPresentation.result === "pass", "Production output contains no known diagnostic or timecode presentation.", "Production output contains or declares debug/timecode presentation.", "production_presentation");
+  addVisual("product_readability", visual?.readability.result === "pass", "Known product evidence remains readable.", "One or more product scenes are too small or brief to interpret.", "product_readability");
+  addVisual("presenter_exposure", visual?.presenterExposure.result === "pass", "Presenter exposure passes sampled luma checks.", "The presenter is materially underexposed in one or more scenes.", "presenter_exposure");
+  addVisual("treatment_completeness", visual?.treatments.result === "pass", "Every supported treatment is populated and meaningful.", "One or more product treatments is blank or incomplete.", "treatment_completeness");
+  addVisual("transition_safety", visual?.transitions.result === "pass", "Required elements remain safe across transitions.", "Required content clips, disappears, or darkens excessively at a transition.", "transition_safety");
   const unsupportedScenes = blueprint.scenes.filter((scene) => scene.supportedClaimIds.some((claimId) =>
     !blueprint.productAssets.some((asset) =>
       asset.factualUseAllowed &&
@@ -127,7 +160,8 @@ export function evaluateCreatorVideoQuality(input: CreatorVideoQualityInput): Cr
     )
   ));
   add("claim_evidence", unsupportedScenes.length === 0, "Every scene claim has approved factual evidence.", "A scene claim lacks approved factual evidence.", unsupportedScenes.map(({ id }) => id));
-  add("presenter_caption_collision", captionUnsafe.length === 0, "No deterministic presenter/text collisions were found.", "A presenter/text collision was found.", captionUnsafe.map(({ id }) => id));
+  const impossibleLayouts = render?.layoutQa?.impossibleSceneIds ?? captionUnsafe.map(({ id }) => id);
+  add("presenter_caption_collision", impossibleLayouts.length === 0, "No rectangle-based presenter/product/text collisions were found.", "No readable collision-free text placement exists for one or more scenes.", impossibleLayouts);
 
   const presenterScenes = blueprint.scenes.filter((scene) => scene.presenter.visible);
   const disclosureMissing = presenterScenes.filter((scene) => !scene.presenter.disclosure.trim());
@@ -161,11 +195,20 @@ export function evaluateCreatorVideoQuality(input: CreatorVideoQualityInput): Cr
       : "Avatar subjective-quality measurements are available but still require human approval."
   });
 
+  const visualGateCodes = new Set<CreatorVideoQualityGateResult["code"]>([
+    "visible_cta", "interaction_presentation", "production_presentation", "product_readability",
+    "presenter_exposure", "treatment_completeness", "transition_safety"
+  ]);
+  const structuralGates = gates.filter(({ code }) => !visualGateCodes.has(code) && code !== "avatar_subjective_quality");
+  const structurallyPublishable = structuralGates.every(({ status }) => status !== "fail");
+  const humanReviewReady = Boolean(visual?.result === "pass") && gates.filter(({ code }) => visualGateCodes.has(code)).every(({ status }) => status === "pass");
   return {
     schemaVersion: "1",
     blueprintId: blueprint.id,
     generatedAt: input.now ?? new Date().toISOString(),
-    publishable: gates.every(({ status }) => status !== "fail"),
+    structurallyPublishable,
+    humanReviewReady,
+    publishable: structurallyPublishable && humanReviewReady,
     gates,
     avatarQuality
   };

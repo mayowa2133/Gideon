@@ -61,6 +61,7 @@ const ctaStyles: CtaStylePreset[] = ["soft_try", "direct_signup", "learn_more"];
 const musicMoods: MusicMood[] = ["none", "clean_tech", "upbeat"];
 const presenterPositions = ["lower_right", "lower_left"] as const;
 const presenterMotions = ["caption_sync", "idle_bob"] as const;
+const presenterModes = ["local_animated", "photorealistic_gpu", "static"] as const;
 const creatorPacePresets: CreatorPacePreset[] = ["readable", "energetic", "reference_fast"];
 const creatorShotTypes: CreatorShotType[] = [
   "product_hero", "product_fullscreen", "product_mockup", "presenter_fullscreen", "presenter_lower_third",
@@ -285,6 +286,9 @@ function RuntimePanel({ info }: { info: PlatformInfo | null }): JSX.Element {
       <StatusDot ok={info.ffmpegAvailable} label="FFmpeg" />
       <StatusDot ok={info.ffprobeAvailable} label="ffprobe" />
       <StatusDot ok={info.sayAvailable} label="macOS voiceover" />
+      <StatusDot ok={info.localAvatar.available} label="Local animated presenter" />
+      <StatusDot ok={info.localAvatar.primaryCueExtractorAvailable} label="Rhubarb cue extractor (optional)" />
+      <StatusDot ok={info.localAvatar.fallbackCueExtractorAvailable} label="Built-in energy cue fallback" />
       <StatusDot ok={info.openAiConfigured} label="OpenAI providers" />
       <StatusDot
         ok={info.storageProvider === "local_private" || info.cloudStorageConfigured}
@@ -297,6 +301,7 @@ function RuntimePanel({ info }: { info: PlatformInfo | null }): JSX.Element {
       ) : (
         <small>Set OPENAI_API_KEY or GIDEON_OPENAI_API_KEY before launching to enable real AI, ASR, and provider TTS.</small>
       )}
+      <small>{info.localAvatar.message}</small>
       {info.storageProvider !== "local_private" && !info.cloudStorageConfigured ? (
         <small>Cloud storage is selected but missing endpoint, bucket, or credentials.</small>
       ) : null}
@@ -856,6 +861,9 @@ function ProjectWorkspace({
   ).length;
   const matchingAvatarArtifacts = project.artifacts
     .filter((artifact) =>
+      (project.profile.avatarPresenterMode ?? (project.profile.customAvatarSource ? "photorealistic_gpu" : "local_animated")) !== "static" &&
+      ((project.profile.avatarPresenterMode ?? (project.profile.customAvatarSource ? "photorealistic_gpu" : "local_animated")) !== "local_animated" || artifact.avatarModelReceipt?.provider === "viseme2d") &&
+      ((project.profile.avatarPresenterMode ?? (project.profile.customAvatarSource ? "photorealistic_gpu" : "local_animated")) !== "photorealistic_gpu" || artifact.avatarModelReceipt?.provider === "musetalk" || artifact.avatarModelReceipt?.provider === "sadtalker") &&
       artifact.kind === "avatar_presenter" &&
       artifact.avatarModelReceipt?.avatarId === project.profile.avatarPresenterId &&
       artifact.avatarModelReceipt?.avatarProvenance === (
@@ -865,11 +873,40 @@ function ProjectWorkspace({
     )
     .filter((artifact) => {
       const script = project.scripts.find((candidate) => candidate.id === artifact.avatarPresenterLineage?.sourceScriptId);
-      return Boolean(script && artifact.avatarPresenterLineage?.sourceScriptUpdatedAt === script.updatedAt);
+      const latestVoiceover = project.artifacts
+        .filter((candidate) => candidate.kind === "voiceover" && candidate.voiceoverProvenance?.sourceScriptId === script?.id)
+        .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0];
+      const packIsCurrent = artifact.avatarModelReceipt?.provider !== "viseme2d" ||
+        artifact.avatarModelReceipt.avatarPackVersion === `${artifact.avatarModelReceipt.avatarId}-viseme-v1`;
+      return Boolean(
+        script &&
+        artifact.avatarPresenterLineage?.sourceScriptUpdatedAt === script.updatedAt &&
+        (!latestVoiceover || artifact.avatarPresenterLineage?.sourceVoiceoverArtifactId === latestVoiceover.id) &&
+        packIsCurrent
+      );
     })
     .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
   const readyAvatarScriptIds = new Set(matchingAvatarArtifacts
     .map((artifact) => artifact.avatarPresenterLineage!.sourceScriptId));
+  const avatarPreviewStatuses = new Map<string, "generated" | "generating" | "failed" | "stale" | "not_generated">();
+  project.scripts.forEach((script) => {
+    const latestJob = [...project.jobs].reverse().find((job) => job.kind === "avatar" && job.renderScope?.scriptIds?.includes(script.id));
+    const hasOlderArtifact = project.artifacts.some((artifact) =>
+      artifact.kind === "avatar_presenter" && artifact.avatarPresenterLineage?.sourceScriptId === script.id
+    );
+    avatarPreviewStatuses.set(
+      script.id,
+      readyAvatarScriptIds.has(script.id)
+        ? "generated"
+        : latestJob?.status === "queued" || latestJob?.status === "running"
+          ? "generating"
+          : latestJob?.status === "failed"
+            ? "failed"
+            : hasOlderArtifact
+              ? "stale"
+              : "not_generated"
+    );
+  });
   const avatarClipUrls = new Map<string, string>();
   matchingAvatarArtifacts.forEach((artifact) => {
     const scriptId = artifact.avatarPresenterLineage!.sourceScriptId;
@@ -1064,14 +1101,25 @@ function ProjectWorkspace({
           onRenderScript={(scriptId, voiceoverMode) =>
             void runAction("rendering", () => window.gideon.renderScript(project.id, scriptId, voiceoverMode))
           }
+          onRegenerateScene={(scriptId, sceneId) => void runAction("rendering", async () => {
+            const blueprint = scripts.find((script) => script.id === scriptId)?.creativeBlueprint ?? scripts.find((script) => script.id === scriptId)?.editDecisionList?.creativeBlueprint;
+            if (!blueprint) throw new Error("CreativeBlueprint not found.");
+            await window.gideon.updateCreativeBlueprint(project.id, scriptId, blueprint);
+            return window.gideon.renderScene(project.id, scriptId, sceneId);
+          })}
           onRegenerateVoiceover={(scriptId) =>
             void runAction("rendering", () => window.gideon.regenerateVoiceover(project.id, scriptId))
           }
           onGenerateAvatarPresenter={(scriptId) =>
             void runAction("rendering", () => window.gideon.generateAvatarPresenter(project.id, scriptId))
           }
-          canGenerateAvatarPresenter={project.profile.avatarPresenterId === "orbit" || project.profile.avatarPresenterId === "nova"}
+          canGenerateAvatarPresenter={
+            (project.profile.avatarPresenterMode ?? "local_animated") !== "static" &&
+            (project.profile.avatarPresenterMode !== "local_animated" || !project.profile.customAvatarSource) &&
+            (project.profile.avatarPresenterId === "orbit" || project.profile.avatarPresenterId === "nova")
+          }
           readyAvatarScriptIds={readyAvatarScriptIds}
+          avatarPreviewStatuses={avatarPreviewStatuses}
           avatarClipUrls={avatarClipUrls}
         />
       </Panel>
@@ -1369,6 +1417,30 @@ function ProfileForm({
           ))}
         </select>
       </label>
+      <label>
+        Presenter quality
+        <select
+          disabled={!profile.brandPresenterEnabled}
+          value={profile.avatarPresenterMode ?? "local_animated"}
+          onChange={(event) => update("avatarPresenterMode", event.target.value as ProductProfile["avatarPresenterMode"])}
+        >
+          {presenterModes.map((mode) => (
+            <option key={mode} value={mode}>
+              {mode === "local_animated"
+                ? "Local animated · free"
+                : mode === "photorealistic_gpu"
+                  ? "Photorealistic · GPU setup"
+                  : "Static presenter"}
+            </option>
+          ))}
+        </select>
+      </label>
+      {(profile.avatarPresenterMode ?? "local_animated") === "local_animated" ? (
+        <small className="field-help">
+          Runs privately on this device with FFmpeg and the built-in Orbit/Nova sprite packs. No API, network, GPU, or per-video fee.
+          {profile.customAvatarSource ? " Imported self portraits remain static in this mode." : ""}
+        </small>
+      ) : null}
       <div className="avatar-preview" aria-label="Selected fictional presenter">
         {avatarPreviewUrl ? <img src={avatarPreviewUrl} alt="" /> : <span>{initials(profile.productName || "G")}</span>}
         <div>
@@ -1685,20 +1757,24 @@ function ScriptEditor({
   setScripts,
   onRegenerate,
   onRenderScript,
+  onRegenerateScene,
   onRegenerateVoiceover,
   onGenerateAvatarPresenter,
   canGenerateAvatarPresenter,
   readyAvatarScriptIds,
+  avatarPreviewStatuses,
   avatarClipUrls
 }: {
   scripts: ScriptDraft[];
   setScripts: (scripts: ScriptDraft[]) => void;
   onRegenerate: (scriptId: string) => void;
   onRenderScript: (scriptId: string, voiceoverMode: "regenerate" | "reuse") => void;
+  onRegenerateScene: (scriptId: string, sceneId: string) => void;
   onRegenerateVoiceover: (scriptId: string) => void;
   onGenerateAvatarPresenter: (scriptId: string) => void;
   canGenerateAvatarPresenter: boolean;
   readyAvatarScriptIds: Set<string>;
+  avatarPreviewStatuses: Map<string, "generated" | "generating" | "failed" | "stale" | "not_generated">;
   avatarClipUrls: Map<string, string>;
 }): JSX.Element {
   if (scripts.length === 0) {
@@ -1905,22 +1981,6 @@ function ScriptEditor({
     }));
   }
 
-  function regenerateBlueprintScene(scriptId: string, sceneId: string): void {
-    setScripts(scripts.map((script) => {
-      const blueprint = script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint;
-      if (script.id !== scriptId || !blueprint) return script;
-      const nextBlueprint = {
-        ...blueprint,
-        scenes: blueprint.scenes.map((scene) => scene.id === sceneId ? { ...scene, manuallyOverridden: false } : scene)
-      };
-      return {
-        ...script,
-        creativeBlueprint: nextBlueprint,
-        editDecisionList: script.editDecisionList ? { ...script.editDecisionList, creativeBlueprint: nextBlueprint } : script.editDecisionList
-      };
-    }));
-  }
-
   function updateBlueprintAsset(
     scriptId: string,
     assetId: string,
@@ -1966,7 +2026,7 @@ function ScriptEditor({
                 onClick={() => onGenerateAvatarPresenter(script.id)}
                 type="button"
               >
-                {readyAvatarScriptIds.has(script.id) ? "Regenerate avatar clip" : "Generate avatar clip"}
+                {readyAvatarScriptIds.has(script.id) ? "Regenerate presenter preview" : "Generate presenter preview"}
               </button>
               <button
                 className="secondary compact"
@@ -1994,6 +2054,10 @@ function ScriptEditor({
               />
               {hasBlockingWarnings ? "Fix blocking warnings before render" : "Approved for render"}
             </label>
+            <small className="field-help">
+              Presenter preview: {(avatarPreviewStatuses.get(script.id) ?? "not_generated").replace(/_/g, " ")}.
+              {avatarPreviewStatuses.get(script.id) === "stale" ? " Final render will refresh the free local animation automatically." : ""}
+            </small>
             <label>
               Template
               <select
@@ -2052,7 +2116,23 @@ function ScriptEditor({
                 <div className="blueprint-asset-list">
                   {(script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint)!.productAssets.map((asset) => (
                     <div className="blueprint-asset-row" key={`${script.id}-${asset.id}`}>
-                      <span>{asset.label} · {asset.kind.replace(/_/g, " ")}</span>
+                      <div className="blueprint-asset-preview">
+                        {asset.kind === "interaction_clip" && asset.clipUrl ? (
+                          <video aria-label={`Interaction preview for ${asset.label}`} controls muted playsInline preload="metadata" src={asset.clipUrl} />
+                        ) : asset.imageUrl ? (
+                          <img alt={`Product evidence preview: ${asset.label}`} loading="lazy" src={asset.imageUrl} />
+                        ) : (
+                          <div aria-label={`Preview unavailable for ${asset.label}`} className="asset-preview-fallback">Preview unavailable</div>
+                        )}
+                      </div>
+                      <div className="blueprint-asset-details">
+                        <strong>{asset.label}</strong>
+                        <span>Treatment: {asset.kind.replace(/_/g, " ")}</span>
+                        <small>Flow/moment: {asset.sourceMomentIds.join(", ") || "none"} · {asset.sourceStartMs === undefined ? "timestamp unavailable" : `${(asset.sourceStartMs / 1000).toFixed(1)}s`}</small>
+                        <small>Claims: {asset.supportedClaimIds.join(", ") || "none"} · Evidence: {asset.sourceEvidenceIds.join(", ") || "none"}</small>
+                        <small>{asset.factualUseAllowed ? "Factual use allowed after approval" : "Factual use blocked"}</small>
+                        {asset.provenance === "conceptual" || !asset.factualUseAllowed ? <strong className="conceptual-warning">Conceptual visual — never use as factual proof</strong> : null}
+                      </div>
                       <div className="blueprint-asset-controls">
                         <select
                           aria-label={`Masking for ${asset.label}`}
@@ -2075,6 +2155,21 @@ function ScriptEditor({
                           <option value="approved" disabled={!asset.factualUseAllowed || asset.maskingStatus === "needs_review"}>Approved</option>
                           <option value="rejected">Rejected</option>
                         </select>
+                        <label>
+                          Replace preview
+                          <select
+                            aria-label={`Replace ${asset.label} with a compatible approved asset`}
+                            defaultValue=""
+                            onChange={(event) => {
+                              const replacement = (script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint)?.productAssets.find((candidate) => candidate.id === event.target.value);
+                              if (replacement) updateBlueprintAsset(script.id, asset.id, { imagePath: replacement.imagePath, imageUrl: replacement.imageUrl, clipPath: replacement.clipPath, clipUrl: replacement.clipUrl, sourceMomentIds: replacement.sourceMomentIds, sourceEvidenceIds: replacement.sourceEvidenceIds, supportedClaimIds: replacement.supportedClaimIds, sourceStartMs: replacement.sourceStartMs, sourceEndMs: replacement.sourceEndMs, crop: replacement.crop, readableRegion: replacement.readableRegion, provenance: replacement.provenance, factualUseAllowed: replacement.factualUseAllowed, maskingStatus: replacement.maskingStatus, contentHash: replacement.contentHash, factoryVersion: replacement.factoryVersion });
+                              event.currentTarget.value = "";
+                            }}
+                          >
+                            <option value="">Keep current</option>
+                            {(script.creativeBlueprint ?? script.editDecisionList?.creativeBlueprint)!.productAssets.filter((candidate) => candidate.id !== asset.id && candidate.kind === asset.kind && candidate.approvalStatus === "approved" && candidate.maskingStatus !== "needs_review").map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}
+                          </select>
+                        </label>
                       </div>
                     </div>
                   ))}
@@ -2158,8 +2253,8 @@ function ScriptEditor({
                               {(["top", "center", "bottom", "left", "right"] as const).map((position) => <option key={position} value={position}>{position}</option>)}
                             </select>
                           </label>
-                          <button className="secondary compact" onClick={() => regenerateBlueprintScene(script.id, scene.id)} type="button">
-                            Re-plan this scene
+                          <button className="secondary compact" onClick={() => onRegenerateScene(script.id, scene.id)} type="button">
+                            Regenerate encoded scene
                           </button>
                         </div>
                         <small>
@@ -2363,17 +2458,31 @@ function RenderGallery({
           ) : null}
           {render.qualityReport ? (
             <div className="quality-warning-list">
-              <small>{render.qualityReport.publishable ? "Automated quality gates passed." : "Blocking quality failures remain."}</small>
+              <small>{(render.qualityReport.structurallyPublishable ?? render.qualityReport.publishable) ? "Structural validation passed." : "Structural validation has blocking failures."}</small>
+              <small>{render.qualityReport.humanReviewReady ? "Human-review readiness passed; final human approval is still required." : "Human-review readiness has blocking visual findings."}</small>
               {render.qualityReport.gates
                 .filter((gate) => gate.status !== "pass")
-                .map((gate) => <small key={`${render.id}-${gate.code}`}>{gate.code.replace(/_/g, " ")}: {gate.message}</small>)}
+                .map((gate) => <small key={`${render.id}-${gate.code}`}>{gate.code.replace(/_/g, " ")}: {gate.message}{gate.sceneIds?.length ? ` Scenes: ${gate.sceneIds.join(", ")}.` : ""}{gate.timestampsMs?.length ? ` At: ${gate.timestampsMs.map((value) => `${value}ms`).join(", ")}.` : ""}</small>)}
+              {render.validation?.visualReadinessQa ? (
+                <>
+                  <small>CTA: {render.validation.visualReadinessQa.cta.result} · {render.validation.visualReadinessQa.cta.text} · samples {render.validation.visualReadinessQa.cta.sampleTimestampsMs.join(", ")} ms</small>
+                  <small>Pointer/typing: {render.validation.visualReadinessQa.interactions.result} · {render.validation.visualReadinessQa.interactions.movementCount} moves · {render.validation.visualReadinessQa.interactions.clickCount} clicks · {render.validation.visualReadinessQa.interactions.typingSequenceCount} typing sequence(s)</small>
+                  <small>Production presentation: {render.validation.visualReadinessQa.productionPresentation.result} · Readability: {render.validation.visualReadinessQa.readability.result} · Presenter exposure: {render.validation.visualReadinessQa.presenterExposure.result} · Transitions: {render.validation.visualReadinessQa.transitions.result}</small>
+                </>
+              ) : <small>This older render has no encoded visual-readiness receipt and requires regeneration.</small>}
+            </div>
+          ) : null}
+          {render.sceneCache ? (
+            <div className="quality-warning-list" aria-label="Scene regeneration receipt">
+              <small>Regenerated: {render.sceneCache.regeneratedSceneIds.join(", ") || "none"}</small>
+              <small>Reused unchanged: {render.sceneCache.reusedSceneIds.join(", ") || "none"}</small>
             </div>
           ) : null}
           {render.storageKey ? <p className="storage-key">Private storage: {render.storageKey}</p> : null}
           <label className="checkbox-row">
             <input
               checked={render.finalApproval?.approved ?? false}
-              disabled={render.status !== "completed" || Boolean(render.qualityReport && !render.qualityReport.publishable)}
+              disabled={render.status !== "completed" || Boolean(render.qualityReport && (!(render.qualityReport.structurallyPublishable ?? render.qualityReport.publishable) || !render.qualityReport.humanReviewReady))}
               onChange={(event) => onApproval(render.id, event.target.checked)}
               type="checkbox"
             />

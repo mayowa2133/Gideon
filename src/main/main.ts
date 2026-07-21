@@ -381,6 +381,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle("scripts:update", async (_event, projectId: string, scripts: ScriptDraft[]) =>
     store.updateScripts(projectId, scripts)
   );
+  ipcMain.handle("blueprint:update", async (_event, projectId: string, scriptId: string, blueprint: NonNullable<ScriptDraft["creativeBlueprint"]>) =>
+    store.updateCreativeBlueprint(projectId, scriptId, blueprint)
+  );
   ipcMain.handle("brand:choose-logo", async () => {
     const options: OpenDialogOptions = {
       title: "Choose brand logo",
@@ -407,6 +410,11 @@ function registerIpcHandlers(): void {
     "render:script",
     async (_event, projectId: string, scriptId: string, voiceoverMode: "regenerate" | "reuse") =>
       enqueueRenderFromControl(projectId, "local_user", { scriptIds: [scriptId], voiceoverMode })
+  );
+  ipcMain.handle(
+    "render:scene",
+    async (_event, projectId: string, scriptId: string, sceneId: string) =>
+      enqueueRenderFromControl(projectId, "local_user", { scriptIds: [scriptId], sceneIds: [sceneId], voiceoverMode: "reuse" })
   );
   ipcMain.handle("render:approve", async (_event, projectId: string, renderId: string, approved: boolean) =>
     store.setRenderFinalApproval(projectId, renderId, approved)

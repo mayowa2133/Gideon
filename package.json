@@ -33,6 +33,8 @@
     "capture:isolation:runtime:check": "node scripts/check-capture-browser-isolation.mjs --require-runtime",
     "avatar:worker:check": "node scripts/check-avatar-worker-config.mjs",
     "avatar:worker:canary": "node scripts/run-avatar-worker-canary.mjs",
+    "avatar:local:canary": "pnpm build:main && node dist/main/main/viseme2dCanaryCli.js",
+    "creator-video:benchmark": "pnpm build:main && node dist/main/main/creatorVideoBenchmarkCli.js",
     "provider:canary": "pnpm build:main && node dist/main/main/providerCanaryCli.js",
     "smoke:local-core": "pnpm build && node scripts/run-local-core-smoke.mjs",
     "staging:check": "node scripts/check-staging-readiness.mjs",

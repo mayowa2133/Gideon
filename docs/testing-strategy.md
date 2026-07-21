@@ -518,6 +518,14 @@ Before a beta release:
 - Non-core copy issue.
 - Low-frequency edge case with workaround.
 
+## Creator-video gap validation
+
+Run `pnpm creator-video:benchmark` plus the focused interaction, visual-readiness, scene-cache, temporal-quality, product-factory, job-executor, media, typography, treatment, layout, pronunciation, creator-quality, storage, and capture tests. The benchmark is an integration test, not a subjective avatar-quality claim. It deliberately breaks CTA drawing, interaction presentation, production-overlay policy, readability, exposure, treatment population, and transition safety in negative fixtures so a structural pass cannot masquerade as human readiness.
+
+The ignored benchmark bundle retains the readable MP4, one-second overview, high-resolution key frames, interaction-motion strip, progressive-typing strip, CTA samples, product manifest, scene-cache report, separate structural and visual-readiness reports, combined creator-quality report, and path-free benchmark JSON. Acceptance requires `structurallyPublishable` and `humanReviewReady`, FFprobe format/duration verification, measured loudness and temporal QA, non-empty path-bounded artifacts, and manual inspection of product frames, pointer/click/typing sequences, CTA samples, presenter scenes, all ten treatments, and each transition boundary.
+
+For the free local presenter, run `pnpm avatar:local:canary`. It uses `/usr/bin/say`, converts to validated PCM WAV, generates real Orbit and Nova `viseme2d` MP4s, probes both, extracts rest/speech/blink frames, and runs a full 1080×1920 Gideon fixture render. Inspect every extracted frame under ignored `tmp/viseme2d-canary/frames/`; verify mouth state, blink, subtle positional motion, clean background removal, shoulders-up framing, caption/product visibility, and disclosure. The focused automated suite is `pnpm vitest run src/main/avatarWorker.test.ts src/main/visemeCues.test.ts src/main/viseme2dAvatarWorker.test.ts`.
+
 ## Definition of test completeness
 
 A feature is not complete until:
