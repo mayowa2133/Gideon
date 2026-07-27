@@ -224,7 +224,7 @@ pnpm presenter:pilot -- \
   --output-dir "$PWD/tmp/solomon-masked-presenter-v1"
 ```
 
-The pilot uses macOS Samantha narration and a procedural audio bed as review placeholders. Both are disclosed in the quality and narration manifests.
+The original pilot uses macOS Samantha narration and a procedural audio bed as review placeholders. The versioned Chatterbox pilot uses the provider-neutral local narration path documented in `docs/chatterbox-narration.md`, preserves Samantha as an explicit comparison/fallback, and rejects any beat that would need more than 1.08× timing compression. Both versions disclose their voice and audio-bed provenance.
 
 ## Expected pilot artifacts
 

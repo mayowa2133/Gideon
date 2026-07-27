@@ -323,6 +323,14 @@ export interface VoiceoverProvenance {
   pronunciationDictionaryHash: string;
   pronunciationMode: "provider_native" | "text_substitution" | "none";
   speechInputHash: string;
+  provider?: "openai" | "chatterbox_local" | "macos_say";
+  model?: string;
+  modelRevision?: string;
+  device?: "mps" | "cpu" | "macos" | "hosted";
+  voiceMode?: "model_default" | "approved_reference";
+  referenceSha256?: string;
+  consentSubjectId?: string;
+  watermark?: "perth" | "none";
 }
 
 export interface AvatarPresenterLineage {

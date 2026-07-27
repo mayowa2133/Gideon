@@ -20,6 +20,7 @@ import {
   type MaskedPresenterAssetProvider
 } from "./maskedPresenterProvider";
 import type { MaskedPresenterRenderResult } from "./maskedPresenterRenderer";
+import type { NarrationProvider, NarrationResult } from "./narration";
 
 const PILOT_VERSION = "solomon-masked-presenter-v1";
 const DURATION_MS = 43_000;
@@ -205,6 +206,7 @@ export async function runSolomonMaskedPresenterPilot(input: {
   captureRunRoot?: string;
   outputDir?: string;
   provider?: MaskedPresenterAssetProvider;
+  narrationProvider?: NarrationProvider;
   ffmpegPath?: string;
   ffprobePath?: string;
   sayPath?: string;
@@ -274,11 +276,12 @@ export async function runSolomonMaskedPresenterPilot(input: {
     captionFrameRate: captionOverlay.frameRate,
     outputPath: silentVideoPath
   });
-  const narration = await renderNarrationBed({ outputDir, beats, say, ffmpeg, ffprobe });
+  const narration = await renderSolomonNarrationBed({ outputDir, beats, say, ffmpeg, ffprobe, provider: input.narrationProvider, seed });
   const finalDir = path.join(outputDir, "final");
   await fs.mkdir(finalDir, { recursive: true, mode: 0o700 });
-  const masterPath = path.join(finalDir, "solomon-masked-presenter-v1.mp4");
-  const socialPath = path.join(finalDir, "solomon-masked-presenter-v1-social.mp4");
+  const outputStem = input.narrationProvider ? "solomon-masked-presenter-chatterbox-v1" : "solomon-masked-presenter-v1";
+  const masterPath = path.join(finalDir, `${outputStem}.mp4`);
+  const socialPath = path.join(finalDir, `${outputStem}-social.mp4`);
   await run(ffmpeg, [
     "-hide_banner", "-loglevel", "error", "-y",
     "-i", silentVideoPath, "-i", narration.audioPath,
@@ -302,6 +305,7 @@ export async function runSolomonMaskedPresenterPilot(input: {
     presenter,
     layouts,
     beats,
+    narration: narration.result,
     ffmpeg,
     ffprobe
   });
@@ -530,23 +534,67 @@ function captionText(beat: MaskedPresenterBeat): string {
   return `{\\fad(110,100)}${wrapCaption(text, 34)}`;
 }
 
-async function renderNarrationBed(input: {
+export async function renderSolomonNarrationBed(input: {
   outputDir: string;
   beats: MaskedPresenterBeat[];
   say: string;
   ffmpeg: string;
   ffprobe: string;
-}): Promise<{ audioPath: string; manifestPath: string }> {
+  provider?: NarrationProvider;
+  seed: number;
+}): Promise<{ audioPath: string; manifestPath: string; result: NarrationResult | undefined }> {
   const narrationDir = path.join(input.outputDir, "narration");
   await fs.mkdir(narrationDir, { recursive: true, mode: 0o700 });
   const tracks: Array<{ beat: MaskedPresenterBeat; path: string; durationMs: number; tempo: number }> = [];
+  let result: NarrationResult | undefined;
+  if (input.provider) {
+    result = await input.provider.synthesize({
+      outputDir: path.join(narrationDir, "provider"),
+      beats: input.beats.map((beat) => ({
+        id: beat.id,
+        approvedText: beat.text,
+        startMs: beat.startMs,
+        endMs: beat.endMs,
+        energy: beat.energy,
+        pacing: beat.endMs - beat.startMs <= 2_500 ? "compact_pause" : "natural"
+      })),
+      language: "en",
+      voice: { mode: "model_default" },
+      seed: input.seed
+    });
+  }
   for (const beat of input.beats) {
-    const outputPath = path.join(narrationDir, `${beat.id}.aiff`);
-    await run(input.say, ["-v", "Samantha", "-r", beat.energy === "high" ? "168" : "158", "-o", outputPath, beat.text], 60_000);
+    const providerBeat = result?.beats.find((candidate) => candidate.id === beat.id);
+    let outputPath = providerBeat?.outputPath ?? path.join(narrationDir, `${beat.id}.aiff`);
+    if (!providerBeat) {
+      await run(input.say, ["-v", "Samantha", "-r", beat.energy === "high" ? "168" : "158", "-o", outputPath, beat.text], 60_000);
+    } else {
+      const trimmedDir = path.join(narrationDir, "trimmed");
+      await fs.mkdir(trimmedDir, { recursive: true, mode: 0o700 });
+      const trimmedPath = path.join(trimmedDir, `${beat.id}.wav`);
+      await run(input.ffmpeg, [
+        "-hide_banner", "-loglevel", "error", "-y", "-i", outputPath,
+        "-af", "silenceremove=start_periods=1:start_duration=0:start_threshold=-48dB,areverse,silenceremove=start_periods=1:start_duration=0:start_threshold=-48dB,areverse",
+        "-c:a", "pcm_s16le", trimmedPath
+      ], 60_000);
+      outputPath = trimmedPath;
+    }
     const durationMs = await probeDuration(input.ffprobe, outputPath);
     const availableMs = Math.max(700, beat.endMs - beat.startMs - 220);
-    const tempo = durationMs > availableMs ? clamp(durationMs / availableMs, 1, 1.8) : 1;
+    const tempo = durationMs > availableMs ? durationMs / availableMs : 1;
+    if (tempo > 1.08) {
+      throw new Error(`Narration beat ${beat.id} needs ${tempo.toFixed(3)}x compression; revise or regenerate it instead of using unnatural time-stretching.`);
+    }
     tracks.push({ beat, path: outputPath, durationMs, tempo });
+  }
+  if (result) {
+    result = {
+      ...result,
+      beats: result.beats.map((beat) => ({
+        ...beat,
+        tempo: tracks.find((track) => track.beat.id === beat.id)?.tempo ?? 1
+      }))
+    };
   }
   const args = ["-hide_banner", "-loglevel", "error", "-y"];
   for (const track of tracks) args.push("-i", track.path);
@@ -565,14 +613,14 @@ async function renderNarrationBed(input: {
   const musicIndex = tracks.length;
   filters.push(`[${musicIndex}:a]lowpass=f=700,highpass=f=80,volume=0.18[music]`);
   labels.push("[music]");
-  filters.push(`${labels.join("")}amix=inputs=${labels.length}:normalize=0:duration=longest,atrim=0:${seconds(DURATION_MS)},loudnorm=I=-14:TP=-1.5:LRA=7[a]`);
+  filters.push(`${labels.join("")}amix=inputs=${labels.length}:normalize=0:duration=longest,atrim=0:${seconds(DURATION_MS)},loudnorm=I=-14:TP=-1.5:LRA=7,aresample=48000[a]`);
   const audioPath = path.join(narrationDir, "solomon-narration-bed.wav");
-  args.push("-filter_complex", filters.join(";"), "-map", "[a]", "-t", seconds(DURATION_MS), "-c:a", "pcm_s16le", audioPath);
+  args.push("-filter_complex", filters.join(";"), "-map", "[a]", "-t", seconds(DURATION_MS), "-ar", "48000", "-c:a", "pcm_s16le", audioPath);
   await run(input.ffmpeg, args, 300_000);
   const manifestPath = path.join(narrationDir, "narration-manifest.json");
   await writeJson(manifestPath, {
     schemaVersion: "1",
-    voice: "macOS Samantha review placeholder",
+    voice: result?.provenance ?? "macOS Samantha review placeholder",
     music: "procedural filtered pink-noise review placeholder",
     lipSyncAttempted: false,
     semanticBeatAlignment: true,
@@ -585,7 +633,7 @@ async function renderNarrationBed(input: {
       tempo
     }))
   });
-  return { audioPath, manifestPath };
+  return { audioPath, manifestPath, result };
 }
 
 async function generateReviewArtifacts(input: {
@@ -641,6 +689,7 @@ async function evaluatePilot(input: {
   presenter: MaskedPresenterRenderResult;
   layouts: MaskedPresenterLayoutManifest;
   beats: MaskedPresenterBeat[];
+  narration: NarrationResult | undefined;
   ffmpeg: string;
   ffprobe: string;
 }) {
@@ -686,6 +735,8 @@ async function evaluatePilot(input: {
     noBlackInterval: !/black_start|black_end/.test(blackOutput.stderr),
     noUnexpectedLongSilence: silenceDurations.every((duration) => duration <= 5),
     narrationPresent: Boolean(master.audioCodec),
+    narrationNaturalTempo: input.narration ? input.narration.beats.every((beat) => beat.tempo >= 0.92 && beat.tempo <= 1.08) : true,
+    chatterboxWatermarked: input.narration?.provider !== "chatterbox_local" || input.narration.provenance.watermark === "perth",
     placeholderDisclosureRequired: true
   };
   const failedChecks = Object.entries(checks).filter(([, passed]) => !passed).map(([name]) => name);
@@ -708,7 +759,9 @@ async function evaluatePilot(input: {
     },
     presenterMotion: input.presenter.manifest.motionQuality,
     caveats: [
-      "macOS Samantha narration is a review placeholder pending voice approval.",
+      input.narration
+        ? `${input.narration.provenance.provider} narration uses the model-default voice; publication still requires an editorial voice review.`
+        : "macOS Samantha narration is a review placeholder pending voice approval.",
       "The procedural tonal bed is a review placeholder pending music approval.",
       "The code-native Axiom visual identity requires brand approval.",
       "The CTA deliberately avoids promising public availability."

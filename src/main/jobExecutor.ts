@@ -119,12 +119,20 @@ interface RenderDraftResult {
   validation: RenderedVideo["validation"];
 }
 
-interface SpeechProvider {
+export interface SpeechProvider {
+  readonly providerKind?: "openai" | "chatterbox_local" | "macos_say";
+  readonly modelName?: string;
   isConfigured(): boolean;
   synthesizeSpeech(input: { text: string; instructions: string; outputPath: string }): Promise<{
     outputPath: string;
-    provider: "openai";
+    provider: "openai" | "chatterbox_local" | "macos_say";
     model: string;
+    modelRevision?: string;
+    device?: "mps" | "cpu" | "macos" | "hosted";
+    voiceMode?: "model_default" | "approved_reference";
+    referenceSha256?: string;
+    consentSubjectId?: string;
+    watermark?: "perth" | "none";
   }>;
 }
 
@@ -182,7 +190,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
   const renderDraft = options.renderDraft ?? defaultRenderDraft;
   const createPrivateObjectStorage = options.createPrivateObjectStorage ?? defaultCreatePrivateObjectStorage;
   const loadProviderConfig = options.loadProviderConfig ?? defaultLoadProviderConfig;
-  const createSpeechProvider =
+  const createSpeechProvider: (config: ProviderConfig) => SpeechProvider =
     options.createSpeechProvider ?? ((config: ProviderConfig) => new OpenAiProvider({ config: config.openai }));
   const validateVoiceoverAudio = options.validateVoiceoverAudio ?? defaultValidateWavAudioFile;
   const createApprovedAvatarWorker = options.createAvatarWorker ?? createAvatarWorker;
@@ -738,7 +746,7 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
         {
           id: makeId(),
           kind: "tts",
-          provider: "openai",
+          provider: result.provider === "openai" ? "openai" : "local",
           model: result.model,
           promptVersion: config.openai.ttsPromptVersion ?? "tts-v1",
           status: "completed",
@@ -766,8 +774,8 @@ export function createGideonJobExecutor(options: GideonJobExecutorOptions): Gide
         {
           id: makeId(),
           kind: "tts",
-          provider: "openai",
-          model: config.openai.ttsModel,
+          provider: provider.providerKind === "chatterbox_local" || provider.providerKind === "macos_say" ? "local" : "openai",
+          model: provider.modelName ?? config.openai.ttsModel,
           promptVersion: config.openai.ttsPromptVersion ?? "tts-v1",
           status: "failed",
           startedAt,
