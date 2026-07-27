@@ -113,6 +113,8 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm capture:isolation:runtime:check
 - pnpm avatar:worker:check
 - pnpm avatar:worker:canary
+- pnpm presenter:pilot
+- pnpm test:masked-presenter
 - pnpm release:mac:check
 - pnpm db:migrate
 - pnpm db:seed

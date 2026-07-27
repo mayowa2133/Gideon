@@ -34,6 +34,8 @@
     "avatar:worker:check": "node scripts/check-avatar-worker-config.mjs",
     "avatar:worker:canary": "node scripts/run-avatar-worker-canary.mjs",
     "avatar:local:canary": "pnpm build:main && node dist/main/main/viseme2dCanaryCli.js",
+    "presenter:pilot": "pnpm build:main && node dist/main/main/solomonMaskedPresenterPilotCli.js",
+    "test:masked-presenter": "vitest run src/main/maskedPresenter.test.ts src/main/maskedPresenterRenderer.test.ts src/main/maskedPresenterProvider.test.ts src/main/solomonMaskedPresenterPilot.test.ts",
     "creator-video:benchmark": "pnpm build:main && node dist/main/main/creatorVideoBenchmarkCli.js",
     "provider:canary": "pnpm build:main && node dist/main/main/providerCanaryCli.js",
     "smoke:local-core": "pnpm build && node scripts/run-local-core-smoke.mjs",

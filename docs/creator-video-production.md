@@ -2,6 +2,8 @@
 
 Status: all locally achievable structural and visual-readiness work is implemented. The deterministic benchmark passes both readiness states; real avatar quality, subjective human approval, brand acceptance, licensing, provider credentials, and production infrastructure still require external confirmation.
 
+The reusable mouthless code-native presenter and authentic Solomon pilot are documented separately in [masked-presenter-system.md](./masked-presenter-system.md). That presenter avoids lip synchronization and does not replace the existing provider-backed human-avatar work described here.
+
 ## Scope and reference grammar
 
 The three supplied reference clips share a production grammar, not a reusable person or brand identity. Gideon preserves that grammar while excluding the referenced presenter, products, handles, logos, and CTA keywords.
