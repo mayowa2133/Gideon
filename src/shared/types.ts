@@ -420,7 +420,14 @@ export type CreatorTemplateKey =
   | "founder_demo"
   | "three_reasons"
   | "before_after_workflow"
-  | "brand_presenter";
+  | "brand_presenter"
+  | "creator_editorial_v1"
+  | "creator_editorial_v2"
+  | "creator_editorial_v3"
+  | "creator_editorial_v4"
+  | "creator_editorial_reference_rhythm_v1"
+  | "creator_editorial_ai_creator_v6"
+  | "creator_editorial_user_story_v7";
 
 export type CaptionStylePreset = "kinetic_bold" | "clean_founder" | "educational_stack";
 

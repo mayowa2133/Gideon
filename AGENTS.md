@@ -114,7 +114,15 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm avatar:worker:check
 - pnpm avatar:worker:canary
 - pnpm presenter:pilot
+- pnpm creator-editorial:pilot:solomon
+- pnpm creator-editorial:v2:pilot:solomon
+- pnpm creator-editorial:v3:pilot:solomon
+- pnpm creator-editorial:v4:pilot:solomon
+- pnpm creator-editorial:reference-rhythm:pilot:solomon
+- pnpm creator-editorial:v6:pilot:solomon
+- pnpm creator-editorial:v7:pilot:solomon
 - pnpm test:masked-presenter
+- pnpm test:creator-editorial
 - pnpm release:mac:check
 - pnpm db:migrate
 - pnpm db:seed
@@ -156,6 +164,11 @@ Follow docs/security-rules.md. Key constraints:
 - Never trust user-provided object keys or filenames.
 - Keep FFmpeg stderr out of user-facing responses.
 - Add fixture tests for media behavior.
+- Preserve independently selectable creator-editorial versions. New creator formats must not silently change V1–V5 outputs.
+- User-story creator formats must use isolated authenticated product micro-scenes as supporting proof, with presenter resets between concepts; continuous cursor-following and connected workflow navigation are not the default.
+- Creator-editorial product claims must fail closed against approved asset hashes and verified source intervals; conceptual graphics must remain disclosed and visually distinct from product pixels.
+- Mouthless presenter styling must not imply lip sync. Any visor or eye accent is character decoration, never product evidence.
+- Informational CTAs must not imply a public URL, comment-keyword delivery, or distribution automation without verified availability.
 
 ## AI generation rules
 

@@ -74,6 +74,13 @@ describe("creator render templates", () => {
     expect(templateForFormatFamily("founder-demo")).toBe("founder_demo");
     expect(templateForFormatFamily("three-reasons")).toBe("three_reasons");
     expect(templateForFormatFamily("before-after")).toBe("before_after_workflow");
+    expect(templateForFormatFamily("creator-editorial")).toBe("creator_editorial_v1");
+    expect(templateForFormatFamily("creator-editorial-v2")).toBe("creator_editorial_v2");
+    expect(templateForFormatFamily("creator-editorial-v3")).toBe("creator_editorial_v3");
+    expect(templateForFormatFamily("creator-editorial-v4")).toBe("creator_editorial_v4");
+    expect(templateForFormatFamily("creator-editorial-reference-rhythm")).toBe("creator_editorial_reference_rhythm_v1");
+    expect(templateForFormatFamily("creator-editorial-ai-creator-v6")).toBe("creator_editorial_ai_creator_v6");
+    expect(templateForFormatFamily("creator-editorial-user-story-v7")).toBe("creator_editorial_user_story_v7");
   });
 
   it("normalizes stable brand kit identifiers for render lineage", () => {

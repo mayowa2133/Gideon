@@ -230,6 +230,167 @@ export const creatorTemplatePack: CreatorTemplateDefinition[] = [
     defaultDurationSec: 34,
     ctaPosition: "bottom",
     presenterCompatible: true
+  },
+  {
+    key: "creator_editorial_v1",
+    name: "Creator editorial",
+    formatFamily: "creator-editorial",
+    hookPattern: "Here is how {product} turns a scattered workflow into one clear next step.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.06, minMs: 1_500, maxMs: 2_000 },
+      { purpose: "problem", weight: 0.09, minMs: 1_500, maxMs: 2_500 },
+      { purpose: "demo", weight: 0.42, minMs: 1_500, maxMs: 2_500 },
+      { purpose: "proof", weight: 0.20, minMs: 1_500, maxMs: 2_500 },
+      { purpose: "payoff", weight: 0.09, minMs: 1_500, maxMs: 2_500 },
+      { purpose: "cta", weight: 0.14, minMs: 1_500, maxMs: 3_000 }
+    ],
+    captionStyle: "kinetic_bold",
+    visualRhythm: "snap",
+    zoomIntensity: "medium",
+    hookOverlayMs: 2_000,
+    proofOverlayMs: 2_200,
+    ctaLeadMs: 6_000,
+    defaultDurationSec: 35,
+    ctaPosition: "center",
+    presenterCompatible: true
+  },
+  {
+    key: "creator_editorial_v2",
+    name: "Creator editorial v2",
+    formatFamily: "creator-editorial-v2",
+    hookPattern: "Here is how {product} keeps the evidence for the next decision in focus.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.05, minMs: 1_400, maxMs: 1_700 },
+      { purpose: "problem", weight: 0.05, minMs: 1_400, maxMs: 1_700 },
+      { purpose: "demo", weight: 0.46, minMs: 1_500, maxMs: 2_500 },
+      { purpose: "proof", weight: 0.20, minMs: 1_500, maxMs: 2_500 },
+      { purpose: "payoff", weight: 0.10, minMs: 1_800, maxMs: 2_600 },
+      { purpose: "cta", weight: 0.14, minMs: 2_400, maxMs: 3_000 }
+    ],
+    captionStyle: "kinetic_bold",
+    visualRhythm: "snap",
+    zoomIntensity: "medium",
+    hookOverlayMs: 2_000,
+    proofOverlayMs: 2_000,
+    ctaLeadMs: 6_000,
+    defaultDurationSec: 35,
+    ctaPosition: "center",
+    presenterCompatible: true
+  },
+  {
+    key: "creator_editorial_v3",
+    name: "Creator editorial v3",
+    formatFamily: "creator-editorial-v3",
+    hookPattern: "The hardest part is keeping the evidence for every next decision in view.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.05, minMs: 1_400, maxMs: 1_700 },
+      { purpose: "problem", weight: 0.05, minMs: 1_400, maxMs: 1_700 },
+      { purpose: "demo", weight: 0.46, minMs: 1_500, maxMs: 2_500 },
+      { purpose: "proof", weight: 0.20, minMs: 1_500, maxMs: 2_500 },
+      { purpose: "payoff", weight: 0.10, minMs: 1_800, maxMs: 2_600 },
+      { purpose: "cta", weight: 0.14, minMs: 2_400, maxMs: 3_000 }
+    ],
+    captionStyle: "kinetic_bold",
+    visualRhythm: "snap",
+    zoomIntensity: "medium",
+    hookOverlayMs: 2_000,
+    proofOverlayMs: 2_000,
+    ctaLeadMs: 6_000,
+    defaultDurationSec: 35,
+    ctaPosition: "center",
+    presenterCompatible: true
+  },
+  {
+    key: "creator_editorial_v4",
+    name: "Creator editorial v4",
+    formatFamily: "creator-editorial-v4",
+    hookPattern: "The hardest part is keeping the evidence for every next decision in view.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.05, minMs: 1_400, maxMs: 1_700 },
+      { purpose: "problem", weight: 0.05, minMs: 1_400, maxMs: 1_700 },
+      { purpose: "demo", weight: 0.46, minMs: 1_500, maxMs: 2_500 },
+      { purpose: "proof", weight: 0.20, minMs: 1_500, maxMs: 2_500 },
+      { purpose: "payoff", weight: 0.10, minMs: 1_800, maxMs: 2_600 },
+      { purpose: "cta", weight: 0.14, minMs: 2_400, maxMs: 3_000 }
+    ],
+    captionStyle: "kinetic_bold",
+    visualRhythm: "snap",
+    zoomIntensity: "medium",
+    hookOverlayMs: 2_000,
+    proofOverlayMs: 2_000,
+    ctaLeadMs: 6_000,
+    defaultDurationSec: 35,
+    ctaPosition: "center",
+    presenterCompatible: true
+  },
+  {
+    key: "creator_editorial_reference_rhythm_v1",
+    name: "Creator editorial reference rhythm",
+    formatFamily: "creator-editorial-reference-rhythm",
+    hookPattern: "Stop rebuilding every {customer} decision across disconnected tabs.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.06, minMs: 1_800, maxMs: 2_200 },
+      { purpose: "problem", weight: 0.16, minMs: 1_800, maxMs: 2_300 },
+      { purpose: "demo", weight: 0.28, minMs: 1_800, maxMs: 2_300 },
+      { purpose: "proof", weight: 0.22, minMs: 1_800, maxMs: 2_300 },
+      { purpose: "payoff", weight: 0.12, minMs: 1_800, maxMs: 2_300 },
+      { purpose: "cta", weight: 0.16, minMs: 3_000, maxMs: 4_000 }
+    ],
+    captionStyle: "kinetic_bold",
+    visualRhythm: "snap",
+    zoomIntensity: "medium",
+    hookOverlayMs: 2_200,
+    proofOverlayMs: 2_200,
+    ctaLeadMs: 6_000,
+    defaultDurationSec: 36,
+    ctaPosition: "center",
+    presenterCompatible: true
+  },
+  {
+    key: "creator_editorial_ai_creator_v6",
+    name: "Creator editorial AI co-host v6",
+    formatFamily: "creator-editorial-ai-creator-v6",
+    hookPattern: "In {product}, review the concrete result before the irreversible action.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.06, minMs: 1_800, maxMs: 2_200 },
+      { purpose: "problem", weight: 0.16, minMs: 1_800, maxMs: 2_300 },
+      { purpose: "demo", weight: 0.28, minMs: 1_800, maxMs: 2_300 },
+      { purpose: "proof", weight: 0.22, minMs: 1_800, maxMs: 2_300 },
+      { purpose: "payoff", weight: 0.12, minMs: 1_800, maxMs: 2_300 },
+      { purpose: "cta", weight: 0.16, minMs: 3_000, maxMs: 4_000 }
+    ],
+    captionStyle: "kinetic_bold",
+    visualRhythm: "contrast",
+    zoomIntensity: "medium",
+    hookOverlayMs: 2_200,
+    proofOverlayMs: 2_200,
+    ctaLeadMs: 6_000,
+    defaultDurationSec: 36,
+    ctaPosition: "center",
+    presenterCompatible: true
+  },
+  {
+    key: "creator_editorial_user_story_v7",
+    name: "Creator editorial user story v7",
+    formatFamily: "creator-editorial-user-story-v7",
+    hookPattern: "The user starts with {problem}; {product} reveals one clear proof at a time.",
+    pacingRules: [
+      { purpose: "hook", weight: 0.10, minMs: 1_500, maxMs: 3_000 },
+      { purpose: "problem", weight: 0.18, minMs: 1_500, maxMs: 3_000 },
+      { purpose: "demo", weight: 0.24, minMs: 1_000, maxMs: 3_000 },
+      { purpose: "proof", weight: 0.18, minMs: 1_000, maxMs: 3_000 },
+      { purpose: "payoff", weight: 0.14, minMs: 1_500, maxMs: 3_000 },
+      { purpose: "cta", weight: 0.16, minMs: 3_000, maxMs: 6_000 }
+    ],
+    captionStyle: "kinetic_bold",
+    visualRhythm: "contrast",
+    zoomIntensity: "subtle",
+    hookOverlayMs: 2_200,
+    proofOverlayMs: 2_200,
+    ctaLeadMs: 6_000,
+    defaultDurationSec: 36,
+    ctaPosition: "center",
+    presenterCompatible: true
   }
 ];
 
@@ -241,6 +402,27 @@ export function getCreatorTemplate(key: CreatorTemplateKey | undefined): Creator
 
 export function templateForFormatFamily(formatFamily: string, index = 0): CreatorTemplateKey {
   const normalized = formatFamily.toLowerCase();
+  if (normalized.includes("user-story-v7") || normalized.includes("user_story_v7")) {
+    return "creator_editorial_user_story_v7";
+  }
+  if (normalized.includes("ai-creator-v6") || normalized.includes("ai_creator_v6")) {
+    return "creator_editorial_ai_creator_v6";
+  }
+  if (normalized.includes("reference-rhythm") || normalized.includes("reference_rhythm")) {
+    return "creator_editorial_reference_rhythm_v1";
+  }
+  if (normalized.includes("editorial-v4") || normalized.includes("editorial_v4")) {
+    return "creator_editorial_v4";
+  }
+  if (normalized.includes("editorial-v3") || normalized.includes("editorial_v3")) {
+    return "creator_editorial_v3";
+  }
+  if (normalized.includes("editorial-v2") || normalized.includes("editorial_v2")) {
+    return "creator_editorial_v2";
+  }
+  if (normalized.includes("editorial")) {
+    return "creator_editorial_v1";
+  }
   if (normalized.includes("feature")) {
     return "hidden_feature_reveal";
   }
@@ -704,7 +886,7 @@ function compactCalloutText(text: string): string {
 
 function focusForBeat(index: number, templateKey: CreatorTemplateKey): RenderFocusPoint {
   const scaleBase =
-    templateKey === "hidden_feature_reveal" || templateKey === "brand_presenter" || templateKey === "saves_you_time"
+    templateKey === "hidden_feature_reveal" || templateKey === "brand_presenter" || templateKey === "creator_editorial_v1" || templateKey === "creator_editorial_v2" || templateKey === "saves_you_time"
       ? 1.18
       : 1.12;
   const focusPoints: RenderFocusPoint[] = [

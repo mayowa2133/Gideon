@@ -174,12 +174,16 @@ export class ChatterboxNarrationProvider implements NarrationProvider {
           }))
         }
       });
+      const generatedDirRealPath = await fs.realpath(generatedDir);
       for (const output of bridge.outputs) {
         const key = cacheKeys.get(output.id);
-        if (!key || path.dirname(path.resolve(output.outputPath)) !== generatedDir) throw new Error("Chatterbox returned an unexpected output.");
+        const outputRealPath = await fs.realpath(output.outputPath);
+        if (!key || path.dirname(outputRealPath) !== generatedDirRealPath) {
+          throw new Error("Chatterbox returned an unexpected output.");
+        }
         const targetPath = path.join(cacheDir, `${key}.wav`);
         const temporaryPath = `${targetPath}.${process.pid}.tmp`;
-        await fs.copyFile(output.outputPath, temporaryPath);
+        await fs.copyFile(outputRealPath, temporaryPath);
         const audio = await probeWav(temporaryPath);
         const outputSha256 = await hashFile(temporaryPath);
         await fs.rename(temporaryPath, targetPath);

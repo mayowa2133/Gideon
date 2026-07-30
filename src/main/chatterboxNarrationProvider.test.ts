@@ -16,7 +16,18 @@ describe("Chatterbox narration provider", () => {
       calls += 1;
       const outputPath = path.join(input.request.outputRoot, `${input.request.beats[0]!.id}.wav`);
       await writePcmWav(outputPath, 24_000, 2_400);
-      return { ok: true, model: "chatterbox-turbo", modelRevision: "a".repeat(40), device: "cpu", watermark: "perth", outputs: [{ id: input.request.beats[0]!.id, outputPath, durationMs: 100 }] };
+      return {
+        ok: true,
+        model: "chatterbox-turbo",
+        modelRevision: "a".repeat(40),
+        device: "cpu",
+        watermark: "perth",
+        outputs: [{
+          id: input.request.beats[0]!.id,
+          outputPath: await fs.realpath(outputPath),
+          durationMs: 100
+        }]
+      };
     };
     const provider = new ChatterboxNarrationProvider({
       pythonPath: process.execPath,
