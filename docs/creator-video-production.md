@@ -137,6 +137,29 @@ Expected artifacts:
 
 Generated benchmark media lives under ignored `tmp/` and must not be committed.
 
+## Solomon 36-second user-story review composition
+
+`SolomonCreatorStoryV2` remains the internal Remotion composition ID for compatibility, but the current output is the V5 creator-review master. It tells one continuous Senior Product Engineer at Faire → privacy-masked relevant contact → personalized draft and human approval story without changing V1–V7. Four purpose-built, 1080×1350, hash-verified clips come from an authenticated genuine Solomon session; the renderer rejects missing or changed hashes before synthesis or composition.
+
+The review edit uses only purpose-specific crops from those authentic pixels. It excludes fixture banners, synthetic-data explanations, model-call disclaimers, internal storyboard labels, and the former fake CTA. Status shots isolate the Discovered-to-Interviewing action and result, the opportunity shot holds the real role/company, the people shot holds privacy-masked verified hiring-manager evidence, and outreach shots isolate the recipient, role context, message, `DRAFT — NOT SENT` state, and manual-review controls. Bounded camera drift creates readable proof holds without fabricating interface pixels.
+
+The story manifest declares every scene, product target, host pose/emotion/framing/gaze state, caption phrase, sound cue, transition behavior, camera recipe, source interval, environment class, and public-release approval. `ProductFocus` uses bounded target-aware quintic camera movement, cursor-aware clamping, and a standard arrow pointer rather than a circle. `SolomonHost` remains a mouthless code-native rig with independent blink, eyebrows, gaze, head, hand, breathing, posture, framing, emotional-lighting, and voice-reactive speaker-grille controls. This follows the selected masked-performer direction without pretending to provide literal lip synchronization.
+
+The render creates conversational, energetic, and restrained/credible Chatterbox candidates. The selected master must preserve the exact normalized 89-word script and achieve mean Whisper word confidence of at least 0.90. Punctuation is normalized; word order and count are not relaxed.
+
+`auditSolomonStoryRetention` fails closed for event gaps, adjacent repeated poses, missing proof targets or source entries, inconsistent product gaze, a required cursor outside the visible crop, excessive camera velocity or acceleration, abrupt camera direction changes, caption-cadence violations, placeholder/debug/legacy copy, and unapproved product assets. CTA verification is reported as a separate release gate.
+
+A verified platform-native `COMMENT ‘SOLOMON’` CTA is rendered and held through the final Solomon brand sting. The file name includes `NOT-FOR-PUBLICATION` because explicit approval to publish the genuine source footage remains a separate release gate. Delivery encoding is H.264/yuv420p with BT.709 matrix, primaries, transfer, and limited range.
+
+Run:
+
+```bash
+pnpm test:creator-story
+pnpm creator-story:v2:solomon
+```
+
+Generated review artifacts include a 36-second non-publication master, social transcode, muted review, ten-second opening, three voice candidates, source and claim manifests, frame-level phrase timings, retention and encoded-narration audits, reproducible reference comparison, media-quality report, one-frame-per-second OCR scan for forbidden visual copy, V5-priority completion audit, and full/mobile/scene/avatar/product/CTA review strips under `tmp/solomon-creator-story-v5-creator-review/`.
+
 ## External-provider canary
 
 After provider/model/legal confirmation, configure the existing worker and run:
@@ -179,3 +202,10 @@ Then render the benchmark with the returned presenter artifact and run the same 
 - [ ] Voice, visual identity, CTA, pace, and human acceptance policies approved.
 - [ ] Provider/model/licence review completed.
 - [ ] Production storage, queue, database, GPU, observability, secret, retention, and deletion controls approved and deployed.
+## Solomon Creator Story V6 robot edition
+
+`pnpm creator-story:v6:solomon` renders an isolated 36-second Solomon review master without changing V1–V5 composition IDs or outputs. The V6 format uses a code-native, mouthless Gideon robot; authenticated, hash-verified Solomon micro-scenes; disclosed conceptual illustrations; a 205–225 WPM user story; and a single verified platform-follow CTA that does not promise comment delivery, a public URL, or automated distribution.
+
+The runtime manifest validates creative direction, evidence bindings, robot performance, caption cadence, product occupancy, proof-by-2.2-seconds, and narration-to-visual alignment. Product proof remains full-color and uses selected crops or outlines rather than a global dim. A normal arrow cursor appears only when an interaction is part of the claim.
+
+Generated review media and reports live under ignored `tmp/solomon-creator-story-v6-robot/`. The master remains marked `NOT-FOR-PUBLICATION` until a human approves the genuine source footage, voice naturalness, robot brand appearance, phone readability, and any required synthetic-presenter disclosure.
