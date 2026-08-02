@@ -122,6 +122,9 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm creator-editorial:v6:pilot:solomon
 - pnpm creator-editorial:v7:pilot:solomon
 - pnpm creator-story:v6:solomon
+- pnpm creator-story:v7:baseline
+- pnpm creator-story:v7:compare
+- pnpm creator-story:v7:solomon
 - pnpm test:creator-story
 - pnpm test:masked-presenter
 - pnpm test:creator-editorial
