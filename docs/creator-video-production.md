@@ -234,3 +234,25 @@ pnpm creator-story:v8:compare
 ```
 
 The render writes the master, 720×1280 social export, muted and opening reviews, thirteen candidate MP4s, contact sheets, inspection strips, spectrogram, decoded measurement reports, claim/source lineage, exact transcript verification, and V7/reference comparison under ignored `tmp/solomon-creator-story-v8-robot/`. The master filename remains `NOT-FOR-PUBLICATION`, and `releaseReady` remains false until a human approves voice naturalness, physical-phone readability, publication of the genuine Solomon footage, Solomon brand/legal treatment, and the synthetic-presenter disclosure decision.
+
+## Solomon Creator Story V9 cute-mascot edition
+
+V9 is an isolated `SolomonCreatorStoryV9Mascot` composition. It preserves V1–V8 behavior while replacing the armored V8 host with a code-native, soft-gloss Solomon mascot and replacing privacy-obscured product footage with authentic captures from Solomon's fail-closed synthetic demo mode. The capture environment runs only on loopback, disables external providers and navigation, uses deterministic fictional identities, keeps drafts unsent, and records exact source hashes and an environment receipt.
+
+The baby-schema contract makes the redesign measurable: the selected mascot has a 51.1% head/height ratio, a 1.216 head/body width ratio, an 82.3% screen/head width ratio, a 25.8% screen-corner/head ratio, a 25.1% eye/screen ratio, and a 15.3% badge/body ratio. Large arched eyes and a friendly open smile replace the slit eyes and EQ grille. The EQ motif is available only as a thinking state. The egg torso, mitt hands, orange antenna bobble, orange belly accent, `S` badge, near-black visor, mint face, specular shell highlight, ambient shading, and contact shadow are retained as separately testable geometry and material decisions.
+
+The selected material is `code_glossy`. A hybrid glossy-sprite shell was evaluated but rejected for this master because a complete multi-angle sprite pack did not cover all required gestures and expressions; the code-native rig remains deterministic across forward lean, recoil, presentation, control, celebration, and save gestures. A flat fallback remains a review candidate, not the selected master.
+
+V9 uses one 132-word script as the source of narration, captions, and beat copy. The spoken and visible hook are exact: `This job just moved to interviewing.` The story exposes the contact within 2.2 seconds, uses separate semantic and decorative motion accounting, limits active semantic-event gaps to 0.9 seconds, uses cuts/slides/match cuts/object wipes with no default dissolves, and keeps product proof in reserved rectangles separate from mascot and caption zones. Product composites are audited from clean and composed OCR, and the payoff must show Interviewing, Avery Chen, supporting proof, and a complete editable unsent message before the mascot celebrates.
+
+Run:
+
+```bash
+pnpm creator-story:v9:capture
+pnpm creator-story:v9:baseline
+pnpm test:creator-story
+pnpm creator-story:v9:solomon
+pnpm creator-story:v9:compare
+```
+
+Generated media, candidate MP4s, capture receipts, review strips, and decoded QA reports remain private and ignored under `tmp/solomon-creator-story-v9-mascot/`. Automated render completion does not authorize publication. Human mascot-appeal, voice-naturalness, physical-phone readability, synthetic-demo-footage publication, Solomon brand/legal, and synthetic-presenter-disclosure decisions remain explicit release blockers. The CTA stays `SAVE THIS FOR YOUR NEXT JOB SEARCH`; no comment, DM, URL, handle, or delivery promise is implied.

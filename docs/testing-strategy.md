@@ -526,6 +526,12 @@ The ignored benchmark bundle retains the readable MP4, one-second overview, high
 
 For the free local presenter, run `pnpm avatar:local:canary`. It uses `/usr/bin/say`, converts to validated PCM WAV, generates real Orbit and Nova `viseme2d` MP4s, probes both, extracts rest/speech/blink frames, and runs a full 1080×1920 Gideon fixture render. Inspect every extracted frame under ignored `tmp/viseme2d-canary/frames/`; verify mouth state, blink, subtle positional motion, clean background removal, shoulders-up framing, caption/product visibility, and disclosure. The focused automated suite is `pnpm vitest run src/main/avatarWorker.test.ts src/main/visemeCues.test.ts src/main/viseme2dAvatarWorker.test.ts`.
 
+## Creator Story V9 validation
+
+`pnpm test:creator-story` includes V9 baby-schema geometry, performance-plan, layout, hook, composite, semantic-motion, transition, CTA, and isolated story-contract tests. Its negative cases cover undersized heads and eyes, body-width regression, screen/radius regression, oversized badges, armored silhouettes, cameo finger detail, unsmiling or non-restoring mouths, low contrast, clipping/clearance declarations, repeated gestures, gaze-after-gesture, missing interactions, decorative-only motion, empty highlights, composite occlusion, hook disagreement, and unsafe delivery promises.
+
+`pnpm creator-story:v9:solomon` adds final-encoding checks that unit tests cannot establish: exact source hashes, 1080×1920/30 fps decode, BT.709 limited-range encoding, OCR privacy, required proof survival, clean-versus-composed OCR, rendered mascot pixels, phone-scale face readability, collision counts, decoded median/continuous/near-static motion, transition peaks, loudness, true peak, clicks, narration gaps, and exact transcript tokens. Inspect the complete master at full resolution and 360×640, at speed and muted; separately inspect the opening, five-surface sequence, signature transformation, draft, payoff, and CTA review files. Automated completion and public-release approval remain different states.
+
 ## Definition of test completeness
 
 A feature is not complete until:
