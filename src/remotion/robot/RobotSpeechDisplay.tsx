@@ -1,0 +1,1 @@
+export const RobotSpeechDisplay:React.FC<{rms:number;speaking:boolean;onset:number}>=({rms,speaking,onset})=><g transform="translate(325 258)" fill="#42e6b4" opacity={speaking?.7+rms*.3:.18}>{[-38,-19,0,19,38].map((x,index)=>{const gain=1+rms*(index===2?3:index%2?2:1)+onset;return <rect key={x} x={x-5} y={-5*gain} width="10" height={10*gain} rx="5"/>})}</g>;

@@ -213,3 +213,24 @@ Run `pnpm creator-story:v7:baseline` to reproduce the direct V6/reference measur
 The runtime manifest validates creative direction, evidence bindings, robot performance, caption cadence, product occupancy, proof-by-2.2-seconds, and narration-to-visual alignment. Product proof remains full-color and uses selected crops or outlines rather than a global dim. A normal arrow cursor appears only when an interaction is part of the claim.
 
 Generated review media and reports live under ignored `tmp/solomon-creator-story-v6-robot/`. The master remains marked `NOT-FOR-PUBLICATION` until a human approves the genuine source footage, voice naturalness, robot brand appearance, phone readability, and any required synthetic-presenter disclosure.
+
+## Solomon Creator Story V8 performance-led edition
+
+`pnpm creator-story:v8:solomon` renders the isolated 36-second `SolomonCreatorStoryV8Robot` composition without modifying V1–V7 composition IDs, commands, or output behavior. V8 keeps the Solomon-only, source-grounded V7 story while replacing repeated screenshot framing with ten composition families, continuous semantic events, a reusable robot-host rig, a five-surface problem mechanism, the `JOB → PERSON → PROOF → MESSAGE` signature transformation, draft assembly, human-control proof, a real-product payoff, and the verified `SAVE THIS SOLOMON WORKFLOW` action.
+
+The V8 manifest binds each atomic claim to an approved source hash and interval, required readable text, an OCR confidence threshold, a phone-proof region, action/result frames, semantic-event frames, robot direction, audio cue, and collision-exclusion regions. Authentic Solomon pixels remain visually distinct from conceptual connective graphics. Missing or changed source media, unsupported claims, private OCR matches, robot/evidence collisions, narration drift, or an unsafe CTA fail the render.
+
+The robot is a mouthless host, not a lip-synced avatar. Its serialized per-frame performance data is derived from the exact selected narration WAV and drives the speech grille, emphasis, blink suppression, gaze, head beats, and gesture intensity. Shared V8 robot modules provide reserved host/cameo positions, multiple arm and eye silhouettes, product-directed gaze, forward lean, recoil, open-palm control return, and a save gesture. The public skin remains Solomon-specific; the reusable geometry does not add another public brand.
+
+V8 uses bundled Manrope Variable and Fraunces Variable font packages. Its deterministic mastering chain applies fades at assembled speech boundaries, high-pass filtering, de-clicking, noise reduction, semantic cue mixing, limiting, and loudness normalization. Decoded QA measures the final encoded pixels and PCM rather than trusting manifest declarations. The current accepted local master measures 36 seconds at 1080×1920/30 fps, 210 WPM, −14.43 LUFS, −1.19 dBTP, 3.56% low-energy audio, zero isolated click transients, and a 2.2-second longest static interval. Exact narration, source hashes, proof OCR, privacy OCR, CTA, collision, robot-pixel, color, and full-decode gates pass. Audio-event density is 4.25 events/sec under the documented 10 ms / +6 dB method; this is below the aspirational 5.3 target and is retained as an honest follow-up rather than padded with unrelated sound effects.
+
+Run:
+
+```bash
+pnpm creator-story:v8:baseline
+pnpm test:creator-story
+pnpm creator-story:v8:solomon
+pnpm creator-story:v8:compare
+```
+
+The render writes the master, 720×1280 social export, muted and opening reviews, thirteen candidate MP4s, contact sheets, inspection strips, spectrogram, decoded measurement reports, claim/source lineage, exact transcript verification, and V7/reference comparison under ignored `tmp/solomon-creator-story-v8-robot/`. The master filename remains `NOT-FOR-PUBLICATION`, and `releaseReady` remains false until a human approves voice naturalness, physical-phone readability, publication of the genuine Solomon footage, Solomon brand/legal treatment, and the synthetic-presenter disclosure decision.
