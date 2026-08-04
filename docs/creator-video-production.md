@@ -256,3 +256,26 @@ pnpm creator-story:v9:compare
 ```
 
 Generated media, candidate MP4s, capture receipts, review strips, and decoded QA reports remain private and ignored under `tmp/solomon-creator-story-v9-mascot/`. Automated render completion does not authorize publication. Human mascot-appeal, voice-naturalness, physical-phone readability, synthetic-demo-footage publication, Solomon brand/legal, and synthetic-presenter-disclosure decisions remain explicit release blockers. The CTA stays `SAVE THIS FOR YOUR NEXT JOB SEARCH`; no comment, DM, URL, handle, or delivery promise is implied.
+
+## Solomon Creator Story V10 performance-directed edition
+
+V10 is the isolated `SolomonCreatorStoryV10Performance` composition. It leaves V1–V9 compositions and commands unchanged, preserves V9's baby-schema mascot identity, and adds performance direction, scene-specific semantic camera paths, larger product evidence, a stronger connected-result payoff, and the exact CTA `SAVE FOR YOUR NEXT JOB SEARCH`.
+
+The V10 product footage comes from a temporary worktree of the actual Solomon application running in fail-closed fictional demo mode. External providers and navigation are disabled, the server binds only to loopback, the fixtures use Avery Chen, Northstar Labs, and Product Engineer, messages remain drafts, and every capture stores its source hash, verified interval, DOM evidence, control coordinates, and privacy scan. The master displays one persistent `DEMO DATA` disclosure. Product claims fail closed against this lineage; the connected payoff is explicitly marked as a conceptual assembly of approved product evidence.
+
+The story is a 36-second, 116-word user story rather than a continuous workflow recording. The exact spoken hook is `This job just moved to interviewing, and Solomon already surfaced a relevant contact.` The mechanism is `JOB → PERSON → PROOF → MESSAGE`, followed by a grounded editable message, explicit user control, and a 4.5-second connected payoff. The mascot uses distinct emotional face paths, narration-energy mouth states, gaze-before-gesture timing, independent arms, forward lean and recoil, phrase-aware head/antenna beats, and a physical bookmark performance for the CTA.
+
+Run:
+
+```bash
+pnpm creator-story:v10:fixture
+pnpm creator-story:v10:capture
+pnpm creator-story:v10:baseline
+pnpm test:creator-story:v10
+pnpm creator-story:v10:solomon
+pnpm creator-story:v10:compare
+```
+
+The accepted local exact master is 1080×1920, 30 fps, 36 seconds, BT.709 limited range, and hashes to `00d1f822c82147d0cb8a1f6b5abfeeb77643eff5108816ea189b47bbde85dbde`. Decoded QA measures median movement 7.113, continuous movement 6.575, a 0.20-second longest low-motion interval, −14.48 LUFS, −1.20 dBTP, zero isolated clicks, 100% required OCR coverage, and 94.44% claim-composite OCR coverage. All automated render gates pass. The private master, review variants, candidate clips, contact sheets, source receipts, and decoded reports remain ignored under `tmp/solomon-creator-story-v10-performance/`.
+
+`renderPassed: true` is not publication approval. `releaseReady` remains false until a human approves the demo-footage publication right, mascot appeal, voice performance, message quality, physical-phone readability, proof credibility, disclosure clarity, CTA, Solomon brand/legal treatment, synthetic-presenter disclosure policy, and overall reference quality. See `docs/creator-story-v10-delivery.md` for the exact artifact and validation receipt.

@@ -132,6 +132,12 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm creator-story:v9:compare
 - pnpm creator-story:v9:capture
 - pnpm creator-story:v9:solomon
+- pnpm creator-story:v10:fixture
+- pnpm creator-story:v10:capture
+- pnpm creator-story:v10:baseline
+- pnpm creator-story:v10:compare
+- pnpm creator-story:v10:solomon
+- pnpm test:creator-story:v10
 - pnpm test:creator-story
 - pnpm test:masked-presenter
 - pnpm test:creator-editorial

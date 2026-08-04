@@ -532,6 +532,14 @@ For the free local presenter, run `pnpm avatar:local:canary`. It uses `/usr/bin/
 
 `pnpm creator-story:v9:solomon` adds final-encoding checks that unit tests cannot establish: exact source hashes, 1080×1920/30 fps decode, BT.709 limited-range encoding, OCR privacy, required proof survival, clean-versus-composed OCR, rendered mascot pixels, phone-scale face readability, collision counts, decoded median/continuous/near-static motion, transition peaks, loudness, true peak, clicks, narration gaps, and exact transcript tokens. Inspect the complete master at full resolution and 360×640, at speed and muted; separately inspect the opening, five-surface sequence, signature transformation, draft, payoff, and CTA review files. Automated completion and public-release approval remain different states.
 
+## Creator Story V10 validation
+
+`pnpm test:creator-story:v10` validates the isolated V10 demo fixture, privacy vocabulary, baby-schema mascot geometry, emotional performance plan, story sequence, exact hook and CTA, claim/evidence bindings, layout exclusions, safe distribution objective, and negative regression cases. The aggregate `pnpm test:creator-story` command includes these tests while preserving all V1–V9 suites.
+
+`pnpm creator-story:v10:solomon` verifies the exact encoded master, not only the manifest or pre-render. Required automated gates cover full decode; 1080×1920/30 fps and 36-second metadata; BT.709 limited range; exact capture hashes; manifest and story consistency; banned/private OCR strings; one `DEMO DATA` disclosure per sampled frame; required product text; claim-composite OCR with automatic-page and sparse-text layouts; physical-phone readability; median and continuous decoded movement of at least 4.5; no low-motion hold over two seconds; V9-relative payoff and CTA movement; transition reconciliation; declared layout exclusions; rendered mascot face, gesture, gaze, and timing diversity; −14.5 to −13.5 LUFS; true peak no higher than −1 dBTP; zero isolated clicks; exact narration sequence; safe CTA language; and V1–V9 isolation.
+
+The renderer writes `renderPassed` separately from `releaseReady`. Human review remains mandatory for footage publication permission, mascot appeal, voice naturalness, message quality, physical-phone readability, proof credibility, disclosure clarity, CTA appropriateness, Solomon brand/legal treatment, synthetic-presenter disclosure, and overall reference-quality judgment. Review the full-resolution master, the 720×1280 social export, muted master, opening/mechanism/payoff clips, phone/readability strips, face/gesture strips, product-proof frames, and candidate clips under ignored `tmp/solomon-creator-story-v10-performance/`.
+
 ## Definition of test completeness
 
 A feature is not complete until:
