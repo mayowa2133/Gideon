@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1",
+  "parentVersion": "10",
+  "masterSha256": "e3fe4e9b02256351bddb01b1f79da586ae3efdf54cae831b904ccfe06bc73e0b",
+  "generatedAt": "2026-08-04T19:44:53.294Z",
+  "metrics": {
+    "loudnessIntegratedLufs": {
+      "value": -14.36,
+      "kind": "band",
+      "band": [
+        -14.5,
+        -13.5
+      ]
+    },
+    "truePeakDbtp": {
+      "value": -1.18,
+      "kind": "max",
+      "max": -1
+    },
+    "clickCount": {
+      "value": 0,
+      "kind": "max",
+      "max": 0
+    },
+    "medianFrameChange": {
+      "value": 2.9199305555555557,
+      "kind": "band"
+    },
+    "continuousMovementExcludingCuts": {
+      "value": 3.31206275294334,
+      "kind": "band"
+    },
+    "nearStaticFramePercent": {
+      "value": 12.849162011173185,
+      "kind": "band"
+    },
+    "longestLowMotionSeconds": {
+      "value": 0.8000000000000007,
+      "kind": "max",
+      "max": 2
+    },
+    "majorTransitionPeakCount": {
+      "value": 28,
+      "kind": "min"
+    },
+    "decodedShotCount": {
+      "value": 16,
+      "kind": "min"
+    },
+    "durationSeconds": {
+      "value": 36,
+      "kind": "band",
+      "band": [
+        35.92,
+        36.08
+      ]
+    }
+  },
+  "acceptedDeviations": {
+    "decodedShotCount": {
+      "min": 15,
+      "reason": "V16 straightened the signature context dot at the users request; its arc previously tripped ffmpeg scene detection once inside that scene. No beat boundary was lost: all declared transitions still reconcile and majorTransitionPeakCount is unchanged at 28."
+    }
+  }
+}
