@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1",
+  "parentVersion": "10",
+  "masterSha256": "e835e7fd349b68e3c19a88b31143174cbdbe1388ee1f40aaa84fc17cf9885ebc",
+  "generatedAt": "2026-08-04T19:04:17.434Z",
+  "metrics": {
+    "loudnessIntegratedLufs": {
+      "value": -14.36,
+      "kind": "band",
+      "band": [
+        -14.5,
+        -13.5
+      ]
+    },
+    "truePeakDbtp": {
+      "value": -1.19,
+      "kind": "max",
+      "max": -1
+    },
+    "clickCount": {
+      "value": 0,
+      "kind": "max",
+      "max": 0
+    },
+    "medianFrameChange": {
+      "value": 3.003454861111111,
+      "kind": "band"
+    },
+    "continuousMovementExcludingCuts": {
+      "value": 3.3471563657407404,
+      "kind": "band"
+    },
+    "nearStaticFramePercent": {
+      "value": 15.083798882681565,
+      "kind": "band"
+    },
+    "longestLowMotionSeconds": {
+      "value": 1,
+      "kind": "max",
+      "max": 2
+    },
+    "majorTransitionPeakCount": {
+      "value": 29,
+      "kind": "min"
+    },
+    "decodedShotCount": {
+      "value": 16,
+      "kind": "min"
+    },
+    "durationSeconds": {
+      "value": 36,
+      "kind": "band",
+      "band": [
+        35.92,
+        36.08
+      ]
+    }
+  }
+}
