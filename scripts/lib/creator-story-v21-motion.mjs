@@ -1,0 +1,18 @@
+import { spawn } from "node:child_process";
+
+const WIDTH=180,HEIGHT=320,FPS=5,CUT_THRESHOLD=12,LOW_THRESHOLD=1;
+
+export async function measureV21Motion(target,sections=[]){
+  const decoded=await decode(target),frameBytes=WIDTH*HEIGHT,frames=[];
+  for(let offset=0;offset+frameBytes<=decoded.length;offset+=frameBytes)frames.push(decoded.subarray(offset,offset+frameBytes));
+  const samples=[];
+  for(let index=1;index<frames.length;index+=1)samples.push({timeSeconds:index/FPS,full:difference(frames[index-1],frames[index],0,0,WIDTH,HEIGHT),center:difference(frames[index-1],frames[index],36,32,108,208),lower:difference(frames[index-1],frames[index],18,176,144,128)});
+  const overall=summarize(samples);
+  return{method:{decoder:`FFmpeg grayscale decode at ${WIDTH}x${HEIGHT} and ${FPS} fps`,difference:"Mean absolute per-pixel luma difference between adjacent decoded samples",cutThreshold:CUT_THRESHOLD,lowMotionThreshold:LOW_THRESHOLD},...overall,perSection:sections.map((section)=>({id:section.id,fromSeconds:section.fromSeconds,toSeconds:section.toSeconds,...summarize(samples.filter(({timeSeconds})=>timeSeconds>=section.fromSeconds&&timeSeconds<section.toSeconds))}))};
+}
+function summarize(samples){const full=samples.map(({full})=>full),continuous=full.filter((value)=>value<CUT_THRESHOLD),low=samples.map((sample)=>({...sample,low:sample.full<LOW_THRESHOLD})),windows=lowWindows(low,1/FPS),peaks=samples.filter(({full})=>full>=CUT_THRESHOLD).map(({timeSeconds,full:value})=>({timeSeconds,value}));return{sampleCount:samples.length,averageFrameChange:average(full),medianFrameChange:median(full),continuousMovementExcludingCuts:average(continuous),centerRegionMovement:average(samples.map(({center})=>center)),lowerRegionMovement:average(samples.map(({lower})=>lower)),nearStaticFramePercent:low.filter(({low:value})=>value).length/Math.max(1,low.length)*100,longestLowMotionSeconds:Math.max(0,...windows.map(({startSeconds,endSeconds})=>endSeconds-startSeconds)),lowMotionWindows:windows,majorTransitionPeaks:peaks,majorTransitionPeakCount:peaks.length};}
+function difference(previous,current,x,y,width,height){let sum=0,count=0;for(let row=y;row<y+height;row+=1){const start=row*WIDTH+x;for(let column=0;column<width;column+=1){sum+=Math.abs(previous[start+column]-current[start+column]);count+=1;}}return sum/Math.max(1,count);}
+function lowWindows(samples,cadence){const result=[];let start;for(const sample of samples){if(sample.low&&start===undefined)start=sample.timeSeconds;if(!sample.low&&start!==undefined){result.push({startSeconds:start,endSeconds:sample.timeSeconds});start=undefined;}}if(start!==undefined)result.push({startSeconds:start,endSeconds:(samples.at(-1)?.timeSeconds??start)+cadence});return result;}
+function average(values){return values.length?values.reduce((sum,value)=>sum+value,0)/values.length:0;}
+function median(values){if(!values.length)return 0;const sorted=[...values].sort((a,b)=>a-b),middle=Math.floor(sorted.length/2);return sorted.length%2?sorted[middle]:(sorted[middle-1]+sorted[middle])/2;}
+async function decode(target){return new Promise((resolve,reject)=>{const child=spawn("ffmpeg",["-v","error","-i",target,"-vf",`fps=${FPS},scale=${WIDTH}:${HEIGHT}:flags=bilinear,format=gray`,"-f","rawvideo","pipe:1"],{shell:false,stdio:["ignore","pipe","pipe"]}),chunks=[];let stderr="";child.stdout.on("data",(chunk)=>chunks.push(chunk));child.stderr.setEncoding("utf8").on("data",(chunk)=>stderr=`${stderr}${chunk}`.slice(-20000));child.once("error",reject);child.once("close",(code)=>code===0?resolve(Buffer.concat(chunks)):reject(new Error(`FFmpeg motion decode failed (${code}): ${stderr}`)));});}
