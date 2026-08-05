@@ -110,16 +110,21 @@ export function sampleMascotAudioV21(frames:V21MascotPerformance["audioFrames"],
 //   2.8/3.6 @ .17/.13 -> 33.1  (held  3.0 frames)   <- V20 amplitude, too busy
 //   2.0/2.6 @ .17/.13 -> 23.8  (held  4.2 frames)
 //   1.5/2.0 @ .17/.13 -> 18.2  (held  5.5 frames)
-//   1.2/1.5 @ .17/.13 -> 14.1  (held  7.1 frames)
-//   1.2/1.5 @ .11/.085 ->  9.0 (held 11.1 frames)   <- chosen
+//   1.2/1.5 @ .17/.13 -> 14.1  (held  7.1 frames)   <- chosen
+//   1.2/1.5 @ .11/.085 ->  9.0 (held 11.1 frames)   <- too stiff on review
 //   1.0/1.3 @ .11/.085 ->  8.1 (held 12.3 frames)
 //
-// At the chosen values the character holds ~11 frames between 1px moves, which
-// reads as a slow breath rather than a tick. Lowering these further trends toward
-// a frozen sticker; raising them trends back toward the busy stepping. The one
-// thing not to do is widen them past the point where rounding stops mattering —
-// unquantized sub-pixel drift is the defect this whole version exists to remove.
-export const V21_IDLE_FLOAT={amplitudeX:1.2,amplitudeY:1.5,speedX:.11,speedY:.085} as const;
+// Amplitude and speed are separable levers and were tuned separately. Dropping
+// both at once (1.2/1.5 @ .11/.085) killed the busy tick but read as stiff: the
+// character held ~11 frames, long enough to look frozen between moves. Keeping
+// the reduced amplitude but restoring the original speed holds ~7 frames — the
+// excursion stays small, so no move is large enough to tick, while the cadence
+// stays lifelike.
+//
+// The one thing not to do is widen these past the point where rounding stops
+// mattering. Unquantized sub-pixel drift is the defect this whole version exists
+// to remove, and HeldStability.test will reject it.
+export const V21_IDLE_FLOAT={amplitudeX:1.2,amplitudeY:1.5,speedX:.17,speedY:.13} as const;
 
 export function mascotIdleSeed(value:string){return [...value].reduce((sum,char)=>((sum*31)+char.charCodeAt(0))%997,17);}
 export function unevenV21(seed:number,frame:number,speed:number){return Math.sin(frame*speed+seed*.13)*.58+Math.sin(frame*speed*.43+seed*.29)*.28+Math.sin(frame*speed*.19+seed*.41)*.14;}

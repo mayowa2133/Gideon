@@ -99,16 +99,21 @@ already constant in that window, which confirms the mechanism precisely: all of
 the head's churn arrived through the wrapper, levered by the belly pivot.)
 
 **Decoded level — `scripts/lib/creator-story-v21-stability.mjs`.** Per-pixel
-temporal standard deviation over 12-frame windows decoded at **full resolution
-and full frame rate**, on the mascot box, the headline band, and a static control
-rect. The threshold derives from the control measured *in the same render*
-(`held ≤ max(0.25, control × 6)`) rather than a hand-set constant — a tuned
-ceiling can be quietly relaxed until the film passes; "as still as a region that
-is genuinely still" cannot. If the control is not near-zero the gate fails loudly
-rather than waving everything through on a noisy baseline.
+temporal measurement over 12-frame windows decoded at **full resolution and full
+frame rate** — deliberately not the 180×320/5 fps motion path, which is what made
+the defect invisible for eleven versions. A header comment says so, because the
+obvious "optimisation" would reintroduce the blindness.
 
-Verified to bind against the V20 master: control 0.0501 (valid), headline **6.92
-vs a 0.30 limit**, mascot **3.13 vs 0.30** — a fail by 23× and 10×.
+The metric that binds is the **fraction of adjacent frame pairs that are
+byte-identical**, not the average difference. Sub-pixel drift never produces an
+identical pair; whole-pixel quantization produces mostly identical pairs with the
+change concentrated into occasional steps. That distinction is the whole point of
+the version, and it survives even when the absolute deltas are small.
+
+What it gates, and what it only reports, is set out in the next-but-one section —
+both boundaries were moved by measurement rather than preference. V21 scores
+73–100% identical on the control regions; V20 scores 45% on two of the same
+windows.
 
 ## A third drift source, found by the gate before it shipped
 
@@ -132,9 +137,9 @@ regression-free.
 
 | | V20 | V21 | band |
 |---|---:|---:|---|
-| medianFrameChange | 3.403 | 3.134 | 1.2–8 |
-| nearStaticFramePercent | 12.291 | **27.93** | 10–30 |
-| continuousMovementExcludingCuts | 3.469 | 3.21 | 1.2–5.5 |
+| medianFrameChange | 3.403 | 3.379 | 1.2–8 |
+| nearStaticFramePercent | 12.291 | **24.58** | 10–30 |
+| continuousMovementExcludingCuts | 3.469 | 3.307 | 1.2–5.5 |
 | decodedShotCount | 19 | 19 | 13–21 |
 | claim coverage | 1.00 | 1.00 | — |
 | loudness | −14.36 | −14.36 LUFS | −14.5…−13.5 |
@@ -142,12 +147,12 @@ regression-free.
 No accepted deviation was needed. The predicted `medianFrameChange` drop happened
 and stayed inside the band, so it recorded as a pass rather than a concession.
 
-The number that moved most is **near-static frames, 12.3% → 27.9%**. The film now
+The number that moved most is **near-static frames, 12.3% → 24.6%**. The film now
 has genuine stillness for the first time in the series, rather than uniform
 low-grade churn.
 
-**That figure needs watching.** It sits 2.1 points under the band ceiling of 30,
-and well past the references' 12.1–21.1. Gideon is now *calmer than any reference*,
+**That figure needs watching.** It sits 5.4 points under the band ceiling of 30,
+and past the references' 12.1–21.1. Gideon is now *calmer than any reference*,
 which is the opposite of the problem it had at V10. There is very little headroom
 left: any further calming will fail the band. If the film needs more life, it has
 to come from deliberate motion — more cuts, larger in-scene events, more kinetic
@@ -165,13 +170,18 @@ Measured step rate per 100 frames across all scenes:
 | 2.8 / 3.6 | .17 / .13 | 33.1 | 3.0 |
 | 2.0 / 2.6 | .17 / .13 | 23.8 | 4.2 |
 | 1.5 / 2.0 | .17 / .13 | 18.2 | 5.5 |
-| 1.2 / 1.5 | .17 / .13 | 14.1 | 7.1 |
-| **1.2 / 1.5** | **.11 / .085** | **9.0** | **11.1** |
+| **1.2 / 1.5** | **.17 / .13** | **14.1** | **7.1** |
+| 1.2 / 1.5 | .11 / .085 | 9.0 | 11.1 |
 | 1.0 / 1.3 | .11 / .085 | 8.1 | 12.3 |
 
-Both amplitude and speed were lowered, because step *frequency* is what reads as
-busy and amplitude alone only reaches 14.1. The character now holds ~11 frames
-between 1px moves — a slow breath rather than a tick.
+Amplitude and speed are separable levers and were tuned separately, over two
+review rounds. Lowering both at once (1.2/1.5 @ .11/.085) removed the busy tick
+but read as **stiff** — holding ~11 frames is long enough to look frozen between
+moves. Keeping the reduced amplitude and restoring the original speed holds ~7
+frames: the excursion stays small so no single move is large enough to tick,
+while the cadence stays lifelike.
+
+This landed the best mascot numbers of the three settings — see below.
 
 ### The stability probe, run identically on both masters
 
@@ -180,10 +190,10 @@ Mean absolute per-frame-pair delta, frames 1035–1046:
 | region | V20 | V21 | |
 |---|---:|---:|---|
 | backdrop (control) | 0.018 | 0.011 | 1.6× quieter |
-| headline serif | 6.564 | **0.363** | 18.1× quieter |
-| @SOLOMON pill | 3.076 | **0.595** | 5.2× quieter |
-| mascot head shell | 0.345 | 0.267 | 1.3× quieter |
-| mascot eye edge | 0.670 | 0.608 | 1.1× quieter |
+| headline serif | 6.564 | **0.360** | 18.2× quieter |
+| @SOLOMON pill | 3.076 | **0.596** | 5.2× quieter |
+| mascot head shell | 0.345 | 0.297 | 1.2× quieter |
+| mascot eye edge | 0.670 | **0.533** | 1.3× quieter |
 
 The per-pair detail is the real result, because the shape matters more than the
 mean. The `@SOLOMON` pill in V21 reads:
@@ -199,17 +209,17 @@ instead of smeared as sub-pixel resampling over every frame.**
 The mascot's eye edge reads:
 
 ```
-0.15  0.15  0.23  2.93  0.32  0.24  0.17  0.04  0.19  0.18  2.08
+0.48  0.43  0.44  0.02  0.49  0.33  0.39  0.00  3.12  0.12  0.04
 ```
 
-Two spikes in eleven pairs, and the first (index 3) is the camera's own step —
-it appears on the headline and pill at the same index. So the character floats
-once in this window. Its hold frames sit at 0.15–0.32 against V20's *constant*
-0.68, roughly 4× quieter, while the mean also lands below V20's.
+One step in eleven pairs. Note index 3, where the headline and pill spike to 3.80
+and 6.54 but the mascot reads 0.02 — that is the camera stepping, and the mascot
+correctly does not move with it, because MascotLayer sits outside EditorialCamera.
 
-At the first amplitude (2.8/3.6) the same window showed four mascot steps and a
-mean of 1.110 — quieter on hold frames but visibly ticking. Lowering the float
-kept the hold quality and removed the tick.
+Across the three settings tried, the mascot eye-edge mean went 1.110 (amplitude
+2.8/3.6, visibly ticking) → 0.608 (1.2/1.5 @ .11/.085, stiff) → **0.533**, against
+V20's 0.670. The final setting is the quietest of the three *and* the most alive,
+because small excursions at a natural cadence beat large ones at a slow cadence.
 
 Frame-difference images confirm it. In V20 every outline glowed on every frame,
 with red/cyan fringing on the eyes and mouth. In V21 a typical (hold) pair shows
