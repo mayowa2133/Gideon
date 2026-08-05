@@ -132,9 +132,9 @@ regression-free.
 
 | | V20 | V21 | band |
 |---|---:|---:|---|
-| medianFrameChange | 3.403 | 3.158 | 1.2–8 |
-| nearStaticFramePercent | 12.291 | **22.346** | 10–30 |
-| continuousMovementExcludingCuts | 3.469 | 3.214 | 1.2–5.5 |
+| medianFrameChange | 3.403 | 3.134 | 1.2–8 |
+| nearStaticFramePercent | 12.291 | **27.93** | 10–30 |
+| continuousMovementExcludingCuts | 3.469 | 3.21 | 1.2–5.5 |
 | decodedShotCount | 19 | 19 | 13–21 |
 | claim coverage | 1.00 | 1.00 | — |
 | loudness | −14.36 | −14.36 LUFS | −14.5…−13.5 |
@@ -142,9 +142,36 @@ regression-free.
 No accepted deviation was needed. The predicted `medianFrameChange` drop happened
 and stayed inside the band, so it recorded as a pass rather than a concession.
 
-The number that moved most is **near-static frames, 12.3% → 22.3%**. The film now
-has genuine stillness — slightly past the references' 12.1–21.1 range, and the
-first time the series has had real calm rather than uniform low-grade churn.
+The number that moved most is **near-static frames, 12.3% → 27.9%**. The film now
+has genuine stillness for the first time in the series, rather than uniform
+low-grade churn.
+
+**That figure needs watching.** It sits 2.1 points under the band ceiling of 30,
+and well past the references' 12.1–21.1. Gideon is now *calmer than any reference*,
+which is the opposite of the problem it had at V10. There is very little headroom
+left: any further calming will fail the band. If the film needs more life, it has
+to come from deliberate motion — more cuts, larger in-scene events, more kinetic
+type — and specifically not from restoring drift, which is what produced the
+churn this version removed.
+
+## Idle-float tuning
+
+The first V21 render inherited V20's raw amplitude (2.8/3.6) and speed (.17/.13).
+Quantized, that steps every 3 frames — 10 per second — which reviewed as too busy.
+Measured step rate per 100 frames across all scenes:
+
+| amplitude | speed | steps/100f | frames held |
+|---|---|---:|---:|
+| 2.8 / 3.6 | .17 / .13 | 33.1 | 3.0 |
+| 2.0 / 2.6 | .17 / .13 | 23.8 | 4.2 |
+| 1.5 / 2.0 | .17 / .13 | 18.2 | 5.5 |
+| 1.2 / 1.5 | .17 / .13 | 14.1 | 7.1 |
+| **1.2 / 1.5** | **.11 / .085** | **9.0** | **11.1** |
+| 1.0 / 1.3 | .11 / .085 | 8.1 | 12.3 |
+
+Both amplitude and speed were lowered, because step *frequency* is what reads as
+busy and amplitude alone only reaches 14.1. The character now holds ~11 frames
+between 1px moves — a slow breath rather than a tick.
 
 ### The stability probe, run identically on both masters
 
@@ -152,11 +179,11 @@ Mean absolute per-frame-pair delta, frames 1035–1046:
 
 | region | V20 | V21 | |
 |---|---:|---:|---|
-| backdrop (control) | 0.018 | 0.013 | — |
-| headline serif | 6.564 | **0.376** | 17.5× quieter |
-| @SOLOMON pill | 3.076 | **0.597** | 5.1× quieter |
-| mascot head shell | 0.345 | 0.375 | — |
-| mascot eye edge | 0.670 | 1.110 | see below |
+| backdrop (control) | 0.018 | 0.011 | 1.6× quieter |
+| headline serif | 6.564 | **0.363** | 18.1× quieter |
+| @SOLOMON pill | 3.076 | **0.595** | 5.2× quieter |
+| mascot head shell | 0.345 | 0.267 | 1.3× quieter |
+| mascot eye edge | 0.670 | 0.608 | 1.1× quieter |
 
 The per-pair detail is the real result, because the shape matters more than the
 mean. The `@SOLOMON` pill in V21 reads:
@@ -169,11 +196,20 @@ Dead still, one clean step, dead still. V20 spread that same energy across every
 pair. That is the whole change: **the motion is now coherent and concentrated
 instead of smeared as sub-pixel resampling over every frame.**
 
-**The mascot's eye-edge mean went up, and that is worth stating plainly.** Its
-hold frames run 0.13–0.20 — roughly 4× quieter than V20's *constant* 0.68 — but
-the 1px float steps register as 2–3, which lifts the average. The character of
-the motion is inverted even though the mean is not: V20 never held still, V21
-holds for three frames out of four and then moves once, cleanly.
+The mascot's eye edge reads:
+
+```
+0.15  0.15  0.23  2.93  0.32  0.24  0.17  0.04  0.19  0.18  2.08
+```
+
+Two spikes in eleven pairs, and the first (index 3) is the camera's own step —
+it appears on the headline and pill at the same index. So the character floats
+once in this window. Its hold frames sit at 0.15–0.32 against V20's *constant*
+0.68, roughly 4× quieter, while the mean also lands below V20's.
+
+At the first amplitude (2.8/3.6) the same window showed four mascot steps and a
+mean of 1.110 — quieter on hold frames but visibly ticking. Lowering the float
+kept the hold quality and removed the tick.
 
 Frame-difference images confirm it. In V20 every outline glowed on every frame,
 with red/cyan fringing on the eyes and mouth. In V21 a typical (hold) pair shows

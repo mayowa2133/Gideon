@@ -101,7 +101,25 @@ export function sampleMascotAudioV21(frames:V21MascotPerformance["audioFrames"],
 // pixels. This must therefore be applied by the layer that positions in canvas
 // space (MascotLayer's left/top), never inside a scaled parent, or the rounding
 // buys nothing.
-export const V21_IDLE_FLOAT={amplitudeX:2.8,amplitudeY:3.6,speedX:.17,speedY:.13} as const;
+// Amplitude and speed both control how often the staircase steps, and step
+// frequency is what reads as busy. The first V21 render inherited V20's raw
+// amplitude (2.8/3.6) and speed (.17/.13), which quantized to a step every 3
+// frames — 10 per second, which reviewed as too busy. Measured step rates per
+// 100 frames across all scenes:
+//
+//   2.8/3.6 @ .17/.13 -> 33.1  (held  3.0 frames)   <- V20 amplitude, too busy
+//   2.0/2.6 @ .17/.13 -> 23.8  (held  4.2 frames)
+//   1.5/2.0 @ .17/.13 -> 18.2  (held  5.5 frames)
+//   1.2/1.5 @ .17/.13 -> 14.1  (held  7.1 frames)
+//   1.2/1.5 @ .11/.085 ->  9.0 (held 11.1 frames)   <- chosen
+//   1.0/1.3 @ .11/.085 ->  8.1 (held 12.3 frames)
+//
+// At the chosen values the character holds ~11 frames between 1px moves, which
+// reads as a slow breath rather than a tick. Lowering these further trends toward
+// a frozen sticker; raising them trends back toward the busy stepping. The one
+// thing not to do is widen them past the point where rounding stops mattering —
+// unquantized sub-pixel drift is the defect this whole version exists to remove.
+export const V21_IDLE_FLOAT={amplitudeX:1.2,amplitudeY:1.5,speedX:.11,speedY:.085} as const;
 
 export function mascotIdleSeed(value:string){return [...value].reduce((sum,char)=>((sum*31)+char.charCodeAt(0))%997,17);}
 export function unevenV21(seed:number,frame:number,speed:number){return Math.sin(frame*speed+seed*.13)*.58+Math.sin(frame*speed*.43+seed*.29)*.28+Math.sin(frame*speed*.19+seed*.41)*.14;}
