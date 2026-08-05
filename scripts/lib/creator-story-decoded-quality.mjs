@@ -45,13 +45,20 @@ async function loudnessScan(target) {
   return { integratedLufs: Number(value.input_i), truePeakDbtp: Number(value.input_tp), loudnessRangeLu: Number(value.input_lra), thresholdLufs: Number(value.input_thresh) };
 }
 
+const CUT_CLUSTER_SECONDS = .15;
 async function cutScan(target, durationSeconds) {
   // A 0.10 scene score captures real cuts between Gideon's intentionally bright
   // editorial/product layouts. The previous 0.22 threshold detected only
   // high-contrast cuts and under-counted pale-to-pale composition changes.
   const threshold = .10;
   const result = await run("ffmpeg", ["-hide_banner","-i",target,"-vf",`select='gt(scene,${threshold})',showinfo`,"-an","-f","null","-"], true);
-  return { threshold, times: [...result.stderr.matchAll(/pts_time:([0-9.]+)/g)].map((match) => Number(match[1])).filter((time) => time > .03 && time < durationSeconds - .03) };
+    // A transition that changes backdrop and slides content takes 2-3 frames, and
+  // the scene detector fires on each one. Detections 33ms apart are one cut, not
+  // three, so cluster them: without this a hard 3-frame cut inflates the shot
+  // count by 200% and a film measured as "28 shots" is really 20.
+  const raw = [...result.stderr.matchAll(/pts_time:([0-9.]+)/g)].map((match) => Number(match[1])).filter((time) => time > .03 && time < durationSeconds - .03);
+  const times = raw.filter((time, index) => index === 0 || time - raw[index - 1] > CUT_CLUSTER_SECONDS);
+  return { threshold, times, rawDetectionCount: raw.length, clusterWindowSeconds: CUT_CLUSTER_SECONDS };
 }
 
 async function visualDifferenceScan(target) {
