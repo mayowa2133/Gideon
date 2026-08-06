@@ -15,7 +15,7 @@ import { evaluateV22HeldStability, measureV22HeldStability } from "./lib/creator
 const require=createRequire(import.meta.url);
 const {ChatterboxNarrationProvider}=require("../dist/main/main/chatterboxNarrationProvider.js");
 const {SOLOMON_CREATOR_STORY_V22_SCRIPT,SOLOMON_CREATOR_STORY_V22_TTS_BEATS,SOLOMON_CREATOR_STORY_V22_NUMERAL_ANCHORS,assertSolomonCreatorStoryV22Manifest,auditSolomonCreatorStoryV22,createSolomonCreatorStoryV22Manifest,v22SemanticEvents}=require("../dist/main/shared/solomonCreatorStoryV22.js");
-const {V22_PRODUCT_STILLS,v22ProductStillFile,auditV22BannedStrings,auditV22Layout,auditV22PhoneScale,auditV22RenderedBounds,evaluateV22MotionBands,evaluateV22ShotBands,mascotBoxForScene}=require("../dist/main/shared/creatorStoryV22Quality.js");
+const {V22_MIN_SCENE_FRAMES,V22_PRODUCT_STILLS,v22ProductStillFile,auditV22BannedStrings,auditV22Layout,auditV22PhoneScale,auditV22RenderedBounds,auditV22SceneDurations,evaluateV22MotionBands,evaluateV22ShotBands,mascotBoxForScene}=require("../dist/main/shared/creatorStoryV22Quality.js");
 // Hoisted: qualityAudit runs at module top level, so anything it reaches must be
 // initialized before that await rather than merely declared later in the file.
 // NOTE: this script does all of its work at module top level, so every constant
@@ -223,6 +223,40 @@ function sceneSampleFrames(){
   });
 }
 
+// Reshapes one window's scene lengths so none falls under `minimum`, keeping the
+// window total exactly (its endpoints are beat anchors and must not move). Time
+// is taken from the scenes that have slack above the minimum, in proportion to
+// that slack, so a long scene gives up more than one already near the floor.
+function redistributeLengths(lengths,minimum){
+  const total=lengths.reduce((sum,value)=>sum+value,0);
+  if(lengths.length===0)return lengths;
+  if(lengths.length*minimum>=total){                       // window cannot seat them all
+    const base=Math.floor(total/lengths.length),out=lengths.map(()=>base);
+    let remainder=total-base*lengths.length;
+    for(let i=0;remainder>0;i=(i+1)%out.length,remainder-=1)out[i]+=1;
+    return out;
+  }
+  let out=lengths.slice();
+  for(let pass=0;pass<12;pass+=1){
+    const deficit=out.reduce((sum,value)=>sum+Math.max(0,minimum-value),0);
+    if(deficit<=0)break;
+    const slack=out.map((value)=>Math.max(0,value-minimum));
+    const totalSlack=slack.reduce((sum,value)=>sum+value,0);
+    if(totalSlack<=0)break;
+    out=out.map((value,index)=>Math.max(minimum,slack[index]>0?value-deficit*(slack[index]/totalSlack):value));
+  }
+  const rounded=out.map((value)=>Math.max(minimum,Math.round(value)));
+  let drift=rounded.reduce((sum,value)=>sum+value,0)-total;
+  while(drift!==0){
+    const order=rounded.map((value,index)=>({value,index})).sort((a,b)=>drift>0?b.value-a.value:a.value-b.value);
+    const target=order.find(({index})=>drift<0||rounded[index]>minimum);
+    if(!target)break;
+    rounded[target.index]+=drift>0?-1:1;
+    drift+=drift>0?-1:1;
+  }
+  return rounded;
+}
+
 function hydrateSceneTimings(input,narration){
   const realized=narration.realizedTimings;
   if(!realized||!Array.isArray(realized.timings)||realized.timings.length===0)throw new Error("V22 scene hydration: narration has no realized timings");
@@ -258,6 +292,23 @@ function hydrateSceneTimings(input,narration){
   }
   boundaries.set(sorted[0],0);
   boundaries.set(sorted[sorted.length-1],FILM_FRAMES);
+  // Give every scene a readable minimum without letting any beat anchor move.
+  // A boundary that is a narrated scene's start is fixed -- that is the whole
+  // point of the derivation -- so the time is found strictly between anchors,
+  // taken from the scenes in that window with slack above the minimum.
+  const anchored=new Set(input.scenes.filter((scene)=>declared.has(scene.id)).map((scene)=>scene.from));
+  const values=sorted.map((key)=>boundaries.get(key));
+  let windowStart=0;
+  for(let index=1;index<sorted.length;index+=1){
+    if(index!==sorted.length-1&&!anchored.has(sorted[index]))continue;
+    const lengths=[];
+    for(let k=windowStart;k<index;k+=1)lengths.push(values[k+1]-values[k]);
+    const adjusted=redistributeLengths(lengths,V22_MIN_SCENE_FRAMES);
+    let cursor=values[windowStart];
+    for(let k=0;k<adjusted.length;k+=1){cursor+=adjusted[k];values[windowStart+k+1]=cursor;}
+    windowStart=index;
+  }
+  sorted.forEach((key,index)=>boundaries.set(key,values[index]));
   const B=(f)=>boundaries.has(f)?boundaries.get(f):mapFrame(f);
   const scenes=input.scenes.map((scene)=>{
     const from=B(scene.from),to=Math.max(from+1,B(scene.to));
@@ -414,9 +465,9 @@ function strip(frames,scale){
   const columns=Math.min(frames.length,Math.ceil(Math.sqrt(frames.length*2)));
   return `select='${frames.map((frame)=>`eq(n,${frame})`).join("+")}',scale=${scale},tile=${columns}x${Math.ceil(frames.length/columns)}`;
 }
-async function qualityAudit(files){const decoded=await measureDecodedMedia(files.master),sections=[{id:"opening",fromSeconds:0,toSeconds:4.4},{id:"mechanism",fromSeconds:14,toSeconds:24.5},{id:"payoff",fromSeconds:27.5,toSeconds:32},{id:"cta",fromSeconds:32,toSeconds:FILM_SECONDS}],motion=await measureV22Motion(files.master,sections),ocr=await ocrAudit(files.master),composite=await compositeAudit(files.master),layout=layoutAudit(),bounds=auditV22RenderedBounds(manifest.scenes.map((scene)=>({id:scene.id,layout:scene.layout,camera:scene.camera,mascotRole:scene.mascot.role}))),mascot=await mascotAudit(),mascotBoundaries=await mascotBoundaryContinuityAudit(),phone=phoneAudit(ocr,mascot),transitions=transitionAudit(motion),motionBands=evaluateV22MotionBands(motion),shotBands=evaluateV22ShotBands(decoded.shots),transcript=await narrationAudit(files.master,files.narration),metadata=decoded.metadata,manifestAudit=auditSolomonCreatorStoryV22(manifest),narrationGaps=await narrationGapAudit(),numeralAnchorsDecoded=await numeralAnchorAudit(),heldStability=await heldStabilityAudit(files.master),captionSync=auditCaptionSync(transcript),baseline=JSON.parse(await fs.readFile(path.join(output,"baseline","v21-authoritative-baseline.json"),"utf8"));
-  const gates={fullDecode:"passed",metadata:metadata.width===1080&&metadata.height===1920&&metadata.frameRate==="30/1"&&Math.abs(metadata.durationSeconds-FILM_SECONDS)<.08?"passed":"failed",color:metadata.pixelFormat==="yuv420p"&&metadata.colorRange==="tv"&&metadata.colorSpace==="bt709"?"passed":"failed",sourceHashes:manifest.sources.every((source)=>captureReceipt.captures.some((capture)=>capture.id===source.id&&capture.sha256===source.sourceSha256))?"passed":"failed",manifest:manifestAudit.passed?"passed":"failed",storyConsistency:manifestAudit.story.passed?"passed":"failed",captionLints:manifestAudit.captionLints.passed?"passed":"failed",numeralAnchorsStatic:manifestAudit.numeralAnchors.passed?"passed":"failed",numeralAnchorsSpoken:numeralAnchorsDecoded.passed?"passed":"failed",narrationGaps:narrationGaps.passed?"passed":"failed",captionSync:captionSync.passed?"passed":"failed",bannedStrings:ocr.banned.passed?"passed":"failed",singleDisclosure:ocr.singleDisclosurePassed?"passed":"failed",requiredOcr:ocr.requiredCoverage>=.9?"passed":"failed",composite:composite.passed?"passed":"failed",phoneScale:phone.passed?"passed":"failed",motionBands:motionBands.passed?"passed":"failed",heldStability:heldStability.evaluation.passed?"passed":"failed",shotDensity:shotBands.passed?"passed":"failed",renderedBounds:bounds.passed?"passed":"failed",transitions:transitions.passed?"passed":"failed",layout:layout.passed?"passed":"failed",mascotPerception:mascot.passed?"passed":"failed",mascotBoundaryContinuity:mascotBoundaries.passed?"passed":"failed",loudness:decoded.loudness.integratedLufs>=-14.5&&decoded.loudness.integratedLufs<=-13.5&&decoded.loudness.truePeakDbtp<=-1?"passed":"failed",clicks:decoded.audioActivity.clickCount===0?"passed":"failed",exactNarration:transcript.passed?"passed":"failed",safeCta:manifestAudit.cta.passed?"passed":"failed",ctaDeliveryApproval:"blocked_external_confirmation",v1ToV21Isolation:"passed",publicSourceApproval:"blocked_external_confirmation",humanMascotAppeal:"blocked_external_confirmation",humanVoiceApproval:"blocked_external_confirmation",humanMessageApproval:"blocked_external_confirmation",physicalPhoneApproval:"blocked_external_confirmation",proofCredibilityApproval:"blocked_external_confirmation",disclosureApproval:"blocked_external_confirmation",ctaApproval:"blocked_external_confirmation",brandLegalApproval:"blocked_external_confirmation",syntheticPresenterDisclosure:"blocked_external_confirmation",overallReferenceQuality:"blocked_external_confirmation"};
-  const external=new Set(Object.keys(gates).filter((key)=>gates[key]==="blocked_external_confirmation")),renderPassed=Object.entries(gates).filter(([key])=>!external.has(key)).every(([,value])=>value==="passed");return{schemaVersion:"10.1",...files,decoded,motion,motionBands,shotBands,heldStability,captionSync,bounds,ocr,composite,layout,mascot,mascotBoundaries,narrationGaps,numeralAnchorsDecoded,phone,transitions,transcript,masterSha256:await sha256(files.master),renderPassed,releaseReady:Object.values(gates).every((value)=>value==="passed"),gates};}
+async function qualityAudit(files){const decoded=await measureDecodedMedia(files.master),sections=[{id:"opening",fromSeconds:0,toSeconds:4.4},{id:"mechanism",fromSeconds:14,toSeconds:24.5},{id:"payoff",fromSeconds:27.5,toSeconds:32},{id:"cta",fromSeconds:32,toSeconds:FILM_SECONDS}],motion=await measureV22Motion(files.master,sections),ocr=await ocrAudit(files.master),composite=await compositeAudit(files.master),layout=layoutAudit(),bounds=auditV22RenderedBounds(manifest.scenes.map((scene)=>({id:scene.id,layout:scene.layout,camera:scene.camera,mascotRole:scene.mascot.role}))),mascot=await mascotAudit(),mascotBoundaries=await mascotBoundaryContinuityAudit(),phone=phoneAudit(ocr,mascot),transitions=transitionAudit(motion),motionBands=evaluateV22MotionBands(motion),shotBands=evaluateV22ShotBands(decoded.shots),sceneDurations=auditV22SceneDurations(manifest.scenes),transcript=await narrationAudit(files.master,files.narration),metadata=decoded.metadata,manifestAudit=auditSolomonCreatorStoryV22(manifest),narrationGaps=await narrationGapAudit(),numeralAnchorsDecoded=await numeralAnchorAudit(),heldStability=await heldStabilityAudit(files.master),captionSync=auditCaptionSync(transcript),baseline=JSON.parse(await fs.readFile(path.join(output,"baseline","v21-authoritative-baseline.json"),"utf8"));
+  const gates={fullDecode:"passed",metadata:metadata.width===1080&&metadata.height===1920&&metadata.frameRate==="30/1"&&Math.abs(metadata.durationSeconds-FILM_SECONDS)<.08?"passed":"failed",color:metadata.pixelFormat==="yuv420p"&&metadata.colorRange==="tv"&&metadata.colorSpace==="bt709"?"passed":"failed",sourceHashes:manifest.sources.every((source)=>captureReceipt.captures.some((capture)=>capture.id===source.id&&capture.sha256===source.sourceSha256))?"passed":"failed",manifest:manifestAudit.passed?"passed":"failed",storyConsistency:manifestAudit.story.passed?"passed":"failed",captionLints:manifestAudit.captionLints.passed?"passed":"failed",numeralAnchorsStatic:manifestAudit.numeralAnchors.passed?"passed":"failed",numeralAnchorsSpoken:numeralAnchorsDecoded.passed?"passed":"failed",narrationGaps:narrationGaps.passed?"passed":"failed",captionSync:captionSync.passed?"passed":"failed",bannedStrings:ocr.banned.passed?"passed":"failed",singleDisclosure:ocr.singleDisclosurePassed?"passed":"failed",requiredOcr:ocr.requiredCoverage>=.9?"passed":"failed",composite:composite.passed?"passed":"failed",phoneScale:phone.passed?"passed":"failed",motionBands:motionBands.passed?"passed":"failed",heldStability:heldStability.evaluation.passed?"passed":"failed",shotDensity:shotBands.passed?"passed":"failed",sceneDurations:sceneDurations.passed?"passed":"failed",renderedBounds:bounds.passed?"passed":"failed",transitions:transitions.passed?"passed":"failed",layout:layout.passed?"passed":"failed",mascotPerception:mascot.passed?"passed":"failed",mascotBoundaryContinuity:mascotBoundaries.passed?"passed":"failed",loudness:decoded.loudness.integratedLufs>=-14.5&&decoded.loudness.integratedLufs<=-13.5&&decoded.loudness.truePeakDbtp<=-1?"passed":"failed",clicks:decoded.audioActivity.clickCount===0?"passed":"failed",exactNarration:transcript.passed?"passed":"failed",safeCta:manifestAudit.cta.passed?"passed":"failed",ctaDeliveryApproval:"blocked_external_confirmation",v1ToV21Isolation:"passed",publicSourceApproval:"blocked_external_confirmation",humanMascotAppeal:"blocked_external_confirmation",humanVoiceApproval:"blocked_external_confirmation",humanMessageApproval:"blocked_external_confirmation",physicalPhoneApproval:"blocked_external_confirmation",proofCredibilityApproval:"blocked_external_confirmation",disclosureApproval:"blocked_external_confirmation",ctaApproval:"blocked_external_confirmation",brandLegalApproval:"blocked_external_confirmation",syntheticPresenterDisclosure:"blocked_external_confirmation",overallReferenceQuality:"blocked_external_confirmation"};
+  const external=new Set(Object.keys(gates).filter((key)=>gates[key]==="blocked_external_confirmation")),renderPassed=Object.entries(gates).filter(([key])=>!external.has(key)).every(([,value])=>value==="passed");return{schemaVersion:"10.1",...files,decoded,motion,motionBands,shotBands,sceneDurations,heldStability,captionSync,bounds,ocr,composite,layout,mascot,mascotBoundaries,narrationGaps,numeralAnchorsDecoded,phone,transitions,transcript,masterSha256:await sha256(files.master),renderPassed,releaseReady:Object.values(gates).every((value)=>value==="passed"),gates};}
 // Held-element stability. This is the gate V22 exists to add, and the reason it
 // is measured here rather than folded into measureV22Motion is that the motion
 // path decodes at 180x320/5fps: sub-pixel churn is averaged away before it can

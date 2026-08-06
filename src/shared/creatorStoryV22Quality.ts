@@ -267,6 +267,20 @@ export function auditV22BackdropCadence(scenes:Array<{id:string;backdrop:V22Back
 // V16 by contrast sat at 15 shots whose boundaries collapsed above threshold 0.2.
 export const V22_SHOT_BANDS={decodedShotCount:[13,20],meanShotSeconds:[1.7,2.7],medianShotSeconds:[1.4,2.4]} as const;
 
+// Deriving scene boundaries from realized beat starts allocates screen time by
+// speech alone, and the authored scene lengths were never proportional to how
+// long their lines actually take to say: `result` collapsed to 17 frames (0.57s)
+// and `sting` to 18. Measured on the available reference files with the repo's
+// own detector (scene>0.10), the shortest real shots are 0.60s and 0.83s --
+// their sub-0.1s "shots" are double-detections on a single hard cut, not shots.
+// 30 frames sits inside both distributions rather than below them.
+export const V22_MIN_SCENE_FRAMES=30;
+
+export function auditV22SceneDurations(scenes:Array<{id:string;from:number;to:number}>,minimum=V22_MIN_SCENE_FRAMES){
+  const short=scenes.filter((scene)=>scene.to-scene.from<minimum).map((scene)=>({id:scene.id,frames:scene.to-scene.from,seconds:Number(((scene.to-scene.from)/30).toFixed(2))}));
+  return {passed:short.length===0,minimumFrames:minimum,shortestFrames:scenes.reduce((low,scene)=>Math.min(low,scene.to-scene.from),Number.POSITIVE_INFINITY),short};
+}
+
 export function evaluateV22ShotBands(shots:{count:number;meanSeconds:number;medianSeconds:number}){
   const checks=[
     {metric:"decodedShotCount",value:shots.count,low:V22_SHOT_BANDS.decodedShotCount[0],high:V22_SHOT_BANDS.decodedShotCount[1]},

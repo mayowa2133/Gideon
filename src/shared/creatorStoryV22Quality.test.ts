@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditV22BannedStrings, auditV22CompositionSimilarity, auditV22Cta, auditV22MascotPlacement, auditV22PhoneScale, auditV22RenderedBounds, auditV22StoryConsistency, auditV22Transitions, evaluateV22MotionBands, mascotBoxForScene } from "./creatorStoryV22Quality";
+import { auditV22BannedStrings, auditV22CompositionSimilarity, auditV22Cta, auditV22MascotPlacement, auditV22PhoneScale, auditV22RenderedBounds, auditV22StoryConsistency, auditV22Transitions, evaluateV22MotionBands, mascotBoxForScene,auditV22SceneDurations} from "./creatorStoryV22Quality";
 import { compileSolomonV22DemoContent } from "./solomonDemoContentV22";
 
 const content=compileSolomonV22DemoContent();
@@ -68,5 +68,20 @@ describe("V22 mascot placement",()=>{
     const audit=auditV22MascotPlacement([{id:"b",layout:[{id:"product",kind:"product",left:.1,top:.2,right:.9,bottom:.7}],mascotRole:"cameo_right"}]);
     expect(audit.passed).toBe(false);
     expect(audit.failures[0]).toContain("mascot_rect_missing");
+  });
+});
+
+describe("auditV22SceneDurations",()=>{
+  it("passes when every scene meets the minimum dwell",()=>{
+    const audit=auditV22SceneDurations([{id:"a",from:0,to:30},{id:"b",from:30,to:90}]);
+    expect(audit.passed).toBe(true);
+    expect(audit.shortestFrames).toBe(30);
+  });
+  it("fails scenes too short to read, naming them",()=>{
+    // `result` at 17 frames is the case this exists for: 0.57s, below anything
+    // the reference films do once their sub-0.1s double-detections are excluded.
+    const audit=auditV22SceneDurations([{id:"payoff",from:0,to:60},{id:"result",from:60,to:77}]);
+    expect(audit.passed).toBe(false);
+    expect(audit.short).toEqual([{id:"result",frames:17,seconds:.57}]);
   });
 });
