@@ -14,7 +14,7 @@ import { evaluateV22HeldStability, measureV22HeldStability } from "./lib/creator
 
 const require=createRequire(import.meta.url);
 const {ChatterboxNarrationProvider}=require("../dist/main/main/chatterboxNarrationProvider.js");
-const {SOLOMON_CREATOR_STORY_V22_SCRIPT,SOLOMON_CREATOR_STORY_V22_TTS_BEATS,SOLOMON_CREATOR_STORY_V22_NUMERAL_ANCHORS,assertSolomonCreatorStoryV22Manifest,auditSolomonCreatorStoryV22,createSolomonCreatorStoryV22Manifest}=require("../dist/main/shared/solomonCreatorStoryV22.js");
+const {SOLOMON_CREATOR_STORY_V22_SCRIPT,SOLOMON_CREATOR_STORY_V22_TTS_BEATS,SOLOMON_CREATOR_STORY_V22_NUMERAL_ANCHORS,assertSolomonCreatorStoryV22Manifest,auditSolomonCreatorStoryV22,createSolomonCreatorStoryV22Manifest,v22SemanticEvents}=require("../dist/main/shared/solomonCreatorStoryV22.js");
 const {V22_PRODUCT_STILLS,v22ProductStillFile,auditV22BannedStrings,auditV22Layout,auditV22PhoneScale,auditV22RenderedBounds,evaluateV22MotionBands,evaluateV22ShotBands,mascotBoxForScene}=require("../dist/main/shared/creatorStoryV22Quality.js");
 // Hoisted: qualityAudit runs at module top level, so anything it reaches must be
 // initialized before that await rather than merely declared later in the file.
@@ -50,6 +50,7 @@ for(const source of manifest.sources){if(!existsSync(source.sourcePath))throw ne
 await extractProofs();
 await extractProductStills();
 const narration=await generateNarration();
+manifest=hydrateSceneTimings(manifest,narration);
 manifest=hydrateCaptionTimings(manifest,narration);
 manifest=await alignCaptionsToSpokenWords(manifest,path.join(publicDir,"narration.wav"));
 assertSolomonCreatorStoryV22Manifest(manifest);
@@ -187,6 +188,99 @@ async function assembleNarration(result,target){
 // anchors, so no OCR/composite gate frame shifts. The visual beats are therefore
 // still keyed to the authored timeline, which remains the deeper issue -- see
 // docs/creator-story-v22-delivery.md.
+// Place the visuals on the words, by deriving every scene boundary from the beat
+// that was actually spoken there.
+//
+// Captions were fixed earlier by aligning them to the audio, but the SCENES were
+// left on hand-authored anchors, so a shot could sit seconds away from the sentence
+// it illustrates: worst beat drift measured 3682ms. Scaling the anchors did not help
+// and could not — beats are packed cumulatively from measured durations, so drift
+// accumulates independently of where an anchor sits, and moving both sides together
+// never aligns them.
+//
+// This maps each boundary through the same piecewise-linear declared -> realized
+// transform used for captions. Scene frames are first converted back to the authored
+// 1080-frame timeline (they were scaled by 1155/1080 when the film lengthened), so
+// the lookup matches the beats' declared milliseconds.
+//
+// Boundaries are mapped ONCE and shared between neighbours, which is what keeps
+// scenes contiguous; the final boundary is pinned to the film length so the timeline
+// still terminates exactly. Everything derived from a scene's frames — its semantic
+// events, its mascot plan's gesture and blink timings — is rescaled by the same
+// ratio, or the rig would gesture against a window that no longer exists.
+// Sample points follow the scenes rather than sitting at hand-authored absolute
+// frames. The old list ([38,50,76,116,320,...]) was chosen against a timeline
+// that no longer exists: once scene boundaries were derived from the realized
+// beats, frame 320 moved from `role` into `collapse` and the evidence those
+// frames were meant to capture simply was not on screen, dropping required-text
+// coverage to 0.60 and failing phoneScale with it. Settling past the post-cut
+// slide and before the outgoing transition keeps each sample on held content.
+function sceneSampleFrames(){
+  return manifest.scenes.map((scene)=>{
+    const length=scene.to-scene.from;
+    const offset=Math.min(Math.max(10,Math.floor(length*.55)),Math.max(1,length-3));
+    return Math.min(scene.to-1,scene.from+offset);
+  });
+}
+
+function hydrateSceneTimings(input,narration){
+  const realized=narration.realizedTimings;
+  if(!realized||!Array.isArray(realized.timings)||realized.timings.length===0)throw new Error("V22 scene hydration: narration has no realized timings");
+  const declared=new Map(narration.beats.map((beat)=>[beat.id,beat]));
+  const beats=realized.timings.map((t)=>{const d=declared.get(t.id);return{...t,declStartMs:d?d.startMs:t.targetStartMs};}).sort((a,b)=>a.declStartMs-b.declStartMs);
+  // Piecewise breakpoints: authored beat start -> realized beat start.
+  const points=beats.map((b)=>({from:b.declStartMs,to:b.startMs}));
+  points.push({from:FILM_FRAMES/30*1000,to:FILM_FRAMES/30*1000});
+  const mapMs=(ms)=>{
+    if(ms<=points[0].from)return points[0].to*(ms/Math.max(1,points[0].from||1));
+    for(let i=1;i<points.length;i+=1){
+      if(ms<=points[i].from){
+        const a=points[i-1],b=points[i];
+        const span=b.from-a.from;
+        return a.to+(span<=0?0:(ms-a.from)/span*(b.to-a.to));
+      }
+    }
+    return points[points.length-1].to;
+  };
+  // Scene frames and the beats' declared startMs are on the same timeline: a beat
+  // takes its declared start from the scene it belongs to, so `friction` declares
+  // 4700ms and its scene starts at frame 141, which is 4700ms. No rescaling.
+  const mapFrame=(frame)=>Math.max(0,Math.min(FILM_FRAMES,Math.round(mapMs(frame/30*1000)/1000*30)));
+  // One mapped value per distinct boundary keeps scenes touching.
+  const boundaries=new Map();
+  for(const scene of input.scenes){for(const f of [scene.from,scene.to])if(!boundaries.has(f))boundaries.set(f,mapFrame(f));}
+  const sorted=[...boundaries.keys()].sort((a,b)=>a-b);
+  let previous=-1;
+  for(const key of sorted){
+    let value=boundaries.get(key);
+    if(value<=previous)value=previous+1;           // strictly increasing
+    boundaries.set(key,value);previous=value;
+  }
+  boundaries.set(sorted[0],0);
+  boundaries.set(sorted[sorted.length-1],FILM_FRAMES);
+  const B=(f)=>boundaries.has(f)?boundaries.get(f):mapFrame(f);
+  const scenes=input.scenes.map((scene)=>{
+    const from=B(scene.from),to=Math.max(from+1,B(scene.to));
+    const oldLength=Math.max(1,scene.to-scene.from),ratio=(to-from)/oldLength;
+    const t=(v)=>Math.max(0,Math.round(v*ratio));
+    const timing=(x)=>({...x,start:t(x.start),peak:t(x.peak),recover:t(x.recover)});
+    return{...scene,from,to,groupFrom:B(scene.groupFrom),
+      // Regenerated, not rescaled: these are an every-18-frames ledger, so a
+      // stretched scene needs more markers, not the same ones spread thinner.
+      semanticEvents:v22SemanticEvents(from,to,scene.id),
+      mascot:{...scene.mascot,
+        left:{...scene.mascot.left,timing:timing(scene.mascot.left.timing)},
+        right:{...scene.mascot.right,timing:timing(scene.mascot.right.timing)},
+        blinkFrames:scene.mascot.blinkFrames.map(t),
+        head:{...scene.mascot.head,beats:scene.mascot.head.beats.map(t)},
+        gazePath:scene.mascot.gazePath.map((g)=>({...g,frame:t(g.frame)})),
+        audioFrames:scene.mascot.audioFrames.map((a)=>({...a,frame:t(a.frame)})),
+        faceAccents:(scene.mascot.faceAccents??[]).map((a)=>({...a,atFrame:t(a.atFrame)}))}};
+  });
+  const claims=input.claims.map((claim)=>({...claim,actionFrame:mapFrame(claim.actionFrame),resultFrame:mapFrame(claim.resultFrame)}));
+  return{...input,scenes,claims};
+}
+
 function hydrateCaptionTimings(input,narration){
   const realized=narration.realizedTimings;
   if(!realized||!Array.isArray(realized.timings)||realized.timings.length===0)throw new Error("V22 caption hydration: narration has no realized timings");
@@ -306,7 +400,20 @@ async function narrationGapAudit(){
 }
 async function writePlanning(narration,soundDesign){const audit=auditSolomonCreatorStoryV22(manifest),lineage={...captureReceipt,sources:manifest.sources.map((source)=>({id:source.id,path:source.sourcePath,sha256:source.sourceSha256,verifiedInterval:source.verifiedInterval,domEvidence:source.domEvidence,claims:manifest.claims.filter(({assetIds})=>assetIds.includes(source.id)).map(({id})=>id)}))};await Promise.all([writeJson(path.join(output,"story-manifest.json"),manifest),writeJson(path.join(output,"creative-director-contract.json"),manifest.creativeDirector),writeJson(path.join(output,"storyboard.json"),{frameCount:1080,scenes:manifest.scenes,captions:manifest.captions}),writeJson(path.join(reportsDir,"manifest-audit.json"),audit),writeJson(path.join(reportsDir,"mascot-geometry-report.json"),{passed:true,geometry:manifest.mascotGeometry}),writeJson(path.join(reportsDir,"mascot-performance-plan.json"),audit.mascot),writeJson(path.join(reportsDir,"claim-evidence-matrix.json"),{passed:true,claims:manifest.claims}),writeJson(path.join(reportsDir,"source-privacy-lineage.json"),lineage),writeJson(path.join(reportsDir,"distribution-objective.json"),manifest.distributionObjective),writeJson(path.join(reportsDir,"narration-plan.json"),narration),writeJson(path.join(reportsDir,"semantic-audio-plan.json"),soundDesign),fs.writeFile(path.join(output,"script.txt"),`${SOLOMON_CREATOR_STORY_V22_SCRIPT}\n`),fs.writeFile(path.join(output,"reproduce.txt"),"pnpm creator-story:v22:capture\npnpm creator-story:v22:solomon\npnpm creator-story:v22:compare\n")]);}
 async function generateCandidates(master){const clips=[{id:"hook",start:0,duration:4.4},{id:"contact-reveal",start:1.8,duration:2.6},{id:"signature-mechanism",start:14,duration:5.5},{id:"payoff",start:27.5,duration:4.5},{id:"cta",start:32,duration:4}];for(const item of clips)await clip(master,path.join(candidatesDir,`${item.id}-candidate.mp4`),item.start,item.duration,360,640);await writeJson(path.join(candidatesDir,"candidate-manifest.json"),{schemaVersion:"10.1",sourceMaster:master,clips,humanReviewRequired:true});}
-async function generateReview(master){const filters={"contact-sheet-1fps.jpg":"fps=1,scale=180:320,tile=6x6","contact-sheet-half-second.jpg":"fps=2,scale=120:213,tile=12x6","opening-quarter-second.jpg":"fps=4,select='lt(t,4.5)',scale=180:320,tile=6x3","scene-boundary-strip.jpg":`select='${manifest.scenes.map(({from})=>`eq(n,${from})`).join("+")}',scale=180:320,tile=${Math.ceil(Math.sqrt(manifest.scenes.length))}x${Math.ceil(manifest.scenes.length/Math.ceil(Math.sqrt(manifest.scenes.length)))}`,"phone-readability-strip.jpg":"select='eq(n,74)+eq(n,116)+eq(n,320)+eq(n,600)+eq(n,690)+eq(n,790)+eq(n,885)+eq(n,940)+eq(n,1010)',scale=360:640,tile=9x1","face-expression-strip.jpg":"select='eq(n,12)+eq(n,38)+eq(n,76)+eq(n,116)+eq(n,146)+eq(n,210)+eq(n,380)+eq(n,690)+eq(n,770)+eq(n,942)+eq(n,1010)+eq(n,1068)',scale=180:320,tile=6x2","gesture-comparison-strip.jpg":"select='eq(n,16)+eq(n,44)+eq(n,82)+eq(n,122)+eq(n,150)+eq(n,220)+eq(n,274)+eq(n,330)+eq(n,390)+eq(n,520)+eq(n,785)+eq(n,944)+eq(n,1012)+eq(n,1068)',scale=180:320,tile=7x2","product-proof-strip.jpg":"select='eq(n,38)+eq(n,76)+eq(n,116)+eq(n,320)+eq(n,390)+eq(n,510)+eq(n,610)+eq(n,690)+eq(n,790)+eq(n,885)+eq(n,940)',scale=180:320,tile=6x2","payoff-cta-strip.jpg":"select='eq(n,830)+eq(n,855)+eq(n,880)+eq(n,905)+eq(n,935)+eq(n,970)+eq(n,1005)+eq(n,1035)+eq(n,1068)',scale=180:320,tile=9x1"};for(const[filename,filter]of Object.entries(filters))await run("ffmpeg",["-y","-i",master,"-vf",filter,"-vsync","0","-frames:v","1",path.join(reviewDir,filename)],600000);for(const frame of[12,38,50,76,116,146,210,274,320,390,510,610,690,790,840,885,920,942,970,1010,1040,1068])await extractFrame(master,frame,path.join(reviewDir,`frame-${String(frame).padStart(4,"0")}.png`));}
+async function generateReview(master){const filters={"contact-sheet-1fps.jpg":"fps=1,scale=180:320,tile=6x6","contact-sheet-half-second.jpg":"fps=2,scale=120:213,tile=12x6","opening-quarter-second.jpg":"fps=4,select='lt(t,4.5)',scale=180:320,tile=6x3","scene-boundary-strip.jpg":`select='${manifest.scenes.map(({from})=>`eq(n,${from})`).join("+")}',scale=180:320,tile=${Math.ceil(Math.sqrt(manifest.scenes.length))}x${Math.ceil(manifest.scenes.length/Math.ceil(Math.sqrt(manifest.scenes.length)))}`,"phone-readability-strip.jpg":strip(sampleFor((scene)=>scene.layout.some(({kind})=>kind==="product")),"360:640"),"face-expression-strip.jpg":strip(sampleFor((scene)=>scene.mascot.role!=="absent"),"180:320"),"gesture-comparison-strip.jpg":strip(sampleFor((scene)=>scene.mascot.role!=="absent"),"180:320"),"product-proof-strip.jpg":strip(sampleFor((scene)=>scene.claimIds.length>0||scene.layout.some(({kind})=>kind==="product")),"180:320"),"payoff-cta-strip.jpg":strip(sampleFor((scene)=>["payoff","result","cta","sting"].includes(scene.id)),"180:320")};for(const[filename,filter]of Object.entries(filters))await run("ffmpeg",["-y","-i",master,"-vf",filter,"-vsync","0","-frames:v","1",path.join(reviewDir,filename)],600000);for(const frame of sceneSampleFrames())await extractFrame(master,frame,path.join(reviewDir,`frame-${String(frame).padStart(4,"0")}.png`));}
+
+// Review strips are built from the scenes they are meant to show, for the same
+// reason the OCR samples are: absolute frame lists silently point at the wrong
+// content the moment a boundary moves, and these strips are what on-frame checks
+// are read from -- a stale one hides the defect it exists to reveal.
+function sampleFor(predicate){
+  const frames=sceneSampleFrames();
+  return manifest.scenes.map((scene,index)=>({scene,frame:frames[index]})).filter(({scene})=>predicate(scene)).map(({frame})=>frame);
+}
+function strip(frames,scale){
+  const columns=Math.min(frames.length,Math.ceil(Math.sqrt(frames.length*2)));
+  return `select='${frames.map((frame)=>`eq(n,${frame})`).join("+")}',scale=${scale},tile=${columns}x${Math.ceil(frames.length/columns)}`;
+}
 async function qualityAudit(files){const decoded=await measureDecodedMedia(files.master),sections=[{id:"opening",fromSeconds:0,toSeconds:4.4},{id:"mechanism",fromSeconds:14,toSeconds:24.5},{id:"payoff",fromSeconds:27.5,toSeconds:32},{id:"cta",fromSeconds:32,toSeconds:FILM_SECONDS}],motion=await measureV22Motion(files.master,sections),ocr=await ocrAudit(files.master),composite=await compositeAudit(files.master),layout=layoutAudit(),bounds=auditV22RenderedBounds(manifest.scenes.map((scene)=>({id:scene.id,layout:scene.layout,camera:scene.camera,mascotRole:scene.mascot.role}))),mascot=await mascotAudit(),mascotBoundaries=await mascotBoundaryContinuityAudit(),phone=phoneAudit(ocr,mascot),transitions=transitionAudit(motion),motionBands=evaluateV22MotionBands(motion),shotBands=evaluateV22ShotBands(decoded.shots),transcript=await narrationAudit(files.master,files.narration),metadata=decoded.metadata,manifestAudit=auditSolomonCreatorStoryV22(manifest),narrationGaps=await narrationGapAudit(),numeralAnchorsDecoded=await numeralAnchorAudit(),heldStability=await heldStabilityAudit(files.master),captionSync=auditCaptionSync(transcript),baseline=JSON.parse(await fs.readFile(path.join(output,"baseline","v21-authoritative-baseline.json"),"utf8"));
   const gates={fullDecode:"passed",metadata:metadata.width===1080&&metadata.height===1920&&metadata.frameRate==="30/1"&&Math.abs(metadata.durationSeconds-FILM_SECONDS)<.08?"passed":"failed",color:metadata.pixelFormat==="yuv420p"&&metadata.colorRange==="tv"&&metadata.colorSpace==="bt709"?"passed":"failed",sourceHashes:manifest.sources.every((source)=>captureReceipt.captures.some((capture)=>capture.id===source.id&&capture.sha256===source.sourceSha256))?"passed":"failed",manifest:manifestAudit.passed?"passed":"failed",storyConsistency:manifestAudit.story.passed?"passed":"failed",captionLints:manifestAudit.captionLints.passed?"passed":"failed",numeralAnchorsStatic:manifestAudit.numeralAnchors.passed?"passed":"failed",numeralAnchorsSpoken:numeralAnchorsDecoded.passed?"passed":"failed",narrationGaps:narrationGaps.passed?"passed":"failed",captionSync:captionSync.passed?"passed":"failed",bannedStrings:ocr.banned.passed?"passed":"failed",singleDisclosure:ocr.singleDisclosurePassed?"passed":"failed",requiredOcr:ocr.requiredCoverage>=.9?"passed":"failed",composite:composite.passed?"passed":"failed",phoneScale:phone.passed?"passed":"failed",motionBands:motionBands.passed?"passed":"failed",heldStability:heldStability.evaluation.passed?"passed":"failed",shotDensity:shotBands.passed?"passed":"failed",renderedBounds:bounds.passed?"passed":"failed",transitions:transitions.passed?"passed":"failed",layout:layout.passed?"passed":"failed",mascotPerception:mascot.passed?"passed":"failed",mascotBoundaryContinuity:mascotBoundaries.passed?"passed":"failed",loudness:decoded.loudness.integratedLufs>=-14.5&&decoded.loudness.integratedLufs<=-13.5&&decoded.loudness.truePeakDbtp<=-1?"passed":"failed",clicks:decoded.audioActivity.clickCount===0?"passed":"failed",exactNarration:transcript.passed?"passed":"failed",safeCta:manifestAudit.cta.passed?"passed":"failed",ctaDeliveryApproval:"blocked_external_confirmation",v1ToV21Isolation:"passed",publicSourceApproval:"blocked_external_confirmation",humanMascotAppeal:"blocked_external_confirmation",humanVoiceApproval:"blocked_external_confirmation",humanMessageApproval:"blocked_external_confirmation",physicalPhoneApproval:"blocked_external_confirmation",proofCredibilityApproval:"blocked_external_confirmation",disclosureApproval:"blocked_external_confirmation",ctaApproval:"blocked_external_confirmation",brandLegalApproval:"blocked_external_confirmation",syntheticPresenterDisclosure:"blocked_external_confirmation",overallReferenceQuality:"blocked_external_confirmation"};
   const external=new Set(Object.keys(gates).filter((key)=>gates[key]==="blocked_external_confirmation")),renderPassed=Object.entries(gates).filter(([key])=>!external.has(key)).every(([,value])=>value==="passed");return{schemaVersion:"10.1",...files,decoded,motion,motionBands,shotBands,heldStability,captionSync,bounds,ocr,composite,layout,mascot,mascotBoundaries,narrationGaps,numeralAnchorsDecoded,phone,transitions,transcript,masterSha256:await sha256(files.master),renderPassed,releaseReady:Object.values(gates).every((value)=>value==="passed"),gates};}
@@ -353,7 +460,7 @@ async function heldStabilityAudit(master){
 }
 
 
-async function ocrAudit(master){const sampleFrames=[38,50,76,116,320,390,510,610,690,790,885,920,942,1010,1068],rows=[];for(const frame of sampleFrames){const target=path.join(reviewDir,`ocr-${String(frame).padStart(4,"0")}.png`);await extractFrame(master,frame,target,"scale=2160:3840:flags=lanczos");rows.push({frame,text:await tesseract(target,11)});}const joined=rows.map(({text})=>text).join("\n"),banned=auditV22BannedStrings(joined,"DEMO DATA"),privatePatterns=[/preshoth/i,/paramalingam/i,/lyndon\s+zhong/i,/vihang\s+m/i,/faire/i,/demo[_ ]fixture/i,/no model was called/i],privateMatches=privatePatterns.filter((pattern)=>pattern.test(joined)).map(String),required=["interviewing","avery","senior technical recruiter","northstar","product engineer","technical hiring","save edit","cancel","not sent","connected next step"],recognized=required.filter((value)=>fuzzyContains(joined,value));const disclosuresPerFrame=rows.map(({frame,text})=>({frame,count:text.match(/demo\s+data/gi)?.length??0})),singleDisclosurePassed=disclosuresPerFrame.every(({count})=>count<=1)&&disclosuresPerFrame.some(({count})=>count===1);await fs.writeFile(path.join(reportsDir,"ocr-final-master-transcript.txt"),rows.map(({frame,text})=>`## frame ${frame}\n${text}`).join("\n\n"));return{schemaVersion:"10.1",method:"OCR on 2× exact decoded final-master frames; disclosure is counted per frame/region, not accumulated over time.",rows,banned,privateMatches,required,recognized,requiredCoverage:recognized.length/required.length,disclosuresPerFrame,singleDisclosurePassed,passed:banned.passed&&privateMatches.length===0&&recognized.length/required.length>=.9&&singleDisclosurePassed};}
+async function ocrAudit(master){const sampleFrames=sceneSampleFrames(),rows=[];for(const frame of sampleFrames){const target=path.join(reviewDir,`ocr-${String(frame).padStart(4,"0")}.png`);await extractFrame(master,frame,target,"scale=2160:3840:flags=lanczos");rows.push({frame,text:await tesseract(target,11)});}const joined=rows.map(({text})=>text).join("\n"),banned=auditV22BannedStrings(joined,"DEMO DATA"),privatePatterns=[/preshoth/i,/paramalingam/i,/lyndon\s+zhong/i,/vihang\s+m/i,/faire/i,/demo[_ ]fixture/i,/no model was called/i],privateMatches=privatePatterns.filter((pattern)=>pattern.test(joined)).map(String),required=["interviewing","avery","senior technical recruiter","northstar","product engineer","technical hiring","save edit","cancel","not sent","connected next step"],recognized=required.filter((value)=>fuzzyContains(joined,value));const disclosuresPerFrame=rows.map(({frame,text})=>({frame,count:text.match(/demo\s+data/gi)?.length??0})),singleDisclosurePassed=disclosuresPerFrame.every(({count})=>count<=1)&&disclosuresPerFrame.some(({count})=>count===1);await fs.writeFile(path.join(reportsDir,"ocr-final-master-transcript.txt"),rows.map(({frame,text})=>`## frame ${frame}\n${text}`).join("\n\n"));return{schemaVersion:"10.1",method:"OCR on 2× exact decoded final-master frames; disclosure is counted per frame/region, not accumulated over time.",rows,banned,privateMatches,required,recognized,requiredCoverage:recognized.length/required.length,disclosuresPerFrame,singleDisclosurePassed,passed:banned.passed&&privateMatches.length===0&&recognized.length/required.length>=.9&&singleDisclosurePassed};}
 async function compositeAudit(master){const rows=[];for(const claim of manifest.claims){const frame=claim.resultFrame,target=path.join(reviewDir,`composite-${claim.id}-${frame}.png`);await extractFrame(master,frame,target,"scale=2160:3840:flags=lanczos");const text=[await tesseract(target,3),await tesseract(target,11),await tesseract(target,12)].join("\n"),observed=claim.requiredReadableText.filter((value)=>fuzzyContains(text,value));rows.push({claimId:claim.id,frame,required:claim.requiredReadableText,observed,coverage:observed.length/claim.requiredReadableText.length,emptyHighlight:false,messageStartsAtBeginning:claim.id!=="draft"||fuzzyContains(text,"Hi Avery"),heroZeroContradiction:false,proofOccluded:false,text});}return{schemaVersion:"10.1",method:"Claim result frames decoded from the exact final master, enlarged 2×, OCRed with automatic-page plus two sparse-text layouts, and checked for required text, message start, empty highlights, zero contradictions, and proof occlusion.",rows,passed:rows.every((row)=>row.coverage>=.75&&!row.emptyHighlight&&row.messageStartsAtBeginning&&!row.heroZeroContradiction&&!row.proofOccluded),requiredCoverage:rows.reduce((sum,row)=>sum+row.observed.length,0)/rows.reduce((sum,row)=>sum+row.required.length,0)};}
 function layoutAudit(){const scenes=manifest.scenes.map((scene)=>({sceneId:scene.id,...auditV22Layout(scene.layout)})),collisions=scenes.flatMap((scene)=>scene.collisions.map((collision)=>({...collision,sceneId:scene.sceneId})));return{schemaVersion:"10.1",method:"Declared final-canvas rectangles plus decoded review strips use the V22 forbidden-pair matrix.",scenes,collisions,collisionCount:collisions.length,passed:scenes.every(({passed})=>passed)};}
 // The mascot is a persistent layer in V22: it slides between scene anchors and

@@ -3,6 +3,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { analyzeHoisting } from "./check-render-script-hoisting.mjs";
 
 const rootDir = path.resolve(process.env.GIDEON_LINT_ROOT?.trim() || process.cwd());
 const errors = [];
@@ -40,6 +41,7 @@ checkTrackedPathPolicy(files);
 checkTextFilePolicy(files);
 checkCompletionEstimateSync();
 checkPackageContract();
+checkRenderScriptHoisting();
 
 if (errors.length > 0) {
   console.error("Repository lint failed:");
@@ -60,6 +62,21 @@ if (warnings.length > 0) {
   console.log("Warnings:");
   for (const warning of warnings) {
     console.log(`- ${warning}`);
+  }
+}
+
+// The creator-story render scripts execute at module top level, so a constant
+// declared beside the function that reads it is still in its temporal dead zone
+// when top-level code calls that function. Four renders have died this way; the
+// note in the render script asking for hoisting was never enforced until now.
+function checkRenderScriptHoisting() {
+  const scriptsDir = path.join(rootDir, "scripts");
+  if (!fs.existsSync(scriptsDir)) return;   // lint also runs against fixture roots
+  for (const name of fs.readdirSync(scriptsDir)) {
+    if (!/^render-solomon-creator-story-v\d+\.mjs$/.test(name)) continue;
+    for (const violation of analyzeHoisting(fs.readFileSync(path.join(scriptsDir, name), "utf8"))) {
+      errors.push(`scripts/${name}:${violation.line} reads '${violation.binding}' ${violation.via}, but it is declared at line ${violation.declaredAt} (temporal dead zone). Hoist it above the top-level code.`);
+    }
   }
 }
 
