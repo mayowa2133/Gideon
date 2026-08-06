@@ -4,7 +4,7 @@ V21 solved stability. This pass measured everything else against the three
 reference creator videos and attacked the two largest compositional gaps: colour
 and presenter scale.
 
-**Status: partial.** The palette work landed and two of three colour metrics are
+**Status: partial, and the latest commit does not pass all gates — see the crop-region section.** The palette work landed and two of three colour metrics are
 now inside the reference range. The presenter work is half done, and the reason
 is a measured structural limit worth recording. Phases 4 (content density, deeper
 darks, freer type) and 5 (palette/presenter gates) are not done.
@@ -192,6 +192,45 @@ around fewer, larger elements.
 The chrome reductions are kept on their own merits (less visual noise, cleaner
 chips). The zoom finding is recorded at the `PRODUCT_FOCUS_SCALE` constant so it is
 not retried.
+
+
+## Per-usage crop regions — refactor landed, with a known regression
+
+`Crop` now means **region of interest** — the part of the recording that carries the
+proof — and `fitRegionToCard` derives the actual framing from whatever card it is
+drawn into, expanding the region to that card's aspect, centred and clamped to the
+source.
+
+**Why it was needed.** `EvidenceCrop` scales with `max()` to cover the card, so
+whenever a region's aspect did not match the card's, the surplus was silently cut on
+the tighter axis. The same region is drawn at wildly different aspects —
+`trackerAfter` at 5.5:1 in a strip and 1.6:1 in a card, `message` at 1.18:1 and
+1.88:1 — so no single rect could serve them. The old values were not well-framed;
+they merely carried enough slack to hide the mismatch, which is why tightening them
+clipped words mid-character.
+
+Fitting to the card makes cover and contain identical, so **clipping is now
+structurally impossible**. Containment was verified arithmetically across all twelve
+usages before rendering. One usage genuinely cannot be fitted — a 5.5:1 strip cannot
+hold a 1.8:1 region — so `trackerAfterStrip` is authored wide and short to match the
+shape it is drawn into. It is the only per-usage region required.
+
+**Result:** claim coverage 1.00, OCR 1.00, phone scale passing, no clipped proof.
+Edge density 7.42 → 7.30.
+
+**Known regression, not yet fixed.** `shotDensity` is **29** against a band of
+[13,20]; the render does not pass. Containment has a cost: to guarantee a region
+fits, the fitter grows it, so several cards now show more surrounding application —
+and that extra UI carries its own animation, which the scene detector counts. This
+is outside the 19–22 range that identical code produces run to run, so it is a real
+effect and not the gate's noise.
+
+The fix is tight per-usage regions, which the refactor now makes safe to author
+(the fitter only ever grows a region, so a tight one cannot clip). It is not
+automatic: a tighter region can frame a busier part of the app. A wide region for
+the 790×470 role card was tried and reverted for exactly that reason — it took
+detected shots from 22 to 29 on its own. Each region needs a render to check what it
+newly exposes.
 
 ## Not done
 
