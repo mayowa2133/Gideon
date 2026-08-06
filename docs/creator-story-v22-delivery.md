@@ -4,7 +4,7 @@ V21 solved stability. This pass measured everything else against the three
 reference creator videos and attacked the two largest compositional gaps: colour
 and presenter scale.
 
-**Status: partial.** All 29 gates pass. The palette work landed and two of three colour metrics are
+**Status: partial.** Gate results are not currently reproducible — see the shotDensity section. The palette work landed and two of three colour metrics are
 now inside the reference range. The presenter work is half done, and the reason
 is a measured structural limit worth recording. Phases 4 (content density, deeper
 darks, freer type) and 5 (palette/presenter gates) are not done.
@@ -194,47 +194,43 @@ chips). The zoom finding is recorded at the `PRODUCT_FOCUS_SCALE` constant so it
 not retried.
 
 
-## Shot density — diagnosed by evidence, after three wrong guesses
+## shotDensity is not trustworthy: the render is nondeterministic
 
-The `split` layout regressed `shotDensity`. Renders came back at 19, 22, 25 and 29
-across changes, and I attributed the movement to whatever I had just edited —
-crop framing, then video playback, then Remotion decode nondeterminism. I wrote in
-an earlier commit that 29 was "a real effect rather than the gate's noise" and that
-the gate "is not reproducible." **Both statements were wrong**, and neither was
-tested before being asserted.
+**This supersedes two earlier claims in this document and in commit messages
+`5ec762d` and `25159dc`.** I asserted the gate was unreproducible, then asserted the
+opposite, then found the first was right. The record, from *byte-identical* code at
+commit `25159dc` with a clean working tree:
 
-The actual diagnosis took one measurement: diff the frames either side of each
-phantom cut on a 4×6 grid and see where the pixels move.
+| run | shots |
+|---|---:|
+| 1 | 19 |
+| 2 | 19 (cut list byte-identical to run 1) |
+| 3 | **33** |
 
-```
-cut at 13.30s — per-region mean abs delta (4 cols × 6 rows)
-    0   0   0   0
-    0   0   0   0
-    0   0   0   0
-    0   8   9   0
-    0  76  72   0
-    0 103 101   0
-```
+A provably no-op refactor of the same code rendered 28. The render already uses
+`concurrency: 1` and pins product clips to a single frame, so neither parallelism
+nor clip playback explains it. The remaining suspect is asynchronous video decode in
+headless Chrome: fifteen `<Video>` elements are being sampled per frame, and under
+different machine load the decoder can deliver a neighbouring source frame.
 
-Every phantom cut is in the bottom-centre — exactly where the rig sits in the split
-layout — and zero everywhere else. Cross-checked against the manifest, all of them
-land inside an active limb window.
+**Consequences, stated plainly.**
 
-**The gestures were reading as edits.** The reach offsets in `gestureTarget` were
-tuned when the mascot was a 7.2% corner cameo. V22 puts it at 14%, which doubles the
-absolute pixels an arm sweeps for the same relative reach, and a sweep that large
-crosses ffmpeg's 0.10 scene threshold. Nothing to do with crops, playback or
-decoding.
+- `shotDensity` cannot be used as a pass/fail gate in its present form. A green
+  result is a draw from a distribution, not a verdict.
+- Every attribution of a shot-count change in this version is unreliable, including
+  ones I put in commit messages: the `EvidenceCrop` un-zoom "restoring 19 shots",
+  caption-span tightening "24 → 19", the `fitRegionToCard` refactor "causing 29", and
+  the gesture-reach fix "29 → 19".
+- The gesture-reach fix is still justified, but by the evidence that actually
+  supports it — a 4×6 region diff showing every phantom cut confined to the
+  bottom-centre where the rig sits, inside an active limb window — and not by the
+  shot count that followed it.
 
-Damping reach to `GESTURE_REACH = 0.62` restores roughly the cameo's absolute
-motion. Duration is deliberately untouched: slowing the swing would change the
-performance, where shortening the travel only changes how far the hand goes.
-`mascotPerception` still passes, so the gestures remain legible as gestures.
-
-**Result: 19 shots, all 29 gates pass — and two consecutive renders produced
-byte-identical cut lists.** The metric was deterministic the whole time; the varying
-numbers were real responses to real changes that I mis-read as randomness because I
-never isolated *where* on the frame the change was.
+**The fix is to make the render deterministic, not to re-tune the gate.** Replace
+`<Video>` with `<Img>` over pre-extracted stills for the fourteen usages that do not
+declare `playback`, so those cards stop depending on decoder timing. Only the one
+usage that genuinely animates needs a video element. Until then, treat `shotDensity`
+as advisory and confirm any conclusion about it across repeated renders.
 
 ## Per-usage crop regions — refactor built, then reverted
 
