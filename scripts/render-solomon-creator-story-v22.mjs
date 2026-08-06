@@ -15,7 +15,7 @@ import { evaluateV22HeldStability, measureV22HeldStability } from "./lib/creator
 const require=createRequire(import.meta.url);
 const {ChatterboxNarrationProvider}=require("../dist/main/main/chatterboxNarrationProvider.js");
 const {SOLOMON_CREATOR_STORY_V22_SCRIPT,SOLOMON_CREATOR_STORY_V22_TTS_BEATS,SOLOMON_CREATOR_STORY_V22_NUMERAL_ANCHORS,assertSolomonCreatorStoryV22Manifest,auditSolomonCreatorStoryV22,createSolomonCreatorStoryV22Manifest}=require("../dist/main/shared/solomonCreatorStoryV22.js");
-const {auditV22BannedStrings,auditV22Layout,auditV22PhoneScale,auditV22RenderedBounds,evaluateV22MotionBands,evaluateV22ShotBands,mascotBoxForScene}=require("../dist/main/shared/creatorStoryV22Quality.js");
+const {V22_PRODUCT_STILLS,v22ProductStillFile,auditV22BannedStrings,auditV22Layout,auditV22PhoneScale,auditV22RenderedBounds,evaluateV22MotionBands,evaluateV22ShotBands,mascotBoxForScene}=require("../dist/main/shared/creatorStoryV22Quality.js");
 // Hoisted: qualityAudit runs at module top level, so anything it reaches must be
 // initialized before that await rather than merely declared later in the file.
 // NOTE: this script does all of its work at module top level, so every constant
@@ -40,6 +40,7 @@ let manifest=createSolomonCreatorStoryV22Manifest(inputs,parentHash);assertSolom
 for(const source of manifest.sources){if(!existsSync(source.sourcePath))throw new Error(`V22 source missing: ${source.sourcePath}`);if(await sha256(source.sourcePath)!==source.sourceSha256)throw new Error(`V22 source hash mismatch: ${source.id}`);}
 
 await extractProofs();
+await extractProductStills();
 const narration=await generateNarration();
 manifest=hydrateCaptionTimings(manifest,narration);
 manifest=await alignCaptionsToSpokenWords(manifest,path.join(publicDir,"narration.wav"));
@@ -67,6 +68,26 @@ process.stdout.write(`${JSON.stringify({master,masterSha256:qa.masterSha256,rend
 if(!qa.renderPassed)process.exitCode=1;
 
 async function extractProofs(){const names={tracker_before:"proof-tracker-before.mp4",tracker_after:"proof-tracker-after.mp4",opportunity:"proof-opportunity.mp4",contact:"proof-contact.mp4",outreach_blank:"proof-outreach-blank.mp4",outreach_complete:"proof-outreach-complete.mp4"};for(const source of manifest.sources)await run("ffmpeg",["-y","-i",source.sourcePath,"-vf","fps=30,format=yuv420p","-an","-c:v","libx264","-crf","11","-preset","slow","-movflags","+faststart",path.join(publicDir,names[source.id])],600000);}
+// Extracts one still per (asset, trim) the composition asks for.
+//
+// The composition renders product proof from these rather than from <Video>, because
+// fifteen decoding video elements made the render nondeterministic: byte-identical
+// code at 25159dc produced 19, 19 and then 33 shots, with concurrency already 1 and
+// playback already pinned. A PNG cannot decode differently between runs.
+//
+// Fails loudly if a still is missing rather than letting the composition fall back to
+// video, which would restore the nondeterminism silently.
+async function extractProductStills(){
+  const names={tracker_before:"proof-tracker-before.mp4",tracker_after:"proof-tracker-after.mp4",opportunity:"proof-opportunity.mp4",contact:"proof-contact.mp4",outreach_blank:"proof-outreach-blank.mp4",outreach_complete:"proof-outreach-complete.mp4"};
+  for(const {asset,trim} of V22_PRODUCT_STILLS){
+    const source=path.join(publicDir,names[asset]);
+    const target=path.join(publicDir,v22ProductStillFile(asset,trim));
+    await run("ffmpeg",["-y","-i",source,"-vf",`select='eq(n\\,${trim})'`,"-vsync","0","-frames:v","1",target],120000);
+    if(!existsSync(target))throw new Error(`V22 product still missing after extraction: ${asset}@${trim}`);
+  }
+  process.stdout.write(`Product stills: ${V22_PRODUCT_STILLS.length} extracted\n`);
+}
+
 async function generateNarration(){
   const runtimeOptions=[process.env.GIDEON_CHATTERBOX_RUNTIME,path.join(root,"tmp","chatterbox-runtime")].filter(Boolean),runtime=runtimeOptions.find((item)=>existsSync(path.join(item,".venv","bin","python")));
   if(!runtime)throw new Error("Chatterbox runtime is required for the V22 master.");

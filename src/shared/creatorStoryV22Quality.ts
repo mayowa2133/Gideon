@@ -368,3 +368,27 @@ export function evaluateV22MotionBands(motion:{nearStaticFramePercent:number;med
   return{passed:checks.every(({passed})=>passed),checks};
 }
 
+// Product proof is rendered from pre-extracted stills, not from live video.
+//
+// Fifteen <Video> elements were being sampled on every frame. Byte-identical code at
+// commit 25159dc rendered 19, 19 and then 33 shots, with concurrency already at 1 and
+// clip playback already pinned — asynchronous decode in headless Chrome hands back a
+// neighbouring source frame under different machine load, and that lands in the
+// master. It made shotDensity a draw from a distribution rather than a verdict, and
+// invalidated every shot-count attribution made in V22.
+//
+// A still cannot decode differently. Only the one usage that genuinely animates keeps
+// a video element.
+//
+// This list is the single source of truth: the render script extracts exactly these
+// frames into the Remotion public directory, and the composition resolves filenames
+// through v22ProductStillFile. Adding a crop trim without adding it here fails the
+// render loudly rather than silently falling back to video.
+export const V22_PRODUCT_STILLS=[
+  {asset:"tracker_before",trim:145},{asset:"tracker_after",trim:155},
+  {asset:"opportunity",trim:52},{asset:"opportunity",trim:142},
+  {asset:"contact",trim:130},{asset:"contact",trim:140},
+  {asset:"outreach_blank",trim:85},
+  {asset:"outreach_complete",trim:180},{asset:"outreach_complete",trim:75},{asset:"outreach_complete",trim:20},
+] as const;
+export function v22ProductStillFile(asset:string,trim:number){return `still-${asset}-${trim}.png`;}

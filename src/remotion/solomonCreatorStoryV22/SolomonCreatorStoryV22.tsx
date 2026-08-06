@@ -1,6 +1,7 @@
 import { Audio, Video } from "@remotion/media";
+import { Img } from "remotion";
 import { AbsoluteFill, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { V22_BACKDROPS, V22_TEXT_ZONES, v22CameraTransform } from "../../shared/creatorStoryV22Quality";
+import { V22_BACKDROPS, V22_TEXT_ZONES, v22CameraTransform, v22ProductStillFile } from "../../shared/creatorStoryV22Quality";
 import { SOLOMON_CREATOR_STORY_V22_HEADLINES, type SolomonCreatorStoryV22Manifest, type V22AssetId, type V22Caption, type V22Scene } from "../../shared/solomonCreatorStoryV22";
 import { MascotLayer } from "./MascotLayer";
 
@@ -57,26 +58,10 @@ const KineticHeadline:React.FC<{sceneId:string;accentColor:string;top:number;max
 const INK="#07111f", PAPER="#fbf8f0", WHITE="#fff", MINT="#39f2b5", GREEN="#087052", CORAL="#ff6f61", AMBER="#ff9d18";
 const FILES:Record<V22AssetId,string>={tracker_before:"proof-tracker-before.mp4",tracker_after:"proof-tracker-after.mp4",opportunity:"proof-opportunity.mp4",contact:"proof-contact.mp4",outreach_blank:"proof-outreach-blank.mp4",outreach_complete:"proof-outreach-complete.mp4"};
 type Crop={x:number;y:number;width:number;height:number;trim:number};
-// Product clips are pinned to a single frame unless a usage asks for playback.
-//
-// This is the fix for shotDensity, and for something worse than the gate failing:
-// the gate was NOT REPRODUCIBLE. Byte-identical code produced 19, 22 and 25 shots
-// across three renders. Every extra detection sat inside a scene holding a product
-// recording (contact, reason, signature_proof, grounded, payoff), and the reason is
-// that each card is a live window onto a screen capture playing at 0.35x. Remotion's
-// decode and seek do not land on the same source frame every run, and the captures
-// contain their own motion — cursors, scrolling, UI transitions — which crosses the
-// 0.10 scene threshold when it happens to be on screen.
-//
-// Holding the clips removes both the phantom cuts and the variance, because the
-// composition stops depending on which source frame a decoder chose. Nothing is lost:
-// 14 of 15 usages carry no narrative motion. Every state change the film asserts comes
-// from swapping assets (tracker_before -> tracker_after, outreach_blank ->
-// outreach_complete) or from our own chrome. The references show product stills too.
-//
-// Not zero because Remotion needs a positive rate; at this value a 110-frame scene
-// advances a hundredth of a source frame, so it is a still in practice.
-const PRODUCT_HOLD_RATE=0.0001;
+// Product proof renders from pre-extracted stills. See V22_PRODUCT_STILLS in
+// creatorStoryV22Quality for why: fifteen decoding <Video> elements made the render
+// nondeterministic, and byte-identical code produced 19, 19 and 33 shots. Only the
+// one usage declaring `playback` still mounts a video.
 const CROPS={
   trackerBefore:{x:72,y:178,width:560,height:310,trim:145},trackerAfter:{x:258,y:178,width:560,height:310,trim:155},trackerControl:{x:940,y:285,width:430,height:390,trim:105},
   opportunityHeader:{x:72,y:75,width:760,height:265,trim:52},opportunityPanel:{x:75,y:95,width:900,height:520,trim:142},
@@ -197,7 +182,15 @@ const Sting:React.FC<{scene:V22Scene}> = ({scene}) => {const frame=useCurrentFra
 // Closing edge density needs the scenes re-composed around fewer elements, not a
 // tighter window onto the same dense ones.
 const PRODUCT_FOCUS_SCALE=1.02;
-const EvidenceCrop:React.FC<{asset:V22AssetId;crop:Crop;width:number;height:number;playback?:boolean}> = ({asset,crop,width,height,playback=false}) => {const scale=Math.max(width/crop.width,height/crop.height),videoWidth=1440*scale,videoHeight=900*scale,focusScale=PRODUCT_FOCUS_SCALE;return <div data-v22-product={asset} style={{position:"absolute",inset:0,overflow:"hidden",background:WHITE}}><Video src={staticFile(FILES[asset])} trimBefore={crop.trim} muted playbackRate={playback?1:PRODUCT_HOLD_RATE} style={{position:"absolute",left:-crop.x*scale,top:-crop.y*scale,width:videoWidth,height:videoHeight,maxWidth:"none",transform:`scale(${focusScale})`,transformOrigin:`${(crop.x+crop.width/2)/14.4}% ${(crop.y+crop.height/2)/9}%`}}/></div>;};
+const EvidenceCrop:React.FC<{asset:V22AssetId;crop:Crop;width:number;height:number;playback?:boolean}> = ({asset,crop,width,height,playback=false}) => {
+  const scale=Math.max(width/crop.width,height/crop.height),videoWidth=1440*scale,videoHeight=900*scale,focusScale=PRODUCT_FOCUS_SCALE;
+  // Same box for both paths; only the source differs.
+  const frame={position:"absolute" as const,left:-crop.x*scale,top:-crop.y*scale,width:videoWidth,height:videoHeight,maxWidth:"none",transform:`scale(${focusScale})`,transformOrigin:`${(crop.x+crop.width/2)/14.4}% ${(crop.y+crop.height/2)/9}%`};
+  return <div data-v22-product={asset} style={{position:"absolute",inset:0,overflow:"hidden",background:WHITE}}>
+    {playback
+      ? <Video src={staticFile(FILES[asset])} trimBefore={crop.trim} muted playbackRate={1} style={frame}/>
+      : <Img src={staticFile(v22ProductStillFile(asset,crop.trim))} style={frame}/>}
+  </div>;};
 const EvidenceCard:React.FC<React.PropsWithChildren<{border?:string}>> = ({children,border}) => <div style={{position:"absolute",inset:0,overflow:"hidden",borderRadius:32,background:WHITE,border:border?`5px solid ${border}`:"none",boxShadow:"0 28px 70px rgba(7,17,31,.18)"}}>{children}</div>;
 // Background now comes from the scene backdrop; this is only a positioning shell.
 const EvidenceBackground:React.FC<React.PropsWithChildren<{accent?:string}>> = ({children}) => <AbsoluteFill>{children}</AbsoluteFill>;
