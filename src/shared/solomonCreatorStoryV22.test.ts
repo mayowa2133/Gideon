@@ -7,7 +7,7 @@ const inputs=ids.map((id)=>({id,path:`/${id}.webm`,sha256:id.padEnd(64,"0"),domE
 describe("Solomon Creator Story V22",()=>{
   it("is isolated, locked, evidence-bound, performance-directed, and safe",()=>{
     const manifest=createSolomonCreatorStoryV22Manifest(inputs,"9".repeat(64)),audit=auditSolomonCreatorStoryV22(manifest);
-    expect(audit.passed).toBe(true);expect(audit.words).toBeGreaterThanOrEqual(112);expect(audit.words).toBeLessThanOrEqual(122);expect(audit.wpm).toBeGreaterThanOrEqual(185);expect(audit.wpm).toBeLessThanOrEqual(205);expect(manifest.creativeDirector.hook).toBe(SOLOMON_CREATOR_STORY_V22_HOOK);expect(manifest.distributionObjective.ctaText).toBe(SOLOMON_CREATOR_STORY_V22_CTA);expect(manifest.regenerationLineage.parentVersion).toBe("21");expect(manifest.release.publicReleaseApproved).toBe(false);
+    expect(audit.passed).toBe(true);expect(audit.words).toBeGreaterThanOrEqual(112);expect(audit.words).toBeLessThanOrEqual(122);expect(audit.wpm).toBeGreaterThanOrEqual(170);expect(audit.wpm).toBeLessThanOrEqual(192);expect(manifest.creativeDirector.hook).toBe(SOLOMON_CREATOR_STORY_V22_HOOK);expect(manifest.distributionObjective.ctaText).toBe(SOLOMON_CREATOR_STORY_V22_CTA);expect(manifest.regenerationLineage.parentVersion).toBe("21");expect(manifest.release.publicReleaseApproved).toBe(false);
   });
   it("locks the viewer-outcome hook and comment-gated CTA templates",()=>{
     const manifest=createSolomonCreatorStoryV22Manifest(inputs,"9".repeat(64)),audit=auditSolomonCreatorStoryV22(manifest);

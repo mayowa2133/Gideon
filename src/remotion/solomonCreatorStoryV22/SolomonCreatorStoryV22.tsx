@@ -73,7 +73,7 @@ export const SolomonCreatorStoryV22:React.FC<SolomonCreatorStoryV22Manifest> = (
   {manifest.scenes.map((scene)=><Sequence key={scene.id} from={scene.from} durationInFrames={scene.to-scene.from} premountFor={30} name={scene.id}><Scene scene={scene}/></Sequence>)}
   <MascotLayer scenes={manifest.scenes}/>
   {manifest.captions.map((caption)=><Sequence key={caption.id} from={caption.from} durationInFrames={caption.to-caption.from} premountFor={10}><Caption caption={caption}/></Sequence>)}
-  <Sequence from={42} durationInFrames={897}><Disclosure/></Sequence>
+  <Sequence from={45} durationInFrames={959}><Disclosure/></Sequence>
   <Audio src={staticFile("narration.wav")}/><Audio src={staticFile("sound-design.wav")}/>
 </AbsoluteFill>;
 

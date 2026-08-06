@@ -253,6 +253,47 @@ fitter becomes a no-op — identical framing, plus the containment guarantee. It
 15 regions and a render each, and any region tightened past that must exclude the
 capture's disclosure banner.
 
+
+## The 36-second cap was costing the voice
+
+The hard 36s film gave narration a 35s budget, which forced `globalTempo` to
+**1.0753** — every take was being sped up 7.5% purely to fit. Speaking rate came out
+at 191.7 wpm. Voice naturalness is one of the blocked human-approval gates, so the
+duration constraint was directly degrading something we cannot automatically verify.
+
+Relaxing the film to **38.5s (1155 frames)** — 2.5s longer — lets the beats run at
+their recorded pace:
+
+| | before | after |
+|---|---|---|
+| globalTempo | 1.0753 | **0.9997** |
+| speaking rate | 191.7 wpm | **179.2 wpm** |
+| narrationGaps | failed | **passes** |
+
+Scene boundaries, claim frames, mascot plan durations, the disclosure window and the
+caption clamps were all scaled by 1155/1080, and the wpm band re-derived.
+
+**A caching trap worth recording.** The first render at the new length reported
+`globalTempo 0.9997` while the audio was still the old 35s file: narration is cached
+by script hash, and `assembleNarration` only runs when the file is absent, so
+changing the *budget* does not invalidate the cache. The number came from the
+cache-path recomputation, not from the artefact. Anything that changes narration
+placement now needs the cached wav removed, or the reported tempo describes a file
+that no longer exists.
+
+**What this did NOT fix.** Worst beat drift against its declared anchor is **3682ms**,
+slightly worse than the 3419ms before. I predicted scaling anchors by 1.0694 would
+collapse it because that is close to the 1.0753 compression being removed. That
+reasoning was wrong: beats are packed *cumulatively* from measured durations, so
+drift accumulates independently of where the anchors sit — scaling both sides moves
+them together without aligning them.
+
+Captions are unaffected because they are aligned to the audio directly (43/44 within
+tolerance). But the *visual* beats still sit on authored anchors, so a scene can be
+seconds away from the words it illustrates. Fixing that needs scene boundaries
+derived from realized beat starts, which the duration freedom now makes
+straightforward — there is no longer a fixed 1080-frame budget to satisfy.
+
 ## Not done
 
 - **Phase 4 — content density.** Edge density is **7.42** against the references'
