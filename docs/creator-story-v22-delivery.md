@@ -102,12 +102,69 @@ shows, and the symptom appears in a completely unrelated metric.
 
 ## Results
 
-All **28** gates pass; scorecard regression-free. Claims 1.00, OCR 1.00, shots 19,
+All **29** gates pass; scorecard regression-free. Claims 1.00, OCR 1.00, shots 19,
 loudness −14.3 LUFS.
 
-`medianFrameChange` fell 3.379 → 2.382 (band 1.2–8) and `nearStaticFramePercent`
-is 23.46 (band 10–30). Both in band; the film is calmer again, which is the
+`medianFrameChange` fell 3.379 → 2.379 (band 1.2–8) and `nearStaticFramePercent`
+is 18.99 (band 10–30). Both in band; the film is calmer again, which is the
 expected consequence of a larger static mascot replacing moving cameo content.
+
+
+## Caption sync — reported, diagnosed, fixed
+
+Reported: "a lot of the times they are not matching up with the words being said."
+Correct, and it had been true since at least V11.
+
+**Two timelines that were never reconciled.** `assembleNarration` places each beat
+by its *measured* audio length (`cursor += audibleMs + GAP_MS`), while every
+caption window was a hand-authored absolute frame keyed to the beat's *declared*
+start. Measured drift between declared and spoken beat starts:
+
+| beat | drift | | beat | drift |
+|---|---:|---|---|---:|
+| hook | +0.00s | | reason | +3.00s |
+| friction | −0.40s | | signature | +3.50s |
+| five | −0.64s | | control | +2.82s |
+| role | +0.88s | | payoff | +3.34s |
+
+By mid-film captions ran ~3.5s ahead of the audio.
+
+**Why it stayed invisible for eleven versions.** The render already computes this
+as `driftMs` for every beat — and discards it; the identifier appeared exactly
+once in the script, on the line creating it. Worse, it was only computed on a cold
+synthesis: narration is cached by script hash, so on every warm render the whole
+assembly block is skipped and `realizedTimings` stays `null`. The numbers existed
+only in the one case nobody re-runs.
+
+**Fix, in two layers.** `hydrateCaptionTimings` maps each caption into its beat's
+realized window (removes the multi-second drift), then `alignCaptionsToSpokenWords`
+snaps every word group onto its actual spoken word using Whisper on `narration.wav`
+*before* the render rather than only measuring the master afterwards (removes the
+~1.6s residue left by interpolating linearly across a beat). Beat packing was
+extracted into one shared function so the cache path reports the same placement the
+audio was built with.
+
+**Result: 44/44 groups aligned, worst drift 0.33s**, against a 0.45s tolerance —
+from means of +3.5s to +0.04–0.12s per caption.
+
+**New `captionSync` gate.** Compares every kinetic word group against Whisper word
+timings on the encoded master; fails below 80% aligned. It measures the symptom
+directly, so nothing but real alignment satisfies it. Annotation chips are excluded
+via a new `tracksSpeech` flag — "WHY AVERY?" is a label that is never spoken, and
+auditing it against speech found a spurious match on an unrelated "why" 12s later.
+
+**Two side effects, both fixed.** Widening caption windows to the union of authored
+and spoken spans left chips lingering past their last word, so they appeared and
+vanished when nothing else changed — five phantom cuts. Captions now span exactly
+their words. And a hard group swap resizes the dark chip in a single frame, which
+also read as a cut; the swap now eases in over four frames. Shot count returned
+from 24 → 19.
+
+**Three renders were lost to one avoidable mistake**: this script does all its work
+at module top level, so a `const` declared beside the function that uses it is
+still in its temporal dead zone when that function runs, and fails only at render
+time. All such constants are now hoisted above the first `await`, with a note in
+the file.
 
 ## Not done
 

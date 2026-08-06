@@ -14,6 +14,14 @@ export interface V22CompiledCaption {
   zone: "top" | "bottom" | "attached";
   /** 1-2 word groups that swap inside the caption window, reference-style. */
   wordGroups: V22WordGroup[];
+  /**
+   * True when the word groups are the beat's spoken line, false when they are the
+   * chip's own label text (annotation chips like "WHY AVERY?" are never said).
+   * Only speech-tracking captions can be aligned to, or audited against, the
+   * narration — auditing a label against speech finds a spurious match on some
+   * unrelated later occurrence of the same word.
+   */
+  tracksSpeech: boolean;
 }
 export interface V22WordGroup { text: string; from: number; to: number; emphasis: boolean }
 export interface V22BeatHeadline { primary: string; accentItalic: string }
@@ -23,7 +31,7 @@ export interface V22Beat {
   sceneId: string;
   vo: string;
   energy: "high" | "medium";
-  chip?: Omit<V22CompiledCaption, "id" | "text" | "wordGroups">;
+  chip?: Omit<V22CompiledCaption, "id" | "text" | "wordGroups" | "tracksSpeech">;
   headline?: V22BeatHeadline;
   anchors?: V22NumeralAnchor[];
 }
@@ -196,7 +204,7 @@ export function compileSolomonCreatorStoryV22(): CompiledSolomonCreatorStoryV22 
     .map((beat) => {
       const chip = beat.chip!;
       const source = beat.vo.length > 0 ? beat.vo : chip.beatText;
-      return { id: beat.id, text: chip.beatText, ...chip, wordGroups: buildWordGroups(source, chip.from, chip.to, chip.highlight) };
+      return { id: beat.id, text: chip.beatText, ...chip, tracksSpeech: beat.vo.length > 0, wordGroups: buildWordGroups(source, chip.from, chip.to, chip.highlight) };
     });
   const headlines: Record<string, V22BeatHeadline> = {};
   for (const beat of beats) if (beat.headline) headlines[beat.sceneId] = beat.headline;

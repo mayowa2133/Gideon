@@ -18,6 +18,17 @@ const {SOLOMON_CREATOR_STORY_V22_SCRIPT,SOLOMON_CREATOR_STORY_V22_TTS_BEATS,SOLO
 const {auditV22BannedStrings,auditV22Layout,auditV22PhoneScale,auditV22RenderedBounds,evaluateV22MotionBands,evaluateV22ShotBands,mascotBoxForScene}=require("../dist/main/shared/creatorStoryV22Quality.js");
 // Hoisted: qualityAudit runs at module top level, so anything it reaches must be
 // initialized before that await rather than merely declared later in the file.
+// NOTE: this script does all of its work at module top level, so every constant
+// an audit or helper reads must be declared HERE, above the first await. A const
+// placed next to the function that uses it is still in its temporal dead zone
+// when that function runs, and fails only at render time — which cost three
+// render cycles in V22 alone (HELD_STABILITY_*, TRIM_FILTER, CAPTION_SYNC_*).
+const CAPTION_SYNC_TOL_SECONDS=0.45,CAPTION_SYNC_MIN_ALIGNED=0.8;
+// Single source of truth for beat placement. Both the assembler and the cache
+// path below pack beats with these, so a reused narration reports the same
+// timings the audio was actually built with.
+const GAP_MS=200,LEAD_MS=150,SPEECH_END_MS=35_000;
+const TRIM_FILTER="silenceremove=start_periods=1:start_duration=0:start_threshold=-45dB:stop_periods=-1:stop_duration=0.2:stop_threshold=-45dB,areverse,silenceremove=start_periods=1:start_duration=0:start_threshold=-45dB,areverse";
 const HELD_STABILITY_SLIDE_CLEARANCE=24,HELD_STABILITY_WINDOW=12;
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),".."),output=path.join(root,"tmp","solomon-creator-story-v22-performance"),captureDir=process.env.SOLOMON_V22_CAPTURE_DIR??path.join(output,"capture"),publicDir=path.join(output,"remotion-public"),finalDir=path.join(output,"final"),reviewDir=path.join(output,"review"),reportsDir=path.join(output,"reports"),candidatesDir=path.join(output,"candidates"),narrationDir=path.join(output,"narration-candidates");
 for(const dir of[output,publicDir,finalDir,reviewDir,reportsDir,candidatesDir,narrationDir])await fs.mkdir(dir,{recursive:true,mode:0o700});
@@ -30,6 +41,9 @@ for(const source of manifest.sources){if(!existsSync(source.sourcePath))throw ne
 
 await extractProofs();
 const narration=await generateNarration();
+manifest=hydrateCaptionTimings(manifest,narration);
+manifest=await alignCaptionsToSpokenWords(manifest,path.join(publicDir,"narration.wav"));
+assertSolomonCreatorStoryV22Manifest(manifest);
 manifest=await hydrateMascotAudio(manifest,path.join(publicDir,"narration.wav"));assertSolomonCreatorStoryV22Manifest(manifest);
 const soundDesign=await generateSoundDesign();
 await writePlanning(narration,soundDesign);
@@ -67,11 +81,37 @@ async function generateNarration(){
   });
   const scriptHash=createHash("sha256").update(SOLOMON_CREATOR_STORY_V22_SCRIPT).digest("hex").slice(0,12);
   const target=path.join(narrationDir,`v22-warm-direct-${scriptHash}.wav`);
-  let provenance={reusedExisting:true},realized=null;if(!existsSync(target)){const generatedDir=path.join(narrationDir,`warm-direct-${scriptHash}`,"generated"),canReuseGeneratedBeats=beats.every(({id})=>existsSync(path.join(generatedDir,`${id}.wav`)));let result;if(canReuseGeneratedBeats){result={beats:await Promise.all(beats.map(async(item)=>{const outputPath=path.join(generatedDir,`${item.id}.wav`);return{...item,outputPath,sourceDurationMs:await probeDurationMs(outputPath)};})),provenance:{provider:"chatterbox",reusedGeneratedBeats:true}};}else{result=await provider.synthesize({outputDir:path.join(narrationDir,`warm-direct-${scriptHash}`),beats,language:"en",voice:{mode:"model_default"},seed:110101});}await assembleNarration(result,target);provenance=result.provenance;realized=result.realizedTimings;}
+  let provenance={reusedExisting:true},realized=null;const cachedGeneratedDir=path.join(narrationDir,`warm-direct-${scriptHash}`,"generated");if(!existsSync(target)){const generatedDir=cachedGeneratedDir,canReuseGeneratedBeats=beats.every(({id})=>existsSync(path.join(generatedDir,`${id}.wav`)));let result;if(canReuseGeneratedBeats){result={beats:await Promise.all(beats.map(async(item)=>{const outputPath=path.join(generatedDir,`${item.id}.wav`);return{...item,outputPath,sourceDurationMs:await probeDurationMs(outputPath)};})),provenance:{provider:"chatterbox",reusedGeneratedBeats:true}};}else{result=await provider.synthesize({outputDir:path.join(narrationDir,`warm-direct-${scriptHash}`),beats,language:"en",voice:{mode:"model_default"},seed:110101});}await assembleNarration(result,target);provenance=result.provenance;realized=result.realizedTimings;}
+  // A reused narration still needs its realized placement, or caption hydration
+  // has nothing to map into and the drift stays invisible exactly as it did
+  // through V21.
+  if(!realized)realized=await realizedTimingsForBeats(beats,cachedGeneratedDir);
   await fs.copyFile(target,path.join(publicDir,"narration.wav"));
   const report={schemaVersion:"11.1",approvedScript:SOLOMON_CREATOR_STORY_V22_SCRIPT,scriptHash,selectedCandidateId:`v22-warm-direct-${scriptHash}`,selectedTarget:target,sha256:await sha256(target),beats,realizedTimings:realized,humanVoiceApprovalRequired:true,provenance};await writeJson(path.join(reportsDir,"narration-provenance.json"),report);return report;
 }
 function beat(id,approvedText,startMs,endMs,energy){return{id,approvedText,startMs,endMs,energy};}
+function packBeatTimings(trimmed){
+  const totalSourceMs=trimmed.reduce((sum,item)=>sum+item.trimmedDurationMs,0),gapTotalMs=GAP_MS*(trimmed.length-1);
+  const globalTempo=Math.min(1.25,Math.max(.92,totalSourceMs/(SPEECH_END_MS-LEAD_MS-gapTotalMs)));
+  const timings=[];let cursor=LEAD_MS;
+  for(const item of trimmed){const audibleMs=item.trimmedDurationMs/globalTempo;timings.push({id:item.id,startMs:Math.round(cursor),audibleMs:Math.round(audibleMs),targetStartMs:item.startMs,driftMs:Math.round(cursor-item.startMs)});cursor+=audibleMs+GAP_MS;}
+  return{globalTempo,timings,lastEndMs:cursor-GAP_MS};
+}
+// Recomputes placement for a narration that was reused from cache. Without this
+// realizedTimings stays null on every cache hit — which is why caption drift went
+// unnoticed: the numbers only existed on a cold synthesis.
+async function realizedTimingsForBeats(beats,generatedDir){
+  const trimmed=[];
+  for(const item of beats){
+    const source=path.join(generatedDir,`${item.id}.wav`);
+    if(!existsSync(source))return null;
+    const trimmedPath=path.join(generatedDir,`${item.id}.timing.wav`);
+    await run("ffmpeg",["-y","-i",source,"-af",TRIM_FILTER,"-c:a","pcm_s16le",trimmedPath],120000);
+    trimmed.push({...item,trimmedDurationMs:await probeDurationMs(trimmedPath)});
+  }
+  const packed=packBeatTimings(trimmed);
+  return{globalTempo:packed.globalTempo,speechStartMs:LEAD_MS,speechEndMs:Math.round(packed.lastEndMs),gapMs:GAP_MS,timings:packed.timings};
+}
 async function assembleNarration(result,target){
   // Two-pass placement: beats play at a single global tempo and each beat starts
   // a fixed 225 ms after the previous one ends, so internal dead air cannot
@@ -80,7 +120,7 @@ async function assembleNarration(result,target){
   // Speech must land before the sting scene (frame 1056 = 35.2s). The tempo
   // ceiling sits at 1.25: atempo preserves pitch, and the reference videos run
   // 220-240 wpm, so a modest compression is on-style rather than chipmunky.
-  const GAP_MS=200,LEAD_MS=150,SPEECH_END_MS=35_000;
+
   // Each synthesized beat carries its own leading/trailing silence. Placement has
   // to be measured on trimmed audio, otherwise the real gap is that padding plus
   // GAP_MS — which is exactly how ~0.5s pauses appear despite a 200ms budget.
@@ -92,17 +132,125 @@ async function assembleNarration(result,target){
     await run("ffmpeg",["-y","-i",item.outputPath,"-af","silenceremove=start_periods=1:start_duration=0:start_threshold=-45dB:stop_periods=-1:stop_duration=0.2:stop_threshold=-45dB,areverse,silenceremove=start_periods=1:start_duration=0:start_threshold=-45dB,areverse","-c:a","pcm_s16le",trimmedPath],120000);
     trimmed.push({...item,trimmedPath,trimmedDurationMs:await probeDurationMs(trimmedPath)});
   }
-  const totalSourceMs=trimmed.reduce((sum,item)=>sum+item.trimmedDurationMs,0),gapTotalMs=GAP_MS*(trimmed.length-1);
-  const globalTempo=Math.min(1.25,Math.max(.92,totalSourceMs/(SPEECH_END_MS-LEAD_MS-gapTotalMs)));
-  const timings=[];let cursor=LEAD_MS;
-  for(const item of trimmed){const audibleMs=item.trimmedDurationMs/globalTempo;timings.push({id:item.id,startMs:Math.round(cursor),audibleMs:Math.round(audibleMs),targetStartMs:item.startMs,driftMs:Math.round(cursor-item.startMs)});cursor+=audibleMs+GAP_MS;}
-  const lastEnd=cursor-GAP_MS;if(lastEnd>SPEECH_END_MS+250)throw new Error(`Narration overruns speech window: ends at ${Math.round(lastEnd)}ms`);
+  const {globalTempo,timings,lastEndMs:lastEnd}=packBeatTimings(trimmed);if(lastEnd>SPEECH_END_MS+250)throw new Error(`Narration overruns speech window: ends at ${Math.round(lastEnd)}ms`);
   const args=["-y"],filters=[];
   trimmed.forEach((item,index)=>{args.push("-i",item.trimmedPath);const placed=timings[index],audibleSeconds=placed.audibleMs/1000;const chain=globalTempo<.5?`atempo=0.5,atempo=${(globalTempo/.5).toFixed(6)}`:`atempo=${globalTempo.toFixed(6)}`;filters.push(`[${index}:a]${chain},atrim=duration=${audibleSeconds.toFixed(3)},afade=t=in:st=0:d=0.02,afade=t=out:st=${Math.max(0,audibleSeconds-.04).toFixed(3)}:d=0.04,adelay=${placed.startMs}|${placed.startMs}[b${index}]`);});
   filters.push(`${trimmed.map((_,index)=>`[b${index}]`).join("")}amix=inputs=${trimmed.length}:normalize=0,aresample=48000,apad,atrim=duration=36[a]`);
   args.push("-filter_complex",filters.join(";"),"-map","[a]","-c:a","pcm_s16le",target);await run("ffmpeg",args,300000);
   result.realizedTimings={globalTempo,speechStartMs:LEAD_MS,speechEndMs:Math.round(lastEnd),gapMs:GAP_MS,timings};
 }
+// Re-time captions into the narration that was actually produced.
+//
+// Beat audio is placed by measured length -- assembleNarration packs each beat at
+// `cursor += audibleMs + GAP_MS` -- while every caption window is a hand-authored
+// absolute frame matching the beat's *declared* startMs. Those two timelines are
+// not the same, and nothing reconciled them: the difference is computed on every
+// render as `driftMs` and was then discarded. Measured on the V21 and V22 masters
+// it reaches +3.5s, so by the middle of the film captions were showing words three
+// seconds before they were spoken.
+//
+// This maps each caption (and each kinetic word group inside it) from declared
+// beat space into realized beat space, proportionally within its beat:
+//
+//   realized = beat.startMs + (t - beat.targetStartMs) * (beat.audibleMs / declaredMs)
+//
+// Only captions move. Scene boundaries and claim frames stay on the declared
+// anchors, so no OCR/composite gate frame shifts. The visual beats are therefore
+// still keyed to the authored timeline, which remains the deeper issue -- see
+// docs/creator-story-v22-delivery.md.
+function hydrateCaptionTimings(input,narration){
+  const realized=narration.realizedTimings;
+  if(!realized||!Array.isArray(realized.timings)||realized.timings.length===0)throw new Error("V22 caption hydration: narration has no realized timings");
+  const declared=new Map(narration.beats.map((beat)=>[beat.id,{startMs:beat.startMs,endMs:beat.endMs}]));
+  const beats=realized.timings.map((t)=>{
+    const d=declared.get(t.id);
+    const declaredMs=d&&d.endMs>d.startMs?d.endMs-d.startMs:Math.max(1,t.audibleMs);
+    return{...t,declaredMs};
+  }).sort((a,b)=>a.targetStartMs-b.targetStartMs);
+  const toFrame=(ms)=>Math.round(ms/1000*30);
+  const mapFrame=(frame)=>{
+    const ms=frame/30*1000;
+    let beat=beats.find((b)=>ms>=b.targetStartMs&&ms<b.targetStartMs+b.declaredMs);
+    if(!beat)beat=beats.reduce((best,b)=>Math.abs(b.targetStartMs-ms)<Math.abs(best.targetStartMs-ms)?b:best,beats[0]);
+    const ratio=beat.audibleMs/beat.declaredMs;
+    const mapped=beat.startMs+(ms-beat.targetStartMs)*ratio;
+    return Math.max(0,Math.min(1080,toFrame(mapped)));
+  };
+  const captions=input.captions.map((caption)=>{
+    const from=mapFrame(caption.from);
+    const to=Math.max(from+1,mapFrame(caption.to));
+    const groups=(caption.wordGroups??[]).map((group)=>{
+      const gf=Math.max(from,mapFrame(group.from));
+      return{...group,from:gf,to:Math.max(gf+1,Math.min(to,mapFrame(group.to)))};
+    });
+    return{...caption,from,to:Math.min(1080,to),wordGroups:groups};
+  });
+  return{...input,captions};
+}
+
+// Snap speech-tracking caption groups onto the words actually spoken.
+//
+// hydrateCaptionTimings maps each caption into its beat's realized window, which
+// removes the multi-second beat drift. It cannot fix distribution *inside* a beat:
+// it interpolates linearly, while real speech is not evenly spaced, which left
+// groups up to 1.6s out. Forced alignment against the narration's own word
+// timings removes that residue.
+//
+// Whisper is already a dependency (narrationAudit runs it on the master). Running
+// it once more on narration.wav BEFORE the render is what makes the timings
+// available in time to be used, rather than only measurable afterwards.
+//
+// Annotation chips are skipped: `tracksSpeech` is false when a chip shows its own
+// label text ("WHY AVERY?") rather than the beat's spoken line. Aligning those to
+// speech is meaningless, and auditing them against it finds a spurious match on an
+// unrelated later occurrence of the same word — which is exactly what the first
+// captionSync run reported as a 12.2s drift.
+async function alignCaptionsToSpokenWords(input,narrationPath){
+  const dir=path.join(output,"caption-alignment");
+  await fs.mkdir(dir,{recursive:true,mode:0o700});
+  const result=await run("whisper",[narrationPath,"--model","small.en","--language","en","--output_dir",dir,"--output_format","json","--word_timestamps","True","--verbose","False"],600000,true);
+  if(result.code!==0){process.stdout.write("Caption alignment: whisper unavailable, keeping proportional timings\n");return input;}
+  let words=[];
+  try{
+    const json=JSON.parse(await fs.readFile(path.join(dir,`${path.parse(narrationPath).name}.json`),"utf8"));
+    words=(json.segments??[]).flatMap((segment)=>segment.words??[]).map((w)=>({word:normalizeWord(w.word),start:w.start,end:w.end})).filter((w)=>w.word);
+  }catch{return input;}
+  if(words.length===0)return input;
+  let cursor=0;
+  const captions=input.captions.map((caption)=>{
+    if(!caption.tracksSpeech)return caption;
+    const groups=(caption.wordGroups??[]).map((group)=>{
+      const tokens=String(group.text).split(/\s+/).map(normalizeWord).filter(Boolean);
+      if(tokens.length===0)return group;
+      // Sequential scan: captions are authored in spoken order, so never look
+      // backwards. A repeated word therefore matches its own occurrence.
+      let index=-1;
+      for(let start=cursor;start<=words.length-tokens.length;start+=1){
+        if(tokens.every((token,offset)=>words[start+offset].word===token)){index=start;break;}
+      }
+      if(index<0){
+        for(let start=cursor;start<words.length;start+=1)if(words[start].word===tokens[0]){index=start;break;}
+      }
+      if(index<0)return group;
+      const first=words[index],last=words[Math.min(words.length-1,index+tokens.length-1)];
+      cursor=Math.min(words.length-1,index+tokens.length);
+      const from=Math.max(0,Math.min(1079,Math.round(first.start*30)));
+      const to=Math.max(from+1,Math.min(1080,Math.round(last.end*30)));
+      return{...group,from,to};
+    });
+    // Span exactly the words, rather than the union with the authored window. A
+    // caption that lingers past its last spoken word is both wrong and expensive:
+    // its chip then appears or vanishes at a moment nothing else changes, which
+    // ffmpeg's scene detector reads as a cut. Widening the window this way added
+    // five phantom shots and failed shotDensity.
+    const from=Math.max(0,Math.min(...groups.map((g)=>g.from)));
+    const to=Math.min(1080,Math.max(...groups.map((g)=>g.to)));
+    return{...caption,from,to:Math.max(from+1,to),wordGroups:groups};
+  });
+  return{...input,captions};
+}
+function normalizeWord(value){return String(value).toLowerCase().replace(/[^a-z0-9]/g,"");}
+
 async function hydrateMascotAudio(input,target){const raw=path.join(output,"narration-v22.f32");await run("ffmpeg",["-y","-i",target,"-ac","1","-ar","48000","-f","f32le",raw]);const bytes=await fs.readFile(raw),samples=new Float32Array(bytes.buffer,bytes.byteOffset,Math.floor(bytes.byteLength/4)),next=structuredClone(input);let previous=0;for(const scene of next.scenes){const rows=[];for(let global=scene.from;global<scene.to;global+=1){const start=Math.floor(global/30*48000),end=Math.min(samples.length,start+1600);let sum=0;for(let index=start;index<end;index+=1)sum+=samples[index]*samples[index];const rms=Math.min(1,Math.sqrt(sum/Math.max(1,end-start))*5),onset=Math.max(0,Math.min(1,(rms-previous)*4)),speaking=rms>.04;rows.push({frame:global-scene.from,rms,speaking,onset,phraseBoundary:previous>.08&&rms<.035});previous=rms;}scene.mascot.audioFrames=rows;}await fs.unlink(raw);return next;}
 async function generateSoundDesign(){const cues=[{id:"status-click",frame:49,f:920},{id:"interview-confirm",frame:53,f:1120},{id:"contact-reveal",frame:66,f:740},{id:"window-crowd",frame:148,f:260},{id:"five-collapse",frame:274,f:430},{id:"evidence-attach",frame:390,f:680},{id:"context-transfer",frame:510,f:840},{id:"draft-complete",frame:622,f:980},{id:"edit-save",frame:790,f:760},{id:"payoff-reveal",frame:878,f:520},{id:"bookmark-confirm",frame:1008,f:1180},{id:"sting",frame:1060,f:610}],args=["-y","-f","lavfi","-t","36","-i","anoisesrc=color=pink:sample_rate=48000"],filters=["[0:a]highpass=f=220,lowpass=f=3200,volume=0.004,afade=t=in:d=0.4,afade=t=out:st=35.3:d=0.7[room]"];for(const [index,cue] of cues.entries()){args.push("-f","lavfi","-t","0.16","-i",`sine=frequency=${cue.f}:sample_rate=48000`);filters.push(`[${index+1}:a]afade=t=out:st=0.03:d=0.13,volume=0.035,adelay=${Math.round(cue.frame/30*1000)}|${Math.round(cue.frame/30*1000)}[c${index}]`);}filters.push(`[room]${cues.map((_,index)=>`[c${index}]`).join("")}amix=inputs=${cues.length+1}:normalize=0,alimiter=limit=0.6,atrim=duration=36[a]`);args.push("-filter_complex",filters.join(";"),"-map","[a]","-c:a","pcm_s16le",path.join(publicDir,"sound-design.wav"));await run("ffmpeg",args,300000);const report={schemaVersion:"10.1",semanticOnly:true,cues};await writeJson(path.join(reportsDir,"sound-design-plan.json"),report);return report;}
 async function masterAudioVideo(input,target){
@@ -130,9 +278,9 @@ async function narrationGapAudit(){
 async function writePlanning(narration,soundDesign){const audit=auditSolomonCreatorStoryV22(manifest),lineage={...captureReceipt,sources:manifest.sources.map((source)=>({id:source.id,path:source.sourcePath,sha256:source.sourceSha256,verifiedInterval:source.verifiedInterval,domEvidence:source.domEvidence,claims:manifest.claims.filter(({assetIds})=>assetIds.includes(source.id)).map(({id})=>id)}))};await Promise.all([writeJson(path.join(output,"story-manifest.json"),manifest),writeJson(path.join(output,"creative-director-contract.json"),manifest.creativeDirector),writeJson(path.join(output,"storyboard.json"),{frameCount:1080,scenes:manifest.scenes,captions:manifest.captions}),writeJson(path.join(reportsDir,"manifest-audit.json"),audit),writeJson(path.join(reportsDir,"mascot-geometry-report.json"),{passed:true,geometry:manifest.mascotGeometry}),writeJson(path.join(reportsDir,"mascot-performance-plan.json"),audit.mascot),writeJson(path.join(reportsDir,"claim-evidence-matrix.json"),{passed:true,claims:manifest.claims}),writeJson(path.join(reportsDir,"source-privacy-lineage.json"),lineage),writeJson(path.join(reportsDir,"distribution-objective.json"),manifest.distributionObjective),writeJson(path.join(reportsDir,"narration-plan.json"),narration),writeJson(path.join(reportsDir,"semantic-audio-plan.json"),soundDesign),fs.writeFile(path.join(output,"script.txt"),`${SOLOMON_CREATOR_STORY_V22_SCRIPT}\n`),fs.writeFile(path.join(output,"reproduce.txt"),"pnpm creator-story:v22:capture\npnpm creator-story:v22:solomon\npnpm creator-story:v22:compare\n")]);}
 async function generateCandidates(master){const clips=[{id:"hook",start:0,duration:4.4},{id:"contact-reveal",start:1.8,duration:2.6},{id:"signature-mechanism",start:14,duration:5.5},{id:"payoff",start:27.5,duration:4.5},{id:"cta",start:32,duration:4}];for(const item of clips)await clip(master,path.join(candidatesDir,`${item.id}-candidate.mp4`),item.start,item.duration,360,640);await writeJson(path.join(candidatesDir,"candidate-manifest.json"),{schemaVersion:"10.1",sourceMaster:master,clips,humanReviewRequired:true});}
 async function generateReview(master){const filters={"contact-sheet-1fps.jpg":"fps=1,scale=180:320,tile=6x6","contact-sheet-half-second.jpg":"fps=2,scale=120:213,tile=12x6","opening-quarter-second.jpg":"fps=4,select='lt(t,4.5)',scale=180:320,tile=6x3","scene-boundary-strip.jpg":`select='${manifest.scenes.map(({from})=>`eq(n,${from})`).join("+")}',scale=180:320,tile=${Math.ceil(Math.sqrt(manifest.scenes.length))}x${Math.ceil(manifest.scenes.length/Math.ceil(Math.sqrt(manifest.scenes.length)))}`,"phone-readability-strip.jpg":"select='eq(n,74)+eq(n,116)+eq(n,320)+eq(n,600)+eq(n,690)+eq(n,790)+eq(n,885)+eq(n,940)+eq(n,1010)',scale=360:640,tile=9x1","face-expression-strip.jpg":"select='eq(n,12)+eq(n,38)+eq(n,76)+eq(n,116)+eq(n,146)+eq(n,210)+eq(n,380)+eq(n,690)+eq(n,770)+eq(n,942)+eq(n,1010)+eq(n,1068)',scale=180:320,tile=6x2","gesture-comparison-strip.jpg":"select='eq(n,16)+eq(n,44)+eq(n,82)+eq(n,122)+eq(n,150)+eq(n,220)+eq(n,274)+eq(n,330)+eq(n,390)+eq(n,520)+eq(n,785)+eq(n,944)+eq(n,1012)+eq(n,1068)',scale=180:320,tile=7x2","product-proof-strip.jpg":"select='eq(n,38)+eq(n,76)+eq(n,116)+eq(n,320)+eq(n,390)+eq(n,510)+eq(n,610)+eq(n,690)+eq(n,790)+eq(n,885)+eq(n,940)',scale=180:320,tile=6x2","payoff-cta-strip.jpg":"select='eq(n,830)+eq(n,855)+eq(n,880)+eq(n,905)+eq(n,935)+eq(n,970)+eq(n,1005)+eq(n,1035)+eq(n,1068)',scale=180:320,tile=9x1"};for(const[filename,filter]of Object.entries(filters))await run("ffmpeg",["-y","-i",master,"-vf",filter,"-vsync","0","-frames:v","1",path.join(reviewDir,filename)],600000);for(const frame of[12,38,50,76,116,146,210,274,320,390,510,610,690,790,840,885,920,942,970,1010,1040,1068])await extractFrame(master,frame,path.join(reviewDir,`frame-${String(frame).padStart(4,"0")}.png`));}
-async function qualityAudit(files){const decoded=await measureDecodedMedia(files.master),sections=[{id:"opening",fromSeconds:0,toSeconds:4.4},{id:"mechanism",fromSeconds:14,toSeconds:24.5},{id:"payoff",fromSeconds:27.5,toSeconds:32},{id:"cta",fromSeconds:32,toSeconds:36}],motion=await measureV22Motion(files.master,sections),ocr=await ocrAudit(files.master),composite=await compositeAudit(files.master),layout=layoutAudit(),bounds=auditV22RenderedBounds(manifest.scenes.map((scene)=>({id:scene.id,layout:scene.layout,camera:scene.camera,mascotRole:scene.mascot.role}))),mascot=await mascotAudit(),mascotBoundaries=await mascotBoundaryContinuityAudit(),phone=phoneAudit(ocr,mascot),transitions=transitionAudit(motion),motionBands=evaluateV22MotionBands(motion),shotBands=evaluateV22ShotBands(decoded.shots),transcript=await narrationAudit(files.master,files.narration),metadata=decoded.metadata,manifestAudit=auditSolomonCreatorStoryV22(manifest),narrationGaps=await narrationGapAudit(),numeralAnchorsDecoded=await numeralAnchorAudit(),heldStability=await heldStabilityAudit(files.master),baseline=JSON.parse(await fs.readFile(path.join(output,"baseline","v21-authoritative-baseline.json"),"utf8"));
-  const gates={fullDecode:"passed",metadata:metadata.width===1080&&metadata.height===1920&&metadata.frameRate==="30/1"&&Math.abs(metadata.durationSeconds-36)<.08?"passed":"failed",color:metadata.pixelFormat==="yuv420p"&&metadata.colorRange==="tv"&&metadata.colorSpace==="bt709"?"passed":"failed",sourceHashes:manifest.sources.every((source)=>captureReceipt.captures.some((capture)=>capture.id===source.id&&capture.sha256===source.sourceSha256))?"passed":"failed",manifest:manifestAudit.passed?"passed":"failed",storyConsistency:manifestAudit.story.passed?"passed":"failed",captionLints:manifestAudit.captionLints.passed?"passed":"failed",numeralAnchorsStatic:manifestAudit.numeralAnchors.passed?"passed":"failed",numeralAnchorsSpoken:numeralAnchorsDecoded.passed?"passed":"failed",narrationGaps:narrationGaps.passed?"passed":"failed",bannedStrings:ocr.banned.passed?"passed":"failed",singleDisclosure:ocr.singleDisclosurePassed?"passed":"failed",requiredOcr:ocr.requiredCoverage>=.9?"passed":"failed",composite:composite.passed?"passed":"failed",phoneScale:phone.passed?"passed":"failed",motionBands:motionBands.passed?"passed":"failed",heldStability:heldStability.evaluation.passed?"passed":"failed",shotDensity:shotBands.passed?"passed":"failed",renderedBounds:bounds.passed?"passed":"failed",transitions:transitions.passed?"passed":"failed",layout:layout.passed?"passed":"failed",mascotPerception:mascot.passed?"passed":"failed",mascotBoundaryContinuity:mascotBoundaries.passed?"passed":"failed",loudness:decoded.loudness.integratedLufs>=-14.5&&decoded.loudness.integratedLufs<=-13.5&&decoded.loudness.truePeakDbtp<=-1?"passed":"failed",clicks:decoded.audioActivity.clickCount===0?"passed":"failed",exactNarration:transcript.passed?"passed":"failed",safeCta:manifestAudit.cta.passed?"passed":"failed",ctaDeliveryApproval:"blocked_external_confirmation",v1ToV21Isolation:"passed",publicSourceApproval:"blocked_external_confirmation",humanMascotAppeal:"blocked_external_confirmation",humanVoiceApproval:"blocked_external_confirmation",humanMessageApproval:"blocked_external_confirmation",physicalPhoneApproval:"blocked_external_confirmation",proofCredibilityApproval:"blocked_external_confirmation",disclosureApproval:"blocked_external_confirmation",ctaApproval:"blocked_external_confirmation",brandLegalApproval:"blocked_external_confirmation",syntheticPresenterDisclosure:"blocked_external_confirmation",overallReferenceQuality:"blocked_external_confirmation"};
-  const external=new Set(Object.keys(gates).filter((key)=>gates[key]==="blocked_external_confirmation")),renderPassed=Object.entries(gates).filter(([key])=>!external.has(key)).every(([,value])=>value==="passed");return{schemaVersion:"10.1",...files,decoded,motion,motionBands,shotBands,heldStability,bounds,ocr,composite,layout,mascot,mascotBoundaries,narrationGaps,numeralAnchorsDecoded,phone,transitions,transcript,masterSha256:await sha256(files.master),renderPassed,releaseReady:Object.values(gates).every((value)=>value==="passed"),gates};}
+async function qualityAudit(files){const decoded=await measureDecodedMedia(files.master),sections=[{id:"opening",fromSeconds:0,toSeconds:4.4},{id:"mechanism",fromSeconds:14,toSeconds:24.5},{id:"payoff",fromSeconds:27.5,toSeconds:32},{id:"cta",fromSeconds:32,toSeconds:36}],motion=await measureV22Motion(files.master,sections),ocr=await ocrAudit(files.master),composite=await compositeAudit(files.master),layout=layoutAudit(),bounds=auditV22RenderedBounds(manifest.scenes.map((scene)=>({id:scene.id,layout:scene.layout,camera:scene.camera,mascotRole:scene.mascot.role}))),mascot=await mascotAudit(),mascotBoundaries=await mascotBoundaryContinuityAudit(),phone=phoneAudit(ocr,mascot),transitions=transitionAudit(motion),motionBands=evaluateV22MotionBands(motion),shotBands=evaluateV22ShotBands(decoded.shots),transcript=await narrationAudit(files.master,files.narration),metadata=decoded.metadata,manifestAudit=auditSolomonCreatorStoryV22(manifest),narrationGaps=await narrationGapAudit(),numeralAnchorsDecoded=await numeralAnchorAudit(),heldStability=await heldStabilityAudit(files.master),captionSync=auditCaptionSync(transcript),baseline=JSON.parse(await fs.readFile(path.join(output,"baseline","v21-authoritative-baseline.json"),"utf8"));
+  const gates={fullDecode:"passed",metadata:metadata.width===1080&&metadata.height===1920&&metadata.frameRate==="30/1"&&Math.abs(metadata.durationSeconds-36)<.08?"passed":"failed",color:metadata.pixelFormat==="yuv420p"&&metadata.colorRange==="tv"&&metadata.colorSpace==="bt709"?"passed":"failed",sourceHashes:manifest.sources.every((source)=>captureReceipt.captures.some((capture)=>capture.id===source.id&&capture.sha256===source.sourceSha256))?"passed":"failed",manifest:manifestAudit.passed?"passed":"failed",storyConsistency:manifestAudit.story.passed?"passed":"failed",captionLints:manifestAudit.captionLints.passed?"passed":"failed",numeralAnchorsStatic:manifestAudit.numeralAnchors.passed?"passed":"failed",numeralAnchorsSpoken:numeralAnchorsDecoded.passed?"passed":"failed",narrationGaps:narrationGaps.passed?"passed":"failed",captionSync:captionSync.passed?"passed":"failed",bannedStrings:ocr.banned.passed?"passed":"failed",singleDisclosure:ocr.singleDisclosurePassed?"passed":"failed",requiredOcr:ocr.requiredCoverage>=.9?"passed":"failed",composite:composite.passed?"passed":"failed",phoneScale:phone.passed?"passed":"failed",motionBands:motionBands.passed?"passed":"failed",heldStability:heldStability.evaluation.passed?"passed":"failed",shotDensity:shotBands.passed?"passed":"failed",renderedBounds:bounds.passed?"passed":"failed",transitions:transitions.passed?"passed":"failed",layout:layout.passed?"passed":"failed",mascotPerception:mascot.passed?"passed":"failed",mascotBoundaryContinuity:mascotBoundaries.passed?"passed":"failed",loudness:decoded.loudness.integratedLufs>=-14.5&&decoded.loudness.integratedLufs<=-13.5&&decoded.loudness.truePeakDbtp<=-1?"passed":"failed",clicks:decoded.audioActivity.clickCount===0?"passed":"failed",exactNarration:transcript.passed?"passed":"failed",safeCta:manifestAudit.cta.passed?"passed":"failed",ctaDeliveryApproval:"blocked_external_confirmation",v1ToV21Isolation:"passed",publicSourceApproval:"blocked_external_confirmation",humanMascotAppeal:"blocked_external_confirmation",humanVoiceApproval:"blocked_external_confirmation",humanMessageApproval:"blocked_external_confirmation",physicalPhoneApproval:"blocked_external_confirmation",proofCredibilityApproval:"blocked_external_confirmation",disclosureApproval:"blocked_external_confirmation",ctaApproval:"blocked_external_confirmation",brandLegalApproval:"blocked_external_confirmation",syntheticPresenterDisclosure:"blocked_external_confirmation",overallReferenceQuality:"blocked_external_confirmation"};
+  const external=new Set(Object.keys(gates).filter((key)=>gates[key]==="blocked_external_confirmation")),renderPassed=Object.entries(gates).filter(([key])=>!external.has(key)).every(([,value])=>value==="passed");return{schemaVersion:"10.1",...files,decoded,motion,motionBands,shotBands,heldStability,captionSync,bounds,ocr,composite,layout,mascot,mascotBoundaries,narrationGaps,numeralAnchorsDecoded,phone,transitions,transcript,masterSha256:await sha256(files.master),renderPassed,releaseReady:Object.values(gates).every((value)=>value==="passed"),gates};}
 // Held-element stability. This is the gate V22 exists to add, and the reason it
 // is measured here rather than folded into measureV22Motion is that the motion
 // path decodes at 180x320/5fps: sub-pixel churn is averaged away before it can
@@ -249,8 +397,49 @@ function transitionAudit(motion){
   const mismatches=boundaries.filter(({reconciled})=>!reconciled).map(({sceneId,declared,decodedClass})=>({sceneId,declared,decodedClass}));
   return{schemaVersion:"12.1",method:"Declared transitions are reconciled against decoded mean-luma peaks within ±250ms: cut/slide/object_wipe must produce a peak, dissolves must not, and match cuts are exempt because they preserve composition by definition. Dissolves and match cuts are both capped so the exemptions cannot swallow the timeline.",boundaries,dissolves,matchCuts,decodedDecisiveCount:decisive,mismatches,captionGhosting:false,passed:dissolves<=2&&matchCuts<=5&&decisive>=8&&mismatches.length===0};
 }
-async function narrationAudit(master,narration){const audio=path.join(output,"final-audio.wav");await run("ffmpeg",["-y","-i",master,"-vn","-ac","1","-ar","48000","-c:a","pcm_s16le",audio]);const sourceSequence=narration.beats.map(({approvedText})=>approvedText).join(" "),sequenceApproved=tokens(sourceSequence).join(" ")===tokens(SOLOMON_CREATOR_STORY_V22_SCRIPT).join(" "),transcriptDir=path.join(output,"transcript-check");await fs.mkdir(transcriptDir,{recursive:true,mode:0o700});const whisper=await run("whisper",[master,"--model","small.en","--language","en","--output_dir",transcriptDir,"--output_format","json","--word_timestamps","True","--verbose","False"],600000,true);let asr={available:false,coverage:0,text:""};if(whisper.code===0){const target=path.join(transcriptDir,`${path.parse(master).name}.json`),json=JSON.parse(await fs.readFile(target,"utf8")),text=(json.segments??[]).flatMap((segment)=>segment.words??[]).map(({word})=>word).join(" "),approved=tokens(SOLOMON_CREATOR_STORY_V22_SCRIPT),actual=tokens(text),matched=approved.filter((word)=>actual.includes(word)).length;asr={available:true,coverage:matched/approved.length,text,transcriptPath:target};}return{schemaVersion:"10.1",method:"Exact beat text concatenation is the authoritative sequence gate; Whisper on the encoded master is an independent intelligibility cross-check.",approvedScript:SOLOMON_CREATOR_STORY_V22_SCRIPT,sourceSequence,sequenceApproved,sourceNarrationSha256:narration.sha256,finalAudioSha256:await sha256(audio),asr,declaredIntentionalTailSilence:{fromMs:33800,toMs:36000,purpose:"CTA settle and Solomon sting"},unexplainedNarrationGaps:[],passed:sequenceApproved&&(!asr.available||asr.coverage>=.9)};}
-async function writeFinal(qa){const reports={"media-quality-report.json":qa,"decoded-quality-raw.json":qa.decoded,"semantic-motion-report.json":qa.motion,"motion-band-report.json":qa.motionBands,"held-stability-report.json":qa.heldStability,"shot-density-report.json":qa.shotBands,"rendered-bounds-report.json":qa.bounds,"transition-report.json":qa.transitions,"composite-integrity-report.json":qa.composite,"banned-string-ocr-report.json":qa.ocr,"phone-scale-readability-report.json":qa.phone,"collision-report.json":qa.layout,"mascot-perception-report.json":qa.mascot,"mascot-boundary-continuity.json":qa.mascotBoundaries,"narration-gap-report.json":qa.narrationGaps,"numeral-anchor-report.json":qa.numeralAnchorsDecoded,"audio-report.json":{loudness:qa.decoded.loudness,activity:qa.decoded.audioActivity,soundDesign:qa.soundDesign},"exact-narration-report.json":qa.transcript,"story-consistency-report.json":auditSolomonCreatorStoryV22(manifest).story,"public-release-status.json":{renderPassed:qa.renderPassed,releaseReady:qa.releaseReady,blocked:Object.entries(qa.gates).filter(([,value])=>value==="blocked_external_confirmation").map(([key])=>key)}};await Promise.all(Object.entries(reports).map(([name,value])=>writeJson(path.join(reportsDir,name),value)));await fs.writeFile(path.join(reportsDir,"human-confirmations.md"),`# Human confirmations still required\n\n- Mascot appeal and brand fit\n- Voice naturalness and emotional performance\n- Grounded fictional message quality\n- Physical-phone readability\n- Proof credibility\n- Disclosure clarity\n- CTA appropriateness\n- Solomon brand/legal approval\n- Publication permission for the demo footage\n- Synthetic-presenter disclosure policy\n- Overall reference-quality judgment\n`);await fs.writeFile(path.join(reportsDir,"deferred-product-capabilities.md"),`# Deferred product capabilities\n\nDocumented only; not implemented by the V22 render slice:\n\n- Creative Director approval UI\n- General-purpose DOM capture platform\n- User-facing cinematic capture mode\n- Scene-level regeneration UI\n- Mascot performance editor UI\n- Full audio-director UI\n- Retention analytics ingestion\n- Social posting automation\n- Comment-keyword DM delivery\n- Autonomous publishing\n- Broad marketing automation\n`);}
+// Does each caption actually show the words being spoken underneath it?
+//
+// This is the gate that was missing. Beat placement drift was computed on every
+// render since V11 as `driftMs` and never read, so captions ran up to 3.5s ahead
+// of the narration and nothing failed. Measuring the symptom directly -- comparing
+// each kinetic word group against Whisper's word timings for the encoded master --
+// cannot be satisfied by anything except real alignment, and needs no threshold
+// tuned against our own output.
+//
+// A group counts as aligned when its first word is spoken within CAPTION_SYNC_TOL
+// of the moment the group appears. Some slack is right: the reference videos put a
+// word on screen fractionally before or after it is said, and Whisper's own word
+// boundaries are approximate.
+function auditCaptionSync(transcript){
+  const words=transcript?.asr?.words??[];
+  const norm=(value)=>String(value).toLowerCase().replace(/[^a-z0-9]/g,"");
+  if(!transcript?.asr?.available||words.length===0)return{schemaVersion:"1",passed:false,reason:"no_word_timings",rows:[]};
+  const spoken=words.map((w)=>({word:norm(w.word),start:w.start})).filter((w)=>w.word);
+  const rows=[];
+  for(const caption of manifest.captions){
+    if(!caption.tracksSpeech)continue;
+    for(const group of caption.wordGroups??[]){
+      const first=norm(String(group.text).trim().split(/\s+/)[0]);
+      if(!first)continue;
+      const shownAt=group.from/30;
+      const candidates=spoken.filter((w)=>w.word===first);
+      if(candidates.length===0){rows.push({caption:caption.id,text:group.text,shownAt,drift:null,aligned:false,reason:"word_not_spoken"});continue;}
+      const nearest=candidates.reduce((best,w)=>Math.abs(w.start-shownAt)<Math.abs(best.start-shownAt)?w:best);
+      const drift=nearest.start-shownAt;
+      rows.push({caption:caption.id,text:group.text,shownAt:+shownAt.toFixed(2),drift:+drift.toFixed(2),aligned:Math.abs(drift)<=CAPTION_SYNC_TOL_SECONDS});
+    }
+  }
+  // Groups whose text is never spoken are excluded from the ratio rather than
+  // counted as failures: annotation chips legitimately carry unspoken label text.
+  const spoken_rows=rows.filter((row)=>row.reason!=="word_not_spoken");
+  const aligned=spoken_rows.filter((row)=>row.aligned).length;
+  const ratio=spoken_rows.length?aligned/spoken_rows.length:0;
+  const worst=spoken_rows.reduce((max,row)=>Math.abs(row.drift)>Math.abs(max)?row.drift:max,0);
+  return{schemaVersion:"1",method:`Each kinetic word group's first word compared against Whisper word timings on the encoded master; aligned within ${CAPTION_SYNC_TOL_SECONDS}s.`,toleranceSeconds:CAPTION_SYNC_TOL_SECONDS,minimumAlignedRatio:CAPTION_SYNC_MIN_ALIGNED,groups:spoken_rows.length,aligned,alignedRatio:+ratio.toFixed(3),worstDriftSeconds:+worst.toFixed(2),rows,passed:ratio>=CAPTION_SYNC_MIN_ALIGNED};
+}
+
+async function narrationAudit(master,narration){const audio=path.join(output,"final-audio.wav");await run("ffmpeg",["-y","-i",master,"-vn","-ac","1","-ar","48000","-c:a","pcm_s16le",audio]);const sourceSequence=narration.beats.map(({approvedText})=>approvedText).join(" "),sequenceApproved=tokens(sourceSequence).join(" ")===tokens(SOLOMON_CREATOR_STORY_V22_SCRIPT).join(" "),transcriptDir=path.join(output,"transcript-check");await fs.mkdir(transcriptDir,{recursive:true,mode:0o700});const whisper=await run("whisper",[master,"--model","small.en","--language","en","--output_dir",transcriptDir,"--output_format","json","--word_timestamps","True","--verbose","False"],600000,true);let asr={available:false,coverage:0,text:""};if(whisper.code===0){const target=path.join(transcriptDir,`${path.parse(master).name}.json`),json=JSON.parse(await fs.readFile(target,"utf8")),text=(json.segments??[]).flatMap((segment)=>segment.words??[]).map(({word})=>word).join(" "),approved=tokens(SOLOMON_CREATOR_STORY_V22_SCRIPT),actual=tokens(text),matched=approved.filter((word)=>actual.includes(word)).length;asr={available:true,coverage:matched/approved.length,text,transcriptPath:target,words:(json.segments??[]).flatMap((segment)=>segment.words??[]).map((w)=>({word:String(w.word).trim(),start:w.start,end:w.end}))};}return{schemaVersion:"10.1",method:"Exact beat text concatenation is the authoritative sequence gate; Whisper on the encoded master is an independent intelligibility cross-check.",approvedScript:SOLOMON_CREATOR_STORY_V22_SCRIPT,sourceSequence,sequenceApproved,sourceNarrationSha256:narration.sha256,finalAudioSha256:await sha256(audio),asr,declaredIntentionalTailSilence:{fromMs:33800,toMs:36000,purpose:"CTA settle and Solomon sting"},unexplainedNarrationGaps:[],passed:sequenceApproved&&(!asr.available||asr.coverage>=.9)};}
+async function writeFinal(qa){const reports={"media-quality-report.json":qa,"decoded-quality-raw.json":qa.decoded,"semantic-motion-report.json":qa.motion,"motion-band-report.json":qa.motionBands,"held-stability-report.json":qa.heldStability,"caption-sync-report.json":qa.captionSync,"shot-density-report.json":qa.shotBands,"rendered-bounds-report.json":qa.bounds,"transition-report.json":qa.transitions,"composite-integrity-report.json":qa.composite,"banned-string-ocr-report.json":qa.ocr,"phone-scale-readability-report.json":qa.phone,"collision-report.json":qa.layout,"mascot-perception-report.json":qa.mascot,"mascot-boundary-continuity.json":qa.mascotBoundaries,"narration-gap-report.json":qa.narrationGaps,"numeral-anchor-report.json":qa.numeralAnchorsDecoded,"audio-report.json":{loudness:qa.decoded.loudness,activity:qa.decoded.audioActivity,soundDesign:qa.soundDesign},"exact-narration-report.json":qa.transcript,"story-consistency-report.json":auditSolomonCreatorStoryV22(manifest).story,"public-release-status.json":{renderPassed:qa.renderPassed,releaseReady:qa.releaseReady,blocked:Object.entries(qa.gates).filter(([,value])=>value==="blocked_external_confirmation").map(([key])=>key)}};await Promise.all(Object.entries(reports).map(([name,value])=>writeJson(path.join(reportsDir,name),value)));await fs.writeFile(path.join(reportsDir,"human-confirmations.md"),`# Human confirmations still required\n\n- Mascot appeal and brand fit\n- Voice naturalness and emotional performance\n- Grounded fictional message quality\n- Physical-phone readability\n- Proof credibility\n- Disclosure clarity\n- CTA appropriateness\n- Solomon brand/legal approval\n- Publication permission for the demo footage\n- Synthetic-presenter disclosure policy\n- Overall reference-quality judgment\n`);await fs.writeFile(path.join(reportsDir,"deferred-product-capabilities.md"),`# Deferred product capabilities\n\nDocumented only; not implemented by the V22 render slice:\n\n- Creative Director approval UI\n- General-purpose DOM capture platform\n- User-facing cinematic capture mode\n- Scene-level regeneration UI\n- Mascot performance editor UI\n- Full audio-director UI\n- Retention analytics ingestion\n- Social posting automation\n- Comment-keyword DM delivery\n- Autonomous publishing\n- Broad marketing automation\n`);}
 async function clip(source,target,start,duration,width,height){const args=["-y","-ss",String(start),"-i",source,"-t",String(duration)];if(width&&height)args.push("-vf",`scale=${width}:${height}:flags=lanczos`);args.push("-c:v","libx264","-preset","fast","-crf","18","-c:a","aac","-b:a","160k","-movflags","+faststart",target);return run("ffmpeg",args,600000);}
 async function extractFrame(source,frame,target,extraFilter){const filter=[`select='eq(n,${frame})'`,extraFilter].filter(Boolean).join(",");await run("ffmpeg",["-y","-i",source,"-vf",filter,"-vsync","0","-frames:v","1",target],300000);}
 async function tesseract(target,psm=6){const result=await run("tesseract",[target,"stdout","--psm",String(psm)],120000,true);return result.stdout.trim();}

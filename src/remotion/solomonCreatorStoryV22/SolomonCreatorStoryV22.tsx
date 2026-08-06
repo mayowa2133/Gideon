@@ -197,7 +197,7 @@ const ReasonStack:React.FC<{frame:number}> = ({frame}) => <div style={{position:
 const Cursor:React.FC<{frame:number;from:{x:number;y:number};to:{x:number;y:number};clickAt:number}> = ({frame,from,to,clickAt}) => {const p=interpolate(frame,[0,Math.max(1,clickAt-2)],[0,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp"}),click=interpolate(frame,[clickAt-1,clickAt,clickAt+4],[1,.8,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp"});return <svg viewBox="0 0 40 52" width="56" height="73" style={{position:"absolute",left:from.x+(to.x-from.x)*p,top:from.y+(to.y-from.y)*p,zIndex:60,transform:`scale(${click})`,filter:"drop-shadow(0 4px 4px rgba(0,0,0,.42))"}}><path d="M4 3 L4 39 L14 30 L22 48 L30 44 L22 27 L36 27 Z" fill="#fff" stroke="#111827" strokeWidth="3"/></svg>;};
 const Connector:React.FC<{frame:number;from:{x:number;y:number};to:{x:number;y:number}}> = ({frame,from,to}) => {const p=interpolate(frame,[4,25],[0,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp"});return <svg width="1080" height="1920" style={{position:"absolute",inset:0}}><path d={`M${from.x} ${from.y} Q${(from.x+to.x)/2+70} ${(from.y+to.y)/2} ${to.x} ${to.y}`} fill="none" stroke={MINT} strokeWidth="9" strokeLinecap="round" pathLength="1" strokeDasharray="1" strokeDashoffset={1-p}/></svg>;};
 
-const Caption:React.FC<{caption:V22Caption}> = ({caption}) => {const frame=useCurrentFrame(),{durationInFrames}=useVideoConfig(),enter=spring({frame,fps:30,config:{damping:17,stiffness:185},durationInFrames:9}),opacity=interpolate(frame,[Math.max(0,durationInFrames-4),durationInFrames],[1,0],{extrapolateLeft:"clamp",extrapolateRight:"clamp"});
+const Caption:React.FC<{caption:V22Caption}> = ({caption}) => {const frame=useCurrentFrame(),{durationInFrames}=useVideoConfig(),enter=spring({frame,fps:30,config:{damping:17,stiffness:185},durationInFrames:9}),opacity=interpolate(frame,[Math.max(0,durationInFrames-10),durationInFrames],[1,0],{extrapolateLeft:"clamp",extrapolateRight:"clamp"});
   // Kinetic typography: instead of holding one chip for the whole window (up to
   // 3.4s, which reads as a label), swap 1-2 word groups every ~14 frames with a
   // scale pop, so the words on screen track the words being spoken. This is the
@@ -208,10 +208,17 @@ const Caption:React.FC<{caption:V22Caption}> = ({caption}) => {const frame=useCu
   if(!group)return null;
   const sinceSwap=local-group.from;
   const pop=spring({frame:Math.max(0,sinceSwap),fps:30,config:{damping:13,stiffness:260},durationInFrames:6});
+  // Ease the chip back in across a swap. The text changes in one frame and the
+  // dark chip resizes with it, so a hard swap moves a large block of pixels
+  // instantly — ffmpeg's scene detector reads that as a cut, and once caption
+  // groups were aligned to real speech two of them started registering as shots.
+  // Spreading the change over four frames keeps the kinetic feel while letting
+  // the chip stay a caption rather than a boundary.
+  const swapFade=Math.min(1,.34+Math.max(0,sinceSwap)/4*.66);
   const text=group.text;
   const highlightIndex=caption.highlight?text.toLowerCase().indexOf(caption.highlight.toLowerCase()):-1;
   const pre=highlightIndex>=0?text.slice(0,highlightIndex):text;
   const highlighted=highlightIndex>=0?text.slice(highlightIndex,highlightIndex+(caption.highlight?.length??0)):undefined;
   const post=highlightIndex>=0?text.slice(highlightIndex+(caption.highlight?.length??0)):"";
   const scale=(.82+.18*pop)*(group.emphasis?1.12:1);
-  return <div data-v22-caption={caption.id} data-v22-word-group={group.text} style={{position:"absolute",left:45,right:45,[caption.zone==="top"?"top":"bottom"]:caption.zone==="top"?82:92,display:"flex",justifyContent:"center",zIndex:70,opacity,transform:`translateY(${(1-enter)*(caption.zone==="top"?-25:25)}px)`}}><div style={{padding:"12px 18px",borderRadius:14,background:"rgba(7,17,31,.91)",color:WHITE,fontSize:group.emphasis?44:40,lineHeight:1.06,textAlign:"center",fontWeight:950,boxShadow:"0 12px 30px rgba(0,0,0,.18)",transform:`scale(${scale})`,transformOrigin:caption.zone==="top"?"50% 0%":"50% 100%"}}>{pre}{highlighted&&<span style={{color:MINT}}>{highlighted}</span>}{post}</div></div>;};
+  return <div data-v22-caption={caption.id} data-v22-word-group={group.text} style={{position:"absolute",left:45,right:45,[caption.zone==="top"?"top":"bottom"]:caption.zone==="top"?82:92,display:"flex",justifyContent:"center",zIndex:70,opacity:opacity*swapFade,transform:`translateY(${(1-enter)*(caption.zone==="top"?-25:25)}px)`}}><div style={{padding:"12px 18px",borderRadius:14,background:"rgba(7,17,31,.91)",color:WHITE,fontSize:group.emphasis?44:40,lineHeight:1.06,textAlign:"center",fontWeight:950,boxShadow:"0 12px 30px rgba(0,0,0,.18)",transform:`scale(${scale})`,transformOrigin:caption.zone==="top"?"50% 0%":"50% 100%"}}>{pre}{highlighted&&<span style={{color:MINT}}>{highlighted}</span>}{post}</div></div>;};
