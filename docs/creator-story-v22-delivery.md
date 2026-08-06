@@ -4,7 +4,7 @@ V21 solved stability. This pass measured everything else against the three
 reference creator videos and attacked the two largest compositional gaps: colour
 and presenter scale.
 
-**Status: partial, and the latest commit does not pass all gates — see the crop-region section.** The palette work landed and two of three colour metrics are
+**Status: partial.** All 29 gates pass. The palette work landed and two of three colour metrics are
 now inside the reference range. The presenter work is half done, and the reason
 is a measured structural limit worth recording. Phases 4 (content density, deeper
 darks, freer type) and 5 (palette/presenter gates) are not done.
@@ -194,43 +194,68 @@ chips). The zoom finding is recorded at the `PRODUCT_FOCUS_SCALE` constant so it
 not retried.
 
 
-## Per-usage crop regions — refactor landed, with a known regression
+## Shot density — diagnosed by evidence, after three wrong guesses
 
-`Crop` now means **region of interest** — the part of the recording that carries the
-proof — and `fitRegionToCard` derives the actual framing from whatever card it is
-drawn into, expanding the region to that card's aspect, centred and clamped to the
-source.
+The `split` layout regressed `shotDensity`. Renders came back at 19, 22, 25 and 29
+across changes, and I attributed the movement to whatever I had just edited —
+crop framing, then video playback, then Remotion decode nondeterminism. I wrote in
+an earlier commit that 29 was "a real effect rather than the gate's noise" and that
+the gate "is not reproducible." **Both statements were wrong**, and neither was
+tested before being asserted.
 
-**Why it was needed.** `EvidenceCrop` scales with `max()` to cover the card, so
-whenever a region's aspect did not match the card's, the surplus was silently cut on
-the tighter axis. The same region is drawn at wildly different aspects —
-`trackerAfter` at 5.5:1 in a strip and 1.6:1 in a card, `message` at 1.18:1 and
-1.88:1 — so no single rect could serve them. The old values were not well-framed;
-they merely carried enough slack to hide the mismatch, which is why tightening them
-clipped words mid-character.
+The actual diagnosis took one measurement: diff the frames either side of each
+phantom cut on a 4×6 grid and see where the pixels move.
 
-Fitting to the card makes cover and contain identical, so **clipping is now
-structurally impossible**. Containment was verified arithmetically across all twelve
-usages before rendering. One usage genuinely cannot be fitted — a 5.5:1 strip cannot
-hold a 1.8:1 region — so `trackerAfterStrip` is authored wide and short to match the
-shape it is drawn into. It is the only per-usage region required.
+```
+cut at 13.30s — per-region mean abs delta (4 cols × 6 rows)
+    0   0   0   0
+    0   0   0   0
+    0   0   0   0
+    0   8   9   0
+    0  76  72   0
+    0 103 101   0
+```
 
-**Result:** claim coverage 1.00, OCR 1.00, phone scale passing, no clipped proof.
-Edge density 7.42 → 7.30.
+Every phantom cut is in the bottom-centre — exactly where the rig sits in the split
+layout — and zero everywhere else. Cross-checked against the manifest, all of them
+land inside an active limb window.
 
-**Known regression, not yet fixed.** `shotDensity` is **29** against a band of
-[13,20]; the render does not pass. Containment has a cost: to guarantee a region
-fits, the fitter grows it, so several cards now show more surrounding application —
-and that extra UI carries its own animation, which the scene detector counts. This
-is outside the 19–22 range that identical code produces run to run, so it is a real
-effect and not the gate's noise.
+**The gestures were reading as edits.** The reach offsets in `gestureTarget` were
+tuned when the mascot was a 7.2% corner cameo. V22 puts it at 14%, which doubles the
+absolute pixels an arm sweeps for the same relative reach, and a sweep that large
+crosses ffmpeg's 0.10 scene threshold. Nothing to do with crops, playback or
+decoding.
 
-The fix is tight per-usage regions, which the refactor now makes safe to author
-(the fitter only ever grows a region, so a tight one cannot clip). It is not
-automatic: a tighter region can frame a busier part of the app. A wide region for
-the 790×470 role card was tried and reverted for exactly that reason — it took
-detected shots from 22 to 29 on its own. Each region needs a render to check what it
-newly exposes.
+Damping reach to `GESTURE_REACH = 0.62` restores roughly the cameo's absolute
+motion. Duration is deliberately untouched: slowing the swing would change the
+performance, where shortening the travel only changes how far the hand goes.
+`mascotPerception` still passes, so the gestures remain legible as gestures.
+
+**Result: 19 shots, all 29 gates pass — and two consecutive renders produced
+byte-identical cut lists.** The metric was deterministic the whole time; the varying
+numbers were real responses to real changes that I mis-read as randomness because I
+never isolated *where* on the frame the change was.
+
+## Per-usage crop regions — refactor built, then reverted
+
+`fitRegionToCard` made a `Crop` a region of interest and derived framing from the
+card it is drawn into, so cover and contain become identical and clipping is
+structurally impossible. Containment was verified arithmetically across all twelve
+usages. It fixed the mid-word clipping ("Senior Technical Recruite", "Software Eng")
+and held claims and OCR at 1.00.
+
+It was reverted anyway. Guaranteeing containment means *growing* regions, which
+revealed application chrome that had previously been cropped away — including the
+capture's own "DEMO DATA" banner in frame 320, failing `singleDisclosure`. The
+benefit was preventing latent clipping; the cost was live gate failures.
+
+The framing-neutral version is well defined and mechanical, and is the right next
+step: for each usage compute the rect that was actually visible under the old
+`max()` formula (`cardW/oldScale × cardH/oldScale`, centred on the crop origin) and
+author that as the region. That rect already carries the card's aspect, so the
+fitter becomes a no-op — identical framing, plus the containment guarantee. It needs
+15 regions and a render each, and any region tightened past that must exclude the
+capture's disclosure banner.
 
 ## Not done
 

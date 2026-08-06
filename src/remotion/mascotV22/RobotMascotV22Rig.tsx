@@ -167,19 +167,34 @@ const HandShape: React.FC<{ gesture: V22Gesture; side: "left" | "right"; detail:
   return <ellipse rx="52" ry="54" fill="#f8fbfd" stroke="#acbed0" strokeWidth="7" data-v22-hand="rest" />;
 };
 
+// Gesture reach, damped for presenter scale.
+//
+// These offsets were tuned when the mascot was a 7.2% corner cameo. V22 puts it at
+// 14% in a split layout, which doubles the absolute pixels an arm sweeps for the
+// same relative reach — and a sweep that large, that fast, crosses ffmpeg's 0.10
+// scene threshold. Measured directly: every phantom cut in the V22 master sat in
+// the bottom-centre of the frame (per-region deltas of 74-107 exactly where the rig
+// is) and inside an active limb window.
+//
+// So the gestures were reading as edits. Damping the reach restores roughly the
+// absolute motion the cameo produced, keeping the gesture legible without it
+// registering as a cut. Duration is untouched: slowing the swing would change the
+// performance, where shortening the reach only changes how far the hand travels.
+const GESTURE_REACH=0.62;
+function scaleReach(target:{dx:number;dy:number}){return{dx:target.dx*GESTURE_REACH,dy:target.dy*GESTURE_REACH};}
 function gestureTarget(gesture: V22Gesture, side: "left" | "right") {
-  if (gesture === "celebration" || gesture === "wave") return { dx: 145, dy: -250 };
-  if (gesture === "stop_palm") return { dx: 150, dy: -180 };
-  if (gesture === "thinking_hand") return { dx: side === "left" ? -110 : 110, dy: -250 };
-  if (gesture === "point_down" || gesture === "bookmark_tap") return { dx: 95, dy: 40 };
-  if (gesture === "bookmark_hold") return { dx: 110, dy: -45 };
-  if (gesture.startsWith("true_point")) return { dx: 175, dy: -155 };
-  if (gesture === "presentation_palm" || gesture === "open_palm" || gesture === "approval") return { dx: 140, dy: -105 };
-  return { dx: 60, dy: 20 };
+  if (gesture === "celebration" || gesture === "wave") return scaleReach({ dx: 145, dy: -250 });
+  if (gesture === "stop_palm") return scaleReach({ dx: 150, dy: -180 });
+  if (gesture === "thinking_hand") return scaleReach({ dx: side === "left" ? -110 : 110, dy: -250 });
+  if (gesture === "point_down" || gesture === "bookmark_tap") return scaleReach({ dx: 95, dy: 40 });
+  if (gesture === "bookmark_hold") return scaleReach({ dx: 110, dy: -45 });
+  if (gesture.startsWith("true_point")) return scaleReach({ dx: 175, dy: -155 });
+  if (gesture === "presentation_palm" || gesture === "open_palm" || gesture === "approval") return scaleReach({ dx: 140, dy: -105 });
+  return scaleReach({ dx: 60, dy: 20 });
 }
 function limbCurve(frame: number, timing: V22MascotPerformance["left"]["timing"]) { if (frame <= timing.start) return 0; if (frame <= timing.peak) return ease((frame - timing.start) / (timing.peak - timing.start)); if (frame >= timing.recover) return 0; return 1 - ease((frame - timing.peak) / (timing.recover - timing.peak)); }
 function ease(value: number) { return value * value * (3 - 2 * value); }
-function gazeAt(plan: V22MascotPerformance, frame: number) { const prior = [...plan.gazePath].filter((item) => item.frame <= frame).at(-1) ?? plan.gazePath[0]!, next = plan.gazePath.find((item) => item.frame > frame) ?? prior, p = next.frame === prior.frame ? 1 : Math.min(1, (frame - prior.frame) / (next.frame - prior.frame)); const x = prior.x + (next.x - prior.x) * p, y = prior.y + (next.y - prior.y) * p; return { dx: (x - .5) * 2, dy: (y - .4) * 2 }; }
+function gazeAt(plan: V22MascotPerformance, frame: number) { const prior = [...plan.gazePath].filter((item) => item.frame <= frame).at(-1) ?? plan.gazePath[0]!, next = plan.gazePath.find((item) => item.frame > frame) ?? prior, p = next.frame === prior.frame ? 1 : Math.min(1, (frame - prior.frame) / (next.frame - prior.frame)); const x = prior.x + (next.x - prior.x) * p, y = prior.y + (next.y - prior.y) * p; return scaleReach({ dx: (x - .5) * 2, dy: (y - .4) * 2 }); }
 function mouthFor(face: V22Face, bias: V22Mouth, audio: ReturnType<typeof sampleMascotAudioV22>): V22Mouth { if (!audio.speaking) return bias; if (face === "surprised" && audio.onset > .45) return "surprised_circle"; if (face === "concerned") return audio.rms > .45 ? "small_open" : "concerned_curve"; if (face === "skeptical" && audio.rms < .32) return "thinking_wave"; if (audio.onset > .55 || audio.rms > .62) return "wide_open"; return audio.rms > .3 ? "small_open" : bias; }
 function blinkScale(frame: number, blinkFrames: number[], face: V22Face) { if (face === "surprised") return 1; const distance = Math.min(...blinkFrames.map((beat) => Math.abs(frame - beat)), 999); return distance === 0 ? .07 : distance === 1 ? .26 : 1; }
 // `uneven` and `hash` moved to solomonMascotV22 as unevenV22/mascotIdleSeed, where

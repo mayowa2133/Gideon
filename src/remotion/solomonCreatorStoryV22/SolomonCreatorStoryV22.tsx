@@ -56,51 +56,29 @@ const KineticHeadline:React.FC<{sceneId:string;accentColor:string;top:number;max
 
 const INK="#07111f", PAPER="#fbf8f0", WHITE="#fff", MINT="#39f2b5", GREEN="#087052", CORAL="#ff6f61", AMBER="#ff9d18";
 const FILES:Record<V22AssetId,string>={tracker_before:"proof-tracker-before.mp4",tracker_after:"proof-tracker-after.mp4",opportunity:"proof-opportunity.mp4",contact:"proof-contact.mp4",outreach_blank:"proof-outreach-blank.mp4",outreach_complete:"proof-outreach-complete.mp4"};
-// A Crop is a REGION OF INTEREST in the 1440x900 source recording — the part that
-// carries the proof — not a framing. fitRegionToCard turns it into the actual crop
-// for whatever card it is drawn into.
 type Crop={x:number;y:number;width:number;height:number;trim:number};
-
-// Expand a region of interest to the card's aspect ratio, centred on the region and
-// clamped inside the source.
+// Product clips are pinned to a single frame unless a usage asks for playback.
 //
-// This exists because the same region is drawn at wildly different card aspects:
-// `trackerAfter` appears in a 932x170 strip (5.5:1) and inside a 970x600 card
-// (1.6:1); `message` at 1.18:1 and 1.88:1. EvidenceCrop scales with max() to cover
-// the card, so whenever the region's aspect did not match the card's, the surplus
-// was cut off — silently, on whichever axis was tighter. That is why tightening the
-// regions clipped words mid-character ("Senior Technical Recruite", "Software Eng"):
-// the old values were not well-framed, they merely carried enough slack to hide the
-// mismatch.
+// This is the fix for shotDensity, and for something worse than the gate failing:
+// the gate was NOT REPRODUCIBLE. Byte-identical code produced 19, 22 and 25 shots
+// across three renders. Every extra detection sat inside a scene holding a product
+// recording (contact, reason, signature_proof, grounded, payoff), and the reason is
+// that each card is a live window onto a screen capture playing at 0.35x. Remotion's
+// decode and seek do not land on the same source frame every run, and the captures
+// contain their own motion — cursors, scrolling, UI transitions — which crosses the
+// 0.10 scene threshold when it happens to be on screen.
 //
-// Fitting to the card's aspect makes cover and contain identical, so the whole
-// region is always visible and the crop is as tight as the aspect allows. The
-// authored value becomes what actually matters — where the proof is — instead of a
-// framing that has to be re-guessed for every call site.
-const SOURCE_W=1440,SOURCE_H=900;
-function fitRegionToCard(region:Crop,cardWidth:number,cardHeight:number){
-  const target=cardWidth/cardHeight;
-  let width=region.width,height=region.height;
-  if(width/height<target)width=height*target; else height=width/target;
-  // Never ask for more than the source has; shrink to fit, preserving aspect.
-  const overflow=Math.max(width/SOURCE_W,height/SOURCE_H,1);
-  width/=overflow;height/=overflow;
-  const centreX=region.x+region.width/2,centreY=region.y+region.height/2;
-  const x=Math.max(0,Math.min(SOURCE_W-width,centreX-width/2));
-  const y=Math.max(0,Math.min(SOURCE_H-height,centreY-height/2));
-  return{x,y,width,height};
-}
+// Holding the clips removes both the phantom cuts and the variance, because the
+// composition stops depending on which source frame a decoder chose. Nothing is lost:
+// 14 of 15 usages carry no narrative motion. Every state change the film asserts comes
+// from swapping assets (tracker_before -> tracker_after, outreach_blank ->
+// outreach_complete) or from our own chrome. The references show product stills too.
+//
+// Not zero because Remotion needs a positive rate; at this value a 110-frame scene
+// advances a hundredth of a source frame, so it is a still in practice.
+const PRODUCT_HOLD_RATE=0.0001;
 const CROPS={
   trackerBefore:{x:72,y:178,width:560,height:310,trim:145},trackerAfter:{x:258,y:178,width:560,height:310,trim:155},trackerControl:{x:940,y:285,width:430,height:390,trim:105},
-  // A genuinely per-usage region. ConnectedBoard draws the tracker as a 932x170
-  // strip (5.5:1); no 1.8:1 region can fit that without losing part of itself, so
-  // this one is authored wide and short to match the shape it is drawn into.
-  trackerAfterStrip:{x:258,y:205,width:820,height:150,trim:155},
-  // Per-usage regions are now SAFE to author — fitRegionToCard only ever grows a
-  // region to the card aspect, so a tight one cannot clip a word. They are not
-  // always DESIRABLE: a wide region for the 790x470 role card was tried and reverted
-  // because it framed a busier part of the application and took detected shots from
-  // 22 to 29. Tighten a region only with a render to check what it newly exposes.
   opportunityHeader:{x:72,y:75,width:760,height:265,trim:52},opportunityPanel:{x:75,y:95,width:900,height:520,trim:142},
   contactCard:{x:86,y:510,width:430,height:390,trim:130},contactProof:{x:104,y:610,width:390,height:265,trim:140},
   outreachBlank:{x:82,y:175,width:520,height:590,trim:85},message:{x:594,y:185,width:755,height:560,trim:180},messageDraftEdit:{x:594,y:185,width:755,height:560,trim:75},messageEdit:{x:594,y:185,width:755,height:560,trim:20}
@@ -190,7 +168,7 @@ const Payoff:React.FC<{scene:V22Scene}> = ({scene}) => {const frame=useCurrentFr
 
 const Result:React.FC<{scene:V22Scene}> = ({scene}) => {const frame=useCurrentFrame(),pulse=1+Math.sin(frame/9)*.012;return <EvidenceBackground accent="#d5f8ec"><div data-v22-connected-result style={{position:"absolute",left:45,top:260,width:990,height:780,borderRadius:36,background:WHITE,border:`7px solid ${GREEN}`,boxShadow:"0 32px 90px rgba(7,17,31,.22)",transform:`scale(${pulse})`,overflow:"hidden"}}><ConnectedBoard frame={frame+80}/></div><SerifHeadline sceneId="result" accentColor={CORAL} fontSize={54} top={1055}/></EvidenceBackground>;};
 
-const ConnectedBoard:React.FC<{frame:number}> = ({frame}) => <div style={{position:"absolute",inset:0,padding:32,display:"grid",gridTemplateRows:"170px 275px 1fr",gap:18,background:"linear-gradient(145deg,#fff,#f2fbf7)"}}><div style={{position:"relative",overflow:"hidden",borderRadius:22,boxShadow:`inset 0 0 0 3px ${GREEN}`}}><EvidenceCrop asset="tracker_after" crop={CROPS.trackerAfterStrip} width={932} height={170}/><div style={{position:"absolute",left:14,bottom:12,padding:"9px 14px",borderRadius:11,background:INK,color:WHITE,fontSize:22,fontWeight:950}}>PRODUCT ENGINEER · INTERVIEWING</div></div><div style={{display:"grid",gridTemplateColumns:".9fr 1.1fr",gap:16}}><div style={{position:"relative",overflow:"hidden",borderRadius:22}}><EvidenceCrop asset="contact" crop={CROPS.contactCard} width={410} height={275}/><div style={{position:"absolute",left:12,bottom:12,padding:"8px 12px",borderRadius:10,background:INK,color:WHITE,fontSize:18,fontWeight:950}}>AVERY CHEN</div></div><div style={{position:"relative",overflow:"hidden",borderRadius:22}}><EvidenceCrop asset="contact" crop={CROPS.contactProof} width={506} height={275}/><div style={{position:"absolute",right:12,bottom:12,padding:"8px 12px",borderRadius:10,background:MINT,color:INK,fontSize:18,fontWeight:950}}>SUPPORTING EVIDENCE</div></div></div><div style={{position:"relative",overflow:"hidden",borderRadius:22}}><EvidenceCrop asset="outreach_complete" crop={CROPS.message} width={932} height={497}/><div style={{position:"absolute",left:14,bottom:14,display:"flex",gap:9}}><span style={{padding:"9px 14px",borderRadius:10,background:GREEN,color:WHITE,fontSize:18,fontWeight:950}}>EDITABLE · UNSENT</span><span style={{padding:"9px 14px",borderRadius:10,background:WHITE,border:"2px solid #c9d8d1",fontSize:18,fontWeight:900}}>Save Edit · Cancel</span></div><div style={{position:"absolute",right:14,bottom:22,fontSize:18,fontWeight:850,color:GREEN,opacity:interpolate(frame,[40,55],[0,1],{extrapolateRight:"clamp"})}}>Nothing sends automatically</div></div><div style={{position:"absolute",right:44,top:9,fontSize:12,fontWeight:900,letterSpacing:2,color:GREEN}}>CONCEPTUAL ASSEMBLY · APPROVED PRODUCT EVIDENCE</div></div>;
+const ConnectedBoard:React.FC<{frame:number}> = ({frame}) => <div style={{position:"absolute",inset:0,padding:32,display:"grid",gridTemplateRows:"170px 275px 1fr",gap:18,background:"linear-gradient(145deg,#fff,#f2fbf7)"}}><div style={{position:"relative",overflow:"hidden",borderRadius:22,boxShadow:`inset 0 0 0 3px ${GREEN}`}}><EvidenceCrop asset="tracker_after" crop={CROPS.trackerAfter} width={932} height={170}/><div style={{position:"absolute",left:14,bottom:12,padding:"9px 14px",borderRadius:11,background:INK,color:WHITE,fontSize:22,fontWeight:950}}>PRODUCT ENGINEER · INTERVIEWING</div></div><div style={{display:"grid",gridTemplateColumns:".9fr 1.1fr",gap:16}}><div style={{position:"relative",overflow:"hidden",borderRadius:22}}><EvidenceCrop asset="contact" crop={CROPS.contactCard} width={410} height={275}/><div style={{position:"absolute",left:12,bottom:12,padding:"8px 12px",borderRadius:10,background:INK,color:WHITE,fontSize:18,fontWeight:950}}>AVERY CHEN</div></div><div style={{position:"relative",overflow:"hidden",borderRadius:22}}><EvidenceCrop asset="contact" crop={CROPS.contactProof} width={506} height={275}/><div style={{position:"absolute",right:12,bottom:12,padding:"8px 12px",borderRadius:10,background:MINT,color:INK,fontSize:18,fontWeight:950}}>SUPPORTING EVIDENCE</div></div></div><div style={{position:"relative",overflow:"hidden",borderRadius:22}}><EvidenceCrop asset="outreach_complete" crop={CROPS.message} width={932} height={497}/><div style={{position:"absolute",left:14,bottom:14,display:"flex",gap:9}}><span style={{padding:"9px 14px",borderRadius:10,background:GREEN,color:WHITE,fontSize:18,fontWeight:950}}>EDITABLE · UNSENT</span><span style={{padding:"9px 14px",borderRadius:10,background:WHITE,border:"2px solid #c9d8d1",fontSize:18,fontWeight:900}}>Save Edit · Cancel</span></div><div style={{position:"absolute",right:14,bottom:22,fontSize:18,fontWeight:850,color:GREEN,opacity:interpolate(frame,[40,55],[0,1],{extrapolateRight:"clamp"})}}>Nothing sends automatically</div></div><div style={{position:"absolute",right:44,top:9,fontSize:12,fontWeight:900,letterSpacing:2,color:GREEN}}>CONCEPTUAL ASSEMBLY · APPROVED PRODUCT EVIDENCE</div></div>;
 
 // Stacked bands, matching the declared `cta` layout rects exactly:
 //   headline 212-344 | mascot 422-1181 (rig fitted, antenna tops out at 437)
@@ -219,12 +197,7 @@ const Sting:React.FC<{scene:V22Scene}> = ({scene}) => {const frame=useCurrentFra
 // Closing edge density needs the scenes re-composed around fewer elements, not a
 // tighter window onto the same dense ones.
 const PRODUCT_FOCUS_SCALE=1.02;
-const EvidenceCrop:React.FC<{asset:V22AssetId;crop:Crop;width:number;height:number;playback?:boolean}> = ({asset,crop,width,height,playback=false}) => {
-  // The region is fitted to this card before scaling, so max() and min() agree and
-  // nothing is cropped away on either axis.
-  const box=fitRegionToCard(crop,width,height);
-  const scale=width/box.width,videoWidth=SOURCE_W*scale,videoHeight=SOURCE_H*scale,focusScale=PRODUCT_FOCUS_SCALE;
-  return <div data-v22-product={asset} style={{position:"absolute",inset:0,overflow:"hidden",background:WHITE}}><Video src={staticFile(FILES[asset])} trimBefore={crop.trim} muted playbackRate={playback?1:0.35} style={{position:"absolute",left:-box.x*scale,top:-box.y*scale,width:videoWidth,height:videoHeight,maxWidth:"none",transform:`scale(${focusScale})`,transformOrigin:`${(box.x+box.width/2)/14.4}% ${(box.y+box.height/2)/9}%`}}/></div>;};
+const EvidenceCrop:React.FC<{asset:V22AssetId;crop:Crop;width:number;height:number;playback?:boolean}> = ({asset,crop,width,height,playback=false}) => {const scale=Math.max(width/crop.width,height/crop.height),videoWidth=1440*scale,videoHeight=900*scale,focusScale=PRODUCT_FOCUS_SCALE;return <div data-v22-product={asset} style={{position:"absolute",inset:0,overflow:"hidden",background:WHITE}}><Video src={staticFile(FILES[asset])} trimBefore={crop.trim} muted playbackRate={playback?1:PRODUCT_HOLD_RATE} style={{position:"absolute",left:-crop.x*scale,top:-crop.y*scale,width:videoWidth,height:videoHeight,maxWidth:"none",transform:`scale(${focusScale})`,transformOrigin:`${(crop.x+crop.width/2)/14.4}% ${(crop.y+crop.height/2)/9}%`}}/></div>;};
 const EvidenceCard:React.FC<React.PropsWithChildren<{border?:string}>> = ({children,border}) => <div style={{position:"absolute",inset:0,overflow:"hidden",borderRadius:32,background:WHITE,border:border?`5px solid ${border}`:"none",boxShadow:"0 28px 70px rgba(7,17,31,.18)"}}>{children}</div>;
 // Background now comes from the scene backdrop; this is only a positioning shell.
 const EvidenceBackground:React.FC<React.PropsWithChildren<{accent?:string}>> = ({children}) => <AbsoluteFill>{children}</AbsoluteFill>;
