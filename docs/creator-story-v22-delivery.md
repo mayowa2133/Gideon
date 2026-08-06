@@ -166,12 +166,39 @@ still in its temporal dead zone when that function runs, and fails only at rende
 time. All such constants are now hoisted above the first `await`, with a note in
 the file.
 
+
+## Edge density and green headlines — one fixed, one not
+
+**Headlines: fixed.** Six of eight display headlines rendered in GREEN. They now
+follow the backdrop tier — CORAL on bright and mid grounds, AMBER on the deep
+ones — with MINT kept only for the CTA. GREEN remains the semantic proof colour on
+borders and success chips; it is simply no longer the voice of the typography.
+
+**Edge density: not closed, and the reason is now measured.** Three attempts:
+
+| attempt | result |
+|---|---|
+| Remove chrome (ProofLabel outlines, EvidenceCard hairlines, ConnectedBoard panel borders, Friction placeholder bars) | worked per-scene (`result` −0.75, `signature` −1.13, `hook` −0.72) but net ~0: removing a border un-insets the crop box, so `EvidenceCrop` rescales and reveals more recording, adding it back in `signature_proof` (+1.31) |
+| Zoom product crops 1.02 → 1.30 | −0.15 only, and broke `composite`: claim coverage 1.00 → 0.94, OCR 1.00 → 0.90, because the tighter frame cropped required proof text out. Reverted |
+| — | final 7.42 against the references' 5.69–6.12 |
+
+The measurement that reframes it: **the source recordings measure 2.17–6.36 —
+below the references.** The excess was never the footage and never our borders. It
+is that Gideon shows a whole dense product UI at small scale where the references
+show a few large elements. That is a composition problem, and it lands on exactly
+the same conclusion as the presenter-scale limit: these scenes need re-laying-out
+around fewer, larger elements.
+
+The chrome reductions are kept on their own merits (less visual noise, cleaner
+chips). The zoom finding is recorded at the `PRODUCT_FOCUS_SCALE` constant so it is
+not retried.
+
 ## Not done
 
-- **Phase 4 — content density, darks, type.** Edge density is **7.50** against the
-  references' 5.69–6.12, slightly worse than V21's 7.36. The mock UI's thin-line
-  filler is untouched, and the display type is still 6-of-8 GREEN rather than the
-  references' warm/white serif.
+- **Phase 4 — content density.** Edge density is **7.42** against the references'
+  5.69–6.12. Chrome and crop zoom were both tried and are exhausted; closing this
+  needs the scenes re-composed around fewer, larger elements. Deeper darks were
+  not attempted. Headline colour is done.
 - **Phase 5 — the gates.** `paletteBands` and `presenterOccupancy` were specified
   but not built, so both new axes are currently conventions rather than
   invariants. Given this series' history, that is the most important thing
