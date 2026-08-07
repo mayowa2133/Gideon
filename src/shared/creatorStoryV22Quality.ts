@@ -276,6 +276,39 @@ export const V22_SHOT_BANDS={decodedShotCount:[13,20],meanShotSeconds:[1.7,2.7],
 // 30 frames sits inside both distributions rather than below them.
 export const V22_MIN_SCENE_FRAMES=30;
 
+// The plan's second approved decision: the mascot becomes a presenter at 20-25%
+// of the frame, alternating with product-only shots, rather than the ~7% corner
+// cameo V21 ran for 71% of its frames. It was implemented as a `split` rect one
+// band too short (.64-.975), so the fit came out height-limited at .684 and
+// frame-weighted occupancy sat at 13.7% -- the decision was made but never
+// actually reached, and nothing measured it. Exact and manifest-level: no
+// render, no calibration, same shape as evaluateV22ShotBands.
+export const V22_PRESENTER_OCCUPANCY_BAND=[.18,.28] as const;
+
+export function auditV22PresenterOccupancy(scenes:Array<{id:string;from:number;to:number;mascot:{role:string};layout:V22Rect[]}>,band=V22_PRESENTER_OCCUPANCY_BAND){
+  const total=scenes.reduce((sum,scene)=>sum+(scene.to-scene.from),0)||1;
+  const scales=new Set<string>();
+  let weighted=0,visible=0;
+  for(const scene of scenes){
+    const frames=scene.to-scene.from;
+    if(scene.mascot.role==="absent")continue;
+    const box=mascotBoxForScene(scene);
+    if(!(box.scale>0))continue;
+    visible+=frames;
+    scales.add(box.scale.toFixed(3));
+    weighted+=frames*(V22_RIG.width*box.scale*V22_RIG.height*box.scale)/(V22_CANVAS.width*V22_CANVAS.height);
+  }
+  const occupancy=weighted/total;
+  const failures:string[]=[];
+  if(occupancy<band[0])failures.push(`presenter_too_small:${occupancy.toFixed(3)}`);
+  if(occupancy>band[1])failures.push(`presenter_too_large:${occupancy.toFixed(3)}`);
+  // Three distinct scales is what stops a single anchored size from satisfying
+  // the band while the film still reads as one static sticker.
+  if(scales.size<3)failures.push(`insufficient_scale_variety:${scales.size}`);
+  return{passed:failures.length===0,occupancy,onScreenFraction:visible/total,distinctScales:scales.size,band,failures};
+}
+
+
 export function auditV22SceneDurations(scenes:Array<{id:string;from:number;to:number}>,minimum=V22_MIN_SCENE_FRAMES){
   const short=scenes.filter((scene)=>scene.to-scene.from<minimum).map((scene)=>({id:scene.id,frames:scene.to-scene.from,seconds:Number(((scene.to-scene.from)/30).toFixed(2))}));
   return {passed:short.length===0,minimumFrames:minimum,shortestFrames:scenes.reduce((low,scene)=>Math.min(low,scene.to-scene.from),Number.POSITIVE_INFINITY),short};

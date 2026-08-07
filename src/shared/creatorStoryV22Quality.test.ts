@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditV22BannedStrings, auditV22CompositionSimilarity, auditV22Cta, auditV22MascotPlacement, auditV22PhoneScale, auditV22RenderedBounds, auditV22StoryConsistency, auditV22Transitions, evaluateV22MotionBands, mascotBoxForScene,auditV22SceneDurations} from "./creatorStoryV22Quality";
+import { auditV22BannedStrings, auditV22CompositionSimilarity, auditV22Cta, auditV22MascotPlacement, auditV22PhoneScale, auditV22RenderedBounds, auditV22StoryConsistency, auditV22Transitions, evaluateV22MotionBands, mascotBoxForScene,auditV22SceneDurations,auditV22PresenterOccupancy} from "./creatorStoryV22Quality";
 import { compileSolomonV22DemoContent } from "./solomonDemoContentV22";
 
 const content=compileSolomonV22DemoContent();
@@ -83,5 +83,31 @@ describe("auditV22SceneDurations",()=>{
     const audit=auditV22SceneDurations([{id:"payoff",from:0,to:60},{id:"result",from:60,to:77}]);
     expect(audit.passed).toBe(false);
     expect(audit.short).toEqual([{id:"result",frames:17,seconds:.57}]);
+  });
+});
+
+describe("auditV22PresenterOccupancy",()=>{
+  const split=[{id:"product",kind:"product" as const,left:.04,top:.17,right:.96,bottom:.54},{id:"mascot",kind:"mascot" as const,left:.24,top:.57,right:.76,bottom:.99}];
+  const short=[{id:"product",kind:"product" as const,left:.04,top:.17,right:.96,bottom:.60},{id:"mascot",kind:"mascot" as const,left:.24,top:.64,right:.76,bottom:.975}];
+  const scene=(id:string,to:number,layout:typeof split)=>({id,from:0,to,mascot:{role:"host"},layout});
+  it("fails the cameo-sized presenter the plan set out to replace",()=>{
+    // The band exists because the split rect shipped one band too short, which
+    // left frame-weighted occupancy at 13.7% while the decision said 20-25%.
+    const audit=auditV22PresenterOccupancy([scene("a",100,short),scene("b",100,short),scene("c",100,short)]);
+    expect(audit.passed).toBe(false);
+    expect(audit.failures[0]).toContain("presenter_too_small");
+  });
+  it("passes a presenter sized to the band",()=>{
+    const audit=auditV22PresenterOccupancy([scene("a",100,split),scene("b",100,split),scene("c",100,split)]);
+    expect(audit.occupancy).toBeGreaterThan(.18);
+    expect(audit.occupancy).toBeLessThan(.28);
+  });
+  it("rejects one anchored size even when the band is met",()=>{
+    const audit=auditV22PresenterOccupancy([scene("a",100,split)]);
+    expect(audit.failures).toContain("insufficient_scale_variety:1");
+  });
+  it("ignores absent scenes but still counts their frames",()=>{
+    const audit=auditV22PresenterOccupancy([scene("a",100,split),{id:"b",from:0,to:900,mascot:{role:"absent"},layout:[]}]);
+    expect(audit.occupancy).toBeLessThan(.05);
   });
 });
