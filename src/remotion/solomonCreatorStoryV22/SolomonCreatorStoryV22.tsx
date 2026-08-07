@@ -58,7 +58,14 @@ const KineticHeadline:React.FC<{sceneId:string;accentColor:string;top:number;max
   // before it ever reaches full opacity.
   const pop=spring({frame:Math.max(0,sinceSwap),fps:30,config:{damping:20,stiffness:180},durationInFrames:Math.max(8,Math.min(15,hold-fade))});
   const exit=index<chunks.length-1?Math.min(1,Math.max(0,(hold-sinceSwap)/fade)):1;
-  const GLYPH_EM=.68;
+  // Measured on Fraunces Variable at weight 900, not guessed: a 12-character
+  // headline rendered 983px wide at size 115.2, which is .711 em per glyph. The
+  // old .68 was fitted to the fallback serif the film was accidentally using, so
+  // every width-limited headline overshot its declared band by ~4.6%. The width
+  // is self-normalising -- size scales inversely with length, so this branch
+  // always lands at the same width regardless of the word -- which is why the
+  // overshoot was uniform and never clipped anything.
+  const GLYPH_EM=.711;
   const longest=Math.max(3,...chunk.map(({text})=>text.length));
   const size=Math.max(52,Math.min(widthPx/(longest*GLYPH_EM),maxHeightPx/chunk.length));
   return <div data-v22-kinetic-headline={sceneId} data-v22-kinetic-word={chunk.map(({text})=>text).join(" ")} style={{position:"absolute",left:0,right:0,top,display:"flex",flexDirection:"column",alignItems:"center",pointerEvents:"none"}}>
