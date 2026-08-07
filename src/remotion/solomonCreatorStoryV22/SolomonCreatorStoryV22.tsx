@@ -205,6 +205,19 @@ const Sting:React.FC<{scene:V22Scene}> = ({scene}) => {const frame=useCurrentFra
 // is worth more than a stylistic metric, so this stays at the authored framing.
 // Closing edge density needs the scenes re-composed around fewer elements, not a
 // tighter window onto the same dense ones.
+// Edge density is measured per band, and the product recording is the whole of
+// it: presenter 1.57% and captions 1.89% both sit at or under the references
+// (1.65% / 1.96%), while the content band runs 3.60% and holds 58% of the film's
+// edge pixels. Every product scene measures 2.0-3.2%; the two scenes with no
+// product (hook 1.24%, sting 1.03%) sit well under the references.
+//
+// Zooming the crops does NOT help, which is worth recording because it is the
+// obvious fix and it has now been tried: at 1.18 the film measured 2.34% against
+// 2.33% at 1.02 -- no change -- while pushing required text out of frame and
+// failing requiredOcr, composite and phoneScale. Enlarging UI thickens each
+// glyph's strokes about as fast as it removes glyphs, so the edge *fraction* is
+// invariant to zoom. The remaining gap is intrinsic to filming dense app UI
+// rather than a person, and closing it means showing less evidence.
 const PRODUCT_FOCUS_SCALE=1.02;
 const EvidenceCrop:React.FC<{asset:V22AssetId;crop:Crop;width:number;height:number;playback?:boolean}> = ({asset,crop,width,height,playback=false}) => {
   const scale=Math.max(width/crop.width,height/crop.height),videoWidth=1440*scale,videoHeight=900*scale,focusScale=PRODUCT_FOCUS_SCALE;
