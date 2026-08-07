@@ -142,7 +142,7 @@ function layouts(mode:"hero"|"host"|"left"|"right"|"product"|"cta"|"split"):V22R
 // as they are; it is a 69% lift on V21's 8.3% but short of the 20-25% the reference
 // presenter occupies. Closing the rest means re-composing the scenes as short, wide
 // layouts, which is a change to thirteen components rather than to this rect.
-if(mode==="split")return[{id:"product",kind:"product",left:.04,top:.17,right:.96,bottom:.60},{id:"mascot",kind:"mascot",left:.24,top:.64,right:.76,bottom:.975},caption];
+if(mode==="split")return[{id:"product",kind:"product",left:.04,top:.17,right:.96,bottom:.54},{id:"mascot",kind:"mascot",left:.23,top:.56,right:.77,bottom:.975},caption];
 // The CTA is the only scene where the mascot shares the frame with interactive
 // social UI. V16 reused "host", whose mascot rect spans .18-.78 vertically, so
 // the rig's torso landed squarely on the comment box. Nothing caught it because
