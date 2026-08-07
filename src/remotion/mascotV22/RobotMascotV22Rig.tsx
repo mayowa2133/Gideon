@@ -72,12 +72,26 @@ export const RobotMascotV22Rig: React.FC<{ plan: V22MascotPerformance; frame: nu
   // composed position fractional again, which is the same mistake in a new place.
   const snap = (value: number) => Math.round(value * pixelScale) / pixelScale;
   return <div data-v22-mascot={plan.sceneId} data-v22-face={face} data-v22-left={plan.left.gesture} data-v22-right={plan.right.gesture} style={{ position: "absolute", width: 660, height: 940, zIndex: 32, ...layout, opacity: enter, transform: `${layout.transform ?? ""} translate(${snap(torsoGaze.dx * lean)}px,${snap((1 - enter) * 50 - recoil)}px) rotate(${rotation}deg)`, transformOrigin: "50% 78%" }}>
-    <svg viewBox="0 0 660 940" width="660" height="940" style={{ overflow: "visible", filter: "drop-shadow(0 34px 45px rgba(3,9,20,.24))" }}>
+    {/* No drop-shadow on this element. A 45px blur over the whole 660x940 rig was
+        the most expensive raster in the film, and Chrome rasterizes filtered
+        layers asynchronously: renderMedia intermittently captured a frame before
+        it landed, and the entire mascot was missing for that one frame. Two to
+        ten such dropouts appeared per 1155-frame master, in different places each
+        run; each is a ~10%-of-frame change out and straight back in, which the
+        scene detector scores as cuts, so the shot count moved between identical
+        renders. renderStill draws those same frames correctly, so the
+        composition was never wrong -- only its rasterization was racy. The
+        shadow is now a gradient-filled ellipse: same soft falloff, no filter. */}
+    <svg viewBox="0 0 660 940" width="660" height="940" style={{ overflow: "visible" }}>
       <defs>
+        <radialGradient id={`${plan.sceneId}-cast`} cx="50%" cy="50%" r="50%"><stop stopColor="#030914" stopOpacity=".30" /><stop offset=".55" stopColor="#030914" stopOpacity=".17" /><stop offset="1" stopColor="#030914" stopOpacity="0" /></radialGradient>
         <linearGradient id={`${plan.sceneId}-body`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#fff" /><stop offset=".56" stopColor="#edf3f8" /><stop offset="1" stopColor="#b9c8d7" /></linearGradient>
         <linearGradient id={`${plan.sceneId}-shell`} x1="0" y1="0" x2="1" y2="1"><stop stopColor="#fff" /><stop offset=".46" stopColor="#eef4fa" /><stop offset="1" stopColor="#bac9d8" /></linearGradient>
         <radialGradient id={`${plan.sceneId}-gloss`} cx="24%" cy="12%" r="76%"><stop stopColor="#fff" stopOpacity=".96" /><stop offset=".42" stopColor="#fff" stopOpacity=".12" /><stop offset="1" stopColor="#7f93a8" stopOpacity=".22" /></radialGradient>
       </defs>
+      {/* Replaces the removed drop-shadow: sits under the body, offset down, and
+          falls off through the gradient instead of a blur pass. */}
+      <ellipse data-v22-cast-shadow cx="330" cy="852" rx="300" ry="96" fill={`url(#${plan.sceneId}-cast)`} />
       <Torso id={plan.sceneId} />
       <rect data-v22-neck x="290" y="482" width="80" height="60" rx="26" fill={`url(#${plan.sceneId}-body)`} stroke="#fff" strokeWidth="6" />
       <Arm side="left" gesture={plan.left.gesture} amount={leftAmount} wristRotation={plan.left.timing.wristRotation} detail={handDetail} />
