@@ -81,12 +81,14 @@ export const SOLOMON_CREATOR_STORY_V22_BEATS: readonly V22Beat[] = [
     sceneId: "role",
     vo: "Solomon keeps the role, company, person, and supporting evidence connected.",
     energy: "medium",
+    chip: { from: 311, to: 379, beatText: "ROLE AND COMPANY", role: "spoken", highlight: "COMPANY", zone: "top" },
   },
   {
     id: "reason",
     sceneId: "reason",
     vo: "It shows why Avery is relevant before you write a word.",
     energy: "medium",
+    chip: { from: 379, to: 449, beatText: "WHY AVERY MATCHES", role: "spoken", highlight: "WHY", zone: "top" },
   },
   {
     id: "signature",
@@ -130,8 +132,11 @@ export const SOLOMON_CREATOR_STORY_V22_BEATS: readonly V22Beat[] = [
     sceneId: "cta",
     vo: "Comment SOLOMON and I'll send you the demo.",
     energy: "high",
-    // No chip: the serif headline already reads "COMMENT SOLOMON". V16 printed it
-    // twice, once as the headline and once as a bottom chip.
+    // The chip is back. It was dropped in V16 because the serif headline already
+    // read "COMMENT SOLOMON" and the two printed the same words twice -- and the
+    // headlines are now gone, so without this the call to action is spoken with
+    // nothing on screen tracking it.
+    chip: { from: 1027, to: 1120, beatText: "COMMENT SOLOMON", role: "cta", highlight: "SOLOMON", zone: "top" },
     headline: { primary: "COMMENT SOLOMON", accentItalic: "AND I'LL SEND THE DEMO." },
   },
   {

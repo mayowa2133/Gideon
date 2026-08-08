@@ -66,6 +66,12 @@ export function auditV22Cta(input: { text: string; spoken: string; keyword: stri
   return { passed: failures.length === 0, failures, deliveryVerificationPending };
 }
 
+// The film's length. This bound read 1080 -- the duration before the timeline
+// was relaxed to 38.5s -- so a caption in the last 2.5s would have been
+// rejected as out of range. Nothing caught it because no caption reached
+// that far until the CTA got one back.
+export const V22_FILM_FRAMES=1155;
+
 export function auditV22Captions(captions: Array<{ id: string; from: number; to: number; beatText: string; highlight?: string }>) {
   const failures: string[] = [];
   for (const caption of captions) {
@@ -75,7 +81,7 @@ export function auditV22Captions(captions: Array<{ id: string; from: number; to:
     if (caption.highlight !== undefined) {
       if (!caption.beatText.toLowerCase().includes(caption.highlight.toLowerCase())) failures.push(`${caption.id}:highlight_not_substring`);
     }
-    if (!(caption.from < caption.to) || caption.from < 0 || caption.to > 1080) failures.push(`${caption.id}:invalid_window`);
+    if (!(caption.from < caption.to) || caption.from < 0 || caption.to > V22_FILM_FRAMES) failures.push(`${caption.id}:invalid_window`);
   }
   return { passed: failures.length === 0, failures };
 }
