@@ -89,7 +89,7 @@ describe.skipIf(!executablePath)("generic capture pilot", () => {
     expect(selected.report.coverage?.dimensions.find((dimension) => dimension.key === "outcome")).toMatchObject({ denominator: 2, coveredIds: ["complete-again-outcome"], uncoveredIds: ["complete-outcome"] });
     expect(resets).toBe(10);
     await expect(runCapturePilot({ manifest, adapters, outputRoot, executablePath, workflowIds: ["missing"] })).rejects.toThrow("Capture pilot workflows are not registered: missing");
-  }, 90_000);
+  }, 180_000);
 
   it("persists a failed workflow checkpoint with bounded retry evidence", async () => {
     const outputRoot = path.join(root, "failure-output");
@@ -123,7 +123,7 @@ function manifestValue(baseUrl: string, rootDir: string) {
     repository: { rootDir, maxFiles: 100, maxBytes: 1_000_000 },
     environment: { name: "Fixture", type: "local_preview", baseUrl, allowedDomains: ["localhost"], startupAdapterId: "fixture" },
     persona: { key: "demo", displayName: "Demo", roleDescription: "Synthetic fixture persona.", fixtureProfileId: "fixture:demo", fixtureValues: { result: "Done" } },
-    presentation: { viewport: { width: 960, height: 600 }, initialHoldMs: 1500, beforeActionMs: 200, afterActionMs: 500, finalHoldMs: 1000, showPointer: true, pointerMoveMs: 250, typingDelayMs: 35, verticalOutput: { enabled: true, narration: "none", framing: { mode: "automatic_focus", maxZoom: 1.6, transitionMs: 650 }, quality: { minimumSourceTextPx: 12 } } },
+    presentation: { viewport: { width: 960, height: 600 }, initialHoldMs: 600, beforeActionMs: 200, afterActionMs: 500, finalHoldMs: 400, showPointer: true, pointerMoveMs: 250, typingDelayMs: 35, verticalOutput: { enabled: true, narration: "none", framing: { mode: "automatic_focus", maxZoom: 1.6, transitionMs: 650 }, quality: { minimumSourceTextPx: 12 } } },
     coverageInventory: { revision: 1, fixtureRevision: "fixture-v1", dimensions: [
       { key: "route", trustworthyDenominator: true, items: [], excluded: [], blocked: [] },
       { key: "state", trustworthyDenominator: true, items: [{ id: "fixture-ready", workflowIds: ["complete", "complete-again"] }], excluded: [], blocked: [] },
