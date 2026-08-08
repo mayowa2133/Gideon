@@ -241,13 +241,19 @@ export const V22_RIG_BLEED={topPx:48} as const;
 // the warm ones something to sit against. Mint survives as an accent in type,
 // highlights and the mascot's face, which is where the references put their colour
 // too — on the subject, not the backdrop.
-export const V22_BACKDROPS={
+export const // The references concentrate colour in a single hue -- red at 76%, 53% and 81%
+// of their coloured pixels -- and let everything else go neutral. V22 measured
+// cyan 45%, red 24%, orange 16%, azure 10%: four hues competing, none dominant.
+// Mint is the brand and sits on the mascot's face, so it stays as the dominant
+// hue and the others are removed: the coral accents go mint, and these two blue
+// grounds are desaturated to neutral greys at the same luma tier.
+V22_BACKDROPS={
   paper:{tier:"bright",luma:243,css:"linear-gradient(145deg,#fdfbf5,#eef2ec)",foreground:"#07111f"},
   blush:{tier:"bright",luma:232,css:"linear-gradient(145deg,#fff3ee,#ffd8cc)",foreground:"#07111f"},
   clay:{tier:"mid",luma:150,css:"linear-gradient(150deg,#d6c6b0,#a8917a)",foreground:"#171009"},
-  sky:{tier:"mid",luma:165,css:"linear-gradient(150deg,#a9cfe8,#5f93bd)",foreground:"#07111f"},
+  sky:{tier:"mid",luma:163,css:"linear-gradient(150deg,#ccd0d2,#8f9599)",foreground:"#07111f"},
   espresso:{tier:"deep",luma:57,css:"linear-gradient(160deg,#4c3729,#1e140d)",foreground:"#fdf6ee"},
-  slate:{tier:"deep",luma:40,css:"linear-gradient(160deg,#22354a,#0a1522)",foreground:"#f2f7ff"},
+  slate:{tier:"deep",luma:42,css:"linear-gradient(160deg,#2b2f33,#101315)",foreground:"#f2f7ff"},
   ink:{tier:"deep",luma:15,css:"#07111f",foreground:"#ffffff"},
 } as const;
 export type V22BackdropToken=keyof typeof V22_BACKDROPS;
