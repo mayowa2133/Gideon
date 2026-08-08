@@ -1,6 +1,6 @@
 import { compileSolomonV22DemoContent } from "./solomonDemoContentV22";
 import { describe,expect,it } from "vitest";
-import { auditSolomonCreatorStoryV22, createSolomonCreatorStoryV22Manifest, SOLOMON_CREATOR_STORY_V22_CTA, SOLOMON_CREATOR_STORY_V22_HOOK, type V22AssetId } from "./solomonCreatorStoryV22";
+import { auditSolomonCreatorStoryV22, createSolomonCreatorStoryV22Manifest, SOLOMON_CREATOR_STORY_V22_CTA, SOLOMON_CREATOR_STORY_V22_CTA_SPOKEN, SOLOMON_CREATOR_STORY_V22_HOOK, type V22AssetId } from "./solomonCreatorStoryV22";
 
 const ids:V22AssetId[]=["tracker_before","tracker_after","opportunity","contact","outreach_blank","outreach_complete"];
 const inputs=ids.map((id)=>({id,path:`/${id}.webm`,sha256:id.padEnd(64,"0"),domEvidence:[{elementId:id,role:"region",text:id,box:{x:0,y:0,width:100,height:100}}]}));
@@ -54,5 +54,16 @@ describe("claims are grounded in product pixels",()=>{
   it("keeps control on the product's own controls",()=>{
     const claim=manifest.claims.find((item)=>item.id==="control")!;
     expect(claim.requiredReadableText).toEqual(["Save Edit","Cancel"]);
+  });
+});
+
+describe("the CTA says what it shows",()=>{
+  // The display line read "COMMENT SOLOMON FOR THE DEMO" while the narration says
+  // "Comment SOLOMON and I'll send you the demo" -- two hand-typed strings that
+  // drifted apart, and nothing compared them. auditV22Cta only checks that both
+  // contain the keyword, so it passed throughout.
+  it("renders the spoken words, not a paraphrase of them",()=>{
+    const normalise=(value:string)=>value.toLowerCase().replace(/[^a-z0-9 ]/g,"").replace(/\s+/g," ").trim();
+    expect(normalise(SOLOMON_CREATOR_STORY_V22_CTA)).toBe(normalise(SOLOMON_CREATOR_STORY_V22_CTA_SPOKEN));
   });
 });

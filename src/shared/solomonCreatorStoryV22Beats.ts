@@ -217,7 +217,10 @@ export function compileSolomonCreatorStoryV22(): CompiledSolomonCreatorStoryV22 
     script,
     hook: beats[0]!.vo,
     ctaSpoken: beats.find(({ id }) => id === "cta")!.vo,
-    ctaDisplay: "COMMENT SOLOMON FOR THE DEMO",
+    // The display line is the spoken line. It read "COMMENT SOLOMON FOR THE
+    // DEMO" while the narration says "Comment SOLOMON and I'll send you the
+    // demo", so the words on screen were a paraphrase of the words being said.
+    ctaDisplay: "COMMENT SOLOMON AND I'LL SEND YOU THE DEMO",
     ctaKeyword: "SOLOMON",
     narrationBySceneId,
     captions,
