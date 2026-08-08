@@ -37,7 +37,13 @@ export function createSolomonCreatorStoryV22Manifest(inputs:V22SourceInput[],par
   const claims:V22Claim[]=[
     claim("status","The opportunity visibly changes from Applied to Interviewing.",["tracker_before","tracker_after"],["Product Engineer","Applied","Interviewing"],26,53),
     claim("contact","A relevant fictional contact is visible.",["contact"],["Avery Chen","Senior Technical Recruiter","Northstar Labs"],58,94),
-    claim("relevance","Three reasons support contact relevance.",["contact"],[...demoContent.contact.reasons],109,135),
+    // Grounded in the product's own proof rows, not our overlay. This claim used
+    // to require demoContent.contact.reasons -- the exact strings the ReasonStack
+    // chips render -- so it verified Gideon's own caption against itself and would
+    // have passed even if the recording showed nothing. These two phrases appear
+    // in the contact capture's DOM evidence and are legible in the card at the
+    // claim frame; neither appears in any chip we draw.
+    claim("relevance","The product's own proof rows explain why the contact is relevant.",["contact"],["Recruiting title at the target company","Current role at Northstar Labs"],109,135),
     claim("role","The role and company stay connected.",["opportunity"],["Product Engineer","Northstar Labs"],311,361),
     claim("draft","A grounded editable message is readable.",["outreach_complete"],["Product Engineer","Northstar Labs","technical hiring","Save Edit"],626,672),
     claim("control","The message remains unsent and user-controlled.",["outreach_complete"],["Save Edit","Cancel","Nothing sends without you"],786,858)
