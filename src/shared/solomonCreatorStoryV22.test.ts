@@ -43,13 +43,16 @@ describe("claims are grounded in product pixels",()=>{
     const claim=manifest.claims.find((item)=>item.id==="relevance")!;
     expect(claim.requiredReadableText).toEqual(["Recruiting title at the target company","Current role at Northstar Labs"]);
   });
-  // Known exception, deliberately visible rather than silently tolerated:
-  // `control` still requires "Nothing sends without you", which is our own line
-  // and appears in no capture. It is the film's trust promise, spoken in the
-  // narration, but it is not product evidence -- so this claim is only two
-  // thirds grounded and should be re-grounded or narrowed.
-  it("reports the one claim string that is still ours, not the product's",()=>{
-    const ungrounded=manifest.claims.flatMap((claim)=>claim.requiredReadableText.filter((text)=>/nothing sends without you/i.test(text)));
-    expect(ungrounded).toEqual(["Nothing sends without you"]);
+  // Every claim is now grounded: the two that were not have been re-grounded
+  // (relevance) and narrowed (control). This asserts the general property rather
+  // than a list of known exceptions, so a new self-referential claim fails here.
+  it("requires no editorial copy of ours as claim evidence",()=>{
+    const ourCopy=[...compileSolomonV22DemoContent().contact.reasons,manifest.creativeDirector.trustBoundary].map((value)=>value.toLowerCase());
+    const leaked=manifest.claims.flatMap((claim)=>claim.requiredReadableText.filter((text)=>ourCopy.includes(text.toLowerCase())));
+    expect(leaked).toEqual([]);
+  });
+  it("keeps control on the product's own controls",()=>{
+    const claim=manifest.claims.find((item)=>item.id==="control")!;
+    expect(claim.requiredReadableText).toEqual(["Save Edit","Cancel"]);
   });
 });
