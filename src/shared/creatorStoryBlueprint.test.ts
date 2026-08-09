@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { auditV22BackdropCadence, backdropCssLuma, type V22BackdropToken } from "./creatorStoryV22Quality";
+import { buildFilmScenes, MIN_SCENE_FRAMES } from "./creatorStoryFilm";
+import { v22MascotPerformanceSchema } from "./solomonMascotV22";
 import type { CreativeBlueprint, SceneComposition } from "./types";
 
 // The parity fixture: the V22 film expressed as a CreativeBlueprint, written by
@@ -107,5 +109,43 @@ describe("solomon v22 parity blueprint", () => {
       .reduce((sum, scene) => sum + (scene.endMs - scene.startMs), 0);
     expect(absent / total).toBeGreaterThan(.12);
     expect(absent / total).toBeLessThan(.35);
+  });
+});
+
+describe("blueprint to film scenes", () => {
+  const film = buildFilmScenes(blueprint);
+
+  it("lands on the timeline the film actually renders", () => {
+    expect(film).toHaveLength(18);
+    expect(film.at(-1)!.to).toBe(1155);
+    film.forEach((scene, index) => expect(scene.from, scene.id).toBe(index === 0 ? 0 : film[index - 1]!.to));
+  });
+
+  // The bug this pins: adjusting boundaries in place and shifting the tail
+  // cannot conserve the total, because a donor earlier in the timeline is never
+  // reached by a forward shift. That leaked four frames onto a 1155-frame film.
+  it("conserves total frames while lifting every scene to the floor", () => {
+    for (const scene of film) expect(scene.to - scene.from, scene.id).toBeGreaterThanOrEqual(MIN_SCENE_FRAMES);
+    for (const realizedEndMs of [34_000, 38_500, 41_000, 46_000]) {
+      const hydrated = buildFilmScenes(blueprint, realizedEndMs);
+      expect(hydrated.at(-1)!.to, `${realizedEndMs}ms`).toBe(Math.round(realizedEndMs / 1000 * 30));
+      expect(Math.min(...hydrated.map((scene) => scene.to - scene.from)), `${realizedEndMs}ms`).toBeGreaterThanOrEqual(MIN_SCENE_FRAMES);
+      hydrated.forEach((scene, index) => expect(scene.from).toBe(index === 0 ? 0 : hydrated[index - 1]!.to));
+    }
+  });
+
+  it("derives a mascot performance the rig schema accepts", () => {
+    for (const scene of film) expect(() => v22MascotPerformanceSchema.parse(scene.mascot), scene.id).not.toThrow();
+  });
+
+  it("keeps the presenter deterministic and varied", () => {
+    const again = buildFilmScenes(blueprint);
+    expect(again.map((scene) => scene.mascot.head.tilt)).toEqual(film.map((scene) => scene.mascot.head.tilt));
+    // The regression this guards: head tilt and torso rotate both came from
+    // `sceneId.length % 2`, so eighteen scenes shared two poses between them.
+    const visible = film.filter((scene) => scene.mascot.role !== "absent");
+    expect(new Set(visible.map((scene) => scene.mascot.head.tilt)).size).toBeGreaterThan(visible.length * .8);
+    // Hands on one curve read as a puppet, and the schema rejects it outright.
+    for (const scene of visible) expect(scene.mascot.left.timing.peak, scene.id).not.toBe(scene.mascot.right.timing.peak);
   });
 });
