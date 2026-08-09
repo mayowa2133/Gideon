@@ -1,0 +1,7982 @@
+{
+  "schemaVersion": "1",
+  "product": "solomon",
+  "source": {
+    "width": 1440,
+    "height": 900
+  },
+  "screens": [
+    {
+      "asset": "opportunity",
+      "trim": 52,
+      "width": 1440,
+      "height": 900,
+      "elements": [
+        {
+          "id": "opportunityHeader",
+          "provenance": "approved",
+          "x": 72,
+          "y": 75,
+          "width": 760,
+          "height": 265,
+          "aspect": 2.868,
+          "text": "Discover opportunities across multiple sources, scored against your profile. Search Jobs Search Search across JSearch, Adzuna, Remotive, Dice, newgrad-jobs.com, and more. Paste a job a similar Job Title or Keyword Board ID or e.g. Software Engineer, Frontend Developer e.g. stripe",
+          "words": [
+            {
+              "text": "Discover",
+              "x": 97,
+              "y": 146,
+              "width": 62,
+              "height": 12
+            },
+            {
+              "text": "opportunities",
+              "x": 164,
+              "y": 147,
+              "width": 95,
+              "height": 13
+            },
+            {
+              "text": "across",
+              "x": 265,
+              "y": 149,
+              "width": 47,
+              "height": 9
+            },
+            {
+              "text": "multiple",
+              "x": 318,
+              "y": 146,
+              "width": 57,
+              "height": 14
+            },
+            {
+              "text": "sources,",
+              "x": 381,
+              "y": 149,
+              "width": 59,
+              "height": 11
+            },
+            {
+              "text": "scored",
+              "x": 446,
+              "y": 146,
+              "width": 47,
+              "height": 12
+            },
+            {
+              "text": "against",
+              "x": 499,
+              "y": 147,
+              "width": 53,
+              "height": 14
+            },
+            {
+              "text": "your",
+              "x": 557,
+              "y": 149,
+              "width": 31,
+              "height": 11
+            },
+            {
+              "text": "profile.",
+              "x": 595,
+              "y": 146,
+              "width": 44,
+              "height": 14
+            },
+            {
+              "text": "Search",
+              "x": 113,
+              "y": 209,
+              "width": 51,
+              "height": 12
+            },
+            {
+              "text": "Jobs",
+              "x": 170,
+              "y": 209,
+              "width": 35,
+              "height": 12
+            },
+            {
+              "text": "Search",
+              "x": 745,
+              "y": 209,
+              "width": 51,
+              "height": 12
+            },
+            {
+              "text": "Search",
+              "x": 113,
+              "y": 236,
+              "width": 43,
+              "height": 10
+            },
+            {
+              "text": "across",
+              "x": 161,
+              "y": 238,
+              "width": 41,
+              "height": 8
+            },
+            {
+              "text": "JSearch,",
+              "x": 208,
+              "y": 236,
+              "width": 54,
+              "height": 11
+            },
+            {
+              "text": "Adzuna,",
+              "x": 267,
+              "y": 236,
+              "width": 50,
+              "height": 12
+            },
+            {
+              "text": "Remotive,",
+              "x": 323,
+              "y": 236,
+              "width": 61,
+              "height": 11
+            },
+            {
+              "text": "Dice,",
+              "x": 389,
+              "y": 236,
+              "width": 29,
+              "height": 12
+            },
+            {
+              "text": "newgrad-jobs.com,",
+              "x": 424,
+              "y": 236,
+              "width": 116,
+              "height": 12
+            },
+            {
+              "text": "and",
+              "x": 549,
+              "y": 236,
+              "width": 21,
+              "height": 10
+            },
+            {
+              "text": "more.",
+              "x": 576,
+              "y": 238,
+              "width": 34,
+              "height": 8
+            },
+            {
+              "text": "Paste",
+              "x": 745,
+              "y": 236,
+              "width": 35,
+              "height": 10
+            },
+            {
+              "text": "a",
+              "x": 785,
+              "y": 238,
+              "width": 4,
+              "height": 8
+            },
+            {
+              "text": "job",
+              "x": 795,
+              "y": 236,
+              "width": 19,
+              "height": 12
+            },
+            {
+              "text": "a",
+              "x": 745,
+              "y": 258,
+              "width": 6,
+              "height": 8
+            },
+            {
+              "text": "similar",
+              "x": 756,
+              "y": 256,
+              "width": 41,
+              "height": 10
+            },
+            {
+              "text": "Job",
+              "x": 113,
+              "y": 269,
+              "width": 24,
+              "height": 10
+            },
+            {
+              "text": "Title",
+              "x": 140,
+              "y": 269,
+              "width": 28,
+              "height": 10
+            },
+            {
+              "text": "or",
+              "x": 173,
+              "y": 271,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "Keyword",
+              "x": 190,
+              "y": 269,
+              "width": 55,
+              "height": 12
+            },
+            {
+              "text": "Board",
+              "x": 745,
+              "y": 289,
+              "width": 37,
+              "height": 10
+            },
+            {
+              "text": "ID",
+              "x": 788,
+              "y": 289,
+              "width": 12,
+              "height": 10
+            },
+            {
+              "text": "or",
+              "x": 804,
+              "y": 291,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "e.g.",
+              "x": 124,
+              "y": 302,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "Software",
+              "x": 149,
+              "y": 300,
+              "width": 57,
+              "height": 10
+            },
+            {
+              "text": "Engineer,",
+              "x": 212,
+              "y": 300,
+              "width": 56,
+              "height": 12
+            },
+            {
+              "text": "Frontend",
+              "x": 274,
+              "y": 300,
+              "width": 55,
+              "height": 10
+            },
+            {
+              "text": "Developer",
+              "x": 335,
+              "y": 300,
+              "width": 63,
+              "height": 12
+            },
+            {
+              "text": "e.g.",
+              "x": 756,
+              "y": 322,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "stripe",
+              "x": 781,
+              "y": 321,
+              "width": 36,
+              "height": 11
+            }
+          ]
+        },
+        {
+          "id": "opportunityTitle",
+          "provenance": "approved",
+          "x": 76,
+          "y": 88,
+          "width": 740,
+          "height": 116,
+          "aspect": 6.379,
+          "text": "Discover opportunities across multiple sources, scored against your profile.",
+          "words": [
+            {
+              "text": "Discover",
+              "x": 97,
+              "y": 146,
+              "width": 62,
+              "height": 12
+            },
+            {
+              "text": "opportunities",
+              "x": 164,
+              "y": 147,
+              "width": 95,
+              "height": 13
+            },
+            {
+              "text": "across",
+              "x": 265,
+              "y": 149,
+              "width": 47,
+              "height": 9
+            },
+            {
+              "text": "multiple",
+              "x": 318,
+              "y": 146,
+              "width": 57,
+              "height": 14
+            },
+            {
+              "text": "sources,",
+              "x": 381,
+              "y": 149,
+              "width": 59,
+              "height": 11
+            },
+            {
+              "text": "scored",
+              "x": 446,
+              "y": 146,
+              "width": 47,
+              "height": 12
+            },
+            {
+              "text": "against",
+              "x": 499,
+              "y": 147,
+              "width": 53,
+              "height": 14
+            },
+            {
+              "text": "your",
+              "x": 557,
+              "y": 149,
+              "width": 31,
+              "height": 11
+            },
+            {
+              "text": "profile.",
+              "x": 595,
+              "y": 146,
+              "width": 44,
+              "height": 14
+            }
+          ]
+        },
+        {
+          "id": "opportunityPanel",
+          "provenance": "approved",
+          "x": 75,
+          "y": 95,
+          "width": 900,
+          "height": 520,
+          "aspect": 1.731,
+          "text": "Discover opportunities across multiple sources, scored against your profile. Search Jobs Search Company Career Page Search across JSearch, Adzuna, Remotive, Dice, newgrad-jobs.com, and more. Paste a job posting URL from Apple a similar careers page, or enter a Job Title or Keyword Board ID or Job Posting URL e.g. Software Engineer, Frontend Developer e.g. stripe or Location (optional) links auto-detect the platform and New York, NY or Remote ATS Platform Remote only Greenhouse Your job feed Fetching roles for 2 occupations — pick a category and we go find those jobs (new-grad, internships and all). Toggle chips to widen or",
+          "words": [
+            {
+              "text": "Discover",
+              "x": 97,
+              "y": 146,
+              "width": 62,
+              "height": 12
+            },
+            {
+              "text": "opportunities",
+              "x": 164,
+              "y": 147,
+              "width": 95,
+              "height": 13
+            },
+            {
+              "text": "across",
+              "x": 265,
+              "y": 149,
+              "width": 47,
+              "height": 9
+            },
+            {
+              "text": "multiple",
+              "x": 318,
+              "y": 146,
+              "width": 57,
+              "height": 14
+            },
+            {
+              "text": "sources,",
+              "x": 381,
+              "y": 149,
+              "width": 59,
+              "height": 11
+            },
+            {
+              "text": "scored",
+              "x": 446,
+              "y": 146,
+              "width": 47,
+              "height": 12
+            },
+            {
+              "text": "against",
+              "x": 499,
+              "y": 147,
+              "width": 53,
+              "height": 14
+            },
+            {
+              "text": "your",
+              "x": 557,
+              "y": 149,
+              "width": 31,
+              "height": 11
+            },
+            {
+              "text": "profile.",
+              "x": 595,
+              "y": 146,
+              "width": 44,
+              "height": 14
+            },
+            {
+              "text": "Search",
+              "x": 113,
+              "y": 209,
+              "width": 51,
+              "height": 12
+            },
+            {
+              "text": "Jobs",
+              "x": 170,
+              "y": 209,
+              "width": 35,
+              "height": 12
+            },
+            {
+              "text": "Search",
+              "x": 745,
+              "y": 209,
+              "width": 51,
+              "height": 12
+            },
+            {
+              "text": "Company",
+              "x": 801,
+              "y": 209,
+              "width": 70,
+              "height": 15
+            },
+            {
+              "text": "Career",
+              "x": 876,
+              "y": 209,
+              "width": 49,
+              "height": 12
+            },
+            {
+              "text": "Page",
+              "x": 931,
+              "y": 209,
+              "width": 36,
+              "height": 15
+            },
+            {
+              "text": "Search",
+              "x": 113,
+              "y": 236,
+              "width": 43,
+              "height": 10
+            },
+            {
+              "text": "across",
+              "x": 161,
+              "y": 238,
+              "width": 41,
+              "height": 8
+            },
+            {
+              "text": "JSearch,",
+              "x": 208,
+              "y": 236,
+              "width": 54,
+              "height": 11
+            },
+            {
+              "text": "Adzuna,",
+              "x": 267,
+              "y": 236,
+              "width": 50,
+              "height": 12
+            },
+            {
+              "text": "Remotive,",
+              "x": 323,
+              "y": 236,
+              "width": 61,
+              "height": 11
+            },
+            {
+              "text": "Dice,",
+              "x": 389,
+              "y": 236,
+              "width": 29,
+              "height": 12
+            },
+            {
+              "text": "newgrad-jobs.com,",
+              "x": 424,
+              "y": 236,
+              "width": 116,
+              "height": 12
+            },
+            {
+              "text": "and",
+              "x": 549,
+              "y": 236,
+              "width": 21,
+              "height": 10
+            },
+            {
+              "text": "more.",
+              "x": 576,
+              "y": 238,
+              "width": 34,
+              "height": 8
+            },
+            {
+              "text": "Paste",
+              "x": 745,
+              "y": 236,
+              "width": 35,
+              "height": 10
+            },
+            {
+              "text": "a",
+              "x": 785,
+              "y": 238,
+              "width": 4,
+              "height": 8
+            },
+            {
+              "text": "job",
+              "x": 795,
+              "y": 236,
+              "width": 19,
+              "height": 12
+            },
+            {
+              "text": "posting",
+              "x": 820,
+              "y": 237,
+              "width": 45,
+              "height": 11
+            },
+            {
+              "text": "URL",
+              "x": 871,
+              "y": 236,
+              "width": 26,
+              "height": 10
+            },
+            {
+              "text": "from",
+              "x": 902,
+              "y": 236,
+              "width": 28,
+              "height": 10
+            },
+            {
+              "text": "Apple",
+              "x": 935,
+              "y": 236,
+              "width": 36,
+              "height": 12
+            },
+            {
+              "text": "a",
+              "x": 745,
+              "y": 258,
+              "width": 6,
+              "height": 8
+            },
+            {
+              "text": "similar",
+              "x": 756,
+              "y": 256,
+              "width": 41,
+              "height": 10
+            },
+            {
+              "text": "careers",
+              "x": 802,
+              "y": 258,
+              "width": 46,
+              "height": 8
+            },
+            {
+              "text": "page,",
+              "x": 854,
+              "y": 258,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "or",
+              "x": 893,
+              "y": 258,
+              "width": 11,
+              "height": 8
+            },
+            {
+              "text": "enter",
+              "x": 908,
+              "y": 257,
+              "width": 33,
+              "height": 9
+            },
+            {
+              "text": "a",
+              "x": 946,
+              "y": 258,
+              "width": 6,
+              "height": 8
+            },
+            {
+              "text": "Job",
+              "x": 113,
+              "y": 269,
+              "width": 24,
+              "height": 10
+            },
+            {
+              "text": "Title",
+              "x": 140,
+              "y": 269,
+              "width": 28,
+              "height": 10
+            },
+            {
+              "text": "or",
+              "x": 173,
+              "y": 271,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "Keyword",
+              "x": 190,
+              "y": 269,
+              "width": 55,
+              "height": 12
+            },
+            {
+              "text": "Board",
+              "x": 745,
+              "y": 289,
+              "width": 37,
+              "height": 10
+            },
+            {
+              "text": "ID",
+              "x": 788,
+              "y": 289,
+              "width": 12,
+              "height": 10
+            },
+            {
+              "text": "or",
+              "x": 804,
+              "y": 291,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "Job",
+              "x": 821,
+              "y": 289,
+              "width": 24,
+              "height": 10
+            },
+            {
+              "text": "Posting",
+              "x": 850,
+              "y": 289,
+              "width": 48,
+              "height": 12
+            },
+            {
+              "text": "URL",
+              "x": 903,
+              "y": 289,
+              "width": 27,
+              "height": 10
+            },
+            {
+              "text": "e.g.",
+              "x": 124,
+              "y": 302,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "Software",
+              "x": 149,
+              "y": 300,
+              "width": 57,
+              "height": 10
+            },
+            {
+              "text": "Engineer,",
+              "x": 212,
+              "y": 300,
+              "width": 56,
+              "height": 12
+            },
+            {
+              "text": "Frontend",
+              "x": 274,
+              "y": 300,
+              "width": 55,
+              "height": 10
+            },
+            {
+              "text": "Developer",
+              "x": 335,
+              "y": 300,
+              "width": 63,
+              "height": 12
+            },
+            {
+              "text": "e.g.",
+              "x": 756,
+              "y": 322,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "stripe",
+              "x": 781,
+              "y": 321,
+              "width": 36,
+              "height": 11
+            },
+            {
+              "text": "or",
+              "x": 821,
+              "y": 322,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "Location",
+              "x": 113,
+              "y": 335,
+              "width": 55,
+              "height": 10
+            },
+            {
+              "text": "(optional)",
+              "x": 172,
+              "y": 334,
+              "width": 61,
+              "height": 13
+            },
+            {
+              "text": "links",
+              "x": 788,
+              "y": 352,
+              "width": 24,
+              "height": 9
+            },
+            {
+              "text": "auto-detect",
+              "x": 816,
+              "y": 352,
+              "width": 64,
+              "height": 9
+            },
+            {
+              "text": "the",
+              "x": 884,
+              "y": 352,
+              "width": 17,
+              "height": 9
+            },
+            {
+              "text": "platform",
+              "x": 906,
+              "y": 352,
+              "width": 44,
+              "height": 11
+            },
+            {
+              "text": "and",
+              "x": 955,
+              "y": 352,
+              "width": 19,
+              "height": 9
+            },
+            {
+              "text": "New",
+              "x": 150,
+              "y": 366,
+              "width": 27,
+              "height": 10
+            },
+            {
+              "text": "York,",
+              "x": 181,
+              "y": 366,
+              "width": 30,
+              "height": 11
+            },
+            {
+              "text": "NY",
+              "x": 217,
+              "y": 366,
+              "width": 16,
+              "height": 10
+            },
+            {
+              "text": "or",
+              "x": 237,
+              "y": 368,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "Remote",
+              "x": 255,
+              "y": 366,
+              "width": 48,
+              "height": 10
+            },
+            {
+              "text": "ATS",
+              "x": 744,
+              "y": 379,
+              "width": 24,
+              "height": 10
+            },
+            {
+              "text": "Platform",
+              "x": 773,
+              "y": 379,
+              "width": 55,
+              "height": 10
+            },
+            {
+              "text": "Remote",
+              "x": 137,
+              "y": 404,
+              "width": 48,
+              "height": 10
+            },
+            {
+              "text": "only",
+              "x": 190,
+              "y": 404,
+              "width": 26,
+              "height": 12
+            },
+            {
+              "text": "Greenhouse",
+              "x": 762,
+              "y": 401,
+              "width": 75,
+              "height": 31
+            },
+            {
+              "text": "Your",
+              "x": 112,
+              "y": 560,
+              "width": 29,
+              "height": 10
+            },
+            {
+              "text": "job",
+              "x": 144,
+              "y": 560,
+              "width": 21,
+              "height": 12
+            },
+            {
+              "text": "feed",
+              "x": 169,
+              "y": 560,
+              "width": 28,
+              "height": 10
+            },
+            {
+              "text": "Fetching",
+              "x": 113,
+              "y": 580,
+              "width": 54,
+              "height": 12
+            },
+            {
+              "text": "roles",
+              "x": 172,
+              "y": 580,
+              "width": 30,
+              "height": 10
+            },
+            {
+              "text": "for",
+              "x": 207,
+              "y": 580,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "2",
+              "x": 229,
+              "y": 580,
+              "width": 7,
+              "height": 10
+            },
+            {
+              "text": "occupations",
+              "x": 241,
+              "y": 581,
+              "width": 77,
+              "height": 11
+            },
+            {
+              "text": "—",
+              "x": 323,
+              "y": 585,
+              "width": 11,
+              "height": 1
+            },
+            {
+              "text": "pick",
+              "x": 339,
+              "y": 580,
+              "width": 25,
+              "height": 12
+            },
+            {
+              "text": "a",
+              "x": 370,
+              "y": 582,
+              "width": 6,
+              "height": 8
+            },
+            {
+              "text": "category",
+              "x": 381,
+              "y": 581,
+              "width": 55,
+              "height": 11
+            },
+            {
+              "text": "and",
+              "x": 441,
+              "y": 580,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "we",
+              "x": 468,
+              "y": 582,
+              "width": 18,
+              "height": 8
+            },
+            {
+              "text": "go",
+              "x": 491,
+              "y": 582,
+              "width": 15,
+              "height": 10
+            },
+            {
+              "text": "find",
+              "x": 511,
+              "y": 580,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "those",
+              "x": 539,
+              "y": 580,
+              "width": 35,
+              "height": 10
+            },
+            {
+              "text": "jobs",
+              "x": 578,
+              "y": 580,
+              "width": 26,
+              "height": 12
+            },
+            {
+              "text": "(new-grad,",
+              "x": 609,
+              "y": 580,
+              "width": 67,
+              "height": 12
+            },
+            {
+              "text": "internships",
+              "x": 682,
+              "y": 580,
+              "width": 69,
+              "height": 12
+            },
+            {
+              "text": "and",
+              "x": 756,
+              "y": 580,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "all).",
+              "x": 783,
+              "y": 580,
+              "width": 18,
+              "height": 11
+            },
+            {
+              "text": "Toggle",
+              "x": 808,
+              "y": 580,
+              "width": 41,
+              "height": 12
+            },
+            {
+              "text": "chips",
+              "x": 854,
+              "y": 580,
+              "width": 33,
+              "height": 12
+            },
+            {
+              "text": "to",
+              "x": 893,
+              "y": 581,
+              "width": 11,
+              "height": 9
+            },
+            {
+              "text": "widen",
+              "x": 909,
+              "y": 580,
+              "width": 37,
+              "height": 10
+            },
+            {
+              "text": "or",
+              "x": 951,
+              "y": 582,
+              "width": 12,
+              "height": 8
+            }
+          ]
+        },
+        {
+          "id": "opportunityCandidate1",
+          "provenance": "candidate",
+          "trim": 52,
+          "x": 726,
+          "y": 195,
+          "width": 615,
+          "height": 289,
+          "aspect": 2.128,
+          "text": "Search Company Career Page Paste a job posting URL from Apple Jobs, Greenhouse, Lever, Ashby, Workable, Workday, or a similar careers page, or enter a supported board ID. Board ID or Job Posting URL e.g. stripe or links auto-detect the platform and exact posting. Board IDs still use the selected platform, ATS Platform Greenhouse Search Career Page",
+          "words": [
+            {
+              "text": "Search",
+              "x": 745,
+              "y": 209,
+              "width": 51,
+              "height": 12
+            },
+            {
+              "text": "Company",
+              "x": 801,
+              "y": 209,
+              "width": 70,
+              "height": 15
+            },
+            {
+              "text": "Career",
+              "x": 876,
+              "y": 209,
+              "width": 49,
+              "height": 12
+            },
+            {
+              "text": "Page",
+              "x": 931,
+              "y": 209,
+              "width": 36,
+              "height": 15
+            },
+            {
+              "text": "Paste",
+              "x": 745,
+              "y": 236,
+              "width": 35,
+              "height": 10
+            },
+            {
+              "text": "a",
+              "x": 785,
+              "y": 238,
+              "width": 4,
+              "height": 8
+            },
+            {
+              "text": "job",
+              "x": 795,
+              "y": 236,
+              "width": 19,
+              "height": 12
+            },
+            {
+              "text": "posting",
+              "x": 820,
+              "y": 237,
+              "width": 45,
+              "height": 11
+            },
+            {
+              "text": "URL",
+              "x": 871,
+              "y": 236,
+              "width": 26,
+              "height": 10
+            },
+            {
+              "text": "from",
+              "x": 902,
+              "y": 236,
+              "width": 28,
+              "height": 10
+            },
+            {
+              "text": "Apple",
+              "x": 935,
+              "y": 236,
+              "width": 36,
+              "height": 12
+            },
+            {
+              "text": "Jobs,",
+              "x": 976,
+              "y": 236,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "Greenhouse,",
+              "x": 1014,
+              "y": 236,
+              "width": 78,
+              "height": 11
+            },
+            {
+              "text": "Lever,",
+              "x": 1097,
+              "y": 236,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "Ashby,",
+              "x": 1137,
+              "y": 236,
+              "width": 41,
+              "height": 12
+            },
+            {
+              "text": "Workable,",
+              "x": 1183,
+              "y": 236,
+              "width": 62,
+              "height": 10
+            },
+            {
+              "text": "Workday,",
+              "x": 1249,
+              "y": 236,
+              "width": 57,
+              "height": 12
+            },
+            {
+              "text": "or",
+              "x": 1311,
+              "y": 238,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "a",
+              "x": 745,
+              "y": 258,
+              "width": 6,
+              "height": 8
+            },
+            {
+              "text": "similar",
+              "x": 756,
+              "y": 256,
+              "width": 41,
+              "height": 10
+            },
+            {
+              "text": "careers",
+              "x": 802,
+              "y": 258,
+              "width": 46,
+              "height": 8
+            },
+            {
+              "text": "page,",
+              "x": 854,
+              "y": 258,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "or",
+              "x": 893,
+              "y": 258,
+              "width": 11,
+              "height": 8
+            },
+            {
+              "text": "enter",
+              "x": 908,
+              "y": 257,
+              "width": 33,
+              "height": 9
+            },
+            {
+              "text": "a",
+              "x": 946,
+              "y": 258,
+              "width": 6,
+              "height": 8
+            },
+            {
+              "text": "supported",
+              "x": 957,
+              "y": 256,
+              "width": 63,
+              "height": 12
+            },
+            {
+              "text": "board",
+              "x": 1026,
+              "y": 256,
+              "width": 35,
+              "height": 10
+            },
+            {
+              "text": "ID.",
+              "x": 1067,
+              "y": 256,
+              "width": 14,
+              "height": 10
+            },
+            {
+              "text": "Board",
+              "x": 745,
+              "y": 289,
+              "width": 37,
+              "height": 10
+            },
+            {
+              "text": "ID",
+              "x": 788,
+              "y": 289,
+              "width": 12,
+              "height": 10
+            },
+            {
+              "text": "or",
+              "x": 804,
+              "y": 291,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "Job",
+              "x": 821,
+              "y": 289,
+              "width": 24,
+              "height": 10
+            },
+            {
+              "text": "Posting",
+              "x": 850,
+              "y": 289,
+              "width": 48,
+              "height": 12
+            },
+            {
+              "text": "URL",
+              "x": 903,
+              "y": 289,
+              "width": 27,
+              "height": 10
+            },
+            {
+              "text": "e.g.",
+              "x": 756,
+              "y": 322,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "stripe",
+              "x": 781,
+              "y": 321,
+              "width": 36,
+              "height": 11
+            },
+            {
+              "text": "or",
+              "x": 821,
+              "y": 322,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "links",
+              "x": 788,
+              "y": 352,
+              "width": 24,
+              "height": 9
+            },
+            {
+              "text": "auto-detect",
+              "x": 816,
+              "y": 352,
+              "width": 64,
+              "height": 9
+            },
+            {
+              "text": "the",
+              "x": 884,
+              "y": 352,
+              "width": 17,
+              "height": 9
+            },
+            {
+              "text": "platform",
+              "x": 906,
+              "y": 352,
+              "width": 44,
+              "height": 11
+            },
+            {
+              "text": "and",
+              "x": 955,
+              "y": 352,
+              "width": 19,
+              "height": 9
+            },
+            {
+              "text": "exact",
+              "x": 978,
+              "y": 353,
+              "width": 29,
+              "height": 8
+            },
+            {
+              "text": "posting.",
+              "x": 1012,
+              "y": 353,
+              "width": 39,
+              "height": 10
+            },
+            {
+              "text": "Board",
+              "x": 1059,
+              "y": 352,
+              "width": 30,
+              "height": 9
+            },
+            {
+              "text": "IDs",
+              "x": 1094,
+              "y": 352,
+              "width": 16,
+              "height": 9
+            },
+            {
+              "text": "still",
+              "x": 1115,
+              "y": 352,
+              "width": 18,
+              "height": 9
+            },
+            {
+              "text": "use",
+              "x": 1138,
+              "y": 354,
+              "width": 18,
+              "height": 7
+            },
+            {
+              "text": "the",
+              "x": 1160,
+              "y": 352,
+              "width": 17,
+              "height": 9
+            },
+            {
+              "text": "selected",
+              "x": 1181,
+              "y": 352,
+              "width": 46,
+              "height": 9
+            },
+            {
+              "text": "platform,",
+              "x": 1231,
+              "y": 352,
+              "width": 45,
+              "height": 10
+            },
+            {
+              "text": "ATS",
+              "x": 744,
+              "y": 379,
+              "width": 24,
+              "height": 10
+            },
+            {
+              "text": "Platform",
+              "x": 773,
+              "y": 379,
+              "width": 55,
+              "height": 10
+            },
+            {
+              "text": "Greenhouse",
+              "x": 762,
+              "y": 401,
+              "width": 75,
+              "height": 31
+            },
+            {
+              "text": "Search",
+              "x": 972,
+              "y": 458,
+              "width": 44,
+              "height": 10
+            },
+            {
+              "text": "Career",
+              "x": 1021,
+              "y": 458,
+              "width": 42,
+              "height": 10
+            },
+            {
+              "text": "Page",
+              "x": 1069,
+              "y": 458,
+              "width": 31,
+              "height": 12
+            }
+          ]
+        },
+        {
+          "id": "opportunityCandidate2",
+          "provenance": "candidate",
+          "trim": 52,
+          "x": 107,
+          "y": 610,
+          "width": 298,
+          "height": 148,
+          "aspect": 2.014,
+          "text": "Au Creatives Management and Executive Cybersecurity Project Management",
+          "words": [
+            {
+              "text": "Au",
+              "x": 125,
+              "y": 624,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "Creatives",
+              "x": 126,
+              "y": 660,
+              "width": 61,
+              "height": 10
+            },
+            {
+              "text": "Management",
+              "x": 126,
+              "y": 696,
+              "width": 85,
+              "height": 12
+            },
+            {
+              "text": "and",
+              "x": 215,
+              "y": 696,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "Executive",
+              "x": 243,
+              "y": 696,
+              "width": 63,
+              "height": 10
+            },
+            {
+              "text": "Cybersecurity",
+              "x": 126,
+              "y": 732,
+              "width": 90,
+              "height": 12
+            },
+            {
+              "text": "Project",
+              "x": 252,
+              "y": 732,
+              "width": 45,
+              "height": 12
+            },
+            {
+              "text": "Management",
+              "x": 302,
+              "y": 732,
+              "width": 85,
+              "height": 12
+            }
+          ]
+        },
+        {
+          "id": "opportunityCandidate3",
+          "provenance": "candidate",
+          "trim": 52,
+          "x": 851,
+          "y": 610,
+          "width": 373,
+          "height": 112,
+          "aspect": 3.33,
+          "text": "Analyst and Entertainment Sector and and Training",
+          "words": [
+            {
+              "text": "Analyst",
+              "x": 955,
+              "y": 624,
+              "width": 48,
+              "height": 12
+            },
+            {
+              "text": "and",
+              "x": 1010,
+              "y": 660,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "Entertainment",
+              "x": 1038,
+              "y": 660,
+              "width": 92,
+              "height": 10
+            },
+            {
+              "text": "Sector",
+              "x": 869,
+              "y": 696,
+              "width": 43,
+              "height": 10
+            },
+            {
+              "text": "and",
+              "x": 916,
+              "y": 696,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "and",
+              "x": 1127,
+              "y": 696,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "Training",
+              "x": 1154,
+              "y": 696,
+              "width": 52,
+              "height": 12
+            }
+          ]
+        },
+        {
+          "id": "opportunityCandidate4",
+          "provenance": "candidate",
+          "trim": 52,
+          "x": 1029,
+          "y": 837,
+          "width": 180,
+          "height": 38,
+          "aspect": 4.737,
+          "text": "Near: Toronto or GTA",
+          "words": [
+            {
+              "text": "Near:",
+              "x": 1047,
+              "y": 851,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "Toronto",
+              "x": 1098,
+              "y": 851,
+              "width": 48,
+              "height": 10
+            },
+            {
+              "text": "or",
+              "x": 1150,
+              "y": 853,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "GTA",
+              "x": 1167,
+              "y": 851,
+              "width": 24,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "id": "opportunityCandidate5",
+          "provenance": "candidate",
+          "trim": 52,
+          "x": 90,
+          "y": 837,
+          "width": 160,
+          "height": 40,
+          "aspect": 4,
+          "text": "Search saved jobs...",
+          "words": [
+            {
+              "text": "Search",
+              "x": 108,
+              "y": 851,
+              "width": 43,
+              "height": 10
+            },
+            {
+              "text": "saved",
+              "x": 156,
+              "y": 851,
+              "width": 37,
+              "height": 10
+            },
+            {
+              "text": "jobs...",
+              "x": 197,
+              "y": 851,
+              "width": 35,
+              "height": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "contact",
+      "trim": 130,
+      "width": 1440,
+      "height": 900,
+      "elements": [
+        {
+          "id": "contactCard",
+          "provenance": "approved",
+          "x": 86,
+          "y": 510,
+          "width": 430,
+          "height": 390,
+          "aspect": 1.103,
+          "text": "Northstar Labs 3 Select for batch email ‘Avery Chen Senior Technical Recruiter DIRECT USEFULNESS: Not the right person? Proof Why matched title atthe target company. Company trust Current role at Northstar Labs. Email email is shown only after safe checks. Warm path warm path found from your imported graph yet. Email: avery@example.test Confidence 0",
+          "words": [
+            {
+              "text": "Northstar",
+              "x": 97,
+              "y": 524,
+              "width": 68,
+              "height": 12
+            },
+            {
+              "text": "Labs",
+              "x": 170,
+              "y": 524,
+              "width": 34,
+              "height": 12
+            },
+            {
+              "text": "3",
+              "x": 222,
+              "y": 526,
+              "width": 6,
+              "height": 9
+            },
+            {
+              "text": "Select",
+              "x": 134,
+              "y": 590,
+              "width": 34,
+              "height": 9
+            },
+            {
+              "text": "for",
+              "x": 172,
+              "y": 590,
+              "width": 14,
+              "height": 9
+            },
+            {
+              "text": "batch",
+              "x": 191,
+              "y": 590,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "email",
+              "x": 225,
+              "y": 590,
+              "width": 28,
+              "height": 9
+            },
+            {
+              "text": "‘Avery",
+              "x": 112,
+              "y": 616,
+              "width": 37,
+              "height": 12
+            },
+            {
+              "text": "Chen",
+              "x": 153,
+              "y": 616,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "Senior",
+              "x": 113,
+              "y": 636,
+              "width": 40,
+              "height": 10
+            },
+            {
+              "text": "Technical",
+              "x": 157,
+              "y": 636,
+              "width": 59,
+              "height": 10
+            },
+            {
+              "text": "Recruiter",
+              "x": 222,
+              "y": 636,
+              "width": 56,
+              "height": 10
+            },
+            {
+              "text": "DIRECT",
+              "x": 179,
+              "y": 664,
+              "width": 37,
+              "height": 8
+            },
+            {
+              "text": "USEFULNESS:",
+              "x": 291,
+              "y": 664,
+              "width": 68,
+              "height": 8
+            },
+            {
+              "text": "Not",
+              "x": 125,
+              "y": 698,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "the",
+              "x": 152,
+              "y": 698,
+              "width": 20,
+              "height": 10
+            },
+            {
+              "text": "right",
+              "x": 178,
+              "y": 698,
+              "width": 28,
+              "height": 12
+            },
+            {
+              "text": "person?",
+              "x": 211,
+              "y": 698,
+              "width": 51,
+              "height": 12
+            },
+            {
+              "text": "Proof",
+              "x": 118,
+              "y": 727,
+              "width": 33,
+              "height": 31
+            },
+            {
+              "text": "Why",
+              "x": 122,
+              "y": 759,
+              "width": 23,
+              "height": 11
+            },
+            {
+              "text": "matched",
+              "x": 149,
+              "y": 759,
+              "width": 46,
+              "height": 9
+            },
+            {
+              "text": "title",
+              "x": 277,
+              "y": 759,
+              "width": 20,
+              "height": 9
+            },
+            {
+              "text": "atthe",
+              "x": 301,
+              "y": 760,
+              "width": 29,
+              "height": 8
+            },
+            {
+              "text": "target",
+              "x": 337,
+              "y": 760,
+              "width": 32,
+              "height": 10
+            },
+            {
+              "text": "company.",
+              "x": 373,
+              "y": 761,
+              "width": 51,
+              "height": 9
+            },
+            {
+              "text": "Company",
+              "x": 122,
+              "y": 767,
+              "width": 48,
+              "height": 31
+            },
+            {
+              "text": "trust",
+              "x": 177,
+              "y": 780,
+              "width": 25,
+              "height": 10
+            },
+            {
+              "text": "Current",
+              "x": 217,
+              "y": 779,
+              "width": 41,
+              "height": 9
+            },
+            {
+              "text": "role",
+              "x": 262,
+              "y": 779,
+              "width": 19,
+              "height": 9
+            },
+            {
+              "text": "at",
+              "x": 285,
+              "y": 780,
+              "width": 11,
+              "height": 8
+            },
+            {
+              "text": "Northstar",
+              "x": 300,
+              "y": 779,
+              "width": 51,
+              "height": 9
+            },
+            {
+              "text": "Labs.",
+              "x": 355,
+              "y": 779,
+              "width": 26,
+              "height": 9
+            },
+            {
+              "text": "Email",
+              "x": 122,
+              "y": 799,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "email",
+              "x": 283,
+              "y": 799,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "is",
+              "x": 316,
+              "y": 801,
+              "width": 8,
+              "height": 7
+            },
+            {
+              "text": "shown",
+              "x": 328,
+              "y": 799,
+              "width": 35,
+              "height": 9
+            },
+            {
+              "text": "only",
+              "x": 367,
+              "y": 799,
+              "width": 22,
+              "height": 11
+            },
+            {
+              "text": "after",
+              "x": 393,
+              "y": 799,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "safe",
+              "x": 422,
+              "y": 799,
+              "width": 23,
+              "height": 9
+            },
+            {
+              "text": "checks.",
+              "x": 261,
+              "y": 815,
+              "width": 41,
+              "height": 9
+            },
+            {
+              "text": "Warm",
+              "x": 122,
+              "y": 835,
+              "width": 30,
+              "height": 9
+            },
+            {
+              "text": "path",
+              "x": 157,
+              "y": 835,
+              "width": 23,
+              "height": 11
+            },
+            {
+              "text": "warm",
+              "x": 236,
+              "y": 837,
+              "width": 30,
+              "height": 7
+            },
+            {
+              "text": "path",
+              "x": 270,
+              "y": 835,
+              "width": 24,
+              "height": 11
+            },
+            {
+              "text": "found",
+              "x": 298,
+              "y": 835,
+              "width": 31,
+              "height": 9
+            },
+            {
+              "text": "from",
+              "x": 333,
+              "y": 835,
+              "width": 24,
+              "height": 9
+            },
+            {
+              "text": "your",
+              "x": 361,
+              "y": 837,
+              "width": 24,
+              "height": 9
+            },
+            {
+              "text": "imported",
+              "x": 389,
+              "y": 835,
+              "width": 48,
+              "height": 11
+            },
+            {
+              "text": "graph",
+              "x": 267,
+              "y": 851,
+              "width": 30,
+              "height": 11
+            },
+            {
+              "text": "yet.",
+              "x": 302,
+              "y": 852,
+              "width": 16,
+              "height": 10
+            },
+            {
+              "text": "Email:",
+              "x": 113,
+              "y": 886,
+              "width": 34,
+              "height": 10
+            },
+            {
+              "text": "avery@example.test",
+              "x": 155,
+              "y": 886,
+              "width": 129,
+              "height": 12
+            },
+            {
+              "text": "Confidence",
+              "x": 293,
+              "y": 887,
+              "width": 62,
+              "height": 9
+            },
+            {
+              "text": "0",
+              "x": 359,
+              "y": 887,
+              "width": 7,
+              "height": 9
+            }
+          ]
+        },
+        {
+          "id": "contactHeader",
+          "provenance": "approved",
+          "x": 96,
+          "y": 556,
+          "width": 408,
+          "height": 175,
+          "aspect": 2.331,
+          "text": "Select for batch email ‘Avery Chen Senior Technical Recruiter DIRECT USEFULNESS: Not the right person?",
+          "words": [
+            {
+              "text": "Select",
+              "x": 134,
+              "y": 590,
+              "width": 34,
+              "height": 9
+            },
+            {
+              "text": "for",
+              "x": 172,
+              "y": 590,
+              "width": 14,
+              "height": 9
+            },
+            {
+              "text": "batch",
+              "x": 191,
+              "y": 590,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "email",
+              "x": 225,
+              "y": 590,
+              "width": 28,
+              "height": 9
+            },
+            {
+              "text": "‘Avery",
+              "x": 112,
+              "y": 616,
+              "width": 37,
+              "height": 12
+            },
+            {
+              "text": "Chen",
+              "x": 153,
+              "y": 616,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "Senior",
+              "x": 113,
+              "y": 636,
+              "width": 40,
+              "height": 10
+            },
+            {
+              "text": "Technical",
+              "x": 157,
+              "y": 636,
+              "width": 59,
+              "height": 10
+            },
+            {
+              "text": "Recruiter",
+              "x": 222,
+              "y": 636,
+              "width": 56,
+              "height": 10
+            },
+            {
+              "text": "DIRECT",
+              "x": 179,
+              "y": 664,
+              "width": 37,
+              "height": 8
+            },
+            {
+              "text": "USEFULNESS:",
+              "x": 291,
+              "y": 664,
+              "width": 68,
+              "height": 8
+            },
+            {
+              "text": "Not",
+              "x": 125,
+              "y": 698,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "the",
+              "x": 152,
+              "y": 698,
+              "width": 20,
+              "height": 10
+            },
+            {
+              "text": "right",
+              "x": 178,
+              "y": 698,
+              "width": 28,
+              "height": 12
+            },
+            {
+              "text": "person?",
+              "x": 211,
+              "y": 698,
+              "width": 51,
+              "height": 12
+            }
+          ]
+        },
+        {
+          "id": "contactProof",
+          "provenance": "approved",
+          "x": 104,
+          "y": 610,
+          "width": 390,
+          "height": 265,
+          "aspect": 1.472,
+          "text": "‘Avery Chen Senior Technical Recruiter DIRECT USEFULNESS: Not the right person? Proof Why matched title atthe target company. Company trust Current role at Northstar Labs. Email email is shown only after safe checks. Warm path warm path found from your imported graph yet.",
+          "words": [
+            {
+              "text": "‘Avery",
+              "x": 112,
+              "y": 616,
+              "width": 37,
+              "height": 12
+            },
+            {
+              "text": "Chen",
+              "x": 153,
+              "y": 616,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "Senior",
+              "x": 113,
+              "y": 636,
+              "width": 40,
+              "height": 10
+            },
+            {
+              "text": "Technical",
+              "x": 157,
+              "y": 636,
+              "width": 59,
+              "height": 10
+            },
+            {
+              "text": "Recruiter",
+              "x": 222,
+              "y": 636,
+              "width": 56,
+              "height": 10
+            },
+            {
+              "text": "DIRECT",
+              "x": 179,
+              "y": 664,
+              "width": 37,
+              "height": 8
+            },
+            {
+              "text": "USEFULNESS:",
+              "x": 291,
+              "y": 664,
+              "width": 68,
+              "height": 8
+            },
+            {
+              "text": "Not",
+              "x": 125,
+              "y": 698,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "the",
+              "x": 152,
+              "y": 698,
+              "width": 20,
+              "height": 10
+            },
+            {
+              "text": "right",
+              "x": 178,
+              "y": 698,
+              "width": 28,
+              "height": 12
+            },
+            {
+              "text": "person?",
+              "x": 211,
+              "y": 698,
+              "width": 51,
+              "height": 12
+            },
+            {
+              "text": "Proof",
+              "x": 118,
+              "y": 727,
+              "width": 33,
+              "height": 31
+            },
+            {
+              "text": "Why",
+              "x": 122,
+              "y": 759,
+              "width": 23,
+              "height": 11
+            },
+            {
+              "text": "matched",
+              "x": 149,
+              "y": 759,
+              "width": 46,
+              "height": 9
+            },
+            {
+              "text": "title",
+              "x": 277,
+              "y": 759,
+              "width": 20,
+              "height": 9
+            },
+            {
+              "text": "atthe",
+              "x": 301,
+              "y": 760,
+              "width": 29,
+              "height": 8
+            },
+            {
+              "text": "target",
+              "x": 337,
+              "y": 760,
+              "width": 32,
+              "height": 10
+            },
+            {
+              "text": "company.",
+              "x": 373,
+              "y": 761,
+              "width": 51,
+              "height": 9
+            },
+            {
+              "text": "Company",
+              "x": 122,
+              "y": 767,
+              "width": 48,
+              "height": 31
+            },
+            {
+              "text": "trust",
+              "x": 177,
+              "y": 780,
+              "width": 25,
+              "height": 10
+            },
+            {
+              "text": "Current",
+              "x": 217,
+              "y": 779,
+              "width": 41,
+              "height": 9
+            },
+            {
+              "text": "role",
+              "x": 262,
+              "y": 779,
+              "width": 19,
+              "height": 9
+            },
+            {
+              "text": "at",
+              "x": 285,
+              "y": 780,
+              "width": 11,
+              "height": 8
+            },
+            {
+              "text": "Northstar",
+              "x": 300,
+              "y": 779,
+              "width": 51,
+              "height": 9
+            },
+            {
+              "text": "Labs.",
+              "x": 355,
+              "y": 779,
+              "width": 26,
+              "height": 9
+            },
+            {
+              "text": "Email",
+              "x": 122,
+              "y": 799,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "email",
+              "x": 283,
+              "y": 799,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "is",
+              "x": 316,
+              "y": 801,
+              "width": 8,
+              "height": 7
+            },
+            {
+              "text": "shown",
+              "x": 328,
+              "y": 799,
+              "width": 35,
+              "height": 9
+            },
+            {
+              "text": "only",
+              "x": 367,
+              "y": 799,
+              "width": 22,
+              "height": 11
+            },
+            {
+              "text": "after",
+              "x": 393,
+              "y": 799,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "safe",
+              "x": 422,
+              "y": 799,
+              "width": 23,
+              "height": 9
+            },
+            {
+              "text": "checks.",
+              "x": 261,
+              "y": 815,
+              "width": 41,
+              "height": 9
+            },
+            {
+              "text": "Warm",
+              "x": 122,
+              "y": 835,
+              "width": 30,
+              "height": 9
+            },
+            {
+              "text": "path",
+              "x": 157,
+              "y": 835,
+              "width": 23,
+              "height": 11
+            },
+            {
+              "text": "warm",
+              "x": 236,
+              "y": 837,
+              "width": 30,
+              "height": 7
+            },
+            {
+              "text": "path",
+              "x": 270,
+              "y": 835,
+              "width": 24,
+              "height": 11
+            },
+            {
+              "text": "found",
+              "x": 298,
+              "y": 835,
+              "width": 31,
+              "height": 9
+            },
+            {
+              "text": "from",
+              "x": 333,
+              "y": 835,
+              "width": 24,
+              "height": 9
+            },
+            {
+              "text": "your",
+              "x": 361,
+              "y": 837,
+              "width": 24,
+              "height": 9
+            },
+            {
+              "text": "imported",
+              "x": 389,
+              "y": 835,
+              "width": 48,
+              "height": 11
+            },
+            {
+              "text": "graph",
+              "x": 267,
+              "y": 851,
+              "width": 30,
+              "height": 11
+            },
+            {
+              "text": "yet.",
+              "x": 302,
+              "y": 852,
+              "width": 16,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "id": "contactCandidate1",
+          "provenance": "candidate",
+          "trim": 130,
+          "x": 80,
+          "y": 4,
+          "width": 503,
+          "height": 306,
+          "aspect": 1.644,
+          "text": "+ Solomon Dashboard Jobs Shopify, Stripe, Google GitHub Organization (optional vercel, stripe Find engineers via their public GitHub contributions. Contacts per category 1 Choose how many managers, and peers to try to retum per search. Find People",
+          "words": [
+            {
+              "text": "+",
+              "x": 98,
+              "y": 18,
+              "width": 20,
+              "height": 20
+            },
+            {
+              "text": "Solomon",
+              "x": 129,
+              "y": 21,
+              "width": 73,
+              "height": 13
+            },
+            {
+              "text": "Dashboard",
+              "x": 248,
+              "y": 23,
+              "width": 69,
+              "height": 10
+            },
+            {
+              "text": "Jobs",
+              "x": 347,
+              "y": 23,
+              "width": 31,
+              "height": 10
+            },
+            {
+              "text": "Shopify,",
+              "x": 149,
+              "y": 60,
+              "width": 49,
+              "height": 12
+            },
+            {
+              "text": "Stripe,",
+              "x": 204,
+              "y": 60,
+              "width": 39,
+              "height": 12
+            },
+            {
+              "text": "Google",
+              "x": 248,
+              "y": 60,
+              "width": 44,
+              "height": 12
+            },
+            {
+              "text": "GitHub",
+              "x": 112,
+              "y": 95,
+              "width": 45,
+              "height": 10
+            },
+            {
+              "text": "Organization",
+              "x": 161,
+              "y": 95,
+              "width": 83,
+              "height": 10
+            },
+            {
+              "text": "(optional",
+              "x": 252,
+              "y": 95,
+              "width": 53,
+              "height": 10
+            },
+            {
+              "text": "vercel,",
+              "x": 149,
+              "y": 126,
+              "width": 40,
+              "height": 12
+            },
+            {
+              "text": "stripe",
+              "x": 194,
+              "y": 127,
+              "width": 36,
+              "height": 11
+            },
+            {
+              "text": "Find",
+              "x": 113,
+              "y": 158,
+              "width": 22,
+              "height": 9
+            },
+            {
+              "text": "engineers",
+              "x": 139,
+              "y": 160,
+              "width": 53,
+              "height": 9
+            },
+            {
+              "text": "via",
+              "x": 196,
+              "y": 160,
+              "width": 15,
+              "height": 7
+            },
+            {
+              "text": "their",
+              "x": 215,
+              "y": 158,
+              "width": 24,
+              "height": 9
+            },
+            {
+              "text": "public",
+              "x": 244,
+              "y": 158,
+              "width": 32,
+              "height": 11
+            },
+            {
+              "text": "GitHub",
+              "x": 280,
+              "y": 158,
+              "width": 37,
+              "height": 9
+            },
+            {
+              "text": "contributions.",
+              "x": 321,
+              "y": 158,
+              "width": 71,
+              "height": 9
+            },
+            {
+              "text": "Contacts",
+              "x": 113,
+              "y": 185,
+              "width": 58,
+              "height": 10
+            },
+            {
+              "text": "per",
+              "x": 176,
+              "y": 187,
+              "width": 20,
+              "height": 10
+            },
+            {
+              "text": "category",
+              "x": 201,
+              "y": 186,
+              "width": 57,
+              "height": 11
+            },
+            {
+              "text": "1",
+              "x": 124,
+              "y": 216,
+              "width": 3,
+              "height": 10
+            },
+            {
+              "text": "Choose",
+              "x": 113,
+              "y": 248,
+              "width": 40,
+              "height": 9
+            },
+            {
+              "text": "how",
+              "x": 158,
+              "y": 248,
+              "width": 21,
+              "height": 9
+            },
+            {
+              "text": "many",
+              "x": 184,
+              "y": 250,
+              "width": 28,
+              "height": 9
+            },
+            {
+              "text": "managers,",
+              "x": 308,
+              "y": 250,
+              "width": 53,
+              "height": 9
+            },
+            {
+              "text": "and",
+              "x": 368,
+              "y": 248,
+              "width": 19,
+              "height": 9
+            },
+            {
+              "text": "peers",
+              "x": 392,
+              "y": 250,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "to",
+              "x": 425,
+              "y": 249,
+              "width": 10,
+              "height": 8
+            },
+            {
+              "text": "try",
+              "x": 440,
+              "y": 249,
+              "width": 14,
+              "height": 10
+            },
+            {
+              "text": "to",
+              "x": 458,
+              "y": 249,
+              "width": 10,
+              "height": 8
+            },
+            {
+              "text": "retum",
+              "x": 472,
+              "y": 249,
+              "width": 32,
+              "height": 8
+            },
+            {
+              "text": "per",
+              "x": 508,
+              "y": 250,
+              "width": 17,
+              "height": 8
+            },
+            {
+              "text": "search.",
+              "x": 529,
+              "y": 248,
+              "width": 36,
+              "height": 9
+            },
+            {
+              "text": "Find",
+              "x": 367,
+              "y": 284,
+              "width": 26,
+              "height": 10
+            },
+            {
+              "text": "People",
+              "x": 399,
+              "y": 284,
+              "width": 43,
+              "height": 12
+            }
+          ]
+        },
+        {
+          "id": "contactCandidate2",
+          "provenance": "candidate",
+          "trim": 130,
+          "x": 935,
+          "y": 576,
+          "width": 396,
+          "height": 324,
+          "aspect": 1.222,
+          "text": "Select for batch email Riley Patel Product Engineer DIRECT Not the right person? Proof Why matched teammate ttle at the target company. Company trust Current role at Northstar Labs. Email safety is shown only after safe checks. Warm path warm path found from your imported Linkedin graph yet. Email: riley@example.test Confidence 0",
+          "words": [
+            {
+              "text": "Select",
+              "x": 974,
+              "y": 590,
+              "width": 34,
+              "height": 9
+            },
+            {
+              "text": "for",
+              "x": 1012,
+              "y": 590,
+              "width": 14,
+              "height": 9
+            },
+            {
+              "text": "batch",
+              "x": 1031,
+              "y": 590,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "email",
+              "x": 1065,
+              "y": 590,
+              "width": 28,
+              "height": 9
+            },
+            {
+              "text": "Riley",
+              "x": 953,
+              "y": 616,
+              "width": 31,
+              "height": 12
+            },
+            {
+              "text": "Patel",
+              "x": 989,
+              "y": 616,
+              "width": 32,
+              "height": 10
+            },
+            {
+              "text": "Product",
+              "x": 953,
+              "y": 636,
+              "width": 49,
+              "height": 10
+            },
+            {
+              "text": "Engineer",
+              "x": 1007,
+              "y": 636,
+              "width": 55,
+              "height": 12
+            },
+            {
+              "text": "DIRECT",
+              "x": 1019,
+              "y": 664,
+              "width": 37,
+              "height": 8
+            },
+            {
+              "text": "Not",
+              "x": 965,
+              "y": 698,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "the",
+              "x": 992,
+              "y": 698,
+              "width": 20,
+              "height": 10
+            },
+            {
+              "text": "right",
+              "x": 1018,
+              "y": 698,
+              "width": 28,
+              "height": 12
+            },
+            {
+              "text": "person?",
+              "x": 1051,
+              "y": 698,
+              "width": 51,
+              "height": 12
+            },
+            {
+              "text": "Proof",
+              "x": 962,
+              "y": 739,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "Why",
+              "x": 962,
+              "y": 759,
+              "width": 23,
+              "height": 11
+            },
+            {
+              "text": "matched",
+              "x": 989,
+              "y": 759,
+              "width": 46,
+              "height": 9
+            },
+            {
+              "text": "teammate",
+              "x": 1109,
+              "y": 760,
+              "width": 55,
+              "height": 8
+            },
+            {
+              "text": "ttle",
+              "x": 1168,
+              "y": 759,
+              "width": 20,
+              "height": 9
+            },
+            {
+              "text": "at",
+              "x": 1192,
+              "y": 760,
+              "width": 10,
+              "height": 8
+            },
+            {
+              "text": "the",
+              "x": 1206,
+              "y": 759,
+              "width": 18,
+              "height": 9
+            },
+            {
+              "text": "target",
+              "x": 1228,
+              "y": 760,
+              "width": 32,
+              "height": 10
+            },
+            {
+              "text": "company.",
+              "x": 1264,
+              "y": 761,
+              "width": 49,
+              "height": 9
+            },
+            {
+              "text": "Company",
+              "x": 962,
+              "y": 767,
+              "width": 48,
+              "height": 31
+            },
+            {
+              "text": "trust",
+              "x": 1017,
+              "y": 780,
+              "width": 25,
+              "height": 10
+            },
+            {
+              "text": "Current",
+              "x": 1057,
+              "y": 779,
+              "width": 41,
+              "height": 9
+            },
+            {
+              "text": "role",
+              "x": 1102,
+              "y": 779,
+              "width": 19,
+              "height": 9
+            },
+            {
+              "text": "at",
+              "x": 1125,
+              "y": 780,
+              "width": 11,
+              "height": 8
+            },
+            {
+              "text": "Northstar",
+              "x": 1140,
+              "y": 779,
+              "width": 51,
+              "height": 9
+            },
+            {
+              "text": "Labs.",
+              "x": 1195,
+              "y": 779,
+              "width": 26,
+              "height": 9
+            },
+            {
+              "text": "Email",
+              "x": 962,
+              "y": 799,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "safety",
+              "x": 995,
+              "y": 799,
+              "width": 33,
+              "height": 11
+            },
+            {
+              "text": "is",
+              "x": 1156,
+              "y": 801,
+              "width": 8,
+              "height": 7
+            },
+            {
+              "text": "shown",
+              "x": 1168,
+              "y": 799,
+              "width": 35,
+              "height": 9
+            },
+            {
+              "text": "only",
+              "x": 1207,
+              "y": 799,
+              "width": 22,
+              "height": 11
+            },
+            {
+              "text": "after",
+              "x": 1233,
+              "y": 799,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "safe",
+              "x": 1262,
+              "y": 799,
+              "width": 23,
+              "height": 9
+            },
+            {
+              "text": "checks.",
+              "x": 1101,
+              "y": 815,
+              "width": 41,
+              "height": 9
+            },
+            {
+              "text": "Warm",
+              "x": 962,
+              "y": 835,
+              "width": 30,
+              "height": 9
+            },
+            {
+              "text": "path",
+              "x": 997,
+              "y": 835,
+              "width": 23,
+              "height": 11
+            },
+            {
+              "text": "warm",
+              "x": 1076,
+              "y": 837,
+              "width": 30,
+              "height": 7
+            },
+            {
+              "text": "path",
+              "x": 1110,
+              "y": 835,
+              "width": 24,
+              "height": 11
+            },
+            {
+              "text": "found",
+              "x": 1138,
+              "y": 835,
+              "width": 31,
+              "height": 9
+            },
+            {
+              "text": "from",
+              "x": 1173,
+              "y": 835,
+              "width": 24,
+              "height": 9
+            },
+            {
+              "text": "your",
+              "x": 1201,
+              "y": 837,
+              "width": 24,
+              "height": 9
+            },
+            {
+              "text": "imported",
+              "x": 1229,
+              "y": 835,
+              "width": 48,
+              "height": 11
+            },
+            {
+              "text": "Linkedin",
+              "x": 1058,
+              "y": 851,
+              "width": 45,
+              "height": 9
+            },
+            {
+              "text": "graph",
+              "x": 1107,
+              "y": 851,
+              "width": 30,
+              "height": 11
+            },
+            {
+              "text": "yet.",
+              "x": 1142,
+              "y": 852,
+              "width": 16,
+              "height": 10
+            },
+            {
+              "text": "Email:",
+              "x": 953,
+              "y": 886,
+              "width": 34,
+              "height": 10
+            },
+            {
+              "text": "riley@example.test",
+              "x": 996,
+              "y": 886,
+              "width": 120,
+              "height": 12
+            },
+            {
+              "text": "Confidence",
+              "x": 1125,
+              "y": 887,
+              "width": 62,
+              "height": 9
+            },
+            {
+              "text": "0",
+              "x": 1191,
+              "y": 887,
+              "width": 7,
+              "height": 9
+            }
+          ]
+        },
+        {
+          "id": "contactCandidate3",
+          "provenance": "candidate",
+          "trim": 130,
+          "x": 515,
+          "y": 576,
+          "width": 389,
+          "height": 324,
+          "aspect": 1.201,
+          "text": "for batch email Morgan Lee Director of Engineering | ( DIRECT WATCH ) |» USEFULNESS: 42x Not the right person? Proof Why matched manager title atthe target company. Company trust at Northstar Labs. Email safety email is shown only after safe checks. Warm path warm path found from your imported Linkedin graph yet. Email: morgan@example.test Confidence 0",
+          "words": [
+            {
+              "text": "for",
+              "x": 592,
+              "y": 590,
+              "width": 14,
+              "height": 9
+            },
+            {
+              "text": "batch",
+              "x": 611,
+              "y": 590,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "email",
+              "x": 645,
+              "y": 590,
+              "width": 28,
+              "height": 9
+            },
+            {
+              "text": "Morgan",
+              "x": 533,
+              "y": 616,
+              "width": 48,
+              "height": 12
+            },
+            {
+              "text": "Lee",
+              "x": 587,
+              "y": 616,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "Director",
+              "x": 533,
+              "y": 636,
+              "width": 66,
+              "height": 10
+            },
+            {
+              "text": "of",
+              "x": 586,
+              "y": 626,
+              "width": 13,
+              "height": 30
+            },
+            {
+              "text": "Engineering",
+              "x": 605,
+              "y": 636,
+              "width": 74,
+              "height": 12
+            },
+            {
+              "text": "|",
+              "x": 617,
+              "y": 651,
+              "width": 3,
+              "height": 31
+            },
+            {
+              "text": "(",
+              "x": 624,
+              "y": 651,
+              "width": 12,
+              "height": 31
+            },
+            {
+              "text": "DIRECT",
+              "x": 644,
+              "y": 664,
+              "width": 38,
+              "height": 8
+            },
+            {
+              "text": "WATCH",
+              "x": 690,
+              "y": 664,
+              "width": 30,
+              "height": 8
+            },
+            {
+              "text": ")",
+              "x": 725,
+              "y": 651,
+              "width": 6,
+              "height": 31
+            },
+            {
+              "text": "|»",
+              "x": 746,
+              "y": 667,
+              "width": 4,
+              "height": 4
+            },
+            {
+              "text": "USEFULNESS:",
+              "x": 756,
+              "y": 664,
+              "width": 63,
+              "height": 8
+            },
+            {
+              "text": "42x",
+              "x": 834,
+              "y": 664,
+              "width": 18,
+              "height": 8
+            },
+            {
+              "text": "Not",
+              "x": 545,
+              "y": 698,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "the",
+              "x": 572,
+              "y": 698,
+              "width": 20,
+              "height": 10
+            },
+            {
+              "text": "right",
+              "x": 598,
+              "y": 698,
+              "width": 28,
+              "height": 12
+            },
+            {
+              "text": "person?",
+              "x": 631,
+              "y": 698,
+              "width": 51,
+              "height": 12
+            },
+            {
+              "text": "Proof",
+              "x": 538,
+              "y": 727,
+              "width": 33,
+              "height": 31
+            },
+            {
+              "text": "Why",
+              "x": 542,
+              "y": 759,
+              "width": 23,
+              "height": 11
+            },
+            {
+              "text": "matched",
+              "x": 569,
+              "y": 759,
+              "width": 46,
+              "height": 9
+            },
+            {
+              "text": "manager",
+              "x": 689,
+              "y": 761,
+              "width": 47,
+              "height": 9
+            },
+            {
+              "text": "title",
+              "x": 740,
+              "y": 759,
+              "width": 21,
+              "height": 9
+            },
+            {
+              "text": "atthe",
+              "x": 765,
+              "y": 759,
+              "width": 31,
+              "height": 9
+            },
+            {
+              "text": "target",
+              "x": 800,
+              "y": 760,
+              "width": 32,
+              "height": 10
+            },
+            {
+              "text": "company.",
+              "x": 836,
+              "y": 761,
+              "width": 50,
+              "height": 9
+            },
+            {
+              "text": "Company",
+              "x": 542,
+              "y": 779,
+              "width": 51,
+              "height": 11
+            },
+            {
+              "text": "trust",
+              "x": 597,
+              "y": 780,
+              "width": 25,
+              "height": 8
+            },
+            {
+              "text": "at",
+              "x": 705,
+              "y": 780,
+              "width": 11,
+              "height": 8
+            },
+            {
+              "text": "Northstar",
+              "x": 720,
+              "y": 779,
+              "width": 51,
+              "height": 9
+            },
+            {
+              "text": "Labs.",
+              "x": 775,
+              "y": 779,
+              "width": 26,
+              "height": 9
+            },
+            {
+              "text": "Email",
+              "x": 542,
+              "y": 799,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "safety",
+              "x": 575,
+              "y": 799,
+              "width": 33,
+              "height": 11
+            },
+            {
+              "text": "email",
+              "x": 703,
+              "y": 799,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "is",
+              "x": 736,
+              "y": 801,
+              "width": 8,
+              "height": 7
+            },
+            {
+              "text": "shown",
+              "x": 748,
+              "y": 799,
+              "width": 35,
+              "height": 9
+            },
+            {
+              "text": "only",
+              "x": 787,
+              "y": 799,
+              "width": 22,
+              "height": 11
+            },
+            {
+              "text": "after",
+              "x": 813,
+              "y": 799,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "safe",
+              "x": 842,
+              "y": 799,
+              "width": 23,
+              "height": 9
+            },
+            {
+              "text": "checks.",
+              "x": 681,
+              "y": 815,
+              "width": 38,
+              "height": 9
+            },
+            {
+              "text": "Warm",
+              "x": 542,
+              "y": 835,
+              "width": 30,
+              "height": 9
+            },
+            {
+              "text": "path",
+              "x": 577,
+              "y": 835,
+              "width": 23,
+              "height": 11
+            },
+            {
+              "text": "warm",
+              "x": 656,
+              "y": 837,
+              "width": 30,
+              "height": 7
+            },
+            {
+              "text": "path",
+              "x": 690,
+              "y": 835,
+              "width": 24,
+              "height": 11
+            },
+            {
+              "text": "found",
+              "x": 718,
+              "y": 835,
+              "width": 31,
+              "height": 9
+            },
+            {
+              "text": "from",
+              "x": 753,
+              "y": 835,
+              "width": 24,
+              "height": 9
+            },
+            {
+              "text": "your",
+              "x": 781,
+              "y": 837,
+              "width": 24,
+              "height": 9
+            },
+            {
+              "text": "imported",
+              "x": 809,
+              "y": 835,
+              "width": 48,
+              "height": 11
+            },
+            {
+              "text": "Linkedin",
+              "x": 638,
+              "y": 851,
+              "width": 45,
+              "height": 9
+            },
+            {
+              "text": "graph",
+              "x": 687,
+              "y": 851,
+              "width": 30,
+              "height": 11
+            },
+            {
+              "text": "yet.",
+              "x": 722,
+              "y": 852,
+              "width": 16,
+              "height": 10
+            },
+            {
+              "text": "Email:",
+              "x": 533,
+              "y": 886,
+              "width": 34,
+              "height": 10
+            },
+            {
+              "text": "morgan@example.test",
+              "x": 576,
+              "y": 886,
+              "width": 142,
+              "height": 12
+            },
+            {
+              "text": "Confidence",
+              "x": 727,
+              "y": 887,
+              "width": 62,
+              "height": 9
+            },
+            {
+              "text": "0",
+              "x": 793,
+              "y": 887,
+              "width": 7,
+              "height": 9
+            }
+          ]
+        },
+        {
+          "id": "contactCandidate4",
+          "provenance": "candidate",
+          "trim": 130,
+          "x": 79,
+          "y": 337,
+          "width": 541,
+          "height": 213,
+          "aspect": 2.54,
+          "text": "Saved Contacts (6) Saved contacts are grouped by company so search results do not blur together. Filter saved contacts by company Northstar Labs| Showing 3 of 6 saved contacts. Northstar Labs 3",
+          "words": [
+            {
+              "text": "Saved",
+              "x": 97,
+              "y": 351,
+              "width": 56,
+              "height": 15
+            },
+            {
+              "text": "Contacts",
+              "x": 159,
+              "y": 351,
+              "width": 83,
+              "height": 15
+            },
+            {
+              "text": "(6)",
+              "x": 247,
+              "y": 351,
+              "width": 23,
+              "height": 17
+            },
+            {
+              "text": "Saved",
+              "x": 97,
+              "y": 394,
+              "width": 38,
+              "height": 10
+            },
+            {
+              "text": "contacts",
+              "x": 140,
+              "y": 395,
+              "width": 54,
+              "height": 9
+            },
+            {
+              "text": "are",
+              "x": 199,
+              "y": 396,
+              "width": 19,
+              "height": 8
+            },
+            {
+              "text": "grouped",
+              "x": 223,
+              "y": 394,
+              "width": 51,
+              "height": 12
+            },
+            {
+              "text": "by",
+              "x": 280,
+              "y": 394,
+              "width": 14,
+              "height": 12
+            },
+            {
+              "text": "company",
+              "x": 299,
+              "y": 396,
+              "width": 57,
+              "height": 10
+            },
+            {
+              "text": "so",
+              "x": 361,
+              "y": 396,
+              "width": 14,
+              "height": 8
+            },
+            {
+              "text": "search",
+              "x": 380,
+              "y": 394,
+              "width": 41,
+              "height": 10
+            },
+            {
+              "text": "results",
+              "x": 427,
+              "y": 394,
+              "width": 41,
+              "height": 10
+            },
+            {
+              "text": "do",
+              "x": 473,
+              "y": 394,
+              "width": 15,
+              "height": 10
+            },
+            {
+              "text": "not",
+              "x": 493,
+              "y": 395,
+              "width": 20,
+              "height": 9
+            },
+            {
+              "text": "blur",
+              "x": 518,
+              "y": 394,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "together.",
+              "x": 546,
+              "y": 394,
+              "width": 56,
+              "height": 12
+            },
+            {
+              "text": "Filter",
+              "x": 97,
+              "y": 427,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "saved",
+              "x": 134,
+              "y": 427,
+              "width": 38,
+              "height": 10
+            },
+            {
+              "text": "contacts",
+              "x": 176,
+              "y": 428,
+              "width": 57,
+              "height": 9
+            },
+            {
+              "text": "by",
+              "x": 238,
+              "y": 427,
+              "width": 14,
+              "height": 12
+            },
+            {
+              "text": "company",
+              "x": 256,
+              "y": 429,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Northstar",
+              "x": 108,
+              "y": 458,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Labs|",
+              "x": 173,
+              "y": 454,
+              "width": 31,
+              "height": 18
+            },
+            {
+              "text": "Showing",
+              "x": 97,
+              "y": 490,
+              "width": 46,
+              "height": 11
+            },
+            {
+              "text": "3",
+              "x": 148,
+              "y": 490,
+              "width": 5,
+              "height": 9
+            },
+            {
+              "text": "of",
+              "x": 158,
+              "y": 490,
+              "width": 10,
+              "height": 9
+            },
+            {
+              "text": "6",
+              "x": 173,
+              "y": 490,
+              "width": 3,
+              "height": 9
+            },
+            {
+              "text": "saved",
+              "x": 182,
+              "y": 490,
+              "width": 31,
+              "height": 9
+            },
+            {
+              "text": "contacts.",
+              "x": 218,
+              "y": 491,
+              "width": 46,
+              "height": 8
+            },
+            {
+              "text": "Northstar",
+              "x": 97,
+              "y": 524,
+              "width": 68,
+              "height": 12
+            },
+            {
+              "text": "Labs",
+              "x": 170,
+              "y": 524,
+              "width": 34,
+              "height": 12
+            },
+            {
+              "text": "3",
+              "x": 222,
+              "y": 526,
+              "width": 6,
+              "height": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "outreach_complete",
+      "trim": 180,
+      "width": 1440,
+      "height": 900,
+      "elements": [
+        {
+          "id": "message",
+          "provenance": "approved",
+          "x": 602,
+          "y": 196,
+          "width": 742,
+          "height": 300,
+          "aspect": 2.473,
+          "text": "Message to Avery Chen Subject: Product Engineer at Northstar Labs Subject Product Engineer at Northstar Labs Hi Avery — I'm reaching out about the Product Engineer role at Northstar Labs. Your work supporting technical hiring made you a relevant person to ask about the team and its priorities. I'd value your insight it open",
+          "words": [
+            {
+              "text": "Message",
+              "x": 619,
+              "y": 209,
+              "width": 66,
+              "height": 15
+            },
+            {
+              "text": "to",
+              "x": 690,
+              "y": 210,
+              "width": 15,
+              "height": 11
+            },
+            {
+              "text": "Avery",
+              "x": 709,
+              "y": 209,
+              "width": 42,
+              "height": 15
+            },
+            {
+              "text": "Chen",
+              "x": 756,
+              "y": 209,
+              "width": 37,
+              "height": 12
+            },
+            {
+              "text": "Subject:",
+              "x": 618,
+              "y": 280,
+              "width": 45,
+              "height": 10
+            },
+            {
+              "text": "Product",
+              "x": 678,
+              "y": 280,
+              "width": 44,
+              "height": 8
+            },
+            {
+              "text": "Engineer",
+              "x": 731,
+              "y": 280,
+              "width": 51,
+              "height": 10
+            },
+            {
+              "text": "at",
+              "x": 790,
+              "y": 280,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "Northstar",
+              "x": 810,
+              "y": 280,
+              "width": 58,
+              "height": 8
+            },
+            {
+              "text": "Labs",
+              "x": 876,
+              "y": 280,
+              "width": 25,
+              "height": 8
+            },
+            {
+              "text": "Subject",
+              "x": 618,
+              "y": 326,
+              "width": 50,
+              "height": 12
+            },
+            {
+              "text": "Product",
+              "x": 627,
+              "y": 355,
+              "width": 48,
+              "height": 10
+            },
+            {
+              "text": "Engineer",
+              "x": 680,
+              "y": 355,
+              "width": 56,
+              "height": 12
+            },
+            {
+              "text": "at",
+              "x": 740,
+              "y": 356,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "Northstar",
+              "x": 757,
+              "y": 355,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Labs",
+              "x": 822,
+              "y": 355,
+              "width": 30,
+              "height": 10
+            },
+            {
+              "text": "Hi",
+              "x": 631,
+              "y": 429,
+              "width": 11,
+              "height": 10
+            },
+            {
+              "text": "Avery",
+              "x": 647,
+              "y": 429,
+              "width": 35,
+              "height": 12
+            },
+            {
+              "text": "—",
+              "x": 686,
+              "y": 434,
+              "width": 12,
+              "height": 2
+            },
+            {
+              "text": "I'm",
+              "x": 703,
+              "y": 429,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "reaching",
+              "x": 725,
+              "y": 429,
+              "width": 54,
+              "height": 12
+            },
+            {
+              "text": "out",
+              "x": 784,
+              "y": 430,
+              "width": 20,
+              "height": 9
+            },
+            {
+              "text": "about",
+              "x": 808,
+              "y": 429,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "the",
+              "x": 849,
+              "y": 429,
+              "width": 20,
+              "height": 10
+            },
+            {
+              "text": "Product",
+              "x": 874,
+              "y": 429,
+              "width": 49,
+              "height": 10
+            },
+            {
+              "text": "Engineer",
+              "x": 928,
+              "y": 429,
+              "width": 55,
+              "height": 12
+            },
+            {
+              "text": "role",
+              "x": 988,
+              "y": 429,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "at",
+              "x": 1015,
+              "y": 430,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "Northstar",
+              "x": 1032,
+              "y": 429,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Labs.",
+              "x": 1097,
+              "y": 429,
+              "width": 32,
+              "height": 10
+            },
+            {
+              "text": "Your",
+              "x": 1133,
+              "y": 429,
+              "width": 28,
+              "height": 10
+            },
+            {
+              "text": "work",
+              "x": 1165,
+              "y": 429,
+              "width": 31,
+              "height": 10
+            },
+            {
+              "text": "supporting",
+              "x": 1201,
+              "y": 430,
+              "width": 68,
+              "height": 11
+            },
+            {
+              "text": "technical",
+              "x": 630,
+              "y": 449,
+              "width": 58,
+              "height": 10
+            },
+            {
+              "text": "hiring",
+              "x": 693,
+              "y": 449,
+              "width": 34,
+              "height": 12
+            },
+            {
+              "text": "made",
+              "x": 732,
+              "y": 449,
+              "width": 35,
+              "height": 10
+            },
+            {
+              "text": "you",
+              "x": 771,
+              "y": 451,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "a",
+              "x": 796,
+              "y": 439,
+              "width": 5,
+              "height": 30
+            },
+            {
+              "text": "relevant",
+              "x": 809,
+              "y": 449,
+              "width": 51,
+              "height": 10
+            },
+            {
+              "text": "person",
+              "x": 865,
+              "y": 451,
+              "width": 42,
+              "height": 10
+            },
+            {
+              "text": "to",
+              "x": 912,
+              "y": 450,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "ask",
+              "x": 928,
+              "y": 449,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "about",
+              "x": 955,
+              "y": 449,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "the",
+              "x": 995,
+              "y": 449,
+              "width": 21,
+              "height": 10
+            },
+            {
+              "text": "team",
+              "x": 1020,
+              "y": 450,
+              "width": 32,
+              "height": 9
+            },
+            {
+              "text": "and",
+              "x": 1057,
+              "y": 449,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "its",
+              "x": 1084,
+              "y": 450,
+              "width": 15,
+              "height": 9
+            },
+            {
+              "text": "priorities.",
+              "x": 1103,
+              "y": 449,
+              "width": 58,
+              "height": 12
+            },
+            {
+              "text": "I'd",
+              "x": 1166,
+              "y": 449,
+              "width": 13,
+              "height": 10
+            },
+            {
+              "text": "value",
+              "x": 1183,
+              "y": 449,
+              "width": 34,
+              "height": 10
+            },
+            {
+              "text": "your",
+              "x": 1221,
+              "y": 451,
+              "width": 28,
+              "height": 10
+            },
+            {
+              "text": "insight",
+              "x": 1253,
+              "y": 449,
+              "width": 42,
+              "height": 12
+            },
+            {
+              "text": "it",
+              "x": 1300,
+              "y": 449,
+              "width": 7,
+              "height": 10
+            },
+            {
+              "text": "open",
+              "x": 672,
+              "y": 471,
+              "width": 31,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "id": "messageDraftEdit",
+          "provenance": "approved",
+          "x": 602,
+          "y": 196,
+          "width": 742,
+          "height": 300,
+          "aspect": 2.473,
+          "text": "Message to Avery Chen Subject: Product Engineer at Northstar Labs Subject Product Engineer at Northstar Labs Hi Avery — I'm reaching out about the Product Engineer role at Northstar Labs. Your work supporting technical hiring made you a relevant person to ask about the team and its priorities. I'd value your insight it open",
+          "words": [
+            {
+              "text": "Message",
+              "x": 619,
+              "y": 209,
+              "width": 66,
+              "height": 15
+            },
+            {
+              "text": "to",
+              "x": 690,
+              "y": 210,
+              "width": 15,
+              "height": 11
+            },
+            {
+              "text": "Avery",
+              "x": 709,
+              "y": 209,
+              "width": 42,
+              "height": 15
+            },
+            {
+              "text": "Chen",
+              "x": 756,
+              "y": 209,
+              "width": 37,
+              "height": 12
+            },
+            {
+              "text": "Subject:",
+              "x": 618,
+              "y": 280,
+              "width": 45,
+              "height": 10
+            },
+            {
+              "text": "Product",
+              "x": 678,
+              "y": 280,
+              "width": 44,
+              "height": 8
+            },
+            {
+              "text": "Engineer",
+              "x": 731,
+              "y": 280,
+              "width": 51,
+              "height": 10
+            },
+            {
+              "text": "at",
+              "x": 790,
+              "y": 280,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "Northstar",
+              "x": 810,
+              "y": 280,
+              "width": 58,
+              "height": 8
+            },
+            {
+              "text": "Labs",
+              "x": 876,
+              "y": 280,
+              "width": 25,
+              "height": 8
+            },
+            {
+              "text": "Subject",
+              "x": 618,
+              "y": 326,
+              "width": 50,
+              "height": 12
+            },
+            {
+              "text": "Product",
+              "x": 627,
+              "y": 355,
+              "width": 48,
+              "height": 10
+            },
+            {
+              "text": "Engineer",
+              "x": 680,
+              "y": 355,
+              "width": 56,
+              "height": 12
+            },
+            {
+              "text": "at",
+              "x": 740,
+              "y": 356,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "Northstar",
+              "x": 757,
+              "y": 355,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Labs",
+              "x": 822,
+              "y": 355,
+              "width": 30,
+              "height": 10
+            },
+            {
+              "text": "Hi",
+              "x": 631,
+              "y": 429,
+              "width": 11,
+              "height": 10
+            },
+            {
+              "text": "Avery",
+              "x": 647,
+              "y": 429,
+              "width": 35,
+              "height": 12
+            },
+            {
+              "text": "—",
+              "x": 686,
+              "y": 434,
+              "width": 12,
+              "height": 2
+            },
+            {
+              "text": "I'm",
+              "x": 703,
+              "y": 429,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "reaching",
+              "x": 725,
+              "y": 429,
+              "width": 54,
+              "height": 12
+            },
+            {
+              "text": "out",
+              "x": 784,
+              "y": 430,
+              "width": 20,
+              "height": 9
+            },
+            {
+              "text": "about",
+              "x": 808,
+              "y": 429,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "the",
+              "x": 849,
+              "y": 429,
+              "width": 20,
+              "height": 10
+            },
+            {
+              "text": "Product",
+              "x": 874,
+              "y": 429,
+              "width": 49,
+              "height": 10
+            },
+            {
+              "text": "Engineer",
+              "x": 928,
+              "y": 429,
+              "width": 55,
+              "height": 12
+            },
+            {
+              "text": "role",
+              "x": 988,
+              "y": 429,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "at",
+              "x": 1015,
+              "y": 430,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "Northstar",
+              "x": 1032,
+              "y": 429,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Labs.",
+              "x": 1097,
+              "y": 429,
+              "width": 32,
+              "height": 10
+            },
+            {
+              "text": "Your",
+              "x": 1133,
+              "y": 429,
+              "width": 28,
+              "height": 10
+            },
+            {
+              "text": "work",
+              "x": 1165,
+              "y": 429,
+              "width": 31,
+              "height": 10
+            },
+            {
+              "text": "supporting",
+              "x": 1201,
+              "y": 430,
+              "width": 68,
+              "height": 11
+            },
+            {
+              "text": "technical",
+              "x": 630,
+              "y": 449,
+              "width": 58,
+              "height": 10
+            },
+            {
+              "text": "hiring",
+              "x": 693,
+              "y": 449,
+              "width": 34,
+              "height": 12
+            },
+            {
+              "text": "made",
+              "x": 732,
+              "y": 449,
+              "width": 35,
+              "height": 10
+            },
+            {
+              "text": "you",
+              "x": 771,
+              "y": 451,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "a",
+              "x": 796,
+              "y": 439,
+              "width": 5,
+              "height": 30
+            },
+            {
+              "text": "relevant",
+              "x": 809,
+              "y": 449,
+              "width": 51,
+              "height": 10
+            },
+            {
+              "text": "person",
+              "x": 865,
+              "y": 451,
+              "width": 42,
+              "height": 10
+            },
+            {
+              "text": "to",
+              "x": 912,
+              "y": 450,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "ask",
+              "x": 928,
+              "y": 449,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "about",
+              "x": 955,
+              "y": 449,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "the",
+              "x": 995,
+              "y": 449,
+              "width": 21,
+              "height": 10
+            },
+            {
+              "text": "team",
+              "x": 1020,
+              "y": 450,
+              "width": 32,
+              "height": 9
+            },
+            {
+              "text": "and",
+              "x": 1057,
+              "y": 449,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "its",
+              "x": 1084,
+              "y": 450,
+              "width": 15,
+              "height": 9
+            },
+            {
+              "text": "priorities.",
+              "x": 1103,
+              "y": 449,
+              "width": 58,
+              "height": 12
+            },
+            {
+              "text": "I'd",
+              "x": 1166,
+              "y": 449,
+              "width": 13,
+              "height": 10
+            },
+            {
+              "text": "value",
+              "x": 1183,
+              "y": 449,
+              "width": 34,
+              "height": 10
+            },
+            {
+              "text": "your",
+              "x": 1221,
+              "y": 451,
+              "width": 28,
+              "height": 10
+            },
+            {
+              "text": "insight",
+              "x": 1253,
+              "y": 449,
+              "width": 42,
+              "height": 12
+            },
+            {
+              "text": "it",
+              "x": 1300,
+              "y": 449,
+              "width": 7,
+              "height": 10
+            },
+            {
+              "text": "open",
+              "x": 672,
+              "y": 471,
+              "width": 31,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "id": "messageEdit",
+          "provenance": "approved",
+          "x": 602,
+          "y": 196,
+          "width": 742,
+          "height": 300,
+          "aspect": 2.473,
+          "text": "Message to Avery Chen Subject: Product Engineer at Northstar Labs Subject Product Engineer at Northstar Labs Hi Avery — I'm reaching out about the Product Engineer role at Northstar Labs. Your work supporting technical hiring made you a relevant person to ask about the team and its priorities. I'd value your insight it open",
+          "words": [
+            {
+              "text": "Message",
+              "x": 619,
+              "y": 209,
+              "width": 66,
+              "height": 15
+            },
+            {
+              "text": "to",
+              "x": 690,
+              "y": 210,
+              "width": 15,
+              "height": 11
+            },
+            {
+              "text": "Avery",
+              "x": 709,
+              "y": 209,
+              "width": 42,
+              "height": 15
+            },
+            {
+              "text": "Chen",
+              "x": 756,
+              "y": 209,
+              "width": 37,
+              "height": 12
+            },
+            {
+              "text": "Subject:",
+              "x": 618,
+              "y": 280,
+              "width": 45,
+              "height": 10
+            },
+            {
+              "text": "Product",
+              "x": 678,
+              "y": 280,
+              "width": 44,
+              "height": 8
+            },
+            {
+              "text": "Engineer",
+              "x": 731,
+              "y": 280,
+              "width": 51,
+              "height": 10
+            },
+            {
+              "text": "at",
+              "x": 790,
+              "y": 280,
+              "width": 12,
+              "height": 8
+            },
+            {
+              "text": "Northstar",
+              "x": 810,
+              "y": 280,
+              "width": 58,
+              "height": 8
+            },
+            {
+              "text": "Labs",
+              "x": 876,
+              "y": 280,
+              "width": 25,
+              "height": 8
+            },
+            {
+              "text": "Subject",
+              "x": 618,
+              "y": 326,
+              "width": 50,
+              "height": 12
+            },
+            {
+              "text": "Product",
+              "x": 627,
+              "y": 355,
+              "width": 48,
+              "height": 10
+            },
+            {
+              "text": "Engineer",
+              "x": 680,
+              "y": 355,
+              "width": 56,
+              "height": 12
+            },
+            {
+              "text": "at",
+              "x": 740,
+              "y": 356,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "Northstar",
+              "x": 757,
+              "y": 355,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Labs",
+              "x": 822,
+              "y": 355,
+              "width": 30,
+              "height": 10
+            },
+            {
+              "text": "Hi",
+              "x": 631,
+              "y": 429,
+              "width": 11,
+              "height": 10
+            },
+            {
+              "text": "Avery",
+              "x": 647,
+              "y": 429,
+              "width": 35,
+              "height": 12
+            },
+            {
+              "text": "—",
+              "x": 686,
+              "y": 434,
+              "width": 12,
+              "height": 2
+            },
+            {
+              "text": "I'm",
+              "x": 703,
+              "y": 429,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "reaching",
+              "x": 725,
+              "y": 429,
+              "width": 54,
+              "height": 12
+            },
+            {
+              "text": "out",
+              "x": 784,
+              "y": 430,
+              "width": 20,
+              "height": 9
+            },
+            {
+              "text": "about",
+              "x": 808,
+              "y": 429,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "the",
+              "x": 849,
+              "y": 429,
+              "width": 20,
+              "height": 10
+            },
+            {
+              "text": "Product",
+              "x": 874,
+              "y": 429,
+              "width": 49,
+              "height": 10
+            },
+            {
+              "text": "Engineer",
+              "x": 928,
+              "y": 429,
+              "width": 55,
+              "height": 12
+            },
+            {
+              "text": "role",
+              "x": 988,
+              "y": 429,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "at",
+              "x": 1015,
+              "y": 430,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "Northstar",
+              "x": 1032,
+              "y": 429,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Labs.",
+              "x": 1097,
+              "y": 429,
+              "width": 32,
+              "height": 10
+            },
+            {
+              "text": "Your",
+              "x": 1133,
+              "y": 429,
+              "width": 28,
+              "height": 10
+            },
+            {
+              "text": "work",
+              "x": 1165,
+              "y": 429,
+              "width": 31,
+              "height": 10
+            },
+            {
+              "text": "supporting",
+              "x": 1201,
+              "y": 430,
+              "width": 68,
+              "height": 11
+            },
+            {
+              "text": "technical",
+              "x": 630,
+              "y": 449,
+              "width": 58,
+              "height": 10
+            },
+            {
+              "text": "hiring",
+              "x": 693,
+              "y": 449,
+              "width": 34,
+              "height": 12
+            },
+            {
+              "text": "made",
+              "x": 732,
+              "y": 449,
+              "width": 35,
+              "height": 10
+            },
+            {
+              "text": "you",
+              "x": 771,
+              "y": 451,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "a",
+              "x": 796,
+              "y": 439,
+              "width": 5,
+              "height": 30
+            },
+            {
+              "text": "relevant",
+              "x": 809,
+              "y": 449,
+              "width": 51,
+              "height": 10
+            },
+            {
+              "text": "person",
+              "x": 865,
+              "y": 451,
+              "width": 42,
+              "height": 10
+            },
+            {
+              "text": "to",
+              "x": 912,
+              "y": 450,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "ask",
+              "x": 928,
+              "y": 449,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "about",
+              "x": 955,
+              "y": 449,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "the",
+              "x": 995,
+              "y": 449,
+              "width": 21,
+              "height": 10
+            },
+            {
+              "text": "team",
+              "x": 1020,
+              "y": 450,
+              "width": 32,
+              "height": 9
+            },
+            {
+              "text": "and",
+              "x": 1057,
+              "y": 449,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "its",
+              "x": 1084,
+              "y": 450,
+              "width": 15,
+              "height": 9
+            },
+            {
+              "text": "priorities.",
+              "x": 1103,
+              "y": 449,
+              "width": 58,
+              "height": 12
+            },
+            {
+              "text": "I'd",
+              "x": 1166,
+              "y": 449,
+              "width": 13,
+              "height": 10
+            },
+            {
+              "text": "value",
+              "x": 1183,
+              "y": 449,
+              "width": 34,
+              "height": 10
+            },
+            {
+              "text": "your",
+              "x": 1221,
+              "y": 451,
+              "width": 28,
+              "height": 10
+            },
+            {
+              "text": "insight",
+              "x": 1253,
+              "y": 449,
+              "width": 42,
+              "height": 12
+            },
+            {
+              "text": "it",
+              "x": 1300,
+              "y": 449,
+              "width": 7,
+              "height": 10
+            },
+            {
+              "text": "open",
+              "x": 672,
+              "y": 471,
+              "width": 31,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "id": "outreach_completeCandidate1",
+          "provenance": "candidate",
+          "trim": 180,
+          "x": 91,
+          "y": 195,
+          "width": 455,
+          "height": 223,
+          "aspect": 2.04,
+          "text": "New Draft Select a person, optional saved job, channel, and outcome goal to generate a message. Filter contacts by company Uber, Stripe, Apple Person Avery Chen — Senior Technical Recruiter",
+          "words": [
+            {
+              "text": "New",
+              "x": 113,
+              "y": 209,
+              "width": 32,
+              "height": 12
+            },
+            {
+              "text": "Draft",
+              "x": 151,
+              "y": 209,
+              "width": 36,
+              "height": 12
+            },
+            {
+              "text": "Select",
+              "x": 113,
+              "y": 236,
+              "width": 39,
+              "height": 10
+            },
+            {
+              "text": "a",
+              "x": 157,
+              "y": 238,
+              "width": 7,
+              "height": 8
+            },
+            {
+              "text": "person,",
+              "x": 169,
+              "y": 238,
+              "width": 42,
+              "height": 10
+            },
+            {
+              "text": "optional",
+              "x": 219,
+              "y": 236,
+              "width": 50,
+              "height": 12
+            },
+            {
+              "text": "saved",
+              "x": 274,
+              "y": 236,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "job,",
+              "x": 315,
+              "y": 236,
+              "width": 21,
+              "height": 12
+            },
+            {
+              "text": "channel,",
+              "x": 341,
+              "y": 236,
+              "width": 52,
+              "height": 12
+            },
+            {
+              "text": "and",
+              "x": 399,
+              "y": 236,
+              "width": 21,
+              "height": 10
+            },
+            {
+              "text": "outcome",
+              "x": 426,
+              "y": 237,
+              "width": 55,
+              "height": 9
+            },
+            {
+              "text": "goal",
+              "x": 485,
+              "y": 236,
+              "width": 27,
+              "height": 12
+            },
+            {
+              "text": "to",
+              "x": 517,
+              "y": 237,
+              "width": 11,
+              "height": 9
+            },
+            {
+              "text": "generate",
+              "x": 113,
+              "y": 257,
+              "width": 55,
+              "height": 11
+            },
+            {
+              "text": "a",
+              "x": 173,
+              "y": 258,
+              "width": 7,
+              "height": 8
+            },
+            {
+              "text": "message.",
+              "x": 185,
+              "y": 258,
+              "width": 59,
+              "height": 10
+            },
+            {
+              "text": "Filter",
+              "x": 113,
+              "y": 289,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "contacts",
+              "x": 150,
+              "y": 290,
+              "width": 57,
+              "height": 9
+            },
+            {
+              "text": "by",
+              "x": 211,
+              "y": 289,
+              "width": 15,
+              "height": 12
+            },
+            {
+              "text": "company",
+              "x": 230,
+              "y": 291,
+              "width": 59,
+              "height": 10
+            },
+            {
+              "text": "Uber,",
+              "x": 149,
+              "y": 320,
+              "width": 32,
+              "height": 10
+            },
+            {
+              "text": "Stripe,",
+              "x": 186,
+              "y": 320,
+              "width": 40,
+              "height": 12
+            },
+            {
+              "text": "Apple",
+              "x": 230,
+              "y": 320,
+              "width": 36,
+              "height": 12
+            },
+            {
+              "text": "Person",
+              "x": 109,
+              "y": 345,
+              "width": 48,
+              "height": 30
+            },
+            {
+              "text": "Avery",
+              "x": 129,
+              "y": 392,
+              "width": 35,
+              "height": 12
+            },
+            {
+              "text": "Chen",
+              "x": 169,
+              "y": 392,
+              "width": 32,
+              "height": 10
+            },
+            {
+              "text": "—",
+              "x": 206,
+              "y": 397,
+              "width": 12,
+              "height": 1
+            },
+            {
+              "text": "Senior",
+              "x": 223,
+              "y": 392,
+              "width": 40,
+              "height": 10
+            },
+            {
+              "text": "Technical",
+              "x": 267,
+              "y": 392,
+              "width": 59,
+              "height": 10
+            },
+            {
+              "text": "Recruiter",
+              "x": 331,
+              "y": 392,
+              "width": 57,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "id": "outreach_completeCandidate2",
+          "provenance": "candidate",
+          "trim": 180,
+          "x": 106,
+          "y": 434,
+          "width": 466,
+          "height": 196,
+          "aspect": 2.378,
+          "text": "‘Avery Chen Senior Technical Recruiter Recruiter strategy: fit + next step toward the role. If they are not the owner, ask who on recruiting or the hiring team is best. Email: Verity Email with Hunter",
+          "words": [
+            {
+              "text": "‘Avery",
+              "x": 124,
+              "y": 448,
+              "width": 37,
+              "height": 12
+            },
+            {
+              "text": "Chen",
+              "x": 165,
+              "y": 448,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "Senior",
+              "x": 125,
+              "y": 476,
+              "width": 40,
+              "height": 10
+            },
+            {
+              "text": "Technical",
+              "x": 169,
+              "y": 476,
+              "width": 59,
+              "height": 10
+            },
+            {
+              "text": "Recruiter",
+              "x": 233,
+              "y": 476,
+              "width": 57,
+              "height": 10
+            },
+            {
+              "text": "Recruiter",
+              "x": 134,
+              "y": 505,
+              "width": 50,
+              "height": 9
+            },
+            {
+              "text": "strategy:",
+              "x": 178,
+              "y": 532,
+              "width": 44,
+              "height": 10
+            },
+            {
+              "text": "fit",
+              "x": 230,
+              "y": 531,
+              "width": 10,
+              "height": 9
+            },
+            {
+              "text": "+",
+              "x": 244,
+              "y": 533,
+              "width": 5,
+              "height": 6
+            },
+            {
+              "text": "next",
+              "x": 254,
+              "y": 532,
+              "width": 23,
+              "height": 8
+            },
+            {
+              "text": "step",
+              "x": 281,
+              "y": 532,
+              "width": 23,
+              "height": 9
+            },
+            {
+              "text": "toward",
+              "x": 308,
+              "y": 531,
+              "width": 37,
+              "height": 9
+            },
+            {
+              "text": "the",
+              "x": 350,
+              "y": 531,
+              "width": 17,
+              "height": 9
+            },
+            {
+              "text": "role.",
+              "x": 371,
+              "y": 531,
+              "width": 19,
+              "height": 9
+            },
+            {
+              "text": "If",
+              "x": 397,
+              "y": 531,
+              "width": 6,
+              "height": 9
+            },
+            {
+              "text": "they",
+              "x": 408,
+              "y": 531,
+              "width": 23,
+              "height": 11
+            },
+            {
+              "text": "are",
+              "x": 435,
+              "y": 533,
+              "width": 16,
+              "height": 7
+            },
+            {
+              "text": "not",
+              "x": 455,
+              "y": 532,
+              "width": 17,
+              "height": 8
+            },
+            {
+              "text": "the",
+              "x": 476,
+              "y": 531,
+              "width": 17,
+              "height": 9
+            },
+            {
+              "text": "owner,",
+              "x": 497,
+              "y": 533,
+              "width": 34,
+              "height": 7
+            },
+            {
+              "text": "ask",
+              "x": 536,
+              "y": 531,
+              "width": 18,
+              "height": 9
+            },
+            {
+              "text": "who",
+              "x": 125,
+              "y": 547,
+              "width": 22,
+              "height": 9
+            },
+            {
+              "text": "on",
+              "x": 151,
+              "y": 549,
+              "width": 12,
+              "height": 7
+            },
+            {
+              "text": "recruiting",
+              "x": 168,
+              "y": 548,
+              "width": 50,
+              "height": 10
+            },
+            {
+              "text": "or",
+              "x": 223,
+              "y": 549,
+              "width": 10,
+              "height": 7
+            },
+            {
+              "text": "the",
+              "x": 238,
+              "y": 547,
+              "width": 16,
+              "height": 9
+            },
+            {
+              "text": "hiring",
+              "x": 259,
+              "y": 547,
+              "width": 29,
+              "height": 11
+            },
+            {
+              "text": "team",
+              "x": 293,
+              "y": 548,
+              "width": 26,
+              "height": 8
+            },
+            {
+              "text": "is",
+              "x": 324,
+              "y": 549,
+              "width": 8,
+              "height": 7
+            },
+            {
+              "text": "best.",
+              "x": 336,
+              "y": 547,
+              "width": 23,
+              "height": 9
+            },
+            {
+              "text": "Email:",
+              "x": 125,
+              "y": 573,
+              "width": 34,
+              "height": 10
+            },
+            {
+              "text": "Verity",
+              "x": 269,
+              "y": 605,
+              "width": 35,
+              "height": 11
+            },
+            {
+              "text": "Email",
+              "x": 308,
+              "y": 605,
+              "width": 32,
+              "height": 9
+            },
+            {
+              "text": "with",
+              "x": 343,
+              "y": 605,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "Hunter",
+              "x": 373,
+              "y": 605,
+              "width": 40,
+              "height": 9
+            }
+          ]
+        },
+        {
+          "id": "outreach_completeCandidate3",
+          "provenance": "candidate",
+          "trim": 180,
+          "x": 600,
+          "y": 764,
+          "width": 466,
+          "height": 104,
+          "aspect": 4.481,
+          "text": "Al Reasoning Why the Al wrote this message this way. The role, company, and Avery's recruiting relevance remain attached",
+          "words": [
+            {
+              "text": "Al",
+              "x": 618,
+              "y": 778,
+              "width": 14,
+              "height": 12
+            },
+            {
+              "text": "Reasoning",
+              "x": 638,
+              "y": 778,
+              "width": 77,
+              "height": 15
+            },
+            {
+              "text": "Why",
+              "x": 618,
+              "y": 806,
+              "width": 27,
+              "height": 12
+            },
+            {
+              "text": "the",
+              "x": 650,
+              "y": 806,
+              "width": 20,
+              "height": 10
+            },
+            {
+              "text": "Al",
+              "x": 674,
+              "y": 806,
+              "width": 11,
+              "height": 10
+            },
+            {
+              "text": "wrote",
+              "x": 691,
+              "y": 807,
+              "width": 35,
+              "height": 9
+            },
+            {
+              "text": "this",
+              "x": 731,
+              "y": 806,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "message",
+              "x": 759,
+              "y": 808,
+              "width": 56,
+              "height": 10
+            },
+            {
+              "text": "this",
+              "x": 820,
+              "y": 806,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "way.",
+              "x": 848,
+              "y": 808,
+              "width": 24,
+              "height": 10
+            },
+            {
+              "text": "The",
+              "x": 618,
+              "y": 842,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "role,",
+              "x": 645,
+              "y": 842,
+              "width": 26,
+              "height": 10
+            },
+            {
+              "text": "company,",
+              "x": 676,
+              "y": 844,
+              "width": 59,
+              "height": 10
+            },
+            {
+              "text": "and",
+              "x": 740,
+              "y": 842,
+              "width": 22,
+              "height": 10
+            },
+            {
+              "text": "Avery's",
+              "x": 767,
+              "y": 842,
+              "width": 45,
+              "height": 12
+            },
+            {
+              "text": "recruiting",
+              "x": 817,
+              "y": 843,
+              "width": 59,
+              "height": 11
+            },
+            {
+              "text": "relevance",
+              "x": 881,
+              "y": 842,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "remain",
+              "x": 947,
+              "y": 844,
+              "width": 41,
+              "height": 8
+            },
+            {
+              "text": "attached",
+              "x": 994,
+              "y": 842,
+              "width": 54,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "id": "outreach_completeCandidate4",
+          "provenance": "candidate",
+          "trim": 180,
+          "x": 95,
+          "y": 738,
+          "width": 235,
+          "height": 162,
+          "aspect": 1.451,
+          "text": "Channet Linkedin Note Connection request (300 chars max) Goal Warm Intro",
+          "words": [
+            {
+              "text": "Channet",
+              "x": 113,
+              "y": 752,
+              "width": 53,
+              "height": 10
+            },
+            {
+              "text": "Linkedin",
+              "x": 130,
+              "y": 785,
+              "width": 52,
+              "height": 10
+            },
+            {
+              "text": "Note",
+              "x": 188,
+              "y": 785,
+              "width": 29,
+              "height": 10
+            },
+            {
+              "text": "Connection",
+              "x": 113,
+              "y": 819,
+              "width": 61,
+              "height": 9
+            },
+            {
+              "text": "request",
+              "x": 179,
+              "y": 820,
+              "width": 40,
+              "height": 9
+            },
+            {
+              "text": "(300",
+              "x": 223,
+              "y": 819,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "chars",
+              "x": 253,
+              "y": 821,
+              "width": 29,
+              "height": 7
+            },
+            {
+              "text": "max)",
+              "x": 286,
+              "y": 820,
+              "width": 26,
+              "height": 8
+            },
+            {
+              "text": "Goal",
+              "x": 176,
+              "y": 850,
+              "width": 29,
+              "height": 10
+            },
+            {
+              "text": "Warm",
+              "x": 130,
+              "y": 883,
+              "width": 35,
+              "height": 10
+            },
+            {
+              "text": "Intro",
+              "x": 171,
+              "y": 883,
+              "width": 28,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "id": "outreach_completeCandidate5",
+          "provenance": "candidate",
+          "trim": 180,
+          "x": 79,
+          "y": 97,
+          "width": 427,
+          "height": 77,
+          "aspect": 5.545,
+          "text": "Messages Draft personalized outreach messages powered by Al.",
+          "words": [
+            {
+              "text": "Messages",
+              "x": 98,
+              "y": 111,
+              "width": 138,
+              "height": 27
+            },
+            {
+              "text": "Draft",
+              "x": 97,
+              "y": 146,
+              "width": 35,
+              "height": 12
+            },
+            {
+              "text": "personalized",
+              "x": 138,
+              "y": 146,
+              "width": 91,
+              "height": 14
+            },
+            {
+              "text": "outreach",
+              "x": 235,
+              "y": 146,
+              "width": 63,
+              "height": 12
+            },
+            {
+              "text": "messages",
+              "x": 305,
+              "y": 149,
+              "width": 72,
+              "height": 11
+            },
+            {
+              "text": "powered",
+              "x": 383,
+              "y": 146,
+              "width": 61,
+              "height": 14
+            },
+            {
+              "text": "by",
+              "x": 450,
+              "y": 146,
+              "width": 16,
+              "height": 14
+            },
+            {
+              "text": "Al.",
+              "x": 472,
+              "y": 146,
+              "width": 16,
+              "height": 12
+            }
+          ]
+        },
+        {
+          "id": "outreach_completeCandidate6",
+          "provenance": "candidate",
+          "trim": 180,
+          "x": 600,
+          "y": 674,
+          "width": 444,
+          "height": 63,
+          "aspect": 7.048,
+          "text": "‘Stage this emall as a draft in your inbox — you review and send it manually Connect Gmail or Outlook in Settings to stage drafts in your inbox.",
+          "words": [
+            {
+              "text": "‘Stage",
+              "x": 618,
+              "y": 688,
+              "width": 31,
+              "height": 11
+            },
+            {
+              "text": "this",
+              "x": 654,
+              "y": 689,
+              "width": 19,
+              "height": 8
+            },
+            {
+              "text": "emall",
+              "x": 677,
+              "y": 688,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "as",
+              "x": 710,
+              "y": 690,
+              "width": 11,
+              "height": 7
+            },
+            {
+              "text": "a",
+              "x": 726,
+              "y": 690,
+              "width": 3,
+              "height": 7
+            },
+            {
+              "text": "draft",
+              "x": 735,
+              "y": 688,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "in",
+              "x": 765,
+              "y": 690,
+              "width": 8,
+              "height": 7
+            },
+            {
+              "text": "your",
+              "x": 778,
+              "y": 690,
+              "width": 23,
+              "height": 9
+            },
+            {
+              "text": "inbox",
+              "x": 805,
+              "y": 688,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "—",
+              "x": 838,
+              "y": 693,
+              "width": 10,
+              "height": 1
+            },
+            {
+              "text": "you",
+              "x": 852,
+              "y": 690,
+              "width": 18,
+              "height": 9
+            },
+            {
+              "text": "review",
+              "x": 875,
+              "y": 690,
+              "width": 35,
+              "height": 7
+            },
+            {
+              "text": "and",
+              "x": 914,
+              "y": 688,
+              "width": 19,
+              "height": 9
+            },
+            {
+              "text": "send",
+              "x": 937,
+              "y": 688,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "it",
+              "x": 967,
+              "y": 689,
+              "width": 6,
+              "height": 8
+            },
+            {
+              "text": "manually",
+              "x": 977,
+              "y": 688,
+              "width": 49,
+              "height": 11
+            },
+            {
+              "text": "Connect",
+              "x": 618,
+              "y": 712,
+              "width": 45,
+              "height": 9
+            },
+            {
+              "text": "Gmail",
+              "x": 668,
+              "y": 712,
+              "width": 30,
+              "height": 9
+            },
+            {
+              "text": "or",
+              "x": 702,
+              "y": 714,
+              "width": 10,
+              "height": 7
+            },
+            {
+              "text": "Outlook",
+              "x": 716,
+              "y": 712,
+              "width": 42,
+              "height": 9
+            },
+            {
+              "text": "in",
+              "x": 763,
+              "y": 714,
+              "width": 8,
+              "height": 7
+            },
+            {
+              "text": "Settings",
+              "x": 776,
+              "y": 712,
+              "width": 44,
+              "height": 11
+            },
+            {
+              "text": "to",
+              "x": 825,
+              "y": 713,
+              "width": 10,
+              "height": 8
+            },
+            {
+              "text": "stage",
+              "x": 839,
+              "y": 713,
+              "width": 29,
+              "height": 10
+            },
+            {
+              "text": "drafts",
+              "x": 873,
+              "y": 712,
+              "width": 31,
+              "height": 9
+            },
+            {
+              "text": "in",
+              "x": 909,
+              "y": 714,
+              "width": 8,
+              "height": 7
+            },
+            {
+              "text": "your",
+              "x": 921,
+              "y": 714,
+              "width": 23,
+              "height": 9
+            },
+            {
+              "text": "inbox.",
+              "x": 949,
+              "y": 712,
+              "width": 28,
+              "height": 9
+            }
+          ]
+        },
+        {
+          "id": "outreach_completeCandidate7",
+          "provenance": "candidate",
+          "trim": 180,
+          "x": 94,
+          "y": 639,
+          "width": 187,
+          "height": 74,
+          "aspect": 2.527,
+          "text": "Target Job (Optional) No saved job context",
+          "words": [
+            {
+              "text": "Target",
+              "x": 112,
+              "y": 654,
+              "width": 41,
+              "height": 12
+            },
+            {
+              "text": "Job",
+              "x": 158,
+              "y": 654,
+              "width": 24,
+              "height": 10
+            },
+            {
+              "text": "(Optional)",
+              "x": 186,
+              "y": 653,
+              "width": 63,
+              "height": 13
+            },
+            {
+              "text": "No",
+              "x": 130,
+              "y": 687,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "saved",
+              "x": 151,
+              "y": 687,
+              "width": 37,
+              "height": 10
+            },
+            {
+              "text": "job",
+              "x": 192,
+              "y": 687,
+              "width": 19,
+              "height": 12
+            },
+            {
+              "text": "context",
+              "x": 216,
+              "y": 688,
+              "width": 47,
+              "height": 9
+            }
+          ]
+        },
+        {
+          "id": "outreach_completeCandidate8",
+          "provenance": "candidate",
+          "trim": 180,
+          "x": 1082,
+          "y": 625,
+          "width": 212,
+          "height": 38,
+          "aspect": 5.579,
+          "text": "with fresh Linkedin context",
+          "words": [
+            {
+              "text": "with",
+              "x": 1100,
+              "y": 639,
+              "width": 26,
+              "height": 10
+            },
+            {
+              "text": "fresh",
+              "x": 1132,
+              "y": 639,
+              "width": 31,
+              "height": 10
+            },
+            {
+              "text": "Linkedin",
+              "x": 1169,
+              "y": 639,
+              "width": 53,
+              "height": 10
+            },
+            {
+              "text": "context",
+              "x": 1228,
+              "y": 640,
+              "width": 48,
+              "height": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "outreach_blank",
+      "trim": 85,
+      "width": 1440,
+      "height": 900,
+      "elements": [
+        {
+          "id": "outreachBlank",
+          "provenance": "approved",
+          "x": 82,
+          "y": 175,
+          "width": 520,
+          "height": 590,
+          "aspect": 0.881,
+          "text": "New Draft Select a person, optional saved job, channel, and outcome goal to generate a message. Filter contacts by company e.g. Uber, Stripe, Apple Person Select a person... Target Job (Optional) No saved job context a saved job when you want the draft anchored to a Linkedin Note Connection request (300 chars max) ‘Outcome Goal Warm Intro",
+          "words": [
+            {
+              "text": "New",
+              "x": 113,
+              "y": 209,
+              "width": 32,
+              "height": 12
+            },
+            {
+              "text": "Draft",
+              "x": 151,
+              "y": 209,
+              "width": 37,
+              "height": 12
+            },
+            {
+              "text": "Select",
+              "x": 113,
+              "y": 236,
+              "width": 40,
+              "height": 10
+            },
+            {
+              "text": "a",
+              "x": 157,
+              "y": 238,
+              "width": 7,
+              "height": 8
+            },
+            {
+              "text": "person,",
+              "x": 169,
+              "y": 238,
+              "width": 45,
+              "height": 10
+            },
+            {
+              "text": "optional",
+              "x": 219,
+              "y": 236,
+              "width": 50,
+              "height": 12
+            },
+            {
+              "text": "saved",
+              "x": 274,
+              "y": 236,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "job,",
+              "x": 314,
+              "y": 236,
+              "width": 23,
+              "height": 12
+            },
+            {
+              "text": "channel,",
+              "x": 341,
+              "y": 236,
+              "width": 53,
+              "height": 12
+            },
+            {
+              "text": "and",
+              "x": 398,
+              "y": 236,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "outcome",
+              "x": 426,
+              "y": 237,
+              "width": 55,
+              "height": 9
+            },
+            {
+              "text": "goal",
+              "x": 485,
+              "y": 236,
+              "width": 27,
+              "height": 12
+            },
+            {
+              "text": "to",
+              "x": 516,
+              "y": 237,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "generate",
+              "x": 113,
+              "y": 257,
+              "width": 55,
+              "height": 11
+            },
+            {
+              "text": "a",
+              "x": 173,
+              "y": 258,
+              "width": 7,
+              "height": 8
+            },
+            {
+              "text": "message.",
+              "x": 184,
+              "y": 258,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Filter",
+              "x": 113,
+              "y": 289,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "contacts",
+              "x": 150,
+              "y": 290,
+              "width": 57,
+              "height": 9
+            },
+            {
+              "text": "by",
+              "x": 211,
+              "y": 289,
+              "width": 15,
+              "height": 12
+            },
+            {
+              "text": "company",
+              "x": 230,
+              "y": 291,
+              "width": 59,
+              "height": 10
+            },
+            {
+              "text": "e.g.",
+              "x": 124,
+              "y": 322,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "Uber,",
+              "x": 149,
+              "y": 320,
+              "width": 32,
+              "height": 12
+            },
+            {
+              "text": "Stripe,",
+              "x": 186,
+              "y": 320,
+              "width": 40,
+              "height": 12
+            },
+            {
+              "text": "Apple",
+              "x": 230,
+              "y": 320,
+              "width": 36,
+              "height": 12
+            },
+            {
+              "text": "Person",
+              "x": 113,
+              "y": 359,
+              "width": 44,
+              "height": 10
+            },
+            {
+              "text": "Select",
+              "x": 130,
+              "y": 392,
+              "width": 40,
+              "height": 10
+            },
+            {
+              "text": "a",
+              "x": 174,
+              "y": 394,
+              "width": 7,
+              "height": 8
+            },
+            {
+              "text": "person...",
+              "x": 186,
+              "y": 394,
+              "width": 51,
+              "height": 10
+            },
+            {
+              "text": "Target",
+              "x": 112,
+              "y": 433,
+              "width": 41,
+              "height": 12
+            },
+            {
+              "text": "Job",
+              "x": 158,
+              "y": 433,
+              "width": 24,
+              "height": 10
+            },
+            {
+              "text": "(Optional)",
+              "x": 186,
+              "y": 432,
+              "width": 63,
+              "height": 13
+            },
+            {
+              "text": "No",
+              "x": 130,
+              "y": 466,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "saved",
+              "x": 151,
+              "y": 466,
+              "width": 37,
+              "height": 10
+            },
+            {
+              "text": "job",
+              "x": 192,
+              "y": 466,
+              "width": 19,
+              "height": 12
+            },
+            {
+              "text": "context",
+              "x": 216,
+              "y": 467,
+              "width": 48,
+              "height": 9
+            },
+            {
+              "text": "a",
+              "x": 151,
+              "y": 502,
+              "width": 6,
+              "height": 7
+            },
+            {
+              "text": "saved",
+              "x": 161,
+              "y": 500,
+              "width": 31,
+              "height": 9
+            },
+            {
+              "text": "job",
+              "x": 196,
+              "y": 500,
+              "width": 16,
+              "height": 11
+            },
+            {
+              "text": "when",
+              "x": 216,
+              "y": 500,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "you",
+              "x": 249,
+              "y": 502,
+              "width": 19,
+              "height": 9
+            },
+            {
+              "text": "want",
+              "x": 272,
+              "y": 501,
+              "width": 26,
+              "height": 8
+            },
+            {
+              "text": "the",
+              "x": 302,
+              "y": 500,
+              "width": 16,
+              "height": 9
+            },
+            {
+              "text": "draft",
+              "x": 325,
+              "y": 488,
+              "width": 24,
+              "height": 31
+            },
+            {
+              "text": "anchored",
+              "x": 353,
+              "y": 500,
+              "width": 50,
+              "height": 9
+            },
+            {
+              "text": "to",
+              "x": 407,
+              "y": 501,
+              "width": 11,
+              "height": 8
+            },
+            {
+              "text": "a",
+              "x": 422,
+              "y": 502,
+              "width": 5,
+              "height": 7
+            },
+            {
+              "text": "Linkedin",
+              "x": 130,
+              "y": 564,
+              "width": 53,
+              "height": 10
+            },
+            {
+              "text": "Note",
+              "x": 188,
+              "y": 564,
+              "width": 29,
+              "height": 10
+            },
+            {
+              "text": "Connection",
+              "x": 113,
+              "y": 598,
+              "width": 61,
+              "height": 9
+            },
+            {
+              "text": "request",
+              "x": 179,
+              "y": 599,
+              "width": 40,
+              "height": 9
+            },
+            {
+              "text": "(300",
+              "x": 223,
+              "y": 598,
+              "width": 25,
+              "height": 10
+            },
+            {
+              "text": "chars",
+              "x": 252,
+              "y": 598,
+              "width": 30,
+              "height": 9
+            },
+            {
+              "text": "max)",
+              "x": 286,
+              "y": 598,
+              "width": 26,
+              "height": 10
+            },
+            {
+              "text": "‘Outcome",
+              "x": 112,
+              "y": 629,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Goal",
+              "x": 176,
+              "y": 629,
+              "width": 29,
+              "height": 10
+            },
+            {
+              "text": "Warm",
+              "x": 129,
+              "y": 662,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "Intro",
+              "x": 171,
+              "y": 662,
+              "width": 28,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "id": "outreachDraftCard",
+          "provenance": "approved",
+          "x": 96,
+          "y": 188,
+          "width": 490,
+          "height": 562,
+          "aspect": 0.872,
+          "text": "New Draft Select a person, optional saved job, channel, and outcome goal to generate a message. Filter contacts by company e.g. Uber, Stripe, Apple Person Select a person... Target Job (Optional) No saved job context a saved job when you want the draft anchored to a Linkedin Note Connection request (300 chars max) ‘Outcome Goal Warm Intro",
+          "words": [
+            {
+              "text": "New",
+              "x": 113,
+              "y": 209,
+              "width": 32,
+              "height": 12
+            },
+            {
+              "text": "Draft",
+              "x": 151,
+              "y": 209,
+              "width": 37,
+              "height": 12
+            },
+            {
+              "text": "Select",
+              "x": 113,
+              "y": 236,
+              "width": 40,
+              "height": 10
+            },
+            {
+              "text": "a",
+              "x": 157,
+              "y": 238,
+              "width": 7,
+              "height": 8
+            },
+            {
+              "text": "person,",
+              "x": 169,
+              "y": 238,
+              "width": 45,
+              "height": 10
+            },
+            {
+              "text": "optional",
+              "x": 219,
+              "y": 236,
+              "width": 50,
+              "height": 12
+            },
+            {
+              "text": "saved",
+              "x": 274,
+              "y": 236,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "job,",
+              "x": 314,
+              "y": 236,
+              "width": 23,
+              "height": 12
+            },
+            {
+              "text": "channel,",
+              "x": 341,
+              "y": 236,
+              "width": 53,
+              "height": 12
+            },
+            {
+              "text": "and",
+              "x": 398,
+              "y": 236,
+              "width": 23,
+              "height": 10
+            },
+            {
+              "text": "outcome",
+              "x": 426,
+              "y": 237,
+              "width": 55,
+              "height": 9
+            },
+            {
+              "text": "goal",
+              "x": 485,
+              "y": 236,
+              "width": 27,
+              "height": 12
+            },
+            {
+              "text": "to",
+              "x": 516,
+              "y": 237,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "generate",
+              "x": 113,
+              "y": 257,
+              "width": 55,
+              "height": 11
+            },
+            {
+              "text": "a",
+              "x": 173,
+              "y": 258,
+              "width": 7,
+              "height": 8
+            },
+            {
+              "text": "message.",
+              "x": 184,
+              "y": 258,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Filter",
+              "x": 113,
+              "y": 289,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "contacts",
+              "x": 150,
+              "y": 290,
+              "width": 57,
+              "height": 9
+            },
+            {
+              "text": "by",
+              "x": 211,
+              "y": 289,
+              "width": 15,
+              "height": 12
+            },
+            {
+              "text": "company",
+              "x": 230,
+              "y": 291,
+              "width": 59,
+              "height": 10
+            },
+            {
+              "text": "e.g.",
+              "x": 124,
+              "y": 322,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "Uber,",
+              "x": 149,
+              "y": 320,
+              "width": 32,
+              "height": 12
+            },
+            {
+              "text": "Stripe,",
+              "x": 186,
+              "y": 320,
+              "width": 40,
+              "height": 12
+            },
+            {
+              "text": "Apple",
+              "x": 230,
+              "y": 320,
+              "width": 36,
+              "height": 12
+            },
+            {
+              "text": "Person",
+              "x": 113,
+              "y": 359,
+              "width": 44,
+              "height": 10
+            },
+            {
+              "text": "Select",
+              "x": 130,
+              "y": 392,
+              "width": 40,
+              "height": 10
+            },
+            {
+              "text": "a",
+              "x": 174,
+              "y": 394,
+              "width": 7,
+              "height": 8
+            },
+            {
+              "text": "person...",
+              "x": 186,
+              "y": 394,
+              "width": 51,
+              "height": 10
+            },
+            {
+              "text": "Target",
+              "x": 112,
+              "y": 433,
+              "width": 41,
+              "height": 12
+            },
+            {
+              "text": "Job",
+              "x": 158,
+              "y": 433,
+              "width": 24,
+              "height": 10
+            },
+            {
+              "text": "(Optional)",
+              "x": 186,
+              "y": 432,
+              "width": 63,
+              "height": 13
+            },
+            {
+              "text": "No",
+              "x": 130,
+              "y": 466,
+              "width": 17,
+              "height": 10
+            },
+            {
+              "text": "saved",
+              "x": 151,
+              "y": 466,
+              "width": 37,
+              "height": 10
+            },
+            {
+              "text": "job",
+              "x": 192,
+              "y": 466,
+              "width": 19,
+              "height": 12
+            },
+            {
+              "text": "context",
+              "x": 216,
+              "y": 467,
+              "width": 48,
+              "height": 9
+            },
+            {
+              "text": "a",
+              "x": 151,
+              "y": 502,
+              "width": 6,
+              "height": 7
+            },
+            {
+              "text": "saved",
+              "x": 161,
+              "y": 500,
+              "width": 31,
+              "height": 9
+            },
+            {
+              "text": "job",
+              "x": 196,
+              "y": 500,
+              "width": 16,
+              "height": 11
+            },
+            {
+              "text": "when",
+              "x": 216,
+              "y": 500,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "you",
+              "x": 249,
+              "y": 502,
+              "width": 19,
+              "height": 9
+            },
+            {
+              "text": "want",
+              "x": 272,
+              "y": 501,
+              "width": 26,
+              "height": 8
+            },
+            {
+              "text": "the",
+              "x": 302,
+              "y": 500,
+              "width": 16,
+              "height": 9
+            },
+            {
+              "text": "draft",
+              "x": 325,
+              "y": 488,
+              "width": 24,
+              "height": 31
+            },
+            {
+              "text": "anchored",
+              "x": 353,
+              "y": 500,
+              "width": 50,
+              "height": 9
+            },
+            {
+              "text": "to",
+              "x": 407,
+              "y": 501,
+              "width": 11,
+              "height": 8
+            },
+            {
+              "text": "a",
+              "x": 422,
+              "y": 502,
+              "width": 5,
+              "height": 7
+            },
+            {
+              "text": "Linkedin",
+              "x": 130,
+              "y": 564,
+              "width": 53,
+              "height": 10
+            },
+            {
+              "text": "Note",
+              "x": 188,
+              "y": 564,
+              "width": 29,
+              "height": 10
+            },
+            {
+              "text": "Connection",
+              "x": 113,
+              "y": 598,
+              "width": 61,
+              "height": 9
+            },
+            {
+              "text": "request",
+              "x": 179,
+              "y": 599,
+              "width": 40,
+              "height": 9
+            },
+            {
+              "text": "(300",
+              "x": 223,
+              "y": 598,
+              "width": 25,
+              "height": 10
+            },
+            {
+              "text": "chars",
+              "x": 252,
+              "y": 598,
+              "width": 30,
+              "height": 9
+            },
+            {
+              "text": "max)",
+              "x": 286,
+              "y": 598,
+              "width": 26,
+              "height": 10
+            },
+            {
+              "text": "‘Outcome",
+              "x": 112,
+              "y": 629,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Goal",
+              "x": 176,
+              "y": 629,
+              "width": 29,
+              "height": 10
+            },
+            {
+              "text": "Warm",
+              "x": 129,
+              "y": 662,
+              "width": 36,
+              "height": 10
+            },
+            {
+              "text": "Intro",
+              "x": 171,
+              "y": 662,
+              "width": 28,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "id": "outreach_blankCandidate1",
+          "provenance": "candidate",
+          "trim": 85,
+          "x": 79,
+          "y": 132,
+          "width": 427,
+          "height": 43,
+          "aspect": 9.93,
+          "text": "Draft personalized outreach messages powered by Al.",
+          "words": [
+            {
+              "text": "Draft",
+              "x": 97,
+              "y": 146,
+              "width": 35,
+              "height": 12
+            },
+            {
+              "text": "personalized",
+              "x": 138,
+              "y": 146,
+              "width": 91,
+              "height": 14
+            },
+            {
+              "text": "outreach",
+              "x": 235,
+              "y": 146,
+              "width": 63,
+              "height": 12
+            },
+            {
+              "text": "messages",
+              "x": 304,
+              "y": 149,
+              "width": 73,
+              "height": 12
+            },
+            {
+              "text": "powered",
+              "x": 383,
+              "y": 146,
+              "width": 61,
+              "height": 14
+            },
+            {
+              "text": "by",
+              "x": 450,
+              "y": 146,
+              "width": 17,
+              "height": 14
+            },
+            {
+              "text": "Al.",
+              "x": 471,
+              "y": 146,
+              "width": 17,
+              "height": 12
+            }
+          ]
+        },
+        {
+          "id": "outreach_blankCandidate2",
+          "provenance": "candidate",
+          "trim": 85,
+          "x": 230,
+          "y": 33,
+          "width": 316,
+          "height": 40,
+          "aspect": 7.9,
+          "text": "Dashboard Jobs Tracker People",
+          "words": [
+            {
+              "text": "Dashboard",
+              "x": 248,
+              "y": 47,
+              "width": 69,
+              "height": 10
+            },
+            {
+              "text": "Jobs",
+              "x": 347,
+              "y": 47,
+              "width": 31,
+              "height": 10
+            },
+            {
+              "text": "Tracker",
+              "x": 406,
+              "y": 47,
+              "width": 49,
+              "height": 10
+            },
+            {
+              "text": "People",
+              "x": 485,
+              "y": 47,
+              "width": 43,
+              "height": 12
+            }
+          ]
+        },
+        {
+          "id": "outreach_blankCandidate3",
+          "provenance": "candidate",
+          "trim": 85,
+          "x": 79,
+          "y": 782,
+          "width": 218,
+          "height": 46,
+          "aspect": 4.739,
+          "text": "Message History (2)",
+          "words": [
+            {
+              "text": "Message",
+              "x": 97,
+              "y": 797,
+              "width": 83,
+              "height": 17
+            },
+            {
+              "text": "History",
+              "x": 186,
+              "y": 796,
+              "width": 65,
+              "height": 18
+            },
+            {
+              "text": "(2)",
+              "x": 256,
+              "y": 796,
+              "width": 23,
+              "height": 17
+            }
+          ]
+        },
+        {
+          "id": "outreach_blankCandidate4",
+          "provenance": "candidate",
+          "trim": 85,
+          "x": 1223,
+          "y": 29,
+          "width": 130,
+          "height": 46,
+          "aspect": 2.826,
+          "text": "& O ce",
+          "words": [
+            {
+              "text": "&",
+              "x": 1241,
+              "y": 45,
+              "width": 14,
+              "height": 14
+            },
+            {
+              "text": "O",
+              "x": 1280,
+              "y": 43,
+              "width": 16,
+              "height": 18
+            },
+            {
+              "text": "ce",
+              "x": 1321,
+              "y": 47,
+              "width": 14,
+              "height": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "tracker_after",
+      "trim": 155,
+      "width": 1440,
+      "height": 900,
+      "elements": [
+        {
+          "id": "trackerAfter",
+          "provenance": "approved",
+          "x": 258,
+          "y": 178,
+          "width": 560,
+          "height": 310,
+          "aspect": 1.806,
+          "text": "Applied Interviewing Offers @ Interviewing 1 @ Offer © © Accepted Product Engineer No jobs Northstar Labs 8/3/2026",
+          "words": [
+            {
+              "text": "Applied",
+              "x": 288,
+              "y": 241,
+              "width": 41,
+              "height": 31
+            },
+            {
+              "text": "Interviewing",
+              "x": 469,
+              "y": 252,
+              "width": 65,
+              "height": 11
+            },
+            {
+              "text": "Offers",
+              "x": 649,
+              "y": 241,
+              "width": 32,
+              "height": 30
+            },
+            {
+              "text": "@",
+              "x": 311,
+              "y": 307,
+              "width": 8,
+              "height": 8
+            },
+            {
+              "text": "Interviewing",
+              "x": 328,
+              "y": 306,
+              "width": 76,
+              "height": 12
+            },
+            {
+              "text": "1",
+              "x": 500,
+              "y": 308,
+              "width": 2,
+              "height": 7
+            },
+            {
+              "text": "@",
+              "x": 526,
+              "y": 307,
+              "width": 8,
+              "height": 8
+            },
+            {
+              "text": "Offer",
+              "x": 543,
+              "y": 306,
+              "width": 32,
+              "height": 10
+            },
+            {
+              "text": "©",
+              "x": 712,
+              "y": 308,
+              "width": 6,
+              "height": 7
+            },
+            {
+              "text": "©",
+              "x": 733,
+              "y": 295,
+              "width": 12,
+              "height": 31
+            },
+            {
+              "text": "Accepted",
+              "x": 757,
+              "y": 306,
+              "width": 60,
+              "height": 12
+            },
+            {
+              "text": "Product",
+              "x": 325,
+              "y": 345,
+              "width": 51,
+              "height": 10
+            },
+            {
+              "text": "Engineer",
+              "x": 380,
+              "y": 345,
+              "width": 57,
+              "height": 12
+            },
+            {
+              "text": "No",
+              "x": 606,
+              "y": 349,
+              "width": 12,
+              "height": 9
+            },
+            {
+              "text": "jobs",
+              "x": 623,
+              "y": 349,
+              "width": 23,
+              "height": 11
+            },
+            {
+              "text": "Northstar",
+              "x": 325,
+              "y": 369,
+              "width": 51,
+              "height": 9
+            },
+            {
+              "text": "Labs",
+              "x": 381,
+              "y": 369,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "8/3/2026",
+              "x": 362,
+              "y": 414,
+              "width": 45,
+              "height": 8
+            }
+          ]
+        },
+        {
+          "id": "trackerControl",
+          "provenance": "approved",
+          "x": 940,
+          "y": 285,
+          "width": 430,
+          "height": 390,
+          "aspect": 1.103,
+          "text": "Product Engineer Northstar Labs Toronto, Canada Move to Applied Offer Accepted Rejected Withdrawn Applied: 8/3/2026 Interview Rounds Round No interview rounds logged yet View",
+          "words": [
+            {
+              "text": "Product",
+              "x": 981,
+              "y": 320,
+              "width": 58,
+              "height": 12
+            },
+            {
+              "text": "Engineer",
+              "x": 1044,
+              "y": 320,
+              "width": 65,
+              "height": 15
+            },
+            {
+              "text": "Northstar",
+              "x": 981,
+              "y": 346,
+              "width": 59,
+              "height": 10
+            },
+            {
+              "text": "Labs",
+              "x": 1046,
+              "y": 346,
+              "width": 29,
+              "height": 10
+            },
+            {
+              "text": "Toronto,",
+              "x": 980,
+              "y": 368,
+              "width": 40,
+              "height": 9
+            },
+            {
+              "text": "Canada",
+              "x": 1027,
+              "y": 368,
+              "width": 41,
+              "height": 9
+            },
+            {
+              "text": "Move",
+              "x": 981,
+              "y": 415,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "to",
+              "x": 1014,
+              "y": 416,
+              "width": 11,
+              "height": 8
+            },
+            {
+              "text": "Applied",
+              "x": 991,
+              "y": 428,
+              "width": 42,
+              "height": 30
+            },
+            {
+              "text": "Offer",
+              "x": 1156,
+              "y": 438,
+              "width": 27,
+              "height": 9
+            },
+            {
+              "text": "Accepted",
+              "x": 1210,
+              "y": 438,
+              "width": 53,
+              "height": 11
+            },
+            {
+              "text": "Rejected",
+              "x": 992,
+              "y": 470,
+              "width": 48,
+              "height": 11
+            },
+            {
+              "text": "Withdrawn",
+              "x": 1067,
+              "y": 470,
+              "width": 60,
+              "height": 9
+            },
+            {
+              "text": "Applied:",
+              "x": 981,
+              "y": 508,
+              "width": 40,
+              "height": 11
+            },
+            {
+              "text": "8/3/2026",
+              "x": 1029,
+              "y": 508,
+              "width": 54,
+              "height": 10
+            },
+            {
+              "text": "Interview",
+              "x": 981,
+              "y": 563,
+              "width": 57,
+              "height": 10
+            },
+            {
+              "text": "Rounds",
+              "x": 1043,
+              "y": 563,
+              "width": 46,
+              "height": 10
+            },
+            {
+              "text": "Round",
+              "x": 1282,
+              "y": 563,
+              "width": 34,
+              "height": 9
+            },
+            {
+              "text": "No",
+              "x": 981,
+              "y": 597,
+              "width": 14,
+              "height": 9
+            },
+            {
+              "text": "interview",
+              "x": 1000,
+              "y": 598,
+              "width": 48,
+              "height": 8
+            },
+            {
+              "text": "rounds",
+              "x": 1053,
+              "y": 597,
+              "width": 36,
+              "height": 9
+            },
+            {
+              "text": "logged",
+              "x": 1094,
+              "y": 597,
+              "width": 35,
+              "height": 11
+            },
+            {
+              "text": "yet",
+              "x": 1134,
+              "y": 598,
+              "width": 16,
+              "height": 10
+            },
+            {
+              "text": "View",
+              "x": 980,
+              "y": 657,
+              "width": 26,
+              "height": 9
+            }
+          ]
+        },
+        {
+          "id": "tracker_afterCandidate1",
+          "provenance": "candidate",
+          "trim": 155,
+          "x": 78,
+          "y": 98,
+          "width": 387,
+          "height": 76,
+          "aspect": 5.092,
+          "text": "Application Tracker Track your job applications from applied to offer.",
+          "words": [
+            {
+              "text": "Application",
+              "x": 97,
+              "y": 112,
+              "width": 154,
+              "height": 26
+            },
+            {
+              "text": "Tracker",
+              "x": 258,
+              "y": 112,
+              "width": 103,
+              "height": 21
+            },
+            {
+              "text": "Track",
+              "x": 96,
+              "y": 146,
+              "width": 39,
+              "height": 12
+            },
+            {
+              "text": "your",
+              "x": 141,
+              "y": 149,
+              "width": 31,
+              "height": 11
+            },
+            {
+              "text": "job",
+              "x": 177,
+              "y": 146,
+              "width": 21,
+              "height": 14
+            },
+            {
+              "text": "applications",
+              "x": 204,
+              "y": 146,
+              "width": 87,
+              "height": 14
+            },
+            {
+              "text": "from",
+              "x": 297,
+              "y": 146,
+              "width": 32,
+              "height": 12
+            },
+            {
+              "text": "applied",
+              "x": 335,
+              "y": 146,
+              "width": 52,
+              "height": 14
+            },
+            {
+              "text": "to",
+              "x": 393,
+              "y": 147,
+              "width": 14,
+              "height": 11
+            },
+            {
+              "text": "offer.",
+              "x": 412,
+              "y": 146,
+              "width": 35,
+              "height": 12
+            }
+          ]
+        },
+        {
+          "id": "tracker_afterCandidate2",
+          "provenance": "candidate",
+          "trim": 155,
+          "x": 1055,
+          "y": 820,
+          "width": 199,
+          "height": 58,
+          "aspect": 3.431,
+          "text": "© Moved to interviewing",
+          "words": [
+            {
+              "text": "©",
+              "x": 1073,
+              "y": 842,
+              "width": 15,
+              "height": 14
+            },
+            {
+              "text": "Moved",
+              "x": 1101,
+              "y": 844,
+              "width": 56,
+              "height": 10
+            },
+            {
+              "text": "to",
+              "x": 1144,
+              "y": 834,
+              "width": 10,
+              "height": 30
+            },
+            {
+              "text": "interviewing",
+              "x": 1162,
+              "y": 844,
+              "width": 74,
+              "height": 13
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "asset": "tracker_before",
+      "trim": 145,
+      "width": 1440,
+      "height": 900,
+      "elements": [
+        {
+          "id": "trackerBefore",
+          "provenance": "approved",
+          "x": 72,
+          "y": 178,
+          "width": 560,
+          "height": 310,
+          "aspect": 1.806,
+          "text": "Total Active Applied Interviewing © Applied 1 @ Interviewing Offer Product Engineer No jobs Northstar Labs 8/3/2026",
+          "words": [
+            {
+              "text": "Total",
+              "x": 108,
+              "y": 252,
+              "width": 26,
+              "height": 9
+            },
+            {
+              "text": "Active",
+              "x": 138,
+              "y": 252,
+              "width": 33,
+              "height": 9
+            },
+            {
+              "text": "Applied",
+              "x": 288,
+              "y": 241,
+              "width": 41,
+              "height": 31
+            },
+            {
+              "text": "Interviewing",
+              "x": 469,
+              "y": 252,
+              "width": 65,
+              "height": 11
+            },
+            {
+              "text": "©",
+              "x": 96,
+              "y": 307,
+              "width": 8,
+              "height": 8
+            },
+            {
+              "text": "Applied",
+              "x": 112,
+              "y": 306,
+              "width": 47,
+              "height": 12
+            },
+            {
+              "text": "1",
+              "x": 285,
+              "y": 308,
+              "width": 2,
+              "height": 7
+            },
+            {
+              "text": "@",
+              "x": 311,
+              "y": 307,
+              "width": 8,
+              "height": 8
+            },
+            {
+              "text": "Interviewing",
+              "x": 328,
+              "y": 306,
+              "width": 76,
+              "height": 12
+            },
+            {
+              "text": "Offer",
+              "x": 542,
+              "y": 306,
+              "width": 33,
+              "height": 10
+            },
+            {
+              "text": "Product",
+              "x": 110,
+              "y": 345,
+              "width": 50,
+              "height": 10
+            },
+            {
+              "text": "Engineer",
+              "x": 165,
+              "y": 345,
+              "width": 57,
+              "height": 12
+            },
+            {
+              "text": "No",
+              "x": 391,
+              "y": 349,
+              "width": 14,
+              "height": 9
+            },
+            {
+              "text": "jobs",
+              "x": 408,
+              "y": 349,
+              "width": 23,
+              "height": 11
+            },
+            {
+              "text": "Northstar",
+              "x": 110,
+              "y": 369,
+              "width": 51,
+              "height": 9
+            },
+            {
+              "text": "Labs",
+              "x": 166,
+              "y": 369,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "8/3/2026",
+              "x": 147,
+              "y": 414,
+              "width": 45,
+              "height": 7
+            }
+          ]
+        },
+        {
+          "id": "tracker_beforeCandidate1",
+          "provenance": "candidate",
+          "trim": 145,
+          "x": 78,
+          "y": 97,
+          "width": 387,
+          "height": 77,
+          "aspect": 5.026,
+          "text": "Application Tracker Track your job applications from applied to offer.",
+          "words": [
+            {
+              "text": "Application",
+              "x": 97,
+              "y": 112,
+              "width": 154,
+              "height": 26
+            },
+            {
+              "text": "Tracker",
+              "x": 258,
+              "y": 111,
+              "width": 103,
+              "height": 23
+            },
+            {
+              "text": "Track",
+              "x": 96,
+              "y": 146,
+              "width": 39,
+              "height": 12
+            },
+            {
+              "text": "your",
+              "x": 141,
+              "y": 149,
+              "width": 31,
+              "height": 11
+            },
+            {
+              "text": "job",
+              "x": 177,
+              "y": 146,
+              "width": 21,
+              "height": 14
+            },
+            {
+              "text": "applications",
+              "x": 204,
+              "y": 146,
+              "width": 87,
+              "height": 14
+            },
+            {
+              "text": "from",
+              "x": 297,
+              "y": 146,
+              "width": 32,
+              "height": 12
+            },
+            {
+              "text": "applied",
+              "x": 335,
+              "y": 146,
+              "width": 52,
+              "height": 14
+            },
+            {
+              "text": "to",
+              "x": 393,
+              "y": 147,
+              "width": 14,
+              "height": 11
+            },
+            {
+              "text": "offer.",
+              "x": 412,
+              "y": 146,
+              "width": 35,
+              "height": 12
+            }
+          ]
+        },
+        {
+          "id": "tracker_beforeCandidate2",
+          "provenance": "candidate",
+          "trim": 145,
+          "x": 962,
+          "y": 401,
+          "width": 185,
+          "height": 132,
+          "aspect": 1.402,
+          "text": "Move to Interviewing Rejected Withdrawn Applied: 8/3/2026",
+          "words": [
+            {
+              "text": "Move",
+              "x": 981,
+              "y": 415,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "to",
+              "x": 1014,
+              "y": 416,
+              "width": 11,
+              "height": 8
+            },
+            {
+              "text": "Interviewing",
+              "x": 1061,
+              "y": 438,
+              "width": 68,
+              "height": 11
+            },
+            {
+              "text": "Rejected",
+              "x": 992,
+              "y": 470,
+              "width": 48,
+              "height": 11
+            },
+            {
+              "text": "Withdrawn",
+              "x": 1067,
+              "y": 470,
+              "width": 60,
+              "height": 9
+            },
+            {
+              "text": "Applied:",
+              "x": 980,
+              "y": 508,
+              "width": 41,
+              "height": 11
+            },
+            {
+              "text": "8/3/2026",
+              "x": 1029,
+              "y": 508,
+              "width": 54,
+              "height": 10
+            }
+          ]
+        },
+        {
+          "id": "tracker_beforeCandidate3",
+          "provenance": "candidate",
+          "trim": 145,
+          "x": 962,
+          "y": 306,
+          "width": 165,
+          "height": 85,
+          "aspect": 1.941,
+          "text": "Product Engineer Northstar Labs Toronto, Canada",
+          "words": [
+            {
+              "text": "Product",
+              "x": 981,
+              "y": 320,
+              "width": 58,
+              "height": 12
+            },
+            {
+              "text": "Engineer",
+              "x": 1044,
+              "y": 320,
+              "width": 65,
+              "height": 15
+            },
+            {
+              "text": "Northstar",
+              "x": 981,
+              "y": 346,
+              "width": 60,
+              "height": 10
+            },
+            {
+              "text": "Labs",
+              "x": 1046,
+              "y": 346,
+              "width": 29,
+              "height": 10
+            },
+            {
+              "text": "Toronto,",
+              "x": 980,
+              "y": 368,
+              "width": 41,
+              "height": 9
+            },
+            {
+              "text": "Canada",
+              "x": 1027,
+              "y": 368,
+              "width": 41,
+              "height": 9
+            }
+          ]
+        },
+        {
+          "id": "tracker_beforeCandidate4",
+          "provenance": "candidate",
+          "trim": 145,
+          "x": 694,
+          "y": 292,
+          "width": 141,
+          "height": 40,
+          "aspect": 3.525,
+          "text": "© © Accepted",
+          "words": [
+            {
+              "text": "©",
+              "x": 712,
+              "y": 308,
+              "width": 6,
+              "height": 7
+            },
+            {
+              "text": "©",
+              "x": 741,
+              "y": 307,
+              "width": 8,
+              "height": 8
+            },
+            {
+              "text": "Accepted",
+              "x": 757,
+              "y": 306,
+              "width": 60,
+              "height": 12
+            }
+          ]
+        },
+        {
+          "id": "tracker_beforeCandidate5",
+          "provenance": "candidate",
+          "trim": 145,
+          "x": 962,
+          "y": 554,
+          "width": 143,
+          "height": 39,
+          "aspect": 3.667,
+          "text": "View full job details",
+          "words": [
+            {
+              "text": "View",
+              "x": 980,
+              "y": 568,
+              "width": 26,
+              "height": 9
+            },
+            {
+              "text": "full",
+              "x": 1010,
+              "y": 568,
+              "width": 17,
+              "height": 9
+            },
+            {
+              "text": "job",
+              "x": 1031,
+              "y": 568,
+              "width": 16,
+              "height": 11
+            },
+            {
+              "text": "details",
+              "x": 1051,
+              "y": 568,
+              "width": 36,
+              "height": 9
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

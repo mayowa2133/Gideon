@@ -1,0 +1,187 @@
+// Picks the region of a product screen that proves a claim, and fits it to the
+// card that will show it.
+//
+// This replaces the hardcoded `readableRegion` -- `{x:.08,y:.08,width:.84,
+// height:.78}` on every product asset -- which was the single thing standing
+// between a blueprint and a film. Crop choice is where the quality lives:
+// everything done by hand to make the reference film legible was crop choice.
+//
+// Three rules, each earned:
+//
+// **Smallest region containing the words, not the largest clean element.** A
+// message panel is two-thirds empty box below three lines of text; showing the
+// part that carries the claim is what moved edge density where every framing
+// lever had failed. Aspect-matching for its own sake made it 52% worse.
+//
+// **Margin is not decoration.** A crop flush to an element's edge gets clipped
+// by the composition's 1.02 focus scale -- that is how the "J" came off "Jobs".
+//
+// **Never cut a word in half.** The earlier attempt at tighter crops produced
+// "Senior Technical Recruite". A crop that intersects a word box without
+// containing it is rejected, and the fit is retried the other way.
+export interface InventoryWord { text: string; x: number; y: number; width: number; height: number }
+export interface InventoryElement {
+  id: string;
+  provenance: "approved" | "candidate";
+  x: number; y: number; width: number; height: number;
+  aspect: number;
+  trim?: number;
+  text: string;
+  words: InventoryWord[];
+}
+export interface InventoryScreen { asset: string; trim: number; width: number; height: number; elements: InventoryElement[] }
+export interface ScreenInventory { schemaVersion: "1"; product: string; source: { width: number; height: number }; screens: InventoryScreen[] }
+
+export interface ResolvedCrop {
+  assetId: string;
+  elementId: string;
+  x: number; y: number; width: number; height: number;
+  trim: number;
+  discard: number;
+  matchedTokens: string[];
+}
+export interface ResolveFailure { reason: "no_element_contains_tokens" | "no_fit_without_cutting_words"; tokens: string[]; considered: string[] }
+
+// Margin around the words, in source pixels. Sized so the composition's 1.02
+// focus scale cannot reach a glyph: at the widest region a source pixel is
+// ~0.75 canvas pixels, and 1.02 pushes the edge out by ~1% of the region.
+const MARGIN = 14;
+
+function normalise(text: string) {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+}
+
+// A token matches on word-prefix rather than equality: OCR renders "Recruiter"
+// reliably but punctuation and case are noise, and a claim saying "recruiting"
+// should find "Recruiting".
+//
+// Prefix matching is bounded at four characters in both directions. Unbounded,
+// a two-letter OCR fragment satisfied any token starting with it -- "grouped"
+// matched on a stray "g" and the resolver confidently returned a region of an
+// unrelated screen. A claim matched by noise is worse than no match.
+const MIN_PREFIX = 4;
+function tokensPresent(haystack: string[], tokens: string[]) {
+  return tokens.filter((token) => {
+    const needle = token.toLowerCase();
+    return haystack.some((word) =>
+      word === needle
+      || (needle.length >= MIN_PREFIX && word.startsWith(needle))
+      || (word.length >= MIN_PREFIX && needle.startsWith(word)));
+  });
+}
+
+function bisected(rect: { x: number; y: number; width: number; height: number }, words: InventoryWord[]) {
+  return words.filter((word) => {
+    const intersects = word.x < rect.x + rect.width && word.x + word.width > rect.x && word.y < rect.y + rect.height && word.y + word.height > rect.y;
+    const contained = word.x >= rect.x && word.y >= rect.y && word.x + word.width <= rect.x + rect.width && word.y + word.height <= rect.y + rect.height;
+    return intersects && !contained;
+  });
+}
+
+// Snap each edge past the words it bisects, rather than rejecting the crop.
+//
+// Rejecting was the first design and it does not survive contact with a real UI:
+// checked against every word on the screen, almost any rect clips something at
+// its border, so a five-token claim found no fit at all and a two-token one fell
+// through to a region on a different screen. A dense product screen has no
+// word-free gutters -- the crop has to be moved, not abandoned.
+//
+// Each edge only ever moves inward, past the word it was cutting. Picking the
+// globally cheapest move -- in or out -- oscillated: clearing one word on the
+// contact screen's 230 re-bisected another, and six passes ended where they
+// began. Inward-only strictly shrinks the rect, so it terminates, and it can
+// never grow into a word it had not already met.
+function snapClearOfWords(rect: { x: number; y: number; width: number; height: number }, words: InventoryWord[]) {
+  let current = { ...rect };
+  for (let pass = 0; pass < 40; pass += 1) {
+    const offenders = bisected(current, words);
+    if (!offenders.length) return current;
+    const word = offenders[0]!;
+    const left = current.x, right = current.x + current.width, top = current.y, bottom = current.y + current.height;
+    const moves = [
+      { cost: word.x + word.width - left, apply: () => ({ x: word.x + word.width, y: top, width: right - (word.x + word.width), height: current.height }) },
+      { cost: right - word.x, apply: () => ({ x: left, y: top, width: word.x - left, height: current.height }) },
+      { cost: word.y + word.height - top, apply: () => ({ x: left, y: word.y + word.height, width: current.width, height: bottom - (word.y + word.height) }) },
+      { cost: bottom - word.y, apply: () => ({ x: left, y: top, width: current.width, height: word.y - top }) }
+    ].filter(({ cost }) => cost > 0).sort((a, b) => a.cost - b.cost);
+    if (!moves.length) return null;
+    const next = moves[0]!.apply();
+    if (next.width < 40 || next.height < 40) return null;
+    current = next;
+  }
+  return bisected(current, words).length ? null : current;
+}
+
+// Grow the region to the container's aspect. Growing rather than cropping is
+// deliberate: cropping to fit is what cuts words, and the surrounding pixels are
+// product UI, not emptiness, so a slightly larger window costs nothing.
+function fitToAspect(region: { x: number; y: number; width: number; height: number }, aspect: number, bounds: { width: number; height: number }) {
+  const current = region.width / region.height;
+  let { x, y, width, height } = region;
+  if (current < aspect) {
+    const target = Math.min(bounds.width, height * aspect);
+    x = Math.max(0, Math.min(bounds.width - target, x - (target - width) / 2));
+    width = target;
+  } else if (current > aspect) {
+    const target = Math.min(bounds.height, width / aspect);
+    y = Math.max(0, Math.min(bounds.height - target, y - (target - height) / 2));
+    height = target;
+  }
+  return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) };
+}
+
+export function resolveCrop(
+  inventory: ScreenInventory,
+  claimTokens: string[],
+  containerAspect: number,
+  options: { assetId?: string; allowCandidates?: boolean } = {}
+): ResolvedCrop | ResolveFailure {
+  const tokens = claimTokens.flatMap(normalise);
+  const screens = options.assetId ? inventory.screens.filter((screen) => screen.asset === options.assetId) : inventory.screens;
+  const considered: string[] = [];
+
+  const scored = screens.flatMap((screen) => screen.elements
+    .filter((element) => options.allowCandidates || element.provenance === "approved")
+    .map((element) => {
+      considered.push(element.id);
+      const matched = tokensPresent(normalise(element.text), tokens);
+      return { screen, element, matched, area: element.width * element.height };
+    }))
+    .filter(({ matched }) => tokens.length === 0 || matched.length === tokens.length)
+    // Smallest region that still contains every token. Ties break on the region
+    // whose aspect is already closest to the container, which needs least growth.
+    .sort((a, b) => a.area - b.area || Math.abs(a.element.aspect - containerAspect) - Math.abs(b.element.aspect - containerAspect));
+
+  if (!scored.length) return { reason: "no_element_contains_tokens", tokens, considered };
+
+  for (const { screen, element, matched } of scored) {
+    const bounds = { width: screen.width, height: screen.height };
+    const padded = {
+      x: Math.max(0, element.x - MARGIN),
+      y: Math.max(0, element.y - MARGIN),
+      width: Math.min(bounds.width, element.width + MARGIN * 2),
+      height: Math.min(bounds.height, element.height + MARGIN * 2)
+    };
+    // Every word on the screen, not only this element's: growing sideways can
+    // reach into a neighbour and clip it.
+    const allWords = screen.elements.flatMap(({ words }) => words);
+    const snapped = snapClearOfWords(fitToAspect(padded, containerAspect, bounds), allWords);
+    if (!snapped) continue;
+    const fitted = { x: Math.round(snapped.x), y: Math.round(snapped.y), width: Math.round(snapped.width), height: Math.round(snapped.height) };
+    if (bisected(fitted, allWords).length) continue;
+    const shownScale = Math.max(containerAspect / (fitted.width / fitted.height), 1);
+    return {
+      assetId: screen.asset,
+      elementId: element.id,
+      ...fitted,
+      trim: element.trim ?? screen.trim,
+      discard: Number(Math.max(0, 1 - 1 / shownScale).toFixed(3)),
+      matchedTokens: matched
+    };
+  }
+  return { reason: "no_fit_without_cutting_words", tokens, considered };
+}
+
+export function isResolved(result: ResolvedCrop | ResolveFailure): result is ResolvedCrop {
+  return "elementId" in result;
+}
