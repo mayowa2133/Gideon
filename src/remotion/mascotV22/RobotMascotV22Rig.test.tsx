@@ -85,10 +85,14 @@ describe("RobotMascotV22 character golden masters", () => {
     }
   });
 
-  it("keeps mitts at cameo scale and fingers only at host scale", () => {
-    expect(render(withGesture("open_palm", { role: "cameo_right" }))).not.toContain('data-v22-hand="palm-fingers"');
-    expect(render(withGesture("open_palm", { role: "cameo_right" }))).toContain('data-v22-hand="mitt"');
-    expect(render(withGesture("open_palm", { role: "host" }))).toContain('data-v22-hand="palm-fingers"');
+  it("keeps mitts at every scale", () => {
+    // Was "fingers only at host scale". Splayed fingers read as a splayed hand
+    // rather than a mitt, and the character has no fingers anywhere else, so the
+    // detail is gone at both scales and this pins that rather than the old split.
+    for (const role of ["cameo_right", "host", "hero_close"] as const) {
+      expect(render(withGesture("open_palm", { role }))).not.toContain('data-v22-hand="palm-fingers"');
+      expect(render(withGesture("open_palm", { role }))).toContain('data-v22-hand="mitt"');
+    }
   });
 
   it("draws a neck that closes the head-to-body seam", () => {

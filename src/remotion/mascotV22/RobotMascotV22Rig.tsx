@@ -59,7 +59,6 @@ export const RobotMascotV22Rig: React.FC<{ plan: V22MascotPerformance; frame: nu
   // Whole units: the antenna is a small high-contrast amber disc, and a radius or
   // centre that slides sub-pixel every frame crawls exactly like the face did.
   const antenna = Math.round(audio.onset * 9 + phraseBeat * 3);
-  const handDetail: HandDetail = plan.role === "cameo_left" || plan.role === "cameo_right" ? "mitt" : "full";
   // The idle float is gone from here: MascotLayer applies it as whole-pixel
   // left/top, which is the only place in the tree that positions in unscaled
   // canvas space. Rounding it inside this element would be undone by the layer's
@@ -99,8 +98,8 @@ export const RobotMascotV22Rig: React.FC<{ plan: V22MascotPerformance; frame: nu
       <ellipse data-v22-cast-shadow cx="330" cy="852" rx="300" ry="96" fill={`url(#${plan.sceneId}-cast)`} />
       <Torso id={plan.sceneId} />
       <rect data-v22-neck x="290" y="482" width="80" height="60" rx="26" fill={`url(#${plan.sceneId}-body)`} stroke="#fff" strokeWidth="6" />
-      <Arm side="left" gesture={plan.left.gesture} amount={Math.max(-.2,leftAmount+leftAnticipation)} wristRotation={plan.left.timing.wristRotation} detail={handDetail} />
-      <Arm side="right" gesture={plan.right.gesture} amount={Math.max(-.2,rightAmount+rightAnticipation)} wristRotation={plan.right.timing.wristRotation} detail={handDetail} />
+      <Arm side="left" gesture={plan.left.gesture} amount={Math.max(-.2,leftAmount+leftAnticipation)} wristRotation={plan.left.timing.wristRotation} />
+      <Arm side="right" gesture={plan.right.gesture} amount={Math.max(-.2,rightAmount+rightAnticipation)} wristRotation={plan.right.timing.wristRotation} />
       <g transform={`translate(330 250) rotate(${plan.head.tilt * 12 + headGaze.dy * 3.4 + phraseBeat * 3}) translate(-330 -250)`}>
         <rect x={330 - HEAD_W / 2} y="48" width={HEAD_W} height={HEAD_H} rx="170" fill={`url(#${plan.sceneId}-shell)`} stroke="#fff" strokeWidth="10" />
         <rect x="40" y="66" width="580" height="420" rx="150" fill={`url(#${plan.sceneId}-gloss)`} />
@@ -116,8 +115,6 @@ export const RobotMascotV22Rig: React.FC<{ plan: V22MascotPerformance; frame: nu
     </svg>
   </div>;
 };
-
-type HandDetail = "full" | "mitt";
 
 function activeFace(plan: V22MascotPerformance, frame: number): V22Face {
   for (const accent of plan.faceAccents ?? []) {
@@ -144,21 +141,17 @@ const Torso: React.FC<{ id: string }> = ({ id }) => <g>
 //
 // Three levers do the work, in order of how much they carry at small size:
 // brows (present or absent, and at what angle), eye shape (round vs closed arc vs
-// slit), and asymmetry. Pupils earn their place twice: they give gaze something
-// to read on -- they lead the eye group, so the character looks at things rather
-// than sliding -- and an ink pupil on a mint eye is the only way an open eye
-// reads as open rather than as a blob.
+// slit), and asymmetry. All three are silhouette, which is what survives being
+// scaled down to a phone -- and silhouette is all this face has, deliberately.
 const BROW_Y = 194, EYE_Y = 262, EYE_L = 206, EYE_R = 454;
 const Brow: React.FC<{ cx: number; angle: number; y?: number; thickness?: number }> = ({ cx, angle, y = BROW_Y, thickness = 20 }) =>
   <rect x={cx - 66} y={y - thickness / 2} width="132" height={thickness} rx={thickness / 2} fill={MINT} transform={`rotate(${angle} ${cx} ${y})`} />;
-const Pupil: React.FC<{ cx: number; r: number; gx: number; gy: number }> = ({ cx, r, gx, gy }) => <g>
-  <circle cx={cx + gx} cy={EYE_Y + gy} r={r} fill={INK} />
-  <circle cx={cx + gx - r * .34} cy={EYE_Y + gy - r * .38} r={Math.max(4, r * .3)} fill="#baffea" />
-</g>;
-const EyeRound: React.FC<{ cx: number; rx: number; ry: number; pupil: number; gx: number; gy: number }> = ({ cx, rx, ry, pupil, gx, gy }) => <g>
-  <ellipse cx={cx} cy={EYE_Y} rx={rx} ry={ry} fill={MINT} />
-  <Pupil cx={cx} r={pupil} gx={gx} gy={gy} />
-</g>;
+// Deliberately no pupil. One was tried, and it does two useful things -- it gives
+// gaze something to read on, and it stops a large open eye reading as a blob --
+// but it turns the character into a cartoon creature instead of a screen with a
+// face on it, which is not what this mascot is. Brow angle and eye silhouette
+// carry the expression, and they carry it further than the pupil did.
+const EyeRound: React.FC<{ cx: number; rx: number; ry: number }> = ({ cx, rx, ry }) => <ellipse cx={cx} cy={EYE_Y} rx={rx} ry={ry} fill={MINT} />;
 // A closed eye is a stroke, not a filled crescent: the crescent read as a squint
 // at distance, which is the shape `focused` needs to own.
 const EyeArc: React.FC<{ cx: number; lift: number }> = ({ cx, lift }) =>
@@ -169,13 +162,12 @@ const EyeSlit: React.FC<{ cx: number; ry: number; angle: number }> = ({ cx, ry, 
 const Face: React.FC<{ face: V22Face; gazeX: number; gazeY: number; blink: number; beat: number }> = ({ face, gazeX, gazeY, blink, beat }) => {
   const transform = `translate(${gazeX} ${gazeY}) scale(1 ${blink})`, origin = "330px 262px";
   const glow = { filter: "drop-shadow(0 0 15px rgba(57,242,181,.9))" };
-  // Pupils lead the eye group rather than riding it, and brows lift on the
-  // phrase beats the head already nods to.
-  const gx = gazeX * .5, gy = gazeY * .5, lift = -Math.min(1, beat) * 7;
+  // Brows lift on the phrase beats the head already nods to.
+  const lift = -Math.min(1, beat) * 7;
   const wrap = (children: React.ReactNode) => <g transform={transform} style={{ transformOrigin: origin, ...glow }}>{children}</g>;
   if (face === "surprised") return wrap(<>
     <Brow cx={EYE_L} angle={-6} y={BROW_Y - 30 + lift} thickness={18} /><Brow cx={EYE_R} angle={6} y={BROW_Y - 30 + lift} thickness={18} />
-    <EyeRound cx={EYE_L} rx={68} ry={70} pupil={20} gx={gx} gy={gy} /><EyeRound cx={EYE_R} rx={68} ry={70} pupil={20} gx={gx} gy={gy} />
+    <EyeRound cx={EYE_L} rx={68} ry={70} /><EyeRound cx={EYE_R} rx={68} ry={70} />
   </>);
   if (face === "focused") return wrap(<>
     <Brow cx={EYE_L} angle={13} y={BROW_Y - 16 + lift} /><Brow cx={EYE_R} angle={-13} y={BROW_Y - 16 + lift} />
@@ -183,18 +175,18 @@ const Face: React.FC<{ face: V22Face; gazeX: number; gazeY: number; blink: numbe
   </>);
   if (face === "concerned") return wrap(<>
     <Brow cx={EYE_L} angle={-15} y={BROW_Y + 2 + lift} /><Brow cx={EYE_R} angle={15} y={BROW_Y + 2 + lift} />
-    <EyeRound cx={EYE_L} rx={54} ry={58} pupil={20} gx={gx} gy={gy + 4} /><EyeRound cx={EYE_R} rx={54} ry={58} pupil={20} gx={gx} gy={gy + 4} />
+    <EyeRound cx={EYE_L} rx={54} ry={58} /><EyeRound cx={EYE_R} rx={54} ry={58} />
   </>);
   // Asymmetry is the most legible expression there is at this size, so scepticism
   // gets it outright: one eye narrowed under a flat brow, one open under a raised one.
   if (face === "skeptical") return wrap(<>
     <Brow cx={EYE_L} angle={7} y={BROW_Y + 12 + lift} /><Brow cx={EYE_R} angle={-4} y={BROW_Y - 26 + lift} />
-    <EyeSlit cx={EYE_L} ry={15} angle={5} /><EyeRound cx={EYE_R} rx={58} ry={62} pupil={22} gx={gx} gy={gy} />
+    <EyeSlit cx={EYE_L} ry={15} angle={5} /><EyeRound cx={EYE_R} rx={58} ry={62} />
   </>);
   if (face === "wink") return wrap(<>
     <EyeArc cx={EYE_L} lift={70} />
     <Brow cx={EYE_R} angle={-5} y={BROW_Y - 22 + lift} />
-    <EyeRound cx={EYE_R} rx={62} ry={66} pupil={24} gx={gx} gy={gy} />
+    <EyeRound cx={EYE_R} rx={62} ry={66} />
   </>);
   if (face === "happy") return wrap(<>
     <EyeArc cx={EYE_L} lift={78} /><EyeArc cx={EYE_R} lift={78} />
@@ -205,10 +197,10 @@ const Face: React.FC<{ face: V22Face; gazeX: number; gazeY: number; blink: numbe
   // the V10 regression the rig test still pins.
   if (face === "direct_cta") return wrap(<>
     <Brow cx={EYE_L} angle={0} y={BROW_Y - 26 + lift} thickness={22} /><Brow cx={EYE_R} angle={0} y={BROW_Y - 26 + lift} thickness={22} />
-    <EyeRound cx={EYE_L} rx={64} ry={68} pupil={26} gx={gx} gy={gy} /><EyeRound cx={EYE_R} rx={64} ry={68} pupil={26} gx={gx} gy={gy} />
+    <EyeRound cx={EYE_L} rx={64} ry={68} /><EyeRound cx={EYE_R} rx={64} ry={68} />
   </>);
   return wrap(<>
-    <EyeRound cx={EYE_L} rx={60} ry={64} pupil={22} gx={gx} gy={gy} /><EyeRound cx={EYE_R} rx={60} ry={64} pupil={22} gx={gx} gy={gy} />
+    <EyeRound cx={EYE_L} rx={60} ry={64} /><EyeRound cx={EYE_R} rx={60} ry={64} />
   </>);
 };
 
@@ -224,17 +216,17 @@ const Mouth: React.FC<{ state: V22Mouth }> = ({ state }) => {
   return <path d={`M278 345 Q330 ${345 + height} 382 345 Q374 ${374 + height * .3} 330 ${381 + height * .45} Q286 ${374 + height * .3} 278 345Z`} fill={MINT} style={style} />;
 };
 
-const Arm: React.FC<{ side: "left" | "right"; gesture: V22Gesture; amount: number; wristRotation: number; detail: HandDetail }> = ({ side, gesture, amount, wristRotation, detail }) => {
+const Arm: React.FC<{ side: "left" | "right"; gesture: V22Gesture; amount: number; wristRotation: number }> = ({ side, gesture, amount, wristRotation }) => {
   const sign = side === "left" ? -1 : 1, shoulderX = side === "left" ? 120 : 540;
   const target = gestureTarget(gesture, side), elbowX = shoulderX + sign * ramp(amount, [0, 1], [28, target.dx * .48]), elbowY = 650 + ramp(amount, [0, 1], [70, target.dy * .48]);
   const handX = shoulderX + sign * ramp(amount, [0, 1], [60, target.dx]), handY = 760 + ramp(amount, [0, 1], [20, target.dy]);
   return <g data-v22-gesture={`${side}-${gesture}`}>
     <path d={`M${shoulderX} 625 Q${elbowX} ${elbowY} ${handX} ${handY}`} fill="none" stroke="#e6eef5" strokeWidth="70" strokeLinecap="round" />
-    <g transform={`translate(${handX} ${handY}) rotate(${sign * wristRotation * amount})`}><HandShape gesture={gesture} side={side} detail={detail} /></g>
+    <g transform={`translate(${handX} ${handY}) rotate(${sign * wristRotation * amount})`}><HandShape gesture={gesture} side={side} /></g>
   </g>;
 };
 
-const HandShape: React.FC<{ gesture: V22Gesture; side: "left" | "right"; detail: HandDetail }> = ({ gesture, side, detail }) => {
+const HandShape: React.FC<{ gesture: V22Gesture; side: "left" | "right" }> = ({ gesture, side }) => {
   const flip = side === "left" ? -1 : 1;
   // Point gestures are a single tapered wedge fused to the mitt — never a thin
   // stroke poking out of the ellipse (the V10 pin/lollipop look).
@@ -245,8 +237,12 @@ const HandShape: React.FC<{ gesture: V22Gesture; side: "left" | "right"; detail:
   if (gesture === "thinking_hand") return <g transform="rotate(-24)" data-v22-hand="mitt-tilt"><ellipse rx="48" ry="53" fill="#f8fbfd" stroke="#acbed0" strokeWidth="7" /></g>;
   if (gesture === "open_palm" || gesture === "presentation_palm" || gesture === "stop_palm" || gesture === "wave" || gesture === "celebration") {
     const rotate = gesture === "presentation_palm" ? -90 : gesture === "wave" ? 18 : 0;
-    if (detail === "mitt") return <g transform={`rotate(${rotate})`} data-v22-hand="mitt"><ellipse rx="52" ry="56" fill="#f8fbfd" stroke="#acbed0" strokeWidth="7" /></g>;
-    return <g transform={`rotate(${rotate})`} data-v22-hand="palm-fingers"><ellipse rx="52" ry="56" fill="#f8fbfd" stroke="#acbed0" strokeWidth="7" />{[-34, -12, 12, 34].map((x, index) => <path key={x} d={`M${x} -32 L${x + (index - 1.5) * 3} -${82 - Math.abs(index - 1.5) * 8}`} stroke="#f8fbfd" strokeWidth="18" strokeLinecap="round" />)}</g>;
+    // Mitts at every scale. Splayed fingers were kept for host scale and only
+    // suppressed at cameo, on the theory that the detail was worth having when
+    // the rig was large -- it is not. Four strokes fanning off an ellipse read as
+    // a splayed hand rather than a mitt, and the character does not have fingers
+    // anywhere else. This also retires the V10 sausage-finger loop for good.
+    return <g transform={`rotate(${rotate})`} data-v22-hand="mitt"><ellipse rx="52" ry="56" fill="#f8fbfd" stroke="#acbed0" strokeWidth="7" /></g>;
   }
   return <ellipse rx="52" ry="54" fill="#f8fbfd" stroke="#acbed0" strokeWidth="7" data-v22-hand="rest" />;
 };
