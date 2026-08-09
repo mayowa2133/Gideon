@@ -26,12 +26,18 @@ export default defineConfig({
   test: {
     exclude,
     projects: [
-      { test: { name: "unit", exclude: [...exclude, ...resourceBound] } },
+      { test: { name: "unit", exclude: [...exclude, ...resourceBound], sequence: { groupOrder: 0 } } },
       {
         test: {
           name: "capture-integration",
           include: resourceBound,
           fileParallelism: false,
+          // Runs after the unit project rather than alongside it. Serialising
+          // these files against each other was not enough: vitest runs projects
+          // concurrently, so a browser+ffmpeg file still competed with ~250 unit
+          // files for the cores it needs inside its own timeout. capturePilot
+          // passed in isolation and failed in the full suite for exactly that.
+          sequence: { groupOrder: 1 },
           testTimeout: 180_000,
           hookTimeout: 120_000
         }
