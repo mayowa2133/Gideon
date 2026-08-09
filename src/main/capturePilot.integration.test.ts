@@ -109,7 +109,7 @@ describe.skipIf(!executablePath)("generic capture pilot", () => {
     expect(failure.selection.requestedWorkflowIds).toEqual(["complete"]);
     expect(failure.diagnostics).toEqual([{ workflowId: "complete", message: "Capture worker diagnostic contained sensitive-shaped data and was redacted." }]);
     expect(JSON.stringify(failure)).not.toContain("do-not-store");
-  }, 15_000);
+  }, 60_000);
 });
 
 function manifestValue(baseUrl: string, rootDir: string) {

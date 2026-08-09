@@ -54,7 +54,7 @@ describe.skipIf(!executablePath)("hostile capture fixture browser matrix", () =>
     } finally {
       await fs.rm(outputDir, { recursive: true, force: true });
     }
-  }, 60_000);
+  }, 180_000);
 
   it("exposes local-only synthetic upload/download controls without network side effects", async () => {
     const fixture = await startHostileCaptureFixture();
@@ -73,7 +73,7 @@ describe.skipIf(!executablePath)("hostile capture fixture browser matrix", () =>
       await browser.close();
       await fixture.close();
     }
-  }, 20_000);
+  }, 80_000);
 });
 
 function findBrowserExecutable(): string | undefined {

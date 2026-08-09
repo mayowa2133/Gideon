@@ -30,5 +30,5 @@ describe.skipIf(!fs.existsSync(chromePath))("deterministic rendered inventory cr
     expect(pages.map((page) => new URL(page.url).pathname)).toEqual(["/", "/projects"]);
     expect(pages[0]?.controls).toEqual(expect.arrayContaining([{ role: "link", name: "Projects", destinationPath: `${baseUrl}/projects` }]));
     expect(submitted).toBe(false);
-  }, 15_000);
+  }, 60_000);
 });

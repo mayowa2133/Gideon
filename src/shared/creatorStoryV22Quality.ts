@@ -444,10 +444,22 @@ export function evaluateV22MotionBands(motion:{nearStaticFramePercent:number;med
 // through v22ProductStillFile. Adding a crop trim without adding it here fails the
 // render loudly rather than silently falling back to video.
 export const V22_PRODUCT_STILLS=[
-  {asset:"tracker_before",trim:145},{asset:"tracker_after",trim:155},
+  {asset:"tracker_before",trim:145},{asset:"tracker_after",trim:155,frames:12,step:3},
   {asset:"opportunity",trim:52},{asset:"opportunity",trim:142},
   {asset:"contact",trim:130},{asset:"contact",trim:140},
   {asset:"outreach_blank",trim:85},
-  {asset:"outreach_complete",trim:180},{asset:"outreach_complete",trim:75},{asset:"outreach_complete",trim:20},
+  {asset:"outreach_complete",trim:180,frames:12,step:3},{asset:"outreach_complete",trim:75,frames:12,step:3},{asset:"outreach_complete",trim:20,frames:12,step:3},
 ] as const;
+
+// A still sequence, not a video. Product proof was frozen because fifteen
+// decoding <Video> elements made the render nondeterministic -- byte-identical
+// code produced 19, 19 and 33 shots. Freezing was never the requirement;
+// determinism was, and a list of PNGs is deterministic by construction. An entry
+// with `frames` extracts that many stills `step` source frames apart, and
+// EvidenceCrop indexes them by scene-local frame, so the product moves without
+// a single decoding element in the tree.
+export function v22ProductStillTrims(entry:{trim:number;frames?:number;step?:number}){
+  const frames=entry.frames??1,step=entry.step??1;
+  return Array.from({length:frames},(_,index)=>entry.trim+index*step);
+}
 export function v22ProductStillFile(asset:string,trim:number){return `still-${asset}-${trim}.png`;}

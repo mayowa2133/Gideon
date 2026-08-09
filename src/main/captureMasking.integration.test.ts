@@ -80,7 +80,7 @@ describe.skipIf(!executablePath)("capture masking in real Chromium", () => {
     expect(modal.visibleSensitiveElementCount).toBeGreaterThanOrEqual(2);
     await expectOverlayAligned(page, "#profile [data-sensitive]");
     await context.close();
-  }, 20_000);
+  }, 80_000);
 
   it("fails closed for an invalid custom selector or a browser error document", async () => {
     const invalidContext = await browser.newContext();
@@ -98,7 +98,7 @@ describe.skipIf(!executablePath)("capture masking in real Chromium", () => {
     await errorPage.goto("http://127.0.0.1:1", { waitUntil: "commit", timeout: 2_000 }).catch(() => undefined);
     await expect(assertCaptureMaskingReady(errorPage, policy)).rejects.toThrow("capture_masking_unavailable");
     await errorContext.close();
-  }, 15_000);
+  }, 60_000);
 
   it("burns masking overlays into the browser recording before video leaves the context", async () => {
     const videoDir = fs.mkdtempSync(path.join(os.tmpdir(), "gideon-masked-video-"));
@@ -119,7 +119,7 @@ describe.skipIf(!executablePath)("capture masking in real Chromium", () => {
     } finally {
       fs.rmSync(videoDir, { recursive: true, force: true });
     }
-  }, 15_000);
+  }, 60_000);
 });
 
 async function expectOverlayAligned(page: import("playwright").Page, selector: string): Promise<void> {

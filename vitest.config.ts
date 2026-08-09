@@ -19,7 +19,14 @@ const resourceBound = [
   "src/main/captureMasking.integration.test.ts",
   "src/main/captureInventoryCrawler.integration.test.ts",
   "src/main/hostileCaptureFixture.test.ts",
-  "src/main/githubLivePromotionRunner.test.ts"
+  "src/main/githubLivePromotionRunner.test.ts",
+  // Added after it failed in a full suite run and passed in isolation in 835ms:
+  // it is not slow, it spawns ffmpeg, and spawning under parallel load is what
+  // fails. This list is empirical -- a file joins it when it demonstrates
+  // contention sensitivity, not because it mentions ffmpeg. Nineteen other test
+  // files reference ffmpeg or chromium and are fine, so serialising on the
+  // mention would cost every future run for nothing.
+  "src/main/captureRunWorker.test.ts"
 ];
 
 export default defineConfig({

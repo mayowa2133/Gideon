@@ -15,7 +15,7 @@ import { evaluateV22HeldStability, measureV22HeldStability } from "./lib/creator
 const require=createRequire(import.meta.url);
 const {ChatterboxNarrationProvider}=require("../dist/main/main/chatterboxNarrationProvider.js");
 const {SOLOMON_CREATOR_STORY_V22_SCRIPT,SOLOMON_CREATOR_STORY_V22_TTS_BEATS,SOLOMON_CREATOR_STORY_V22_NUMERAL_ANCHORS,assertSolomonCreatorStoryV22Manifest,auditSolomonCreatorStoryV22,createSolomonCreatorStoryV22Manifest,v22SemanticEvents}=require("../dist/main/shared/solomonCreatorStoryV22.js");
-const {V22_MIN_SCENE_FRAMES,V22_PRODUCT_STILLS,v22ProductStillFile,auditV22BannedStrings,auditV22Layout,auditV22PhoneScale,auditV22RenderedBounds,auditV22SceneDurations,auditV22PresenterOccupancy,evaluateV22MotionBands,evaluateV22ShotBands,mascotBoxForScene}=require("../dist/main/shared/creatorStoryV22Quality.js");
+const {V22_MIN_SCENE_FRAMES,V22_PRODUCT_STILLS,v22ProductStillFile,v22ProductStillTrims,auditV22BannedStrings,auditV22Layout,auditV22PhoneScale,auditV22RenderedBounds,auditV22SceneDurations,auditV22PresenterOccupancy,evaluateV22MotionBands,evaluateV22ShotBands,mascotBoxForScene}=require("../dist/main/shared/creatorStoryV22Quality.js");
 // Hoisted: qualityAudit runs at module top level, so anything it reaches must be
 // initialized before that await rather than merely declared later in the file.
 // NOTE: this script does all of its work at module top level, so every constant
@@ -89,13 +89,19 @@ async function extractProofs(){const names={tracker_before:"proof-tracker-before
 // video, which would restore the nondeterminism silently.
 async function extractProductStills(){
   const names={tracker_before:"proof-tracker-before.mp4",tracker_after:"proof-tracker-after.mp4",opportunity:"proof-opportunity.mp4",contact:"proof-contact.mp4",outreach_blank:"proof-outreach-blank.mp4",outreach_complete:"proof-outreach-complete.mp4"};
-  for(const {asset,trim} of V22_PRODUCT_STILLS){
-    const source=path.join(publicDir,names[asset]);
-    const target=path.join(publicDir,v22ProductStillFile(asset,trim));
-    await run("ffmpeg",["-y","-i",source,"-vf",`select='eq(n\\,${trim})'`,"-vsync","0","-frames:v","1",target],120000);
-    if(!existsSync(target))throw new Error(`V22 product still missing after extraction: ${asset}@${trim}`);
+  // Entries declaring `frames` expand into a sequence, which is how product proof
+  // moves without a decoding element in the tree.
+  let count=0;
+  for(const entry of V22_PRODUCT_STILLS){
+    const source=path.join(publicDir,names[entry.asset]);
+    for(const trim of v22ProductStillTrims(entry)){
+      const target=path.join(publicDir,v22ProductStillFile(entry.asset,trim));
+      await run("ffmpeg",["-y","-i",source,"-vf",`select='eq(n\\,${trim})'`,"-vsync","0","-frames:v","1",target],120000);
+      if(!existsSync(target))throw new Error(`V22 product still missing after extraction: ${entry.asset}@${trim}`);
+      count+=1;
+    }
   }
-  process.stdout.write(`Product stills: ${V22_PRODUCT_STILLS.length} extracted\n`);
+  process.stdout.write(`Product stills: ${count} extracted across ${V22_PRODUCT_STILLS.length} crops\n`);
 }
 
 async function generateNarration(){

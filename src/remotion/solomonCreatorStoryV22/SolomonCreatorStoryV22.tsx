@@ -1,4 +1,4 @@
-import { Audio, Video } from "@remotion/media";
+import { Audio } from "@remotion/media";
 import { Img } from "remotion";
 import { AbsoluteFill, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { V22_BACKDROPS, V22_TEXT_ZONES, v22CameraTransform, v22ProductStillFile } from "../../shared/creatorStoryV22Quality";
@@ -31,17 +31,18 @@ import { MascotLayer } from "./MascotLayer";
 // numeralAnchors and the hook audit bind on them.
 const V22_CONTENT_FLOOR_BOTTOM=1920-1015;
 const INK="#07111f", PAPER="#fbf8f0", WHITE="#fff", MINT="#39f2b5", GREEN="#087052", AMBER="#ff9d18";
-const FILES:Record<V22AssetId,string>={tracker_before:"proof-tracker-before.mp4",tracker_after:"proof-tracker-after.mp4",opportunity:"proof-opportunity.mp4",contact:"proof-contact.mp4",outreach_blank:"proof-outreach-blank.mp4",outreach_complete:"proof-outreach-complete.mp4"};
-type Crop={x:number;y:number;width:number;height:number;trim:number};
+type Crop={x:number;y:number;width:number;height:number;trim:number;motion?:{frames:number;step:number;hold:number}};
 // Product proof renders from pre-extracted stills. See V22_PRODUCT_STILLS in
 // creatorStoryV22Quality for why: fifteen decoding <Video> elements made the render
-// nondeterministic, and byte-identical code produced 19, 19 and 33 shots. Only the
-// one usage declaring `playback` still mounts a video.
+// nondeterministic, and byte-identical code produced 19, 19 and 33 shots. There is now no
+// decoding element left in the tree at all -- a crop that needs to move plays a
+// still sequence instead (the `motion` field on Crop), so nothing here can decode
+// differently between runs.
 const CROPS={
-  trackerBefore:{x:72,y:178,width:560,height:310,trim:145},trackerAfter:{x:258,y:178,width:560,height:310,trim:155},trackerControl:{x:940,y:285,width:430,height:390,trim:105},
+  trackerBefore:{x:72,y:178,width:560,height:310,trim:145},trackerAfter:{x:258,y:178,width:560,height:310,trim:155,motion:{frames:12,step:3,hold:4}},trackerControl:{x:940,y:285,width:430,height:390,trim:105},
   opportunityHeader:{x:72,y:75,width:760,height:265,trim:52},opportunityPanel:{x:75,y:95,width:900,height:520,trim:142},
   contactCard:{x:86,y:510,width:430,height:390,trim:130},contactProof:{x:104,y:610,width:390,height:265,trim:140},
-  outreachBlank:{x:82,y:175,width:520,height:590,trim:85},message:{x:594,y:185,width:755,height:560,trim:180},messageDraftEdit:{x:594,y:185,width:755,height:560,trim:75},messageEdit:{x:594,y:185,width:755,height:560,trim:20}
+  outreachBlank:{x:82,y:175,width:520,height:590,trim:85},message:{x:594,y:185,width:755,height:560,trim:180,motion:{frames:12,step:3,hold:4}},messageDraftEdit:{x:594,y:185,width:755,height:560,trim:75,motion:{frames:12,step:3,hold:4}},messageEdit:{x:594,y:185,width:755,height:560,trim:20,motion:{frames:12,step:3,hold:4}}
 } satisfies Record<string,Crop>;
 
 export const SolomonCreatorStoryV22:React.FC<SolomonCreatorStoryV22Manifest> = (manifest) => <AbsoluteFill style={{background:INK,color:INK,fontFamily:"Manrope Variable,Manrope,sans-serif",overflow:"hidden"}}>
@@ -130,7 +131,7 @@ const Draft:React.FC<{scene:V22Scene}> = ({scene}) => {const frame=useCurrentFra
 // continuously out of the draft scene, which is what the declared match_cut says.
 const Grounded:React.FC<{scene:V22Scene}> = ({scene}) => {const frame=useCurrentFrame(),reveal=interpolate(frame,[10,55],[0,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp"}),arrive=spring({frame,fps:30,config:{damping:18,stiffness:220},durationInFrames:7});return <EvidenceBackground accent="#e6f6ee"><div style={{position:"absolute",left:55,top:300,width:970,height:640,transform:`translateX(${(1-arrive)*640}px)`}}><EvidenceCard border={GREEN}><EvidenceCrop asset="outreach_complete" crop={CROPS.message} width={970} height={820}/><div style={{position:"absolute",left:67,top:328,width:760*reveal,height:72,borderRadius:12,background:"rgba(57,242,181,.24)",borderBottom:`7px solid ${MINT}`}}/></EvidenceCard></div><div style={{position:"absolute",left:80,right:80,bottom:V22_CONTENT_FLOOR_BOTTOM,display:"flex",gap:18,alignItems:"center",justifyContent:"center",fontSize:29,fontWeight:950}}><span style={{padding:"14px 18px",borderRadius:14,background:"#ffe2dc",color:MINT,textDecoration:"line-through"}}>GENERIC OPENER</span><span style={{fontSize:52}}>→</span><span style={{padding:"14px 18px",borderRadius:14,background:MINT}}>ROLE + RELEVANCE</span></div></EvidenceBackground>;};
 
-const Control:React.FC<{scene:V22Scene}> = ({scene}) => {const frame=useCurrentFrame();return <EvidenceBackground><div style={{position:"absolute",left:330,top:275,width:700,height:540}}><EvidenceCard border={GREEN}><EvidenceCrop asset="outreach_complete" crop={CROPS.messageEdit} width={700} height={625} playback/></EvidenceCard></div><div style={{position:"absolute",left:350,right:55,bottom:V22_CONTENT_FLOOR_BOTTOM,display:"grid",gap:10}}><ProofLabel text="SAVE EDIT" primary/><ProofLabel text="CANCEL · SEND UNTOUCHED"/><div style={{padding:"16px 20px",borderRadius:15,background:INK,color:WHITE,fontSize:27,fontWeight:950}}>NOTHING SENDS WITHOUT YOU</div></div><Cursor frame={frame} from={{x:890,y:1040}} to={{x:660,y:985}} clickAt={78}/></EvidenceBackground>;};
+const Control:React.FC<{scene:V22Scene}> = ({scene}) => {const frame=useCurrentFrame();return <EvidenceBackground><div style={{position:"absolute",left:330,top:275,width:700,height:540}}><EvidenceCard border={GREEN}><EvidenceCrop asset="outreach_complete" crop={CROPS.messageEdit} width={700} height={625}/></EvidenceCard></div><div style={{position:"absolute",left:350,right:55,bottom:V22_CONTENT_FLOOR_BOTTOM,display:"grid",gap:10}}><ProofLabel text="SAVE EDIT" primary/><ProofLabel text="CANCEL · SEND UNTOUCHED"/><div style={{padding:"16px 20px",borderRadius:15,background:INK,color:WHITE,fontSize:27,fontWeight:950}}>NOTHING SENDS WITHOUT YOU</div></div><Cursor frame={frame} from={{x:890,y:1040}} to={{x:660,y:985}} clickAt={78}/></EvidenceBackground>;};
 
 const Payoff:React.FC<{scene:V22Scene}> = ({scene}) => {const frame=useCurrentFrame(),collapse=interpolate(frame,[0,42],[0,1],{extrapolateRight:"clamp"}),result=spring({frame:Math.max(0,frame-35),fps:30,config:{damping:20,stiffness:155},durationInFrames:16});const windows=[{asset:"tracker_after" as const,crop:CROPS.trackerAfter,x:30,y:330},{asset:"opportunity" as const,crop:CROPS.opportunityHeader,x:560,y:300},{asset:"contact" as const,crop:CROPS.contactCard,x:65,y:870},{asset:"outreach_complete" as const,crop:CROPS.message,x:565,y:850},{asset:"outreach_blank" as const,crop:CROPS.outreachBlank,x:310,y:1230}];return <AbsoluteFill >{windows.map((item,index)=><div key={index} style={{position:"absolute",left:item.x+(390-item.x)*collapse,top:item.y+(610-item.y)*collapse,width:480,height:300,borderRadius:23,overflow:"hidden",background:WHITE,border:"2px solid #b9cbc4",opacity:1-collapse,transform:`scale(${1-collapse*.55}) rotate(${index%2?-4:4}deg)`}}><EvidenceCrop asset={item.asset} crop={item.crop} width={480} height={300}/></div>)}<div data-v22-connected-result style={{position:"absolute",left:42,top:285,width:996,height:1010,borderRadius:36,background:WHITE,border:`7px solid ${GREEN}`,boxShadow:"0 32px 90px rgba(7,17,31,.22)",opacity:result,transform:`scale(${.7+.3*result})`,overflow:"hidden"}}><ConnectedBoard frame={frame}/></div><div style={{opacity:result}}></div></AbsoluteFill>;};
 
@@ -178,14 +179,19 @@ const Sting:React.FC<{scene:V22Scene}> = ({scene}) => {const frame=useCurrentFra
 // invariant to zoom. The remaining gap is intrinsic to filming dense app UI
 // rather than a person, and closing it means showing less evidence.
 const PRODUCT_FOCUS_SCALE=1.02;
-const EvidenceCrop:React.FC<{asset:V22AssetId;crop:Crop;width:number;height:number;playback?:boolean}> = ({asset,crop,width,height,playback=false}) => {
+const EvidenceCrop:React.FC<{asset:V22AssetId;crop:Crop;width:number;height:number}> = ({asset,crop,width,height}) => {
+  // A still sequence indexed by scene-local frame, not a video. See
+  // V22_PRODUCT_STILLS: freezing product proof was never the requirement,
+  // determinism was, and a list of PNGs cannot decode differently between runs.
+  // Clamps on the last frame rather than looping, so a long scene settles
+  // instead of replaying the same few seconds.
+  const localFrame=useCurrentFrame();
+  const trim=crop.motion?crop.trim+Math.min(crop.motion.frames-1,Math.floor(Math.max(0,localFrame)/crop.motion.hold))*crop.motion.step:crop.trim;
   const scale=Math.max(width/crop.width,height/crop.height),videoWidth=1440*scale,videoHeight=900*scale,focusScale=PRODUCT_FOCUS_SCALE;
   // Same box for both paths; only the source differs.
   const frame={position:"absolute" as const,left:-crop.x*scale,top:-crop.y*scale,width:videoWidth,height:videoHeight,maxWidth:"none",transform:`scale(${focusScale})`,transformOrigin:`${(crop.x+crop.width/2)/14.4}% ${(crop.y+crop.height/2)/9}%`};
   return <div data-v22-product={asset} style={{position:"absolute",inset:0,overflow:"hidden",background:WHITE}}>
-    {playback
-      ? <Video src={staticFile(FILES[asset])} trimBefore={crop.trim} muted playbackRate={1} style={frame}/>
-      : <Img src={staticFile(v22ProductStillFile(asset,crop.trim))} style={frame}/>}
+    <Img src={staticFile(v22ProductStillFile(asset,trim))} style={frame}/>
   </div>;};
 const EvidenceCard:React.FC<React.PropsWithChildren<{border?:string}>> = ({children,border}) => <div style={{position:"absolute",inset:0,overflow:"hidden",borderRadius:32,background:WHITE,border:border?`5px solid ${border}`:"none",boxShadow:"0 28px 70px rgba(7,17,31,.18)"}}>{children}</div>;
 // Background now comes from the scene backdrop; this is only a positioning shell.

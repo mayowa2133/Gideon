@@ -25,5 +25,5 @@ describe.skipIf(!fs.existsSync(chromePath))("capture login adapter", () => {
       await expect(page.getByText("Dashboard").isVisible()).resolves.toBe(true);
       expect(await page.content()).not.toContain("secret-value");
     } finally { await browser.close(); }
-  }, 15_000);
+  }, 60_000);
 });

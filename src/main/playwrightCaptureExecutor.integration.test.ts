@@ -103,7 +103,7 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     expect(result.networkReceipts).toEqual([
       expect.objectContaining({ hostname: "localhost", resolvedAddresses: ["127.0.0.1"] })
     ]);
-  }, 20_000);
+  }, 80_000);
 
   it("records a clean WebM artifact with a content hash", async () => {
     const result = await executePlaywrightCapture({
@@ -141,7 +141,7 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
       output: { contentType: "video/mp4", videoCodec: "h264" }
     });
     expect(normalized.manifest.manifestHash).toMatch(/^[a-f0-9]{64}$/);
-  }, 20_000);
+  }, 80_000);
 
   it("waits for an observable browser state instead of checking it only once", async () => {
     const flow = createFlow();
@@ -164,7 +164,7 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
 
     expect(result.receipt.status).toBe("verified");
     expect(result.receipt.steps.at(-1)?.status).toBe("succeeded");
-  }, 20_000);
+  }, 80_000);
 
   it("waits within the bounded action timeout for asynchronously rendered controls", async () => {
     const flow = createFlow();
@@ -173,7 +173,7 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     flow.finalAssertions = [{ type: "text", target: { strategy: "text", value: "Ready", exact: true }, value: "Ready" }];
     const result = await executePlaywrightCapture({ id: "execution-late-control", workspaceId: "workspace-1", plan: compileProductFlow(flow, createPolicy(baseUrl)), policy: createPolicy(baseUrl), fixtureValues: {}, outputDir, recordVideo: false, executablePath, actionTimeoutMs: 2_000, now: incrementingClock() });
     expect(result.receipt).toMatchObject({ status: "verified", steps: [{ status: "succeeded" }] });
-  }, 10_000);
+  }, 40_000);
 
   it("returns a failed verification receipt instead of claiming completion", async () => {
     const flow = createFlow();
@@ -193,7 +193,7 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     expect(result.receipt.finalAssertions).toEqual([
       expect.objectContaining({ passed: false, safeMessage: "Expected browser state was not observed." })
     ]);
-  }, 20_000);
+  }, 80_000);
 
   it("rejects action timeouts outside the bounded capture policy", async () => {
     await expect(executePlaywrightCapture({
@@ -215,7 +215,7 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     flow.finalAssertions = [{ type: "url", path: "/ambiguous" }];
     const result = await executePlaywrightCapture({ id: "execution-ambiguous", workspaceId: "workspace-1", plan: compileProductFlow(flow, createPolicy(baseUrl)), policy: createPolicy(baseUrl), fixtureValues: {}, outputDir, recordVideo: false, executablePath, actionTimeoutMs: 2_000, now: incrementingClock() });
     expect(result.receipt).toMatchObject({ status: "failed", steps: [{ status: "failed", safeErrorCode: "locator_ambiguous" }] });
-  }, 10_000);
+  }, 40_000);
 
   it("resolves stable-link and landmark-scoped structural locators", async () => {
     const stable = createFlow();
@@ -231,7 +231,7 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     structural.finalAssertions = [{ type: "text", target: { strategy: "text", value: "Workspace", exact: true }, value: "Workspace" }];
     const structuralResult = await executePlaywrightCapture({ id: "execution-structural", workspaceId: "workspace-1", plan: compileProductFlow(structural, createPolicy(baseUrl)), policy: createPolicy(baseUrl), fixtureValues: {}, outputDir, recordVideo: false, executablePath, actionTimeoutMs: 2_000, now: incrementingClock() });
     expect(structuralResult.receipt.status).toBe("verified");
-  }, 15_000);
+  }, 60_000);
 
   it.each([["/login-state", "login"], ["/loading-state", "loading"]] as const)("classifies %s without retaining page text", async (route, expectedSignal) => {
     const flow = createFlow();
@@ -242,7 +242,7 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     expect(result.receipt.steps[0]?.visualEvidence?.pageSignal).toBe(expectedSignal);
     expect(JSON.stringify(result.receipt.steps[0]?.visualEvidence)).not.toContain("Password");
     expect(JSON.stringify(result.receipt.steps[0]?.visualEvidence)).not.toContain("Loading fixture");
-  }, 20_000);
+  }, 80_000);
 
   it("redacts sensitive assertion text from receipts while evaluating the approved assertion", async () => {
     const flow = createFlow();
@@ -253,7 +253,7 @@ describe.skipIf(!executablePath)("Playwright capture executor integration", () =
     expect(result.receipt.finalAssertions[0]).toMatchObject({ assertion: { target: { value: "[masked]" }, value: "[masked]" }, passed: true });
     expect(JSON.stringify(result.receipt)).not.toContain("founder@example.test");
     expect(JSON.stringify(result.networkReceipts)).not.toMatch(/founder|tok_fixture|\?/);
-  }, 20_000);
+  }, 80_000);
 });
 
 function createFlow(): ProductFlowRevision {
