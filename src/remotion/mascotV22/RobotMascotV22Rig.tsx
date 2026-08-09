@@ -42,14 +42,19 @@ export const RobotMascotV22Rig: React.FC<{ plan: V22MascotPerformance; frame: nu
   const face = activeFace(plan, frame);
   const audio = sampleMascotAudioV22(plan.audioFrames, frame), mouth = mouthFor(face, plan.mouthBias, audio);
   const blink = blinkScale(frame, plan.blinkFrames, face), phraseBeat = plan.head.beats.reduce((sum, beat) => sum + Math.max(0, 1 - Math.abs(frame - beat) / 5), 0);
-  const lean = plan.torso.lean * 10 * (.35 + .65 * Math.max(leftAmount, rightAmount)), recoil = plan.torso.recoil * ramp(frame, [0, 8, 18], [0, 1, 0]) * 12;
+  // Anticipation: dip slightly away from the target in the frames before the
+  // reach, then swing through. Straight-to-target is what makes a rig read as a
+  // diagram rather than a character.
+  const anticipate = (timing:{start:number;peak:number}) => -Math.max(0, 1 - Math.abs(frame - (timing.start + (timing.peak - timing.start) * .35)) / 4) * .18;
+  const leftAnticipation = anticipate(plan.left.timing), rightAnticipation = anticipate(plan.right.timing);
+  const lean = plan.torso.lean * 16 * (.35 + .65 * Math.max(leftAmount, rightAmount)), recoil = plan.torso.recoil * ramp(frame, [0, 8, 18], [0, 1, 0]) * 18;
   // No per-frame jitter term. Through V20 this carried `uneven(seed+31,frame,.09)*.45`,
   // which changed the angle by ~0.02 deg every single frame. Because transformOrigin
   // sits at the torso centre, the head — ~455 units from that pivot — was dragged
   // ~0.22px per frame while the torso barely moved, which is why the head in
   // particular read as staticky. Rotation is now constant once gazePath settles,
   // so a held pose produces byte-identical frames.
-  const rotation = plan.torso.rotate * 4 + torsoGaze.dx * 2.2;
+  const rotation = plan.torso.rotate * 7 + torsoGaze.dx * 3.4;
   const layout = positioning === "external" ? { left: 0, top: 0 } : roleLayout(plan.role);
   // Whole units: the antenna is a small high-contrast amber disc, and a radius or
   // centre that slides sub-pixel every frame crawls exactly like the face did.
@@ -94,9 +99,9 @@ export const RobotMascotV22Rig: React.FC<{ plan: V22MascotPerformance; frame: nu
       <ellipse data-v22-cast-shadow cx="330" cy="852" rx="300" ry="96" fill={`url(#${plan.sceneId}-cast)`} />
       <Torso id={plan.sceneId} />
       <rect data-v22-neck x="290" y="482" width="80" height="60" rx="26" fill={`url(#${plan.sceneId}-body)`} stroke="#fff" strokeWidth="6" />
-      <Arm side="left" gesture={plan.left.gesture} amount={leftAmount} wristRotation={plan.left.timing.wristRotation} detail={handDetail} />
-      <Arm side="right" gesture={plan.right.gesture} amount={rightAmount} wristRotation={plan.right.timing.wristRotation} detail={handDetail} />
-      <g transform={`translate(330 250) rotate(${plan.head.tilt * 7 + headGaze.dy * 2 + phraseBeat * 1.5}) translate(-330 -250)`}>
+      <Arm side="left" gesture={plan.left.gesture} amount={Math.max(-.2,leftAmount+leftAnticipation)} wristRotation={plan.left.timing.wristRotation} detail={handDetail} />
+      <Arm side="right" gesture={plan.right.gesture} amount={Math.max(-.2,rightAmount+rightAnticipation)} wristRotation={plan.right.timing.wristRotation} detail={handDetail} />
+      <g transform={`translate(330 250) rotate(${plan.head.tilt * 12 + headGaze.dy * 3.4 + phraseBeat * 3}) translate(-330 -250)`}>
         <rect x={330 - HEAD_W / 2} y="48" width={HEAD_W} height={HEAD_H} rx="170" fill={`url(#${plan.sceneId}-shell)`} stroke="#fff" strokeWidth="10" />
         <rect x="40" y="66" width="580" height="420" rx="150" fill={`url(#${plan.sceneId}-gloss)`} />
         <path d="M68 126 Q154 72 250 84" fill="none" stroke="#fff" strokeOpacity=".84" strokeWidth="24" strokeLinecap="round" />
@@ -194,7 +199,11 @@ const HandShape: React.FC<{ gesture: V22Gesture; side: "left" | "right"; detail:
 // absolute motion the cameo produced, keeping the gesture legible without it
 // registering as a cut. Duration is untouched: slowing the swing would change the
 // performance, where shortening the reach only changes how far the hand travels.
-const GESTURE_REACH=0.62;
+// .62 was V21's damping, added while chasing sub-pixel drift. The real fix for
+// that was the device-space snapping below, which stays; the damping was left
+// behind and is what made the presenter read as static. Raised for reach --
+// still short of 1.0 so hands stay inside the rig box and the antenna clears.
+const GESTURE_REACH=0.92;
 function scaleReach(target:{dx:number;dy:number}){return{dx:target.dx*GESTURE_REACH,dy:target.dy*GESTURE_REACH};}
 function gestureTarget(gesture: V22Gesture, side: "left" | "right") {
   if (gesture === "celebration" || gesture === "wave") return scaleReach({ dx: 145, dy: -250 });
