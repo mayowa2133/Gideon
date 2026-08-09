@@ -62,7 +62,7 @@ function cropsForScene(sceneId) {
   return (SCENE_CROPS[sceneId] ?? []).map((key) => {
     const crop = CROPS[key];
     if (!crop) throw new Error(`Scene ${sceneId} names an unknown crop: ${key}`);
-    return { assetId: ASSET_FOR_CROP[key], x: crop.x, y: crop.y, width: crop.width, height: crop.height, ...(crop.motion ? { motion: crop.motion } : {}) };
+    return { assetId: ASSET_FOR_CROP[key], x: crop.x, y: crop.y, width: crop.width, height: crop.height, trim: crop.trim, ...(crop.motion ? { motion: crop.motion } : {}) };
   });
 }
 
@@ -121,6 +121,28 @@ const CONTENT_PATTERN = {
   signature: "filmstrip", signature_proof: "filmstrip",
   result: "composed_board",
   cta: "comment_card"
+};
+
+// What each pattern needs beyond its crops, read off the V22 components once.
+// This is the part a generated blueprint will have to author for itself, and
+// writing it down is what turns fifteen bespoke components into seven
+// parameterised ones.
+const CONTENT_OPTIONS = {
+  status: { arrangement: "row", swapAt: .31, pills: ["APPLIED", "INTERVIEWING"], cursor: { fromX: 875, fromY: 980, toX: 727, toY: 1005, clickAt: 9 } },
+  contact: { labels: ["AVERY CHEN", "SENIOR TECHNICAL RECRUITER", "NORTHSTAR LABS"] },
+  reasons: { labels: ["WORKS AT NORTHSTAR LABS", "RELEVANT RECRUITING ROLE", "SUPPORTING EVIDENCE INCLUDED"] },
+  role: { labels: ["PRODUCT ENGINEER", "NORTHSTAR LABS"] },
+  reason: { labels: ["WORKS AT NORTHSTAR LABS", "RELEVANT RECRUITING ROLE", "SUPPORTING EVIDENCE INCLUDED"] },
+  grounded: { highlight: true, pills: ["GENERIC OPENER", "ROLE + RELEVANCE"] },
+  control: { labels: ["SAVE EDIT", "CANCEL \u00b7 SEND UNTOUCHED"], note: "NOTHING SENDS WITHOUT YOU", cursor: { fromX: 890, fromY: 1040, toX: 660, toY: 985, clickAt: 78 } },
+  draft: { swapAt: .28, note: "SAVE EDIT \u00b7 DRAFT NOT SENT" },
+  friction: { arrangement: "flank" },
+  five: { arrangement: "grid", labels: ["JOB POST", "PROFILE", "NOTES", "CONTACTS", "BLANK MESSAGE"] },
+  collapse: { arrangement: "converge" },
+  payoff: { arrangement: "converge" },
+  signature: { arrangement: "row", labels: ["JOB", "PERSON", "PROOF", "MESSAGE"] },
+  signature_proof: { arrangement: "row", labels: ["JOB", "PERSON", "PROOF", "MESSAGE"] },
+  result: {}, hook: {}, sting: {}, cta: {}
 };
 
 const PRESENTER_LAYOUT = {
@@ -186,6 +208,7 @@ const scenes = manifest.scenes.map((scene) => {
     purpose: PURPOSE[scene.family] ?? "demo",
     shotType: shotTypeForScene(scene),
     contentPattern: CONTENT_PATTERN[scene.id] ?? "evidence_band",
+    contentOptions: CONTENT_OPTIONS[scene.id] ?? {},
     presenter: presenterCue(scene),
     productAssetIds: scene.assetIds,
     supportedClaimIds: scene.claimIds,

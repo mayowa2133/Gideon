@@ -34,6 +34,7 @@
       "purpose": "hook",
       "shotType": "presenter_fullscreen",
       "contentPattern": "ambient",
+      "contentOptions": {},
       "presenter": {
         "visible": true,
         "layout": "close_up",
@@ -105,6 +106,21 @@
       "purpose": "demo",
       "shotType": "split_presenter_product",
       "contentPattern": "state_swap",
+      "contentOptions": {
+        "arrangement": "row",
+        "swapAt": 0.31,
+        "pills": [
+          "APPLIED",
+          "INTERVIEWING"
+        ],
+        "cursor": {
+          "fromX": 875,
+          "fromY": 980,
+          "toX": 727,
+          "toY": 1005,
+          "clickAt": 9
+        }
+      },
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -159,7 +175,8 @@
         "x": 72,
         "y": 178,
         "width": 560,
-        "height": 310
+        "height": 310,
+        "trim": 145
       },
       "productCrops": [
         {
@@ -167,7 +184,8 @@
           "x": 72,
           "y": 178,
           "width": 560,
-          "height": 310
+          "height": 310,
+          "trim": 145
         },
         {
           "assetId": "tracker_after",
@@ -175,6 +193,7 @@
           "y": 178,
           "width": 560,
           "height": 310,
+          "trim": 155,
           "motion": {
             "frames": 12,
             "step": 3,
@@ -217,6 +236,13 @@
       "purpose": "proof",
       "shotType": "split_presenter_product",
       "contentPattern": "evidence_band",
+      "contentOptions": {
+        "labels": [
+          "AVERY CHEN",
+          "SENIOR TECHNICAL RECRUITER",
+          "NORTHSTAR LABS"
+        ]
+      },
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -270,7 +296,8 @@
         "x": 86,
         "y": 510,
         "width": 430,
-        "height": 390
+        "height": 390,
+        "trim": 130
       },
       "productCrops": [
         {
@@ -278,7 +305,8 @@
           "x": 86,
           "y": 510,
           "width": 430,
-          "height": 390
+          "height": 390,
+          "trim": 130
         }
       ],
       "layoutRects": [
@@ -316,6 +344,13 @@
       "purpose": "proof",
       "shotType": "split_presenter_product",
       "contentPattern": "evidence_band",
+      "contentOptions": {
+        "labels": [
+          "WORKS AT NORTHSTAR LABS",
+          "RELEVANT RECRUITING ROLE",
+          "SUPPORTING EVIDENCE INCLUDED"
+        ]
+      },
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -369,7 +404,8 @@
         "x": 104,
         "y": 610,
         "width": 390,
-        "height": 265
+        "height": 265,
+        "trim": 140
       },
       "productCrops": [
         {
@@ -377,7 +413,8 @@
           "x": 104,
           "y": 610,
           "width": 390,
-          "height": 265
+          "height": 265,
+          "trim": 140
         }
       ],
       "layoutRects": [
@@ -415,6 +452,9 @@
       "purpose": "problem",
       "shotType": "presenter_fullscreen",
       "contentPattern": "card_field",
+      "contentOptions": {
+        "arrangement": "flank"
+      },
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -464,7 +504,8 @@
         "x": 72,
         "y": 75,
         "width": 760,
-        "height": 265
+        "height": 265,
+        "trim": 52
       },
       "productCrops": [
         {
@@ -472,35 +513,40 @@
           "x": 72,
           "y": 75,
           "width": 760,
-          "height": 265
+          "height": 265,
+          "trim": 52
         },
         {
           "assetId": "contact",
           "x": 86,
           "y": 510,
           "width": 430,
-          "height": 390
+          "height": 390,
+          "trim": 130
         },
         {
           "assetId": "opportunity",
           "x": 75,
           "y": 95,
           "width": 900,
-          "height": 520
+          "height": 520,
+          "trim": 142
         },
         {
           "assetId": "contact",
           "x": 104,
           "y": 610,
           "width": 390,
-          "height": 265
+          "height": 265,
+          "trim": 140
         },
         {
           "assetId": "outreach_blank",
           "x": 82,
           "y": 175,
           "width": 520,
-          "height": 590
+          "height": 590,
+          "trim": 85
         }
       ],
       "layoutRects": [
@@ -530,6 +576,16 @@
       "purpose": "problem",
       "shotType": "product_fullscreen",
       "contentPattern": "card_field",
+      "contentOptions": {
+        "arrangement": "grid",
+        "labels": [
+          "JOB POST",
+          "PROFILE",
+          "NOTES",
+          "CONTACTS",
+          "BLANK MESSAGE"
+        ]
+      },
       "presenter": {
         "visible": false,
         "layout": "medium",
@@ -583,7 +639,8 @@
         "x": 72,
         "y": 75,
         "width": 760,
-        "height": 265
+        "height": 265,
+        "trim": 52
       },
       "productCrops": [
         {
@@ -591,35 +648,40 @@
           "x": 72,
           "y": 75,
           "width": 760,
-          "height": 265
+          "height": 265,
+          "trim": 52
         },
         {
           "assetId": "contact",
           "x": 86,
           "y": 510,
           "width": 430,
-          "height": 390
+          "height": 390,
+          "trim": 130
         },
         {
           "assetId": "opportunity",
           "x": 75,
           "y": 95,
           "width": 900,
-          "height": 520
+          "height": 520,
+          "trim": 142
         },
         {
           "assetId": "contact",
           "x": 104,
           "y": 610,
           "width": 390,
-          "height": 265
+          "height": 265,
+          "trim": 140
         },
         {
           "assetId": "outreach_blank",
           "x": 82,
           "y": 175,
           "width": 520,
-          "height": 590
+          "height": 590,
+          "trim": 85
         }
       ],
       "layoutRects": [
@@ -649,6 +711,9 @@
       "purpose": "demo",
       "shotType": "product_fullscreen",
       "contentPattern": "card_field",
+      "contentOptions": {
+        "arrangement": "converge"
+      },
       "presenter": {
         "visible": false,
         "layout": "medium",
@@ -700,7 +765,8 @@
         "x": 72,
         "y": 75,
         "width": 760,
-        "height": 265
+        "height": 265,
+        "trim": 52
       },
       "productCrops": [
         {
@@ -708,7 +774,8 @@
           "x": 72,
           "y": 75,
           "width": 760,
-          "height": 265
+          "height": 265,
+          "trim": 52
         }
       ],
       "layoutRects": [
@@ -738,6 +805,12 @@
       "purpose": "proof",
       "shotType": "split_presenter_product",
       "contentPattern": "evidence_band",
+      "contentOptions": {
+        "labels": [
+          "PRODUCT ENGINEER",
+          "NORTHSTAR LABS"
+        ]
+      },
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -792,7 +865,8 @@
         "x": 76,
         "y": 88,
         "width": 740,
-        "height": 116
+        "height": 116,
+        "trim": 52
       },
       "productCrops": [
         {
@@ -800,7 +874,8 @@
           "x": 76,
           "y": 88,
           "width": 740,
-          "height": 116
+          "height": 116,
+          "trim": 52
         }
       ],
       "layoutRects": [
@@ -838,6 +913,13 @@
       "purpose": "proof",
       "shotType": "split_presenter_product",
       "contentPattern": "evidence_band",
+      "contentOptions": {
+        "labels": [
+          "WORKS AT NORTHSTAR LABS",
+          "RELEVANT RECRUITING ROLE",
+          "SUPPORTING EVIDENCE INCLUDED"
+        ]
+      },
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -892,7 +974,8 @@
         "x": 96,
         "y": 556,
         "width": 408,
-        "height": 175
+        "height": 175,
+        "trim": 130
       },
       "productCrops": [
         {
@@ -900,7 +983,8 @@
           "x": 96,
           "y": 556,
           "width": 408,
-          "height": 175
+          "height": 175,
+          "trim": 130
         }
       ],
       "layoutRects": [
@@ -938,6 +1022,15 @@
       "purpose": "demo",
       "shotType": "split_presenter_product",
       "contentPattern": "filmstrip",
+      "contentOptions": {
+        "arrangement": "row",
+        "labels": [
+          "JOB",
+          "PERSON",
+          "PROOF",
+          "MESSAGE"
+        ]
+      },
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -995,7 +1088,8 @@
         "x": 72,
         "y": 75,
         "width": 760,
-        "height": 265
+        "height": 265,
+        "trim": 52
       },
       "productCrops": [
         {
@@ -1003,21 +1097,24 @@
           "x": 72,
           "y": 75,
           "width": 760,
-          "height": 265
+          "height": 265,
+          "trim": 52
         },
         {
           "assetId": "contact",
           "x": 86,
           "y": 510,
           "width": 430,
-          "height": 390
+          "height": 390,
+          "trim": 130
         },
         {
           "assetId": "contact",
           "x": 104,
           "y": 610,
           "width": 390,
-          "height": 265
+          "height": 265,
+          "trim": 140
         },
         {
           "assetId": "outreach_complete",
@@ -1025,6 +1122,7 @@
           "y": 196,
           "width": 742,
           "height": 300,
+          "trim": 180,
           "motion": {
             "frames": 12,
             "step": 3,
@@ -1067,6 +1165,15 @@
       "purpose": "demo",
       "shotType": "split_presenter_product",
       "contentPattern": "filmstrip",
+      "contentOptions": {
+        "arrangement": "row",
+        "labels": [
+          "JOB",
+          "PERSON",
+          "PROOF",
+          "MESSAGE"
+        ]
+      },
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -1123,7 +1230,8 @@
         "x": 72,
         "y": 75,
         "width": 760,
-        "height": 265
+        "height": 265,
+        "trim": 52
       },
       "productCrops": [
         {
@@ -1131,21 +1239,24 @@
           "x": 72,
           "y": 75,
           "width": 760,
-          "height": 265
+          "height": 265,
+          "trim": 52
         },
         {
           "assetId": "contact",
           "x": 86,
           "y": 510,
           "width": 430,
-          "height": 390
+          "height": 390,
+          "trim": 130
         },
         {
           "assetId": "contact",
           "x": 104,
           "y": 610,
           "width": 390,
-          "height": 265
+          "height": 265,
+          "trim": 140
         },
         {
           "assetId": "outreach_complete",
@@ -1153,6 +1264,7 @@
           "y": 196,
           "width": 742,
           "height": 300,
+          "trim": 180,
           "motion": {
             "frames": 12,
             "step": 3,
@@ -1195,6 +1307,10 @@
       "purpose": "demo",
       "shotType": "product_fullscreen",
       "contentPattern": "evidence_band",
+      "contentOptions": {
+        "swapAt": 0.28,
+        "note": "SAVE EDIT · DRAFT NOT SENT"
+      },
       "presenter": {
         "visible": false,
         "layout": "medium",
@@ -1249,7 +1365,8 @@
         "x": 96,
         "y": 188,
         "width": 490,
-        "height": 562
+        "height": 562,
+        "trim": 85
       },
       "productCrops": [
         {
@@ -1257,7 +1374,8 @@
           "x": 96,
           "y": 188,
           "width": 490,
-          "height": 562
+          "height": 562,
+          "trim": 85
         },
         {
           "assetId": "outreach_complete",
@@ -1265,6 +1383,7 @@
           "y": 196,
           "width": 742,
           "height": 300,
+          "trim": 75,
           "motion": {
             "frames": 12,
             "step": 3,
@@ -1299,6 +1418,13 @@
       "purpose": "proof",
       "shotType": "split_presenter_product",
       "contentPattern": "evidence_band",
+      "contentOptions": {
+        "highlight": true,
+        "pills": [
+          "GENERIC OPENER",
+          "ROLE + RELEVANCE"
+        ]
+      },
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -1354,6 +1480,7 @@
         "y": 196,
         "width": 742,
         "height": 300,
+        "trim": 180,
         "motion": {
           "frames": 12,
           "step": 3,
@@ -1367,6 +1494,7 @@
           "y": 196,
           "width": 742,
           "height": 300,
+          "trim": 180,
           "motion": {
             "frames": 12,
             "step": 3,
@@ -1409,6 +1537,20 @@
       "purpose": "proof",
       "shotType": "split_presenter_product",
       "contentPattern": "evidence_band",
+      "contentOptions": {
+        "labels": [
+          "SAVE EDIT",
+          "CANCEL · SEND UNTOUCHED"
+        ],
+        "note": "NOTHING SENDS WITHOUT YOU",
+        "cursor": {
+          "fromX": 890,
+          "fromY": 1040,
+          "toX": 660,
+          "toY": 985,
+          "clickAt": 78
+        }
+      },
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -1463,6 +1605,7 @@
         "y": 196,
         "width": 742,
         "height": 300,
+        "trim": 20,
         "motion": {
           "frames": 12,
           "step": 3,
@@ -1476,6 +1619,7 @@
           "y": 196,
           "width": 742,
           "height": 300,
+          "trim": 20,
           "motion": {
             "frames": 12,
             "step": 3,
@@ -1518,6 +1662,9 @@
       "purpose": "payoff",
       "shotType": "product_fullscreen",
       "contentPattern": "card_field",
+      "contentOptions": {
+        "arrangement": "converge"
+      },
       "presenter": {
         "visible": false,
         "layout": "medium",
@@ -1580,6 +1727,7 @@
         "y": 178,
         "width": 560,
         "height": 310,
+        "trim": 155,
         "motion": {
           "frames": 12,
           "step": 3,
@@ -1593,6 +1741,7 @@
           "y": 178,
           "width": 560,
           "height": 310,
+          "trim": 155,
           "motion": {
             "frames": 12,
             "step": 3,
@@ -1604,14 +1753,16 @@
           "x": 72,
           "y": 75,
           "width": 760,
-          "height": 265
+          "height": 265,
+          "trim": 52
         },
         {
           "assetId": "contact",
           "x": 86,
           "y": 510,
           "width": 430,
-          "height": 390
+          "height": 390,
+          "trim": 130
         },
         {
           "assetId": "outreach_complete",
@@ -1619,6 +1770,7 @@
           "y": 196,
           "width": 742,
           "height": 300,
+          "trim": 180,
           "motion": {
             "frames": 12,
             "step": 3,
@@ -1630,7 +1782,8 @@
           "x": 82,
           "y": 175,
           "width": 520,
-          "height": 590
+          "height": 590,
+          "trim": 85
         }
       ],
       "layoutRects": [
@@ -1660,6 +1813,7 @@
       "purpose": "payoff",
       "shotType": "split_presenter_product",
       "contentPattern": "composed_board",
+      "contentOptions": {},
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -1719,6 +1873,7 @@
         "y": 178,
         "width": 560,
         "height": 310,
+        "trim": 155,
         "motion": {
           "frames": 12,
           "step": 3,
@@ -1732,6 +1887,7 @@
           "y": 178,
           "width": 560,
           "height": 310,
+          "trim": 155,
           "motion": {
             "frames": 12,
             "step": 3,
@@ -1743,14 +1899,16 @@
           "x": 86,
           "y": 510,
           "width": 430,
-          "height": 390
+          "height": 390,
+          "trim": 130
         },
         {
           "assetId": "contact",
           "x": 104,
           "y": 610,
           "width": 390,
-          "height": 265
+          "height": 265,
+          "trim": 140
         },
         {
           "assetId": "outreach_complete",
@@ -1758,6 +1916,7 @@
           "y": 196,
           "width": 742,
           "height": 300,
+          "trim": 180,
           "motion": {
             "frames": 12,
             "step": 3,
@@ -1800,6 +1959,7 @@
       "purpose": "cta",
       "shotType": "cta_end_card",
       "contentPattern": "comment_card",
+      "contentOptions": {},
       "presenter": {
         "visible": true,
         "layout": "medium",
@@ -1887,6 +2047,7 @@
       "purpose": "cta",
       "shotType": "presenter_fullscreen",
       "contentPattern": "ambient",
+      "contentOptions": {},
       "presenter": {
         "visible": true,
         "layout": "close_up",

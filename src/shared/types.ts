@@ -917,6 +917,9 @@ export interface SceneProductCrop {
   y: number;
   width: number;
   height: number;
+  // Which extracted still this crop reads, as a source frame index. Stills are
+  // keyed by (asset, trim), so two crops of the same moment share one PNG.
+  trim: number;
   motion?: { frames: number; step: number; hold: number };
 }
 
@@ -958,6 +961,30 @@ export type SceneContentPattern =
   | "composed_board"
   | "comment_card";
 
+// What a pattern needs beyond its crops. Kept as a small typed bag rather than
+// bespoke fields per pattern, because the alternative is what V22 did: fifteen
+// components each holding its own arrangement, labels and cursor path as
+// literals, which is exactly what cannot be generated.
+export interface SceneContentOptions {
+  // card_field draws N crops; how they sit is the difference between the crowding
+  // shot, the five-surfaces grid and the collapse into one result.
+  arrangement?: "grid" | "flank" | "converge" | "row";
+  // state_swap exchanges its two crops here, as a fraction of scene duration.
+  swapAt?: number;
+  // Proof labels under an evidence band. First is emphasised.
+  labels?: string[];
+  // Two states either side of an arrow, for a comparison or a stage change.
+  pills?: [string, string];
+  // A pointer moving to a click, in canvas coordinates. Present only where the
+  // product genuinely responds to a click in the source recording.
+  cursor?: { fromX: number; fromY: number; toX: number; toY: number; clickAt: number };
+  // A highlight sweep across the crop's body text, used where the claim is a
+  // sentence rather than a field.
+  highlight?: boolean;
+  // Long-form note rendered under the band, e.g. the control beat's assurance.
+  note?: string;
+}
+
 export interface SceneComposition {
   id: string;
   startMs: number;
@@ -980,6 +1007,7 @@ export interface SceneComposition {
   // requires them and validateCreativeBlueprint enforces that.
   backdrop?: SceneBackdrop;
   contentPattern?: SceneContentPattern;
+  contentOptions?: SceneContentOptions;
   productCrop?: SceneProductCrop;
   // A pattern may show more than one region: `card_field` and `composed_board`
   // draw several, and `state_swap` exchanges two. `productCrop` stays as the

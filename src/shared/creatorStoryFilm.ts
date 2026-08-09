@@ -18,7 +18,7 @@
 // posture. Everything the cue does not say is derived deterministically from the
 // scene id, because the same blueprint must render the same film: the
 // held-stability and mascot-dropout gates both depend on it.
-import type { CreativeBlueprint, SceneComposition, SceneContentPattern, SceneLayoutRect, SceneProductCrop } from "./types";
+import type { CreativeBlueprint, SceneComposition, SceneContentOptions, SceneContentPattern, SceneLayoutRect, SceneProductCrop } from "./types";
 import type { V22Face, V22Gesture, V22MascotPerformance, V22Mouth } from "./solomonMascotV22";
 
 export const FILM_FPS = 30;
@@ -30,6 +30,7 @@ export interface FilmScene {
   to: number;
   groupFrom: number;
   contentPattern: SceneContentPattern;
+  contentOptions: SceneContentOptions;
   backdrop: { token: string; tier: "bright" | "mid" | "deep"; luma: number; css: string; foreground: string };
   productCrops: SceneProductCrop[];
   layout: SceneLayoutRect[];
@@ -188,6 +189,7 @@ export function buildFilmScenes(blueprint: CreativeBlueprint, realizedEndMs?: nu
       from, to,
       groupFrom: groupIndex >= 0 ? bounds[groupIndex]!.from : from,
       contentPattern: scene.contentPattern,
+      contentOptions: scene.contentOptions ?? {},
       backdrop,
       productCrops: scene.productCrops ?? (scene.productCrop ? [scene.productCrop] : []),
       layout: scene.layoutRects ?? [],
