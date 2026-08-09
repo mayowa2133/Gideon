@@ -264,10 +264,12 @@ const Caption:React.FC<{caption:V22Caption;scenes:V22Scene[]}> = ({caption,scene
   // and right lanes -- so the type moves through the frame with the sentence
   // instead of ticking over in place. Everything stays inside the declared caption
   // band (77-307) because scene content starts at ~275.
-  const index=Math.max(0,caption.wordGroups.indexOf(group));
-  const lane=index%3;
-  const size=group.emphasis?132:76;
-  const bandTop=group.emphasis?78:lane===0?112:146;
-  const justify=lane===1?"flex-start":lane===2?"flex-end":"center";
-  const scale=(.86+.14*pop)*(group.emphasis?1.06:1);
-  return <div data-v22-caption={caption.id} data-v22-word-group={group.text} style={{position:"absolute",left:60,right:60,top:bandTop,display:"flex",justifyContent:justify,zIndex:70,opacity:opacity*swapFade,transform:`translateY(${(1-enter)*-22}px)`}}><div style={{fontFamily:"Fraunces Variable,serif",color:tone,fontSize:size,lineHeight:.94,textAlign:"center",fontWeight:900,textShadow:`0 0 26px ${halo},0 2px 10px ${halo}`,transform:`scale(${scale})`,transformOrigin:lane===1?"0% 0%":lane===2?"100% 0%":"50% 0%"}}>{pre}{highlighted&&<span style={{color:MINT}}>{highlighted}</span>}{post}</div></div>;};
+  // Dialled back from three lanes and a 76/132 split. Jumping left-centre-right
+  // every word or two read as busy: the eye chased the type instead of reading
+  // it. Emphasis is now carried by size and a small rise on a fixed centre line,
+  // which keeps the stress legible without moving the reader around the frame.
+  const size=group.emphasis?116:80;
+  const bandTop=group.emphasis?86:116;
+  const justify="center";
+  const scale=(.9+.1*pop)*(group.emphasis?1.04:1);
+  return <div data-v22-caption={caption.id} data-v22-word-group={group.text} style={{position:"absolute",left:60,right:60,top:bandTop,display:"flex",justifyContent:justify,zIndex:70,opacity:opacity*swapFade,transform:`translateY(${(1-enter)*-22}px)`}}><div style={{fontFamily:"Fraunces Variable,serif",color:tone,fontSize:size,lineHeight:.94,textAlign:"center",fontWeight:900,textShadow:`0 0 26px ${halo},0 2px 10px ${halo}`,transform:`scale(${scale})`,transformOrigin:"50% 0%"}}>{pre}{highlighted&&<span style={{color:MINT}}>{highlighted}</span>}{post}</div></div>;};
