@@ -248,15 +248,73 @@ export const // The references concentrate colour in a single hue -- red at 76%,
 // hue and the others are removed: the coral accents go mint, and these two blue
 // grounds are desaturated to neutral greys at the same luma tier.
 V22_BACKDROPS={
-  paper:{tier:"bright",luma:243,css:"linear-gradient(145deg,#fdfbf5,#eef2ec)",foreground:"#07111f"},
-  blush:{tier:"bright",luma:232,css:"linear-gradient(145deg,#fff3ee,#ffd8cc)",foreground:"#07111f"},
-  clay:{tier:"mid",luma:150,css:"linear-gradient(150deg,#d6c6b0,#a8917a)",foreground:"#171009"},
-  sky:{tier:"mid",luma:163,css:"linear-gradient(150deg,#ccd0d2,#8f9599)",foreground:"#07111f"},
-  espresso:{tier:"deep",luma:57,css:"linear-gradient(160deg,#4c3729,#1e140d)",foreground:"#fdf6ee"},
-  slate:{tier:"deep",luma:42,css:"linear-gradient(160deg,#2b2f33,#101315)",foreground:"#f2f7ff"},
-  ink:{tier:"deep",luma:15,css:"#07111f",foreground:"#ffffff"},
+  paper:{tier:"bright",luma:246,css:"linear-gradient(145deg,#fdfbf5,#eef2ec)",foreground:"#07111f"},
+  blush:{tier:"bright",luma:234,css:"linear-gradient(145deg,#fff3ee,#ffd8cc)",foreground:"#07111f"},
+  clay:{tier:"mid",luma:174,css:"linear-gradient(150deg,#d6c6b0,#a8917a)",foreground:"#171009"},
+  sky:{tier:"mid",luma:178,css:"linear-gradient(150deg,#ccd0d2,#8f9599)",foreground:"#07111f"},
+  oxblood:{tier:"deep",luma:23,css:"linear-gradient(160deg,#45120b,#2a0b06)",foreground:"#fdf6ee"},
+  slate:{tier:"deep",luma:19,css:"linear-gradient(160deg,#191d21,#08090b)",foreground:"#f2f7ff"},
+  ink:{tier:"deep",luma:16,css:"#07111f",foreground:"#ffffff"},
 } as const;
 export type V22BackdropToken=keyof typeof V22_BACKDROPS;
+
+// Dark and colourful is a narrow target, and the first attempt missed it. Simply
+// deepening the warm tokens took p10 luma from 23 to 14 -- inside the reference
+// range at last -- but dropped coloured pixels from 13.4% to 7.1% against
+// references at 14.9-22.5%, because the deep tier had been carrying most of the
+// film's colour and a dark neutral carries none.
+//
+// The constraint is arithmetic. A pixel reads as coloured at saturation > .25 and
+// value > .15, so the brightest channel must clear 38/255; luma is 0.72 green, so
+// anything warm-brown (green at ~0.6 of red) is bright by construction. Dropping
+// green is the only way to be dark, saturated and warm at once -- which makes it
+// a deep red, and deep red is what all three references are dominant in (75%, 55%
+// and 81% of their coloured pixels). `espresso` therefore became `oxblood`: both
+// of its stops now clear the colour test, where the brown's dark stop cleared
+// neither.
+//
+// `clay` was saturated in the same pass, for the same reason -- its light stop sat
+// at .18 and counted as neutral -- and that was one lever too many. Together the
+// two took coloured pixels to 21.9%, which is fine, and hue concentration to
+// 90.4%, which is not: no reference exceeds 83%, and the new band caught it on
+// the first render. Oxblood alone carries the colour, so clay stays neutral and
+// is what keeps the warm share off the ceiling.
+//
+// The deep tier used to bottom out at 42 and 57, which is dark relative to paper
+// but is not dark: measured across all four films at 2fps, only 4.4% of V22's
+// pixels fell below luma 16, against 16.1% and 35.9% in two of the three
+// references. The deep backdrops were the whole of Gideon's dark end and they
+// sat in the 40-60 band, so the film had a floor rather than a black.
+//
+// `luma` was documentation until now -- nothing read it, so nothing would have
+// noticed it drifting from `css`, and the tier comment above ("every boundary is
+// a real palette change") rested on numbers no check verified. It is derived and
+// asserted below, which is what makes the tier bands mean something.
+const TIER_LUMA:Record<"bright"|"mid"|"deep",[number,number]>={bright:[200,255],mid:[100,199],deep:[0,80]};
+export function backdropCssLuma(css:string){
+  const stops=[...css.matchAll(/#([0-9a-f]{6})/gi)].map((match)=>match[1]!);
+  if(stops.length===0)return NaN;
+  const lumas=stops.map((hex)=>{
+    const [r,g,b]=[0,2,4].map((offset)=>Number.parseInt(hex.slice(offset,offset+2),16));
+    return 0.2126*r!+0.7152*g!+0.0722*b!;
+  });
+  return lumas.reduce((total,value)=>total+value,0)/lumas.length;
+}
+// Declared luma must match the gradient it describes, and must land inside its
+// tier's band. Both halves matter: the first stops the constant drifting into a
+// lie, the second stops a "deep" token being quietly repainted mid-grey and
+// taking the cut-strength guarantee with it.
+export function auditV22BackdropLuma(){
+  const failures:string[]=[];
+  for(const [token,backdrop] of Object.entries(V22_BACKDROPS)){
+    const measured=backdropCssLuma(backdrop.css);
+    if(!Number.isFinite(measured)){failures.push(`${token}:css_has_no_hex_stops`);continue;}
+    if(Math.abs(measured-backdrop.luma)>6)failures.push(`${token}:declared_${backdrop.luma}_measured_${measured.toFixed(1)}`);
+    const [low,high]=TIER_LUMA[backdrop.tier];
+    if(measured<low||measured>high)failures.push(`${token}:luma_${measured.toFixed(1)}_outside_${backdrop.tier}_band`);
+  }
+  return{passed:failures.length===0,failures};
+}
 
 // Every boundary must be a real luma change, which is what makes it register as a
 // cut. Requiring both a different token and a different tier is the mechanical
@@ -278,6 +336,27 @@ export function auditV22BackdropCadence(scenes:Array<{id:string;backdrop:V22Back
 // 0.392-0.509 shots/s, i.e. 14.1-18.3 shots for a 36s film. Bands carry +-1 shot.
 // V16 by contrast sat at 15 shots whose boundaries collapsed above threshold 0.2.
 export const V22_SHOT_BANDS={decodedShotCount:[13,20],meanShotSeconds:[1.7,2.7],medianShotSeconds:[1.4,2.4]} as const;
+
+// Palette bands, measured on the three references with the same 1fps/64x114
+// sampling `measureV22Palette` uses:
+//
+//   coloured pixels     17.1%   14.9%   22.5%
+//   dominant family     warm 80  warm 69  warm 83
+//
+// The floor on coloured pixels is the half that matters and the one nothing was
+// enforcing: V21 was twice as colourful as any reference and got fixed, and then
+// the deep-tier deepening overshot the other way to 7.1% with all 32 gates green.
+// A ceiling alone would have passed that film. The share band is two-sided for
+// the original reason -- V21 ran four hues competing at 45/24/16/10 and read as
+// noise, where every reference concentrates.
+export const V22_PALETTE_BANDS={colouredPixelFraction:[.13,.24],dominantFamilyShare:[.65,.90]} as const;
+export function evaluateV22PaletteBands(palette:{colouredPixelFraction:number;dominantFamilyShare:number}){
+  const checks=(Object.keys(V22_PALETTE_BANDS) as Array<keyof typeof V22_PALETTE_BANDS>).map((metric)=>{
+    const [low,high]=V22_PALETTE_BANDS[metric],value=palette[metric];
+    return{metric,value,low,high,passed:value>=low&&value<=high};
+  });
+  return{passed:checks.every(({passed})=>passed),checks,failures:checks.filter(({passed})=>!passed).map(({metric,value,low,high})=>`${metric}:${value.toFixed(3)}_outside_${low}-${high}`)};
+}
 
 // Deriving scene boundaries from realized beat starts allocates screen time by
 // speech alone, and the authored scene lengths were never proportional to how

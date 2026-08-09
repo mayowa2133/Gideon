@@ -63,5 +63,12 @@
         36.08
       ]
     }
+  },
+  "acceptedDeviations": {
+    "durationSeconds": {
+      "min": 38.4,
+      "max": 38.6,
+      "reason": "V22 runs 1155 frames (38.5s) against V21's 1080 (36s). The timeline was lengthened deliberately when scene boundaries were re-derived from the beat starts, so the parent's 35.92-36.08s band describes a film that no longer exists. Recorded rather than rewritten so the change stays visible; the band still catches any drift away from 38.5s."
+    }
   }
 }

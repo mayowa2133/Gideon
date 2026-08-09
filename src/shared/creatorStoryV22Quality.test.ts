@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditV22BannedStrings, auditV22CompositionSimilarity, auditV22Cta, auditV22MascotPlacement, auditV22PhoneScale, auditV22RenderedBounds, auditV22StoryConsistency, auditV22Transitions, evaluateV22MotionBands, mascotBoxForScene,auditV22SceneDurations,auditV22PresenterOccupancy} from "./creatorStoryV22Quality";
+import { auditV22BannedStrings, auditV22CompositionSimilarity, auditV22Cta, auditV22MascotPlacement, auditV22PhoneScale, auditV22RenderedBounds, auditV22StoryConsistency, auditV22Transitions, evaluateV22MotionBands, mascotBoxForScene,auditV22SceneDurations,auditV22PresenterOccupancy, auditV22BackdropLuma, backdropCssLuma, evaluateV22PaletteBands} from "./creatorStoryV22Quality";
 import { compileSolomonV22DemoContent } from "./solomonDemoContentV22";
 
 const content=compileSolomonV22DemoContent();
@@ -109,5 +109,34 @@ describe("auditV22PresenterOccupancy",()=>{
   it("ignores absent scenes but still counts their frames",()=>{
     const audit=auditV22PresenterOccupancy([scene("a",100,split),{id:"b",from:0,to:900,mascot:{role:"absent"},layout:[]}]);
     expect(audit.occupancy).toBeLessThan(.05);
+  });
+});
+
+describe("v22 backdrop luma",()=>{
+  it("agrees with the gradients it describes",()=>{
+    expect(auditV22BackdropLuma()).toEqual({passed:true,failures:[]});
+  });
+  // The regression this locks: `luma` was a comment for five versions, and two
+  // tokens had already drifted from their css by 14 and 24 before anything read
+  // it. Deriving the number is only useful if a wrong one fails.
+  it("derives luma from a gradient rather than trusting the declaration",()=>{
+    expect(backdropCssLuma("linear-gradient(160deg,#000000,#ffffff)")).toBeCloseTo(127.5,1);
+    expect(backdropCssLuma("#07111f")).toBeCloseTo(15.9,1);
+    expect(Number.isNaN(backdropCssLuma("rgb(0,0,0)"))).toBe(true);
+  });
+});
+
+describe("v22 palette bands",()=>{
+  it("accepts a reference-shaped palette",()=>{
+    expect(evaluateV22PaletteBands({colouredPixelFraction:.171,dominantFamilyShare:.80}).passed).toBe(true);
+  });
+  // The film this band was written for: every other gate passed it. Deepening the
+  // deep tier took coloured pixels to 7.1% -- half the lowest reference -- and a
+  // ceiling-only rule would have called that an improvement.
+  it("fails a film that has gone grey, not just one that is garish",()=>{
+    const drab=evaluateV22PaletteBands({colouredPixelFraction:.071,dominantFamilyShare:.70});
+    expect(drab.passed).toBe(false);
+    expect(drab.failures).toContain("colouredPixelFraction:0.071_outside_0.13-0.24");
+    expect(evaluateV22PaletteBands({colouredPixelFraction:.39,dominantFamilyShare:.47}).failures).toHaveLength(2);
   });
 });
