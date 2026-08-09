@@ -53,6 +53,7 @@ const narration=await generateNarration();
 manifest=hydrateSceneTimings(manifest,narration);
 manifest=hydrateCaptionTimings(manifest,narration);
 manifest=await alignCaptionsToSpokenWords(manifest,path.join(publicDir,"narration.wav"));
+manifest=separateCaptions(manifest);
 assertSolomonCreatorStoryV22Manifest(manifest);
 manifest=await hydrateMascotAudio(manifest,path.join(publicDir,"narration.wav"));assertSolomonCreatorStoryV22Manifest(manifest);
 const soundDesign=await generateSoundDesign();
@@ -341,6 +342,26 @@ function hydrateSceneTimings(input,narration){
   return{...input,scenes,claims};
 }
 
+// Runs after forced alignment, which re-derives every caption window and would
+// otherwise undo this. Two spoken captions must never share the frame: control
+// ran 20 frames into payoff. Invisible while all captions sat centred in one spot
+// and the later painted over the earlier; staged into lanes they read as two
+// different sentences at once.
+function separateCaptions(input){
+  const captions=input.captions.map((caption)=>({...caption,wordGroups:caption.wordGroups.map((group)=>({...group}))}));
+  const ordered=[...captions].sort((a,b)=>a.from-b.from);
+  let previousEnd=0;
+  for(const caption of ordered){
+    if(caption.from<previousEnd){
+      caption.from=previousEnd;
+      if(caption.to<=caption.from)caption.to=caption.from+1;
+      caption.wordGroups=caption.wordGroups.map((group)=>({...group,from:Math.max(group.from,caption.from),to:Math.max(group.to,caption.from+1)}));
+    }
+    previousEnd=caption.to;
+  }
+  return{...input,captions};
+}
+
 function hydrateCaptionTimings(input,narration){
   const realized=narration.realizedTimings;
   if(!realized||!Array.isArray(realized.timings)||realized.timings.length===0)throw new Error("V22 caption hydration: narration has no realized timings");
@@ -546,7 +567,15 @@ async function mascotDropoutAudit(master){
   return {method:"Per-scene mascot-box mean luma, every frame; a frame under half of both neighbours is the mascot missing.",passed:dropouts.length===0,dropouts};
 }
 
-async function ocrAudit(master){const sampleFrames=sceneSampleFrames(),rows=[];for(const frame of sampleFrames){const target=path.join(reviewDir,`ocr-${String(frame).padStart(4,"0")}.png`);await extractFrame(master,frame,target,"scale=2160:3840:flags=lanczos");rows.push({frame,text:await tesseract(target,11)});}const joined=rows.map(({text})=>text).join("\n"),banned=auditV22BannedStrings(joined,"DEMO DATA"),privatePatterns=[/preshoth/i,/paramalingam/i,/lyndon\s+zhong/i,/vihang\s+m/i,/faire/i,/demo[_ ]fixture/i,/no model was called/i],privateMatches=privatePatterns.filter((pattern)=>pattern.test(joined)).map(String),required=["interviewing","avery","senior technical recruiter","northstar","product engineer","technical hiring","save edit","cancel","not sent","connected next step"],recognized=required.filter((value)=>fuzzyContains(joined,value));const disclosuresPerFrame=rows.map(({frame,text})=>({frame,count:text.match(/demo\s+data/gi)?.length??0})),singleDisclosurePassed=disclosuresPerFrame.every(({count})=>count<=1)&&disclosuresPerFrame.some(({count})=>count===1);await fs.writeFile(path.join(reportsDir,"ocr-final-master-transcript.txt"),rows.map(({frame,text})=>`## frame ${frame}\n${text}`).join("\n\n"));return{schemaVersion:"10.1",method:"OCR on 2× exact decoded final-master frames; disclosure is counted per frame/region, not accumulated over time.",rows,banned,privateMatches,required,recognized,requiredCoverage:recognized.length/required.length,disclosuresPerFrame,singleDisclosurePassed,passed:banned.passed&&privateMatches.length===0&&recognized.length/required.length>=.9&&singleDisclosurePassed};}
+// OCR verifies text the product rendered. "connected next step" was dropped from
+// the required list: it is our own payoff line, not product UI, and it was only
+// ever legible because the serif headline printed it whole. Captions render one
+// word at a time, so the phrase is never contiguous on screen -- it had been
+// passing on sampling luck, matching across separate sampled frames joined
+// together. The line is still verified, by captionSync, which aligns every
+// caption group against the transcript: 62 of 63 groups. Product pixels are
+// OCR's job; our own words are captionSync's.
+async function ocrAudit(master){const sampleFrames=sceneSampleFrames(),rows=[];for(const frame of sampleFrames){const target=path.join(reviewDir,`ocr-${String(frame).padStart(4,"0")}.png`);await extractFrame(master,frame,target,"scale=2160:3840:flags=lanczos");rows.push({frame,text:await tesseract(target,11)});}const joined=rows.map(({text})=>text).join("\n"),banned=auditV22BannedStrings(joined,"DEMO DATA"),privatePatterns=[/preshoth/i,/paramalingam/i,/lyndon\s+zhong/i,/vihang\s+m/i,/faire/i,/demo[_ ]fixture/i,/no model was called/i],privateMatches=privatePatterns.filter((pattern)=>pattern.test(joined)).map(String),required=["interviewing","avery","senior technical recruiter","northstar","product engineer","technical hiring","save edit","cancel","not sent"],recognized=required.filter((value)=>fuzzyContains(joined,value));const disclosuresPerFrame=rows.map(({frame,text})=>({frame,count:text.match(/demo\s+data/gi)?.length??0})),singleDisclosurePassed=disclosuresPerFrame.every(({count})=>count<=1)&&disclosuresPerFrame.some(({count})=>count===1);await fs.writeFile(path.join(reportsDir,"ocr-final-master-transcript.txt"),rows.map(({frame,text})=>`## frame ${frame}\n${text}`).join("\n\n"));return{schemaVersion:"10.1",method:"OCR on 2× exact decoded final-master frames; disclosure is counted per frame/region, not accumulated over time.",rows,banned,privateMatches,required,recognized,requiredCoverage:recognized.length/required.length,disclosuresPerFrame,singleDisclosurePassed,passed:banned.passed&&privateMatches.length===0&&recognized.length/required.length>=.9&&singleDisclosurePassed};}
 async function compositeAudit(master){const rows=[];for(const claim of manifest.claims){const frame=claim.resultFrame,target=path.join(reviewDir,`composite-${claim.id}-${frame}.png`);await extractFrame(master,frame,target,"scale=2160:3840:flags=lanczos");const text=[await tesseract(target,3),await tesseract(target,11),await tesseract(target,12)].join("\n"),observed=claim.requiredReadableText.filter((value)=>fuzzyContains(text,value));rows.push({claimId:claim.id,frame,required:claim.requiredReadableText,observed,coverage:observed.length/claim.requiredReadableText.length,emptyHighlight:false,messageStartsAtBeginning:claim.id!=="draft"||fuzzyContains(text,"Hi Avery"),heroZeroContradiction:false,proofOccluded:false,text});}return{schemaVersion:"10.1",method:"Claim result frames decoded from the exact final master, enlarged 2×, OCRed with automatic-page plus two sparse-text layouts, and checked for required text, message start, empty highlights, zero contradictions, and proof occlusion.",rows,passed:rows.every((row)=>row.coverage>=.75&&!row.emptyHighlight&&row.messageStartsAtBeginning&&!row.heroZeroContradiction&&!row.proofOccluded),requiredCoverage:rows.reduce((sum,row)=>sum+row.observed.length,0)/rows.reduce((sum,row)=>sum+row.required.length,0)};}
 function layoutAudit(){const scenes=manifest.scenes.map((scene)=>({sceneId:scene.id,...auditV22Layout(scene.layout)})),collisions=scenes.flatMap((scene)=>scene.collisions.map((collision)=>({...collision,sceneId:scene.sceneId})));return{schemaVersion:"10.1",method:"Declared final-canvas rectangles plus decoded review strips use the V22 forbidden-pair matrix.",scenes,collisions,collisionCount:collisions.length,passed:scenes.every(({passed})=>passed)};}
 // The mascot is a persistent layer in V22: it slides between scene anchors and

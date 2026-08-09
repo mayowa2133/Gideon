@@ -50,7 +50,11 @@ export const SOLOMON_CREATOR_STORY_V22_BEATS: readonly V22Beat[] = [
     sceneId: "reasons",
     vo: "",
     energy: "medium",
-    chip: { from: 102, to: 132, beatText: "WHY AVERY?", role: "product_annotation", zone: "attached" },
+    // No chip. "WHY AVERY?" is an annotation nobody says -- the narration is still
+    // on the hook at that point, and "why Avery" is not spoken until twelve
+    // seconds later. It also overlapped the hook caption, which only became
+    // visible once captions were staged into lanes instead of all sitting centred
+    // on top of each other.
   },
   {
     id: "friction",
