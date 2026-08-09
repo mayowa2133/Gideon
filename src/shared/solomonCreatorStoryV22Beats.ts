@@ -67,7 +67,10 @@ export const SOLOMON_CREATOR_STORY_V22_BEATS: readonly V22Beat[] = [
     energy: "medium",
     chip: { from: 162, to: 235, beatText: "5× BY HAND", role: "editorial_peak", highlight: "5×", zone: "top" },
     headline: { primary: "THE SAME CONTEXT", accentItalic: "COPIED BY HAND." },
-    anchors: [{ graphic: "5×", spokenToken: "five", sceneId: "five" }],
+    // No numeral anchors. The one graphic, "5x", was the last text on screen that
+    // nobody says -- the narration says "five times" -- and the anchor system
+    // exists to tie a rendered numeral to a spoken token, so with no numeral
+    // rendered there is nothing to tie. Re-add both together if a numeral returns.
   },
   {
     id: "collapse",

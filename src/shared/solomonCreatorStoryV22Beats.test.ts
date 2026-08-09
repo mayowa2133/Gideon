@@ -18,7 +18,13 @@ describe("Solomon Creator Story V22 beat compiler", () => {
     for (const anchor of compiled.numeralAnchors) {
       expect(compiled.script.toLowerCase()).toContain(anchor.spokenToken.toLowerCase());
     }
-    expect(compiled.numeralAnchors.some(({ graphic }) => graphic === "5×")).toBe(true);
+    // This asserted the "5x" anchor existed by name, which pins the content of the
+    // day rather than the rule. That graphic is gone -- it was the last text on
+    // screen nobody spoke -- and the rule it existed to serve still holds both
+    // ways: every anchor's token is spoken (above), and no anchor may describe a
+    // graphic the film does not show (below).
+    const shown = [...Object.values(compiled.headlines).map((headline) => `${headline.primary} ${headline.accentItalic}`), ...compiled.captions.map((caption) => caption.beatText)].join(" ");
+    for (const anchor of compiled.numeralAnchors) expect(shown).toContain(anchor.graphic);
   });
 
   it("keeps the hook viewer-outcome and the CTA comment-gated", () => {
