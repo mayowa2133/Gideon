@@ -892,6 +892,72 @@ export interface SceneTypographyCue {
   manuallyOverridden?: boolean;
 }
 
+// A backdrop token, not just a colour. `background.kind` cannot express the
+// constraint that actually makes scene boundaries read as cuts: no two
+// consecutive scenes may share a token *or* a luma tier. V16 ran six scenes on
+// one pale gradient and its boundaries collapsed to nothing above threshold 0.2.
+// `luma` is derived from `css` and asserted against the tier band rather than
+// declared by hand -- it drifted by up to 24 while it was documentation.
+export interface SceneBackdrop {
+  token: string;
+  tier: "bright" | "mid" | "deep";
+  luma: number;
+  css: string;
+  foreground: string;
+}
+
+// A resolved source-pixel rect, not a focus point. `RenderFocusPoint` says where
+// to look and how far to zoom; it cannot say "this card, these three lines",
+// which is the distinction the edge-density work turned on. `motion` plays a
+// still sequence: a decoding <Video> made the render nondeterministic (19, 19
+// and 33 shots from byte-identical code), a list of PNGs cannot.
+export interface SceneProductCrop {
+  assetId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  motion?: { frames: number; step: number; hold: number };
+}
+
+// Normalised 0..1 rect for everything a scene draws. Scene content has been
+// drawn at absolute pixels since V11, so the collision audit only ever saw
+// declared layout and missed every real overlap: the proof-text occlusion, the
+// CTA comment box, the chips over the product cards. Templates emit these so the
+// audit covers what is actually on screen.
+export interface SceneLayoutRect {
+  id: string;
+  kind: "mascot" | "caption" | "editorial" | "product" | "annotation" | "cta" | "social_ui";
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+// The second axis, and the one `CreatorShotType` is missing. Transcribing V22
+// into a blueprint resolved eighteen scenes onto just four shot types while the
+// film draws them with seventeen different components: `shotType` says where the
+// presenter and the product sit, and nothing about what the product region does.
+// `split_presenter_product` covers both a card swapping state under a cursor and
+// a row of proof labels under a band, which are not interchangeable pictures.
+//
+// Seven patterns cover all eighteen V22 scenes:
+//   ambient        no product; presenter and a lighting gesture (hook, sting)
+//   evidence_band  one crop, optional proof labels (role, reason, grounded, …)
+//   state_swap     two crops exchanged mid-scene, with pills and a cursor
+//   card_field     several crops arranged, optionally converging on a result
+//   filmstrip      a row of crops with a progress marker travelling between them
+//   composed_board one large multi-region board assembled from several crops
+//   comment_card   the CTA's comment box and handle
+export type SceneContentPattern =
+  | "ambient"
+  | "evidence_band"
+  | "state_swap"
+  | "card_field"
+  | "filmstrip"
+  | "composed_board"
+  | "comment_card";
+
 export interface SceneComposition {
   id: string;
   startMs: number;
@@ -909,6 +975,18 @@ export interface SceneComposition {
   minimumReadableDwellMs: number;
   audioCues: RenderSfxCue[];
   manuallyOverridden?: boolean;
+  // Optional so the ffmpeg render path in media.ts, which reads `background.kind`
+  // and knows nothing about these, keeps compiling unchanged. The Remotion path
+  // requires them and validateCreativeBlueprint enforces that.
+  backdrop?: SceneBackdrop;
+  contentPattern?: SceneContentPattern;
+  productCrop?: SceneProductCrop;
+  // A pattern may show more than one region: `card_field` and `composed_board`
+  // draw several, and `state_swap` exchanges two. `productCrop` stays as the
+  // primary for the single-crop patterns that are most of the film.
+  productCrops?: SceneProductCrop[];
+  layoutRects?: SceneLayoutRect[];
+  groupStartMs?: number;
 }
 
 export interface CreativeBlueprintQualityPolicy {

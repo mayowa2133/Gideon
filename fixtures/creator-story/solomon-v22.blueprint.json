@@ -1,0 +1,1975 @@
+{
+  "schemaVersion": "1",
+  "id": "solomon-creator-story-v22-parity",
+  "templateId": "reference-creator-video-v1",
+  "templateVersion": 1,
+  "targetDurationMs": 38500,
+  "pacePreset": "reference_fast",
+  "estimatedWordsPerMinute": 180,
+  "hook": "Your job search just changed — Solomon found the person who helps you next.",
+  "cta": "COMMENT SOLOMON AND I'LL SEND YOU THE DEMO",
+  "brandKit": {
+    "productName": "Solomon",
+    "primaryColor": "#39f2b5",
+    "secondaryColor": "#087052",
+    "accentColor": "#ff9d18",
+    "backgroundColor": "#07111f",
+    "captionStyle": "kinetic_bold",
+    "ctaStyle": "comment_keyword"
+  },
+  "claimIds": [
+    "status",
+    "contact",
+    "relevance",
+    "role",
+    "draft",
+    "control"
+  ],
+  "productAssets": [],
+  "scenes": [
+    {
+      "id": "hook",
+      "startMs": 0,
+      "endMs": 867,
+      "purpose": "hook",
+      "shotType": "presenter_fullscreen",
+      "contentPattern": "ambient",
+      "presenter": {
+        "visible": true,
+        "layout": "close_up",
+        "crop": {
+          "x": 0.5,
+          "y": 0.48,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.64,
+        "expression": "excited",
+        "gestureIntent": "open_hand",
+        "motionIntensity": "energetic",
+        "eyeline": "camera",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [],
+      "supportedClaimIds": [],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "brand"
+      },
+      "backdrop": {
+        "token": "clay",
+        "tier": "mid",
+        "luma": 174,
+        "css": "linear-gradient(150deg,#d6c6b0,#a8917a)",
+        "foreground": "#171009"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.5,
+        "y": 0.34,
+        "scale": 1.28
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "layoutRects": [
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.18,
+          "top": 0.18,
+          "right": 0.82,
+          "bottom": 0.78
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 0
+    },
+    {
+      "id": "status",
+      "startMs": 867,
+      "endMs": 1933,
+      "purpose": "demo",
+      "shotType": "split_presenter_product",
+      "contentPattern": "state_swap",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.7675000000000001,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.54,
+        "expression": "excited",
+        "gestureIntent": "point",
+        "motionIntensity": "subtle",
+        "eyeline": "product_left",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "tracker_before",
+        "tracker_after"
+      ],
+      "supportedClaimIds": [
+        "status"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "light"
+      },
+      "backdrop": {
+        "token": "paper",
+        "tier": "bright",
+        "luma": 246,
+        "css": "linear-gradient(145deg,#fdfbf5,#eef2ec)",
+        "foreground": "#07111f"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.76,
+        "y": 0.62,
+        "scale": 2.05
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "tracker_before",
+        "x": 72,
+        "y": 178,
+        "width": 560,
+        "height": 310
+      },
+      "productCrops": [
+        {
+          "assetId": "tracker_before",
+          "x": 72,
+          "y": 178,
+          "width": 560,
+          "height": 310
+        },
+        {
+          "assetId": "tracker_after",
+          "x": 258,
+          "y": 178,
+          "width": 560,
+          "height": 310,
+          "motion": {
+            "frames": 12,
+            "step": 3,
+            "hold": 4
+          }
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.04,
+          "top": 0.17,
+          "right": 0.96,
+          "bottom": 0.54
+        },
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.23,
+          "top": 0.56,
+          "right": 0.77,
+          "bottom": 0.975
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 867
+    },
+    {
+      "id": "contact",
+      "startMs": 1933,
+      "endMs": 3633,
+      "purpose": "proof",
+      "shotType": "split_presenter_product",
+      "contentPattern": "evidence_band",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.7675000000000001,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.54,
+        "expression": "confident",
+        "gestureIntent": "point",
+        "motionIntensity": "subtle",
+        "eyeline": "product_left",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "contact"
+      ],
+      "supportedClaimIds": [
+        "contact"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "dark"
+      },
+      "backdrop": {
+        "token": "slate",
+        "tier": "deep",
+        "luma": 19,
+        "css": "linear-gradient(160deg,#191d21,#08090b)",
+        "foreground": "#f2f7ff"
+      },
+      "transition": {
+        "kind": "slide",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.28,
+        "y": 0.67,
+        "scale": 1.85
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "contact",
+        "x": 86,
+        "y": 510,
+        "width": 430,
+        "height": 390
+      },
+      "productCrops": [
+        {
+          "assetId": "contact",
+          "x": 86,
+          "y": 510,
+          "width": 430,
+          "height": 390
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.04,
+          "top": 0.17,
+          "right": 0.96,
+          "bottom": 0.54
+        },
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.23,
+          "top": 0.56,
+          "right": 0.77,
+          "bottom": 0.975
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 1933
+    },
+    {
+      "id": "reasons",
+      "startMs": 3633,
+      "endMs": 4700,
+      "purpose": "proof",
+      "shotType": "split_presenter_product",
+      "contentPattern": "evidence_band",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.7675000000000001,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.54,
+        "expression": "explanatory",
+        "gestureIntent": "open_hand",
+        "motionIntensity": "subtle",
+        "eyeline": "product_left",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "contact"
+      ],
+      "supportedClaimIds": [
+        "relevance"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "light"
+      },
+      "backdrop": {
+        "token": "blush",
+        "tier": "bright",
+        "luma": 234,
+        "css": "linear-gradient(145deg,#fff3ee,#ffd8cc)",
+        "foreground": "#07111f"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.27,
+        "y": 0.76,
+        "scale": 1.95
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "contact",
+        "x": 104,
+        "y": 610,
+        "width": 390,
+        "height": 265
+      },
+      "productCrops": [
+        {
+          "assetId": "contact",
+          "x": 104,
+          "y": 610,
+          "width": 390,
+          "height": 265
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.04,
+          "top": 0.17,
+          "right": 0.96,
+          "bottom": 0.54
+        },
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.23,
+          "top": 0.56,
+          "right": 0.77,
+          "bottom": 0.975
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 3633
+    },
+    {
+      "id": "friction",
+      "startMs": 4700,
+      "endMs": 5767,
+      "purpose": "problem",
+      "shotType": "presenter_fullscreen",
+      "contentPattern": "card_field",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.48,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.64,
+        "expression": "neutral",
+        "gestureIntent": "open_hand",
+        "motionIntensity": "energetic",
+        "eyeline": "camera",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [],
+      "supportedClaimIds": [],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "dark"
+      },
+      "backdrop": {
+        "token": "oxblood",
+        "tier": "deep",
+        "luma": 23,
+        "css": "linear-gradient(160deg,#45120b,#2a0b06)",
+        "foreground": "#fdf6ee"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.5,
+        "y": 0.45,
+        "scale": 1.06
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "opportunity",
+        "x": 72,
+        "y": 75,
+        "width": 760,
+        "height": 265
+      },
+      "productCrops": [
+        {
+          "assetId": "opportunity",
+          "x": 72,
+          "y": 75,
+          "width": 760,
+          "height": 265
+        },
+        {
+          "assetId": "contact",
+          "x": 86,
+          "y": 510,
+          "width": 430,
+          "height": 390
+        },
+        {
+          "assetId": "opportunity",
+          "x": 75,
+          "y": 95,
+          "width": 900,
+          "height": 520
+        },
+        {
+          "assetId": "contact",
+          "x": 104,
+          "y": 610,
+          "width": 390,
+          "height": 265
+        },
+        {
+          "assetId": "outreach_blank",
+          "x": 82,
+          "y": 175,
+          "width": 520,
+          "height": 590
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.18,
+          "top": 0.18,
+          "right": 0.82,
+          "bottom": 0.78
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 4700
+    },
+    {
+      "id": "five",
+      "startMs": 5767,
+      "endMs": 9000,
+      "purpose": "problem",
+      "shotType": "product_fullscreen",
+      "contentPattern": "card_field",
+      "presenter": {
+        "visible": false,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.78,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0,
+        "expression": "explanatory",
+        "gestureIntent": "emphasis",
+        "motionIntensity": "subtle",
+        "eyeline": "camera",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "opportunity",
+        "contact",
+        "outreach_blank"
+      ],
+      "supportedClaimIds": [],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "light"
+      },
+      "backdrop": {
+        "token": "blush",
+        "tier": "bright",
+        "luma": 234,
+        "css": "linear-gradient(145deg,#fff3ee,#ffd8cc)",
+        "foreground": "#07111f"
+      },
+      "transition": {
+        "kind": "object_wipe",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.48,
+        "y": 0.47,
+        "scale": 1.32
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "opportunity",
+        "x": 72,
+        "y": 75,
+        "width": 760,
+        "height": 265
+      },
+      "productCrops": [
+        {
+          "assetId": "opportunity",
+          "x": 72,
+          "y": 75,
+          "width": 760,
+          "height": 265
+        },
+        {
+          "assetId": "contact",
+          "x": 86,
+          "y": 510,
+          "width": 430,
+          "height": 390
+        },
+        {
+          "assetId": "opportunity",
+          "x": 75,
+          "y": 95,
+          "width": 900,
+          "height": 520
+        },
+        {
+          "assetId": "contact",
+          "x": 104,
+          "y": 610,
+          "width": 390,
+          "height": 265
+        },
+        {
+          "assetId": "outreach_blank",
+          "x": 82,
+          "y": 175,
+          "width": 520,
+          "height": 590
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.06,
+          "top": 0.18,
+          "right": 0.94,
+          "bottom": 0.78
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 5767
+    },
+    {
+      "id": "collapse",
+      "startMs": 9000,
+      "endMs": 10367,
+      "purpose": "demo",
+      "shotType": "product_fullscreen",
+      "contentPattern": "card_field",
+      "presenter": {
+        "visible": false,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.78,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0,
+        "expression": "explanatory",
+        "gestureIntent": "emphasis",
+        "motionIntensity": "energetic",
+        "eyeline": "camera",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "opportunity"
+      ],
+      "supportedClaimIds": [],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "dark"
+      },
+      "backdrop": {
+        "token": "slate",
+        "tier": "deep",
+        "luma": 19,
+        "css": "linear-gradient(160deg,#191d21,#08090b)",
+        "foreground": "#f2f7ff"
+      },
+      "transition": {
+        "kind": "object_wipe",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.5,
+        "y": 0.48,
+        "scale": 1.25
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "opportunity",
+        "x": 72,
+        "y": 75,
+        "width": 760,
+        "height": 265
+      },
+      "productCrops": [
+        {
+          "assetId": "opportunity",
+          "x": 72,
+          "y": 75,
+          "width": 760,
+          "height": 265
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.04,
+          "top": 0.17,
+          "right": 0.96,
+          "bottom": 0.92
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 9000
+    },
+    {
+      "id": "role",
+      "startMs": 10367,
+      "endMs": 12633,
+      "purpose": "proof",
+      "shotType": "split_presenter_product",
+      "contentPattern": "evidence_band",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.6875,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.54,
+        "expression": "explanatory",
+        "gestureIntent": "open_hand",
+        "motionIntensity": "subtle",
+        "eyeline": "product_left",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "opportunity",
+        "contact"
+      ],
+      "supportedClaimIds": [
+        "role"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "light"
+      },
+      "backdrop": {
+        "token": "paper",
+        "tier": "bright",
+        "luma": 246,
+        "css": "linear-gradient(145deg,#fdfbf5,#eef2ec)",
+        "foreground": "#07111f"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.25,
+        "y": 0.3,
+        "scale": 1.7
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "opportunity",
+        "x": 76,
+        "y": 88,
+        "width": 740,
+        "height": 116
+      },
+      "productCrops": [
+        {
+          "assetId": "opportunity",
+          "x": 76,
+          "y": 88,
+          "width": 740,
+          "height": 116
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.04,
+          "top": 0.17,
+          "right": 0.96,
+          "bottom": 0.38
+        },
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.23,
+          "top": 0.4,
+          "right": 0.77,
+          "bottom": 0.975
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 10367
+    },
+    {
+      "id": "reason",
+      "startMs": 12633,
+      "endMs": 14967,
+      "purpose": "proof",
+      "shotType": "split_presenter_product",
+      "contentPattern": "evidence_band",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.7675000000000001,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.54,
+        "expression": "explanatory",
+        "gestureIntent": "point",
+        "motionIntensity": "subtle",
+        "eyeline": "product_left",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "contact"
+      ],
+      "supportedClaimIds": [
+        "contact",
+        "relevance"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "dark"
+      },
+      "backdrop": {
+        "token": "oxblood",
+        "tier": "deep",
+        "luma": 23,
+        "css": "linear-gradient(160deg,#45120b,#2a0b06)",
+        "foreground": "#fdf6ee"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.25,
+        "y": 0.7,
+        "scale": 1.92
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "contact",
+        "x": 96,
+        "y": 556,
+        "width": 408,
+        "height": 175
+      },
+      "productCrops": [
+        {
+          "assetId": "contact",
+          "x": 96,
+          "y": 556,
+          "width": 408,
+          "height": 175
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.04,
+          "top": 0.17,
+          "right": 0.96,
+          "bottom": 0.54
+        },
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.23,
+          "top": 0.56,
+          "right": 0.77,
+          "bottom": 0.975
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 12633
+    },
+    {
+      "id": "signature",
+      "startMs": 14967,
+      "endMs": 16933,
+      "purpose": "demo",
+      "shotType": "split_presenter_product",
+      "contentPattern": "filmstrip",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.7675000000000001,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.54,
+        "expression": "excited",
+        "gestureIntent": "point",
+        "motionIntensity": "subtle",
+        "eyeline": "product_left",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "opportunity",
+        "contact",
+        "outreach_blank",
+        "outreach_complete"
+      ],
+      "supportedClaimIds": [
+        "role",
+        "contact"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "brand"
+      },
+      "backdrop": {
+        "token": "clay",
+        "tier": "mid",
+        "luma": 174,
+        "css": "linear-gradient(150deg,#d6c6b0,#a8917a)",
+        "foreground": "#171009"
+      },
+      "transition": {
+        "kind": "object_wipe",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.52,
+        "y": 0.48,
+        "scale": 1.12
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "opportunity",
+        "x": 72,
+        "y": 75,
+        "width": 760,
+        "height": 265
+      },
+      "productCrops": [
+        {
+          "assetId": "opportunity",
+          "x": 72,
+          "y": 75,
+          "width": 760,
+          "height": 265
+        },
+        {
+          "assetId": "contact",
+          "x": 86,
+          "y": 510,
+          "width": 430,
+          "height": 390
+        },
+        {
+          "assetId": "contact",
+          "x": 104,
+          "y": 610,
+          "width": 390,
+          "height": 265
+        },
+        {
+          "assetId": "outreach_complete",
+          "x": 602,
+          "y": 196,
+          "width": 742,
+          "height": 300,
+          "motion": {
+            "frames": 12,
+            "step": 3,
+            "hold": 4
+          }
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.04,
+          "top": 0.17,
+          "right": 0.96,
+          "bottom": 0.54
+        },
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.23,
+          "top": 0.56,
+          "right": 0.77,
+          "bottom": 0.975
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 14967
+    },
+    {
+      "id": "signature_proof",
+      "startMs": 16933,
+      "endMs": 20867,
+      "purpose": "demo",
+      "shotType": "split_presenter_product",
+      "contentPattern": "filmstrip",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.7675000000000001,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.54,
+        "expression": "explanatory",
+        "gestureIntent": "point",
+        "motionIntensity": "subtle",
+        "eyeline": "product_left",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "contact",
+        "outreach_blank",
+        "outreach_complete"
+      ],
+      "supportedClaimIds": [
+        "relevance",
+        "draft"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "dark"
+      },
+      "backdrop": {
+        "token": "slate",
+        "tier": "deep",
+        "luma": 19,
+        "css": "linear-gradient(160deg,#191d21,#08090b)",
+        "foreground": "#f2f7ff"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.52,
+        "y": 0.48,
+        "scale": 1.3
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "opportunity",
+        "x": 72,
+        "y": 75,
+        "width": 760,
+        "height": 265
+      },
+      "productCrops": [
+        {
+          "assetId": "opportunity",
+          "x": 72,
+          "y": 75,
+          "width": 760,
+          "height": 265
+        },
+        {
+          "assetId": "contact",
+          "x": 86,
+          "y": 510,
+          "width": 430,
+          "height": 390
+        },
+        {
+          "assetId": "contact",
+          "x": 104,
+          "y": 610,
+          "width": 390,
+          "height": 265
+        },
+        {
+          "assetId": "outreach_complete",
+          "x": 602,
+          "y": 196,
+          "width": 742,
+          "height": 300,
+          "motion": {
+            "frames": 12,
+            "step": 3,
+            "hold": 4
+          }
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.04,
+          "top": 0.17,
+          "right": 0.96,
+          "bottom": 0.54
+        },
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.23,
+          "top": 0.56,
+          "right": 0.77,
+          "bottom": 0.975
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 14967
+    },
+    {
+      "id": "draft",
+      "startMs": 20867,
+      "endMs": 23000,
+      "purpose": "demo",
+      "shotType": "product_fullscreen",
+      "contentPattern": "evidence_band",
+      "presenter": {
+        "visible": false,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.78,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0,
+        "expression": "explanatory",
+        "gestureIntent": "none",
+        "motionIntensity": "subtle",
+        "eyeline": "camera",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "outreach_blank",
+        "outreach_complete"
+      ],
+      "supportedClaimIds": [
+        "draft"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "light"
+      },
+      "backdrop": {
+        "token": "paper",
+        "tier": "bright",
+        "luma": 246,
+        "css": "linear-gradient(145deg,#fdfbf5,#eef2ec)",
+        "foreground": "#07111f"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.63,
+        "y": 0.47,
+        "scale": 2.05
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "outreach_blank",
+        "x": 96,
+        "y": 188,
+        "width": 490,
+        "height": 562
+      },
+      "productCrops": [
+        {
+          "assetId": "outreach_blank",
+          "x": 96,
+          "y": 188,
+          "width": 490,
+          "height": 562
+        },
+        {
+          "assetId": "outreach_complete",
+          "x": 602,
+          "y": 196,
+          "width": 742,
+          "height": 300,
+          "motion": {
+            "frames": 12,
+            "step": 3,
+            "hold": 4
+          }
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.06,
+          "top": 0.18,
+          "right": 0.94,
+          "bottom": 0.78
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 20867
+    },
+    {
+      "id": "grounded",
+      "startMs": 23000,
+      "endMs": 26200,
+      "purpose": "proof",
+      "shotType": "split_presenter_product",
+      "contentPattern": "evidence_band",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.7675000000000001,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.54,
+        "expression": "explanatory",
+        "gestureIntent": "emphasis",
+        "motionIntensity": "energetic",
+        "eyeline": "product_left",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "outreach_blank",
+        "outreach_complete"
+      ],
+      "supportedClaimIds": [
+        "draft"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "dark"
+      },
+      "backdrop": {
+        "token": "oxblood",
+        "tier": "deep",
+        "luma": 23,
+        "css": "linear-gradient(160deg,#45120b,#2a0b06)",
+        "foreground": "#fdf6ee"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.61,
+        "y": 0.47,
+        "scale": 2.08
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "outreach_complete",
+        "x": 602,
+        "y": 196,
+        "width": 742,
+        "height": 300,
+        "motion": {
+          "frames": 12,
+          "step": 3,
+          "hold": 4
+        }
+      },
+      "productCrops": [
+        {
+          "assetId": "outreach_complete",
+          "x": 602,
+          "y": 196,
+          "width": 742,
+          "height": 300,
+          "motion": {
+            "frames": 12,
+            "step": 3,
+            "hold": 4
+          }
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.04,
+          "top": 0.17,
+          "right": 0.96,
+          "bottom": 0.54
+        },
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.23,
+          "top": 0.56,
+          "right": 0.77,
+          "bottom": 0.975
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 23000
+    },
+    {
+      "id": "control",
+      "startMs": 26200,
+      "endMs": 29400,
+      "purpose": "proof",
+      "shotType": "split_presenter_product",
+      "contentPattern": "evidence_band",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.7675000000000001,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.54,
+        "expression": "confident",
+        "gestureIntent": "point",
+        "motionIntensity": "subtle",
+        "eyeline": "product_left",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "outreach_complete"
+      ],
+      "supportedClaimIds": [
+        "control"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "light"
+      },
+      "backdrop": {
+        "token": "paper",
+        "tier": "bright",
+        "luma": 246,
+        "css": "linear-gradient(145deg,#fdfbf5,#eef2ec)",
+        "foreground": "#07111f"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.62,
+        "y": 0.66,
+        "scale": 2
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "outreach_complete",
+        "x": 602,
+        "y": 196,
+        "width": 742,
+        "height": 300,
+        "motion": {
+          "frames": 12,
+          "step": 3,
+          "hold": 4
+        }
+      },
+      "productCrops": [
+        {
+          "assetId": "outreach_complete",
+          "x": 602,
+          "y": 196,
+          "width": 742,
+          "height": 300,
+          "motion": {
+            "frames": 12,
+            "step": 3,
+            "hold": 4
+          }
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.04,
+          "top": 0.17,
+          "right": 0.96,
+          "bottom": 0.54
+        },
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.23,
+          "top": 0.56,
+          "right": 0.77,
+          "bottom": 0.975
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 26200
+    },
+    {
+      "id": "payoff",
+      "startMs": 29400,
+      "endMs": 33167,
+      "purpose": "payoff",
+      "shotType": "product_fullscreen",
+      "contentPattern": "card_field",
+      "presenter": {
+        "visible": false,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.78,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0,
+        "expression": "excited",
+        "gestureIntent": "none",
+        "motionIntensity": "subtle",
+        "eyeline": "camera",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "tracker_after",
+        "opportunity",
+        "contact",
+        "outreach_complete"
+      ],
+      "supportedClaimIds": [
+        "status",
+        "role",
+        "contact",
+        "relevance",
+        "draft",
+        "control"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "dark"
+      },
+      "backdrop": {
+        "token": "ink",
+        "tier": "deep",
+        "luma": 16,
+        "css": "#07111f",
+        "foreground": "#ffffff"
+      },
+      "transition": {
+        "kind": "object_wipe",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.5,
+        "y": 0.48,
+        "scale": 1.16
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "tracker_after",
+        "x": 258,
+        "y": 178,
+        "width": 560,
+        "height": 310,
+        "motion": {
+          "frames": 12,
+          "step": 3,
+          "hold": 4
+        }
+      },
+      "productCrops": [
+        {
+          "assetId": "tracker_after",
+          "x": 258,
+          "y": 178,
+          "width": 560,
+          "height": 310,
+          "motion": {
+            "frames": 12,
+            "step": 3,
+            "hold": 4
+          }
+        },
+        {
+          "assetId": "opportunity",
+          "x": 72,
+          "y": 75,
+          "width": 760,
+          "height": 265
+        },
+        {
+          "assetId": "contact",
+          "x": 86,
+          "y": 510,
+          "width": 430,
+          "height": 390
+        },
+        {
+          "assetId": "outreach_complete",
+          "x": 602,
+          "y": 196,
+          "width": 742,
+          "height": 300,
+          "motion": {
+            "frames": 12,
+            "step": 3,
+            "hold": 4
+          }
+        },
+        {
+          "assetId": "outreach_blank",
+          "x": 82,
+          "y": 175,
+          "width": 520,
+          "height": 590
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.06,
+          "top": 0.18,
+          "right": 0.94,
+          "bottom": 0.78
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 29400
+    },
+    {
+      "id": "result",
+      "startMs": 33167,
+      "endMs": 34233,
+      "purpose": "payoff",
+      "shotType": "split_presenter_product",
+      "contentPattern": "composed_board",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.7675000000000001,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.54,
+        "expression": "excited",
+        "gestureIntent": "emphasis",
+        "motionIntensity": "energetic",
+        "eyeline": "product_left",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [
+        "tracker_after",
+        "contact",
+        "outreach_complete"
+      ],
+      "supportedClaimIds": [
+        "status",
+        "contact",
+        "relevance",
+        "draft"
+      ],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "light"
+      },
+      "backdrop": {
+        "token": "blush",
+        "tier": "bright",
+        "luma": 234,
+        "css": "linear-gradient(145deg,#fff3ee,#ffd8cc)",
+        "foreground": "#07111f"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.5,
+        "y": 0.42,
+        "scale": 1.28
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "productCrop": {
+        "assetId": "tracker_after",
+        "x": 258,
+        "y": 178,
+        "width": 560,
+        "height": 310,
+        "motion": {
+          "frames": 12,
+          "step": 3,
+          "hold": 4
+        }
+      },
+      "productCrops": [
+        {
+          "assetId": "tracker_after",
+          "x": 258,
+          "y": 178,
+          "width": 560,
+          "height": 310,
+          "motion": {
+            "frames": 12,
+            "step": 3,
+            "hold": 4
+          }
+        },
+        {
+          "assetId": "contact",
+          "x": 86,
+          "y": 510,
+          "width": 430,
+          "height": 390
+        },
+        {
+          "assetId": "contact",
+          "x": 104,
+          "y": 610,
+          "width": 390,
+          "height": 265
+        },
+        {
+          "assetId": "outreach_complete",
+          "x": 602,
+          "y": 196,
+          "width": 742,
+          "height": 300,
+          "motion": {
+            "frames": 12,
+            "step": 3,
+            "hold": 4
+          }
+        }
+      ],
+      "layoutRects": [
+        {
+          "id": "product",
+          "kind": "product",
+          "left": 0.04,
+          "top": 0.17,
+          "right": 0.96,
+          "bottom": 0.54
+        },
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.23,
+          "top": 0.56,
+          "right": 0.77,
+          "bottom": 0.975
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 33167
+    },
+    {
+      "id": "cta",
+      "startMs": 34233,
+      "endMs": 37633,
+      "purpose": "cta",
+      "shotType": "cta_end_card",
+      "contentPattern": "comment_card",
+      "presenter": {
+        "visible": true,
+        "layout": "medium",
+        "crop": {
+          "x": 0.5,
+          "y": 0.4175,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.46,
+        "expression": "confident",
+        "gestureIntent": "open_hand",
+        "motionIntensity": "energetic",
+        "eyeline": "camera",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [],
+      "supportedClaimIds": [],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "brand"
+      },
+      "backdrop": {
+        "token": "sky",
+        "tier": "mid",
+        "luma": 178,
+        "css": "linear-gradient(150deg,#ccd0d2,#8f9599)",
+        "foreground": "#07111f"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.5,
+        "y": 0.42,
+        "scale": 1.18
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "layoutRects": [
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.27,
+          "top": 0.22,
+          "right": 0.73,
+          "bottom": 0.615
+        },
+        {
+          "id": "cta-comment",
+          "kind": "cta",
+          "left": 0.09,
+          "top": 0.645,
+          "right": 0.91,
+          "bottom": 0.8
+        },
+        {
+          "id": "cta-handle",
+          "kind": "cta",
+          "left": 0.3,
+          "top": 0.845,
+          "right": 0.7,
+          "bottom": 0.895
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 34233
+    },
+    {
+      "id": "sting",
+      "startMs": 37633,
+      "endMs": 38500,
+      "purpose": "cta",
+      "shotType": "presenter_fullscreen",
+      "contentPattern": "ambient",
+      "presenter": {
+        "visible": true,
+        "layout": "close_up",
+        "crop": {
+          "x": 0.5,
+          "y": 0.6375,
+          "scale": 1
+        },
+        "position": "center",
+        "scale": 0.8,
+        "expression": "confident",
+        "gestureIntent": "none",
+        "motionIntensity": "subtle",
+        "eyeline": "camera",
+        "backgroundTreatment": "transparent",
+        "disclosure": "synthetic_presenter",
+        "sourceScriptId": "solomon-creator-story-v22-performance",
+        "sourceScriptUpdatedAt": "1970-01-01T00:00:00.000Z"
+      },
+      "productAssetIds": [],
+      "supportedClaimIds": [],
+      "captions": [],
+      "typography": [],
+      "background": {
+        "kind": "dark"
+      },
+      "backdrop": {
+        "token": "ink",
+        "tier": "deep",
+        "luma": 16,
+        "css": "#07111f",
+        "foreground": "#ffffff"
+      },
+      "transition": {
+        "kind": "none",
+        "durationMs": 0
+      },
+      "focus": {
+        "x": 0.5,
+        "y": 0.5,
+        "scale": 1.06
+      },
+      "minimumReadableDwellMs": 600,
+      "audioCues": [],
+      "layoutRects": [
+        {
+          "id": "mascot",
+          "kind": "mascot",
+          "left": 0.1,
+          "top": 0.3,
+          "right": 0.9,
+          "bottom": 0.975
+        },
+        {
+          "id": "caption",
+          "kind": "caption",
+          "left": 0.05,
+          "top": 0.04,
+          "right": 0.95,
+          "bottom": 0.16
+        }
+      ],
+      "groupStartMs": 37633
+    }
+  ],
+  "renderPolicy": {
+    "canvas": {
+      "width": 1080,
+      "height": 1920,
+      "fps": 30
+    },
+    "targetLufs": -14,
+    "loudnessToleranceLu": 0.5,
+    "ctaDurationMs": 3400
+  },
+  "qualityPolicy": {
+    "requireEvidenceBackedClaims": true,
+    "requireCaptionSafeArea": true,
+    "requireAudioAlignment": true,
+    "requireCta": true,
+    "requireAvatarDisclosure": true,
+    "maxVisualChangesPerTenSeconds": 12,
+    "minProductTextScale": 1
+  },
+  "compiledAt": "1970-01-01T00:00:00.000Z"
+}
