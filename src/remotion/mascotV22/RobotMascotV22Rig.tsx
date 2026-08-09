@@ -107,7 +107,7 @@ export const RobotMascotV22Rig: React.FC<{ plan: V22MascotPerformance; frame: nu
         <path d="M68 126 Q154 72 250 84" fill="none" stroke="#fff" strokeOpacity=".84" strokeWidth="24" strokeLinecap="round" />
         <rect x={330 - SCREEN_W / 2} y="112" width={SCREEN_W} height={SCREEN_H} rx={SCREEN_R} fill={INK} />
         <path d="M102 154 Q162 120 232 128" fill="none" stroke="#42546a" strokeOpacity=".42" strokeWidth="12" strokeLinecap="round" />
-        <Face face={face} gazeX={gaze.dx * 28} gazeY={gaze.dy * 13} blink={blink} />
+        <Face face={face} gazeX={gaze.dx * 28} gazeY={gaze.dy * 13} blink={blink} beat={phraseBeat} />
         <Mouth state={mouth} />
         <rect x="294" y="18" width="72" height="52" rx="26" fill="#d4dce6" />
         <rect x="319" y={-4 - antenna * .22} width="22" height={35 + antenna * .22} rx="11" fill="#92a6bb" />
@@ -134,17 +134,82 @@ const Torso: React.FC<{ id: string }> = ({ id }) => <g>
   <ellipse cx="330" cy="910" rx="190" ry="24" fill="#07111f" opacity=".18" />
 </g>;
 
-const Face: React.FC<{ face: V22Face; gazeX: number; gazeY: number; blink: number }> = ({ face, gazeX, gazeY, blink }) => {
-  const transform = `translate(${gazeX} ${gazeY}) scale(1 ${blink})`, origin = "330px 270px";
+// Expression, rebuilt so it survives being watched rather than inspected.
+//
+// Every face used to be two mint shapes of the same size in the same place, and
+// at the size a phone renders this rig, `happy`, `focused` and `friendly` were
+// indistinguishable -- seven declared expressions reading as one. The SVG diffed
+// fine, which is exactly why no snapshot caught it: distinctness in the markup is
+// not distinctness on screen.
+//
+// Three levers do the work, in order of how much they carry at small size:
+// brows (present or absent, and at what angle), eye shape (round vs closed arc vs
+// slit), and asymmetry. Pupils earn their place twice: they give gaze something
+// to read on -- they lead the eye group, so the character looks at things rather
+// than sliding -- and an ink pupil on a mint eye is the only way an open eye
+// reads as open rather than as a blob.
+const BROW_Y = 194, EYE_Y = 262, EYE_L = 206, EYE_R = 454;
+const Brow: React.FC<{ cx: number; angle: number; y?: number; thickness?: number }> = ({ cx, angle, y = BROW_Y, thickness = 20 }) =>
+  <rect x={cx - 66} y={y - thickness / 2} width="132" height={thickness} rx={thickness / 2} fill={MINT} transform={`rotate(${angle} ${cx} ${y})`} />;
+const Pupil: React.FC<{ cx: number; r: number; gx: number; gy: number }> = ({ cx, r, gx, gy }) => <g>
+  <circle cx={cx + gx} cy={EYE_Y + gy} r={r} fill={INK} />
+  <circle cx={cx + gx - r * .34} cy={EYE_Y + gy - r * .38} r={Math.max(4, r * .3)} fill="#baffea" />
+</g>;
+const EyeRound: React.FC<{ cx: number; rx: number; ry: number; pupil: number; gx: number; gy: number }> = ({ cx, rx, ry, pupil, gx, gy }) => <g>
+  <ellipse cx={cx} cy={EYE_Y} rx={rx} ry={ry} fill={MINT} />
+  <Pupil cx={cx} r={pupil} gx={gx} gy={gy} />
+</g>;
+// A closed eye is a stroke, not a filled crescent: the crescent read as a squint
+// at distance, which is the shape `focused` needs to own.
+const EyeArc: React.FC<{ cx: number; lift: number }> = ({ cx, lift }) =>
+  <path d={`M${cx - 64} ${EYE_Y + 26} Q${cx} ${EYE_Y + 26 - lift} ${cx + 64} ${EYE_Y + 26}`} fill="none" stroke={MINT} strokeWidth="24" strokeLinecap="round" />;
+const EyeSlit: React.FC<{ cx: number; ry: number; angle: number }> = ({ cx, ry, angle }) =>
+  <rect x={cx - 64} y={EYE_Y - ry} width="128" height={ry * 2} rx={ry} fill={MINT} transform={`rotate(${angle} ${cx} ${EYE_Y})`} />;
+
+const Face: React.FC<{ face: V22Face; gazeX: number; gazeY: number; blink: number; beat: number }> = ({ face, gazeX, gazeY, blink, beat }) => {
+  const transform = `translate(${gazeX} ${gazeY}) scale(1 ${blink})`, origin = "330px 262px";
   const glow = { filter: "drop-shadow(0 0 15px rgba(57,242,181,.9))" };
-  if (face === "surprised") return <g transform={transform} style={{ transformOrigin: origin, ...glow }}><circle cx="206" cy="270" r="66" fill={MINT} /><circle cx="454" cy="270" r="66" fill={MINT} /><circle cx="206" cy="270" r="24" fill="#baffea" /><circle cx="454" cy="270" r="24" fill="#baffea" /></g>;
-  if (face === "focused") return <g transform={transform} style={{ transformOrigin: origin, ...glow }}><path d="M140 245 Q205 216 270 248 L262 284 Q205 260 148 280Z" fill={MINT} /><path d="M390 248 Q455 216 520 245 L512 280 Q455 260 398 284Z" fill={MINT} /></g>;
-  if (face === "concerned") return <g transform={transform} style={{ transformOrigin: origin, ...glow }}><path d="M142 278 Q205 224 270 263 L262 298 Q205 274 148 300Z" fill={MINT} /><path d="M390 263 Q455 224 518 278 L512 300 Q455 274 398 298Z" fill={MINT} /></g>;
-  if (face === "skeptical") return <g transform={transform} style={{ transformOrigin: origin, ...glow }}><path d="M142 255 Q205 219 270 254 L264 290 Q205 269 148 291Z" fill={MINT} /><path d="M394 275 Q455 250 514 270 L510 299 Q455 286 400 301Z" fill={MINT} /></g>;
-  if (face === "wink") return <g transform={transform} style={{ transformOrigin: origin, ...glow }}><path d="M142 278 Q206 216 270 278 L270 298 L142 298Z" fill={MINT} /><path d="M394 282 Q454 310 516 282" fill="none" stroke={MINT} strokeWidth="15" strokeLinecap="round" /></g>;
-  if (face === "happy") return <g transform={transform} style={{ transformOrigin: origin, ...glow }}><path d="M140 286 Q206 216 272 286 Q206 268 140 286Z" fill={MINT} /><path d="M388 286 Q454 216 520 286 Q454 268 388 286Z" fill={MINT} /></g>;
-  if (face === "direct_cta") return <g transform={transform} style={{ transformOrigin: origin, ...glow }}><path d="M140 276 A66 67 0 0 1 272 276 L272 298 L140 298Z" fill={MINT} /><path d="M388 276 A66 67 0 0 1 520 276 L520 298 L388 298Z" fill={MINT} /></g>;
-  return <g transform={transform} style={{ transformOrigin: origin, ...glow }}><path d="M142 278 A64 68 0 0 1 270 278 L270 298 L142 298Z" fill={MINT} /><path d="M390 278 A64 68 0 0 1 518 278 L518 298 L390 298Z" fill={MINT} /></g>;
+  // Pupils lead the eye group rather than riding it, and brows lift on the
+  // phrase beats the head already nods to.
+  const gx = gazeX * .5, gy = gazeY * .5, lift = -Math.min(1, beat) * 7;
+  const wrap = (children: React.ReactNode) => <g transform={transform} style={{ transformOrigin: origin, ...glow }}>{children}</g>;
+  if (face === "surprised") return wrap(<>
+    <Brow cx={EYE_L} angle={-6} y={BROW_Y - 30 + lift} thickness={18} /><Brow cx={EYE_R} angle={6} y={BROW_Y - 30 + lift} thickness={18} />
+    <EyeRound cx={EYE_L} rx={68} ry={70} pupil={20} gx={gx} gy={gy} /><EyeRound cx={EYE_R} rx={68} ry={70} pupil={20} gx={gx} gy={gy} />
+  </>);
+  if (face === "focused") return wrap(<>
+    <Brow cx={EYE_L} angle={13} y={BROW_Y - 16 + lift} /><Brow cx={EYE_R} angle={-13} y={BROW_Y - 16 + lift} />
+    <EyeSlit cx={EYE_L} ry={17} angle={4} /><EyeSlit cx={EYE_R} ry={17} angle={-4} />
+  </>);
+  if (face === "concerned") return wrap(<>
+    <Brow cx={EYE_L} angle={-15} y={BROW_Y + 2 + lift} /><Brow cx={EYE_R} angle={15} y={BROW_Y + 2 + lift} />
+    <EyeRound cx={EYE_L} rx={54} ry={58} pupil={20} gx={gx} gy={gy + 4} /><EyeRound cx={EYE_R} rx={54} ry={58} pupil={20} gx={gx} gy={gy + 4} />
+  </>);
+  // Asymmetry is the most legible expression there is at this size, so scepticism
+  // gets it outright: one eye narrowed under a flat brow, one open under a raised one.
+  if (face === "skeptical") return wrap(<>
+    <Brow cx={EYE_L} angle={7} y={BROW_Y + 12 + lift} /><Brow cx={EYE_R} angle={-4} y={BROW_Y - 26 + lift} />
+    <EyeSlit cx={EYE_L} ry={15} angle={5} /><EyeRound cx={EYE_R} rx={58} ry={62} pupil={22} gx={gx} gy={gy} />
+  </>);
+  if (face === "wink") return wrap(<>
+    <EyeArc cx={EYE_L} lift={70} />
+    <Brow cx={EYE_R} angle={-5} y={BROW_Y - 22 + lift} />
+    <EyeRound cx={EYE_R} rx={62} ry={66} pupil={24} gx={gx} gy={gy} />
+  </>);
+  if (face === "happy") return wrap(<>
+    <EyeArc cx={EYE_L} lift={78} /><EyeArc cx={EYE_R} lift={78} />
+    <circle cx={EYE_L - 78} cy={EYE_Y + 74} r="15" fill={MINT} opacity=".45" /><circle cx={EYE_R + 78} cy={EYE_Y + 74} r="15" fill={MINT} opacity=".45" />
+  </>);
+  // Level brows sitting low, and the largest pupils in the set: the CTA looks
+  // straight down the lens. The old version drew r="11" dots off-centre, which is
+  // the V10 regression the rig test still pins.
+  if (face === "direct_cta") return wrap(<>
+    <Brow cx={EYE_L} angle={0} y={BROW_Y - 26 + lift} thickness={22} /><Brow cx={EYE_R} angle={0} y={BROW_Y - 26 + lift} thickness={22} />
+    <EyeRound cx={EYE_L} rx={64} ry={68} pupil={26} gx={gx} gy={gy} /><EyeRound cx={EYE_R} rx={64} ry={68} pupil={26} gx={gx} gy={gy} />
+  </>);
+  return wrap(<>
+    <EyeRound cx={EYE_L} rx={60} ry={64} pupil={22} gx={gx} gy={gy} /><EyeRound cx={EYE_R} rx={60} ry={64} pupil={22} gx={gx} gy={gy} />
+  </>);
 };
 
 const Mouth: React.FC<{ state: V22Mouth }> = ({ state }) => {

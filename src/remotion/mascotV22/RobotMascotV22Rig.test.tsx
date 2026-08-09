@@ -28,6 +28,11 @@ function renderToString(node: React.ReactNode): string {
   if (Array.isArray(node)) return node.map(renderToString).join("");
   const element = node as React.ReactElement<Record<string, unknown>>;
   if (typeof element.type === "function") return renderToString((element.type as (props: unknown) => React.ReactNode)(element.props));
+  // Fragments have a Symbol type and no markup of their own. Without this the
+  // walker stringified the Symbol and threw, so a rig that groups elements with
+  // <>...</> could not be snapshotted at all -- a limit of the harness, not of
+  // the character.
+  if (typeof element.type === "symbol") return renderToString((element.props as { children?: React.ReactNode }).children);
   const { children, style, ...rest } = element.props;
   const attributes = Object.entries(rest)
     .filter(([, value]) => value !== undefined && value !== null && value !== false)
