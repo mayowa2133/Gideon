@@ -1,6 +1,6 @@
 import { useCurrentFrame } from "remotion";
 import { mascotBoxForScene } from "../../shared/creatorStoryV22Quality";
-import type { V22Scene } from "../../shared/solomonCreatorStoryV22";
+import type { V22Rect } from "../../shared/creatorStoryV22Quality";
 import { mascotIdleFloat, type V22MascotPerformance } from "../../shared/solomonMascotV22";
 import { RobotMascotV22Rig } from "../mascotV22/RobotMascotV22Rig";
 
@@ -23,7 +23,11 @@ import { RobotMascotV22Rig } from "../mascotV22/RobotMascotV22Rig";
 // connectors; the mascot's point gesture carries the same intent.
 const SLIDE_FRAMES = 10;
 
-export const MascotLayer: React.FC<{ scenes: V22Scene[] }> = ({ scenes }) => {
+// Widened to the fields this layer actually reads -- id, from, to, mascot and
+// layout -- so the generic renderer can drive the same presenter without a
+// version-specific manifest. Nothing here was ever product-specific: the mascot
+// is Gideon's, not Solomon's.
+export const MascotLayer: React.FC<{ scenes: Array<{ id: string; from: number; to: number; mascot: V22MascotPerformance; layout: V22Rect[] }> }> = ({ scenes }) => {
   const frame = useCurrentFrame();
   const index = Math.max(0, scenes.findIndex((scene) => frame >= scene.from && frame < scene.to));
   const scene = scenes[index] ?? scenes[0]!;

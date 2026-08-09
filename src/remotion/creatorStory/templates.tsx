@@ -158,20 +158,27 @@ export const CardFieldTemplate: React.FC<TemplateProps> = ({ scene, frame }) => 
     // The field collapses toward the centre and, if a final crop is given, that
     // crop arrives in its place. `collapse` has one; `payoff` has five and a board.
     const progress = spring({ frame, fps: 30, config: { damping: 16, stiffness: 160 }, durationInFrames: 8 });
-    const result = crops.length > 1 ? crops.at(-1)! : null;
-    const field = result ? crops.slice(0, -1) : crops;
+    // With placeholders declared, every crop is the result and the field is
+    // empty cards. `collapse` is that shape: five scattered surfaces carrying no
+    // evidence, converging on one that does. Without this it drew a single card
+    // converging on nothing and the frame read as empty.
+    const placeholderCount = scene.contentOptions.placeholders ?? 0;
+    const result = placeholderCount > 0 ? crops[0]! : crops.length > 1 ? crops.at(-1)! : null;
+    const field: Array<SceneProductCrop | null> = placeholderCount > 0
+      ? Array.from({ length: placeholderCount }, () => null)
+      : (result ? crops.slice(0, -1) : crops);
     const centreX = box.left + box.width / 2, centreY = box.top + box.height / 2;
     return <AbsoluteFill>
       {field.map((crop, index) => {
         const angle = index * Math.PI * 2 / Math.max(1, field.length) - Math.PI / 2;
-        const size = cardSize(crop, 300, 190);
+        const size = crop ? cardSize(crop, 300, 190) : { width: 300, height: 170 };
         const x = centreX - size.width / 2 + Math.cos(angle) * (box.width * .34) * (1 - progress);
         const y = centreY - size.height / 2 + Math.sin(angle) * (box.height * .42) * (1 - progress);
-        return <div key={`${crop.assetId}-${index}`} style={{
+        return <div key={`${crop?.assetId ?? "placeholder"}-${index}`} style={{
           position: "absolute", left: x, top: y, width: size.width, height: size.height,
           background: surface.background, border: `2px solid ${surface.border}`, borderRadius: 18, overflow: "hidden",
           opacity: 1 - progress * .78, transform: `scale(${1 - progress * .45}) rotate(${index * 4 - 8}deg)`
-        }}><EvidenceCrop crop={crop} width={size.width} height={size.height} frame={frame} /></div>;
+        }}>{crop && <EvidenceCrop crop={crop} width={size.width} height={size.height} frame={frame} />}</div>;
       })}
       {result && (() => {
         const size = cardSize(result, box.width, box.height);
@@ -216,7 +223,12 @@ export const FilmstripTemplate: React.FC<TemplateProps> = ({ scene, frame }) => 
   // proofs, not four slots.
   const gap = 18, budget = 1080 - 80;
   const baseHeight = 300;
-  const naturalWidths = crops.map((crop) => baseHeight * (crop.width / crop.height));
+  // Aspect is clamped, not honoured outright. Four crops averaging 2:1 laid out
+  // honestly need 2400px, so fitting them into 1080 shrank every card to 124px
+  // tall and the strip became unreadable. A wide crop gives up some of its width
+  // instead -- discard the strip can afford, because each card is a token here,
+  // not the evidence itself.
+  const naturalWidths = crops.map((crop) => baseHeight * Math.min(1.35, crop.width / crop.height));
   const naturalTotal = naturalWidths.reduce((sum, width) => sum + width, 0) + gap * (crops.length - 1);
   const fit = Math.min(1, budget / Math.max(1, naturalTotal));
   const height = Math.round(baseHeight * fit);

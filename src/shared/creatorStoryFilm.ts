@@ -24,6 +24,16 @@ import type { V22Face, V22Gesture, V22MascotPerformance, V22Mouth } from "./solo
 export const FILM_FPS = 30;
 export const MIN_SCENE_FRAMES = 30;
 
+// Caption windows and their word groups, film-level rather than per scene: the
+// words are spoken across boundaries and the renderer windows them.
+export interface FilmCaption {
+  id: string;
+  from: number;
+  to: number;
+  highlight?: string;
+  wordGroups: Array<{ from: number; to: number; text: string; emphasis?: boolean }>;
+}
+
 export interface FilmScene {
   id: string;
   from: number;
@@ -37,6 +47,9 @@ export interface FilmScene {
   camera: { recipe: string; scaleFrom: number; scaleTo: number; focus: { x: number; y: number }; semanticTarget: string };
   mascot: V22MascotPerformance;
   labels: string[];
+  // Only the camera reads this, to decide whether a scene is calm enough to
+  // freeze its push. Derived from the pattern rather than authored.
+  typography: string;
 }
 
 // Deterministic per-scene variation. A string hash rather than a seed so a scene
@@ -129,14 +142,36 @@ export function mascotFromCue(scene: SceneComposition, durationFrames: number): 
   };
 }
 
+// Where each scene actually starts, measured from the assembled narration. A
+// scene is anchored to the beat that speaks over it, so this is per scene rather
+// than a single film length.
+export interface RealizedTiming { id: string; startMs: number; endMs: number }
+
 // Authored millisecond boundaries become frame boundaries on the realized
-// timeline. `realizedEndMs` comes from the assembled narration; when it is
-// absent the authored durations are used unchanged, which is what makes this
-// testable without rendering audio.
-export function sceneFramesFor(blueprint: CreativeBlueprint, realizedEndMs?: number) {
+// timeline.
+//
+// Scaling authored durations by a single film-length ratio is NOT good enough,
+// and the parity render is what proved it: against V22's realized boundaries the
+// proportional version drifted by up to 110 frames -- 3.7 seconds -- putting
+// scenes on the wrong backdrops and captions over the wrong shots. Speech is not
+// proportional to what was authored. Some beats run long and their neighbours do
+// not shrink to compensate.
+//
+// So per-scene realized timings win when they are available, and the proportional
+// fallback exists only for tests and for previewing a blueprint before its
+// narration has been assembled.
+export function sceneFramesFor(blueprint: CreativeBlueprint, realized?: number | RealizedTiming[]) {
+  const perScene = Array.isArray(realized) ? new Map(realized.map((timing) => [timing.id, timing])) : null;
+  const realizedEndMs = Array.isArray(realized) ? realized.at(-1)?.endMs : realized;
   const authoredEnd = blueprint.scenes.at(-1)?.endMs ?? blueprint.targetDurationMs;
   const scale = realizedEndMs && authoredEnd ? realizedEndMs / authoredEnd : 1;
   const toFrame = (ms: number) => Math.round((ms * scale) / 1000 * FILM_FPS);
+  const sceneMs = (scene: CreativeBlueprint["scenes"][number]) => {
+    const timing = perScene?.get(scene.id);
+    return timing
+      ? { from: Math.round(timing.startMs / 1000 * FILM_FPS), to: Math.round(timing.endMs / 1000 * FILM_FPS) }
+      : { from: toFrame(scene.startMs), to: toFrame(scene.endMs) };
+  };
   // Enforce the floor here rather than trusting the blueprint: hydration can
   // squeeze a scene below a second, and a sub-second shot reads as a glitch
   // rather than a fast cut.
@@ -146,7 +181,7 @@ export function sceneFramesFor(blueprint: CreativeBlueprint, realizedEndMs?: num
   // earlier in the timeline is never reached by a forward shift -- that leaked
   // four frames onto a 1155-frame film. Solving lengths first and laying them
   // out contiguously afterwards conserves it by construction.
-  const lengths = blueprint.scenes.map((scene) => toFrame(scene.endMs) - toFrame(scene.startMs));
+  const lengths = blueprint.scenes.map((scene) => { const { from, to } = sceneMs(scene); return to - from; });
   for (let index = 0; index < lengths.length; index += 1) {
     let deficit = MIN_SCENE_FRAMES - lengths[index]!;
     if (deficit <= 0) continue;
@@ -172,8 +207,8 @@ export function sceneFramesFor(blueprint: CreativeBlueprint, realizedEndMs?: num
   return bounds;
 }
 
-export function buildFilmScenes(blueprint: CreativeBlueprint, realizedEndMs?: number): FilmScene[] {
-  const bounds = sceneFramesFor(blueprint, realizedEndMs);
+export function buildFilmScenes(blueprint: CreativeBlueprint, realized?: number | RealizedTiming[]): FilmScene[] {
+  const bounds = sceneFramesFor(blueprint, realized);
   return blueprint.scenes.map((scene, index) => {
     const { from, to } = bounds[index]!;
     const backdrop = scene.backdrop;
@@ -200,6 +235,7 @@ export function buildFilmScenes(blueprint: CreativeBlueprint, realizedEndMs?: nu
         semanticTarget: `${scene.id}-${scene.shotType}`
       },
       mascot: mascotFromCue(scene, to - from),
+      typography: scene.contentPattern === "evidence_band" || scene.contentPattern === "composed_board" ? "product_annotation" : "spoken",
       labels: scene.typography.map(({ text }) => text)
     };
   });

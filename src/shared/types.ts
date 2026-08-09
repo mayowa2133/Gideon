@@ -983,6 +983,11 @@ export interface SceneContentOptions {
   highlight?: boolean;
   // Long-form note rendered under the band, e.g. the control beat's assurance.
   note?: string;
+  // Empty cards drawn alongside the crops in a converging field. The collapse
+  // beat is "many scattered things become one": the scattered things carry no
+  // evidence, so they are placeholders rather than crops, and without a count
+  // the field has nothing to converge.
+  placeholders?: number;
 }
 
 export interface SceneComposition {

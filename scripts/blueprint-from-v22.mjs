@@ -138,7 +138,7 @@ const CONTENT_OPTIONS = {
   draft: { swapAt: .28, note: "SAVE EDIT \u00b7 DRAFT NOT SENT" },
   friction: { arrangement: "flank" },
   five: { arrangement: "grid", labels: ["JOB POST", "PROFILE", "NOTES", "CONTACTS", "BLANK MESSAGE"] },
-  collapse: { arrangement: "converge" },
+  collapse: { arrangement: "converge", placeholders: 5 },
   payoff: { arrangement: "converge" },
   signature: { arrangement: "row", labels: ["JOB", "PERSON", "PROOF", "MESSAGE"] },
   signature_proof: { arrangement: "row", labels: ["JOB", "PERSON", "PROOF", "MESSAGE"] },

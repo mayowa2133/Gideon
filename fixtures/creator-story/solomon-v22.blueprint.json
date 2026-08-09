@@ -712,7 +712,8 @@
       "shotType": "product_fullscreen",
       "contentPattern": "card_field",
       "contentOptions": {
-        "arrangement": "converge"
+        "arrangement": "converge",
+        "placeholders": 5
       },
       "presenter": {
         "visible": false,
