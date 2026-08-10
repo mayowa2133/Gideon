@@ -72,6 +72,13 @@ export function auditV22Cta(input: { text: string; spoken: string; keyword: stri
 // that far until the CTA got one back.
 export const V22_FILM_FRAMES=1155;
 
+// Words per minute, the rate a short-form voiceover is spoken at. Bands like
+// this belong here because they are properties of speech, not of one film: a
+// word count is just this multiplied by the running time, and hardcoding the
+// product -- 112 to 122 words -- pinned the rule to a 38.5s story and made a
+// film of any other length fail a check about pacing.
+export const V22_SPEECH_RATE_BAND=[170,192] as const;
+
 export function auditV22Captions(captions: Array<{ id: string; from: number; to: number; beatText: string; highlight?: string }>) {
   const failures: string[] = [];
   for (const caption of captions) {

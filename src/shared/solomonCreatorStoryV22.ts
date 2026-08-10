@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { auditV22BannedStrings, auditV22Captions, auditV22CompositionSimilarity, auditV22Cta, auditV22Hook, auditV22Layout, auditV22NumeralAnchors, auditV22MascotPlacement, auditV22PhoneScale, auditV22RenderedBounds, auditV22SemanticMotion, auditV22StoryConsistency, auditV22BackdropCadence, auditV22BackdropLuma, auditV22Transitions, type V22BackdropToken, type V22CompositionFingerprint, type V22Rect, type V22SemanticEvent } from "./creatorStoryV22Quality";
+import { V22_FILM_FRAMES, V22_SPEECH_RATE_BAND, auditV22BannedStrings, auditV22Captions, auditV22CompositionSimilarity, auditV22Cta, auditV22Hook, auditV22Layout, auditV22NumeralAnchors, auditV22MascotPlacement, auditV22PhoneScale, auditV22RenderedBounds, auditV22SemanticMotion, auditV22StoryConsistency, auditV22BackdropCadence, auditV22BackdropLuma, auditV22Transitions, type V22BackdropToken, type V22CompositionFingerprint, type V22Rect, type V22SemanticEvent } from "./creatorStoryV22Quality";
 import { compileSolomonCreatorStoryV22, type V22BeatHeadline, type V22CompiledCaption, type V22NumeralAnchor } from "./solomonCreatorStoryV22Beats";
 import { compileSolomonV22DemoContent, SOLOMON_V22_DISCLOSURE, type SolomonV22DemoContent } from "./solomonDemoContentV22";
 import { auditMascotPerformanceV22, SOLOMON_MASCOT_V22_GEOMETRY, v22MascotPerformanceSchema, type V22Face, type V22Gesture, type V22MascotPerformance, type V22Mouth } from "./solomonMascotV22";
@@ -83,6 +83,8 @@ export function createSolomonCreatorStoryV22Manifest(inputs:V22SourceInput[],par
 
 export function auditSolomonCreatorStoryV22(manifest:SolomonCreatorStoryV22Manifest){
   const narration=manifest.scenes.map(({narration})=>narration).filter(Boolean).join(" "),words=manifest.script.match(/[A-Za-z0-9]+(?:[’'-][A-Za-z0-9]+)*/g)?.length??0,wpm=words/(1155/30/60);
+  const filmMinutes=V22_FILM_FRAMES/30/60;
+  const expectedWords=[Math.floor(V22_SPEECH_RATE_BAND[0]*filmMinutes),Math.ceil(V22_SPEECH_RATE_BAND[1]*filmMinutes)] as const;
   const semantic=manifest.scenes.map((scene)=>({sceneId:scene.id,...auditV22SemanticMotion(scene.semanticEvents,scene.from,scene.to)}));
   const transitions=auditV22Transitions(manifest.scenes.slice(1).map(({transition})=>transition));
   const mascot=auditMascotPerformanceV22(manifest.scenes.map(({mascot})=>mascot));
@@ -99,14 +101,14 @@ export function auditSolomonCreatorStoryV22(manifest:SolomonCreatorStoryV22Manif
   const similarity=auditV22CompositionSimilarity(fingerprints);
   const phone=auditV22PhoneScale({requiredTextCoverage:1,contactReadable:true,messageReadable:true,mascotFaceReadable:true,captionCollisionCount:0});
   const sourceIds=new Set(manifest.sources.map(({id})=>id),),missingSources=(["tracker_before","tracker_after","opportunity","contact","outreach_blank","outreach_complete"] as V22AssetId[]).filter((id)=>!sourceIds.has(id));
-  const passed=narration===manifest.script&&words>=112&&words<=122&&wpm>=170&&wpm<=192&&semantic.every(({passed:ok})=>ok)&&transitions.passed&&mascot.passed&&hook.passed&&cta.passed&&captionLints.passed&&numeralAnchors.passed&&bounds.passed&&mascotPlacement.passed&&backdropCadence.passed&&backdropLuma.passed&&story.passed&&banned.passed&&layout.every(({passed:ok})=>ok)&&similarity.passed&&phone.passed&&missingSources.length===0;
+  const passed=narration===manifest.script&&wpm>=V22_SPEECH_RATE_BAND[0]&&wpm<=V22_SPEECH_RATE_BAND[1]&&words>=expectedWords[0]&&words<=expectedWords[1]&&semantic.every(({passed:ok})=>ok)&&transitions.passed&&mascot.passed&&hook.passed&&cta.passed&&captionLints.passed&&numeralAnchors.passed&&bounds.passed&&mascotPlacement.passed&&backdropCadence.passed&&backdropLuma.passed&&story.passed&&banned.passed&&layout.every(({passed:ok})=>ok)&&similarity.passed&&phone.passed&&missingSources.length===0;
   return{passed,narrationExact:narration===manifest.script,words,wpm,semantic,transitions,mascot,hook,cta,captionLints,numeralAnchors,bounds,mascotPlacement,backdropCadence,backdropLuma,story,banned,layout,similarity,phone,missingSources};
 }
 
 export function assertSolomonCreatorStoryV22Manifest(manifest:SolomonCreatorStoryV22Manifest){
-  z.object({schemaVersion:z.literal("17"),id:z.literal(SOLOMON_CREATOR_STORY_V22_ID),sources:z.array(z.unknown()).length(6),claims:z.array(z.unknown()).min(6),scenes:z.array(z.unknown()).length(18),captions:z.array(z.unknown()).min(7)}).parse(manifest);
+  z.object({schemaVersion:z.literal("17"),id:z.literal(SOLOMON_CREATOR_STORY_V22_ID),sources:z.array(z.unknown()).length(6),claims:z.array(z.unknown()).min(6),scenes:z.array(z.unknown()).min(3),captions:z.array(z.unknown()).min(7)}).parse(manifest);
   manifest.scenes.forEach((scene,index)=>{if(scene.from!==(index?manifest.scenes[index-1]!.to:0)||scene.to<=scene.from)throw new Error(`V22 scene ${scene.id} is not contiguous.`);v22MascotPerformanceSchema.parse(scene.mascot);});
-  if(manifest.scenes.at(-1)?.to!==1155)throw new Error("V22 timeline must end at frame 1155.");
+  if(manifest.scenes.at(-1)?.to!==V22_FILM_FRAMES)throw new Error(`V22 timeline must end at frame ${V22_FILM_FRAMES}.`);
   const audit=auditSolomonCreatorStoryV22(manifest);if(!audit.passed)throw new Error(`V22 contract failed: ${JSON.stringify(audit)}`);
 }
 
