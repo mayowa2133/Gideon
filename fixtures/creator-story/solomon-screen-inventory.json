@@ -20,6 +20,9 @@
           "width": 760,
           "height": 265,
           "aspect": 2.868,
+          "textHeightPx": 11,
+          "renderedTextPx": 16,
+          "legibility": "poor",
           "text": "Discover opportunities across multiple sources, scored against your profile. Search Jobs Search Search across JSearch, Adzuna, Remotive, Dice, newgrad-jobs.com, and more. Paste a job a similar Job Title or Keyword Board ID or e.g. Software Engineer, Frontend Developer e.g. stripe",
           "words": [
             {
@@ -312,6 +315,9 @@
           "width": 740,
           "height": 116,
           "aspect": 6.379,
+          "textHeightPx": 12,
+          "renderedTextPx": 18,
+          "legibility": "poor",
           "text": "Discover opportunities across multiple sources, scored against your profile.",
           "words": [
             {
@@ -387,6 +393,9 @@
           "width": 900,
           "height": 520,
           "aspect": 1.731,
+          "textHeightPx": 10,
+          "renderedTextPx": 12,
+          "legibility": "poor",
           "text": "Discover opportunities across multiple sources, scored against your profile. Search Jobs Search Company Career Page Search across JSearch, Adzuna, Remotive, Dice, newgrad-jobs.com, and more. Paste a job posting URL from Apple a similar careers page, or enter a Job Title or Keyword Board ID or Job Posting URL e.g. Software Engineer, Frontend Developer e.g. stripe or Location (optional) links auto-detect the platform and New York, NY or Remote ATS Platform Remote only Greenhouse Your job feed Fetching roles for 2 occupations — pick a category and we go find those jobs (new-grad, internships and all). Toggle chips to widen or",
           "words": [
             {
@@ -1100,6 +1109,9 @@
           "width": 615,
           "height": 289,
           "aspect": 2.128,
+          "textHeightPx": 10,
+          "renderedTextPx": 18,
+          "legibility": "poor",
           "text": "Search Company Career Page Paste a job posting URL from Apple Jobs, Greenhouse, Lever, Ashby, Workable, Workday, or a similar careers page, or enter a supported board ID. Board ID or Job Posting URL e.g. stripe or links auto-detect the platform and exact posting. Board IDs still use the selected platform, ATS Platform Greenhouse Search Career Page",
           "words": [
             {
@@ -1512,6 +1524,9 @@
           "width": 298,
           "height": 148,
           "aspect": 2.014,
+          "textHeightPx": 12,
+          "renderedTextPx": 43,
+          "legibility": "ok",
           "text": "Au Creatives Management and Executive Cybersecurity Project Management",
           "words": [
             {
@@ -1581,6 +1596,9 @@
           "width": 373,
           "height": 112,
           "aspect": 3.33,
+          "textHeightPx": 10,
+          "renderedTextPx": 29,
+          "legibility": "marginal",
           "text": "Analyst and Entertainment Sector and and Training",
           "words": [
             {
@@ -1643,6 +1661,9 @@
           "width": 180,
           "height": 38,
           "aspect": 4.737,
+          "textHeightPx": 10,
+          "renderedTextPx": 60,
+          "legibility": "ok",
           "text": "Near: Toronto or GTA",
           "words": [
             {
@@ -1684,6 +1705,9 @@
           "width": 160,
           "height": 40,
           "aspect": 4,
+          "textHeightPx": 10,
+          "renderedTextPx": 68,
+          "legibility": "ok",
           "text": "Search saved jobs...",
           "words": [
             {
@@ -1725,6 +1749,9 @@
           "width": 430,
           "height": 390,
           "aspect": 1.103,
+          "textHeightPx": 9,
+          "renderedTextPx": 23,
+          "legibility": "marginal",
           "text": "Northstar Labs 3 Select for batch email ‘Avery Chen Senior Technical Recruiter DIRECT USEFULNESS: Not the right person? Proof Why matched title atthe target company. Company trust Current role at Northstar Labs. Email email is shown only after safe checks. Warm path warm path found from your imported graph yet. Email: avery@example.test Confidence 0",
           "words": [
             {
@@ -2115,6 +2142,9 @@
           "width": 408,
           "height": 175,
           "aspect": 2.331,
+          "textHeightPx": 10,
+          "renderedTextPx": 26,
+          "legibility": "marginal",
           "text": "Select for batch email ‘Avery Chen Senior Technical Recruiter DIRECT USEFULNESS: Not the right person?",
           "words": [
             {
@@ -2232,6 +2262,9 @@
           "width": 390,
           "height": 265,
           "aspect": 1.472,
+          "textHeightPx": 9,
+          "renderedTextPx": 25,
+          "legibility": "marginal",
           "text": "‘Avery Chen Senior Technical Recruiter DIRECT USEFULNESS: Not the right person? Proof Why matched title atthe target company. Company trust Current role at Northstar Labs. Email email is shown only after safe checks. Warm path warm path found from your imported graph yet.",
           "words": [
             {
@@ -2546,6 +2579,9 @@
           "width": 503,
           "height": 306,
           "aspect": 1.644,
+          "textHeightPx": 10,
+          "renderedTextPx": 21,
+          "legibility": "marginal",
           "text": "+ Solomon Dashboard Jobs Shopify, Stripe, Google GitHub Organization (optional vercel, stripe Find engineers via their public GitHub contributions. Contacts per category 1 Choose how many managers, and peers to try to retum per search. Find People",
           "words": [
             {
@@ -2818,6 +2854,9 @@
           "width": 396,
           "height": 324,
           "aspect": 1.222,
+          "textHeightPx": 9,
+          "renderedTextPx": 25,
+          "legibility": "marginal",
           "text": "Select for batch email Riley Patel Product Engineer DIRECT Not the right person? Proof Why matched teammate ttle at the target company. Company trust Current role at Northstar Labs. Email safety is shown only after safe checks. Warm path warm path found from your imported Linkedin graph yet. Email: riley@example.test Confidence 0",
           "words": [
             {
@@ -3195,6 +3234,9 @@
           "width": 389,
           "height": 324,
           "aspect": 1.201,
+          "textHeightPx": 9,
+          "renderedTextPx": 25,
+          "legibility": "marginal",
           "text": "for batch email Morgan Lee Director of Engineering | ( DIRECT WATCH ) |» USEFULNESS: 42x Not the right person? Proof Why matched manager title atthe target company. Company trust at Northstar Labs. Email safety email is shown only after safe checks. Warm path warm path found from your imported Linkedin graph yet. Email: morgan@example.test Confidence 0",
           "words": [
             {
@@ -3607,6 +3649,9 @@
           "width": 541,
           "height": 213,
           "aspect": 2.54,
+          "textHeightPx": 10,
+          "renderedTextPx": 20,
+          "legibility": "marginal",
           "text": "Saved Contacts (6) Saved contacts are grouped by company so search results do not blur together. Filter saved contacts by company Northstar Labs| Showing 3 of 6 saved contacts. Northstar Labs 3",
           "words": [
             {
@@ -3851,6 +3896,9 @@
           "width": 742,
           "height": 300,
           "aspect": 2.473,
+          "textHeightPx": 10,
+          "renderedTextPx": 15,
+          "legibility": "poor",
           "text": "Message to Avery Chen Subject: Product Engineer at Northstar Labs Subject Product Engineer at Northstar Labs Hi Avery — I'm reaching out about the Product Engineer role at Northstar Labs. Your work supporting technical hiring made you a relevant person to ask about the team and its priorities. I'd value your insight it open",
           "words": [
             {
@@ -4241,6 +4289,9 @@
           "width": 742,
           "height": 300,
           "aspect": 2.473,
+          "textHeightPx": 10,
+          "renderedTextPx": 15,
+          "legibility": "poor",
           "text": "Message to Avery Chen Subject: Product Engineer at Northstar Labs Subject Product Engineer at Northstar Labs Hi Avery — I'm reaching out about the Product Engineer role at Northstar Labs. Your work supporting technical hiring made you a relevant person to ask about the team and its priorities. I'd value your insight it open",
           "words": [
             {
@@ -4631,6 +4682,9 @@
           "width": 742,
           "height": 300,
           "aspect": 2.473,
+          "textHeightPx": 10,
+          "renderedTextPx": 15,
+          "legibility": "poor",
           "text": "Message to Avery Chen Subject: Product Engineer at Northstar Labs Subject Product Engineer at Northstar Labs Hi Avery — I'm reaching out about the Product Engineer role at Northstar Labs. Your work supporting technical hiring made you a relevant person to ask about the team and its priorities. I'd value your insight it open",
           "words": [
             {
@@ -5022,6 +5076,9 @@
           "width": 444,
           "height": 63,
           "aspect": 7.048,
+          "textHeightPx": 9,
+          "renderedTextPx": 22,
+          "legibility": "marginal",
           "text": "‘Stage this emall as a draft in your inbox — you review and send it manually Connect Gmail or Outlook in Settings to stage drafts in your inbox.",
           "words": [
             {
@@ -5231,6 +5288,9 @@
           "width": 455,
           "height": 223,
           "aspect": 2.04,
+          "textHeightPx": 10,
+          "renderedTextPx": 24,
+          "legibility": "marginal",
           "text": "New Draft Select a person, optional saved job, channel, and outcome goal to generate a message. Filter contacts by company Uber, Stripe, Apple Person Avery Chen — Senior Technical Recruiter",
           "words": [
             {
@@ -5454,6 +5514,9 @@
           "width": 466,
           "height": 196,
           "aspect": 2.378,
+          "textHeightPx": 9,
+          "renderedTextPx": 21,
+          "legibility": "marginal",
           "text": "‘Avery Chen Senior Technical Recruiter Recruiter strategy: fit + next step toward the role. If they are not the owner, ask who on recruiting or the hiring team is best. Email: Verity Email with Hunter",
           "words": [
             {
@@ -5712,6 +5775,9 @@
           "width": 466,
           "height": 104,
           "aspect": 4.481,
+          "textHeightPx": 10,
+          "renderedTextPx": 23,
+          "legibility": "marginal",
           "text": "Al Reasoning Why the Al wrote this message this way. The role, company, and Avery's recruiting relevance remain attached",
           "words": [
             {
@@ -5858,6 +5924,9 @@
           "width": 235,
           "height": 162,
           "aspect": 1.451,
+          "textHeightPx": 10,
+          "renderedTextPx": 46,
+          "legibility": "ok",
           "text": "Channet Linkedin Note Connection request (300 chars max) Goal Warm Intro",
           "words": [
             {
@@ -5948,6 +6017,9 @@
           "width": 427,
           "height": 77,
           "aspect": 5.545,
+          "textHeightPx": 14,
+          "renderedTextPx": 35,
+          "legibility": "ok",
           "text": "Messages Draft personalized outreach messages powered by Al.",
           "words": [
             {
@@ -6017,6 +6089,9 @@
           "width": 187,
           "height": 74,
           "aspect": 2.527,
+          "textHeightPx": 10,
+          "renderedTextPx": 58,
+          "legibility": "ok",
           "text": "Target Job (Optional) No saved job context",
           "words": [
             {
@@ -6079,6 +6154,9 @@
           "width": 212,
           "height": 38,
           "aspect": 5.579,
+          "textHeightPx": 10,
+          "renderedTextPx": 51,
+          "legibility": "ok",
           "text": "with fresh Linkedin context",
           "words": [
             {
@@ -6127,6 +6205,9 @@
           "width": 520,
           "height": 590,
           "aspect": 0.881,
+          "textHeightPx": 10,
+          "renderedTextPx": 21,
+          "legibility": "marginal",
           "text": "New Draft Select a person, optional saved job, channel, and outcome goal to generate a message. Filter contacts by company e.g. Uber, Stripe, Apple Person Select a person... Target Job (Optional) No saved job context a saved job when you want the draft anchored to a Linkedin Note Connection request (300 chars max) ‘Outcome Goal Warm Intro",
           "words": [
             {
@@ -6538,6 +6619,9 @@
           "width": 490,
           "height": 562,
           "aspect": 0.872,
+          "textHeightPx": 10,
+          "renderedTextPx": 22,
+          "legibility": "marginal",
           "text": "New Draft Select a person, optional saved job, channel, and outcome goal to generate a message. Filter contacts by company e.g. Uber, Stripe, Apple Person Select a person... Target Job (Optional) No saved job context a saved job when you want the draft anchored to a Linkedin Note Connection request (300 chars max) ‘Outcome Goal Warm Intro",
           "words": [
             {
@@ -6950,6 +7034,9 @@
           "width": 427,
           "height": 43,
           "aspect": 9.93,
+          "textHeightPx": 12,
+          "renderedTextPx": 30,
+          "legibility": "ok",
           "text": "Draft personalized outreach messages powered by Al.",
           "words": [
             {
@@ -7012,6 +7099,9 @@
           "width": 316,
           "height": 40,
           "aspect": 7.9,
+          "textHeightPx": 10,
+          "renderedTextPx": 34,
+          "legibility": "ok",
           "text": "Dashboard Jobs Tracker People",
           "words": [
             {
@@ -7053,6 +7143,9 @@
           "width": 218,
           "height": 46,
           "aspect": 4.739,
+          "textHeightPx": 17,
+          "renderedTextPx": 84,
+          "legibility": "ok",
           "text": "Message History (2)",
           "words": [
             {
@@ -7087,6 +7180,9 @@
           "width": 130,
           "height": 46,
           "aspect": 2.826,
+          "textHeightPx": 14,
+          "renderedTextPx": 116,
+          "legibility": "ok",
           "text": "& O ce",
           "words": [
             {
@@ -7128,6 +7224,9 @@
           "width": 560,
           "height": 310,
           "aspect": 1.806,
+          "textHeightPx": 10,
+          "renderedTextPx": 19,
+          "legibility": "poor",
           "text": "Applied Interviewing Offers @ Interviewing 1 @ Offer © © Accepted Product Engineer No jobs Northstar Labs 8/3/2026",
           "words": [
             {
@@ -7266,6 +7365,9 @@
           "width": 430,
           "height": 390,
           "aspect": 1.103,
+          "textHeightPx": 10,
+          "renderedTextPx": 25,
+          "legibility": "marginal",
           "text": "Product Engineer Northstar Labs Toronto, Canada Move to Applied Offer Accepted Rejected Withdrawn Applied: 8/3/2026 Interview Rounds Round No interview rounds logged yet View",
           "words": [
             {
@@ -7447,6 +7549,9 @@
           "width": 387,
           "height": 76,
           "aspect": 5.092,
+          "textHeightPx": 14,
+          "renderedTextPx": 39,
+          "legibility": "ok",
           "text": "Application Tracker Track your job applications from applied to offer.",
           "words": [
             {
@@ -7530,6 +7635,9 @@
           "width": 199,
           "height": 58,
           "aspect": 3.431,
+          "textHeightPx": 14,
+          "renderedTextPx": 76,
+          "legibility": "ok",
           "text": "© Moved to interviewing",
           "words": [
             {
@@ -7578,6 +7686,9 @@
           "width": 560,
           "height": 310,
           "aspect": 1.806,
+          "textHeightPx": 9,
+          "renderedTextPx": 17,
+          "legibility": "poor",
           "text": "Total Active Applied Interviewing © Applied 1 @ Interviewing Offer Product Engineer No jobs Northstar Labs 8/3/2026",
           "words": [
             {
@@ -7710,6 +7821,9 @@
           "width": 387,
           "height": 77,
           "aspect": 5.026,
+          "textHeightPx": 14,
+          "renderedTextPx": 39,
+          "legibility": "ok",
           "text": "Application Tracker Track your job applications from applied to offer.",
           "words": [
             {
@@ -7793,6 +7907,9 @@
           "width": 185,
           "height": 132,
           "aspect": 1.402,
+          "textHeightPx": 10,
+          "renderedTextPx": 58,
+          "legibility": "ok",
           "text": "Move to Interviewing Rejected Withdrawn Applied: 8/3/2026",
           "words": [
             {
@@ -7855,6 +7972,9 @@
           "width": 165,
           "height": 85,
           "aspect": 1.941,
+          "textHeightPx": 10,
+          "renderedTextPx": 65,
+          "legibility": "ok",
           "text": "Product Engineer Northstar Labs Toronto, Canada",
           "words": [
             {
@@ -7910,6 +8030,9 @@
           "width": 141,
           "height": 40,
           "aspect": 3.525,
+          "textHeightPx": 8,
+          "renderedTextPx": 61,
+          "legibility": "ok",
           "text": "© © Accepted",
           "words": [
             {
@@ -7944,6 +8067,9 @@
           "width": 143,
           "height": 39,
           "aspect": 3.667,
+          "textHeightPx": 9,
+          "renderedTextPx": 68,
+          "legibility": "ok",
           "text": "View full job details",
           "words": [
             {

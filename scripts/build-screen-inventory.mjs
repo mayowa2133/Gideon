@@ -65,6 +65,23 @@ const ASSET_FOR_CROP = {
   message: "outreach_complete", messageDraftEdit: "outreach_complete", messageEdit: "outreach_complete"
 };
 
+const FRAME_WIDTH = 1080;
+// Graded, not a threshold, because size alone does not decide it. Measured on
+// this product: `contactHeader` at 26px and `contactProof` at 25px are read by
+// the composite check every time, and the control assurance at 23px never is.
+// The difference there is contrast -- dark card text against light grey small
+// print -- so a single cutoff would either pass the case that fails or fail
+// three that work. This grades the risk and says so.
+const LEGIBILITY = { ok: 30, marginal: 20 };
+function withLegibility(fields, words) {
+  if (!words.length) return { ...fields, textHeightPx: 0, renderedTextPx: 0, legibility: "poor" };
+  const heights = words.map(({ height }) => height).sort((a, b) => a - b);
+  const textHeightPx = heights[Math.floor(heights.length / 2)];
+  const renderedTextPx = Math.round(textHeightPx * (FRAME_WIDTH / Math.max(1, fields.width)));
+  const legibility = renderedTextPx >= LEGIBILITY.ok ? "ok" : renderedTextPx >= LEGIBILITY.marginal ? "marginal" : "poor";
+  return { ...fields, textHeightPx, renderedTextPx, legibility };
+}
+
 const screens = [];
 for (const screen of SCREENS) {
   const still = path.join(studyDir, `${screen.asset}.png`);
@@ -74,11 +91,13 @@ for (const screen of SCREENS) {
   const elements = [];
   for (const [id, rect] of Object.entries(APPROVED)) {
     if (ASSET_FOR_CROP[id] !== screen.asset) continue;
-    elements.push({ id, provenance: "approved", ...rectFields(rect), ...textFor(words, rect) });
+    const content = textFor(words, rect);
+    elements.push({ id, provenance: "approved", ...withLegibility(rectFields(rect), content.words), ...content });
   }
   for (const [id, extra] of Object.entries(EXTRA_APPROVED)) {
     if (extra.asset !== screen.asset) continue;
-    elements.push({ id, provenance: "approved", trim: extra.trim, ...rectFields(extra), ...textFor(words, extra) });
+    const content = textFor(words, extra);
+    elements.push({ id, provenance: "approved", trim: extra.trim, ...withLegibility(rectFields(extra), content.words), ...content });
   }
   // Candidates are only offered where the approved set does not already cover
   // the region: an angle that needs the Jobs title has it, and one that needs a
@@ -88,7 +107,8 @@ for (const screen of SCREENS) {
     const covered = elements.some((element) => overlapFraction(block, element) > .6);
     if (covered || block.words.length < 3) continue;
     candidateIndex += 1;
-    elements.push({ id: `${screen.asset}Candidate${candidateIndex}`, provenance: "candidate", trim: screen.trim, ...rectFields(block), ...textFor(words, block) });
+    const content = textFor(words, block);
+    elements.push({ id: `${screen.asset}Candidate${candidateIndex}`, provenance: "candidate", trim: screen.trim, ...withLegibility(rectFields(block), content.words), ...content });
   }
   screens.push({ asset: screen.asset, trim: screen.trim, width: SOURCE_WIDTH, height: SOURCE_HEIGHT, elements });
   process.stdout.write(`${screen.asset.padEnd(20)}${String(words.length).padStart(4)} words  ${String(elements.filter((element) => element.provenance === "approved").length).padStart(2)} approved  ${String(elements.filter((element) => element.provenance === "candidate").length).padStart(2)} candidate\n`);
@@ -100,9 +120,36 @@ await fs.writeFile(target, `${JSON.stringify(inventory, null, 2)}\n`);
 const total = screens.reduce((sum, screen) => sum + screen.elements.length, 0);
 process.stdout.write(`\n${total} elements across ${screens.length} screens -> ${path.relative(root, target)}\n`);
 
+// Reported rather than dropped. An illegible region is still a true description
+// of the product; what it cannot be is evidence in a vertical frame, and the fix
+// is a re-capture. Silently discarding them would hide that.
+const atRisk = screens.flatMap(({ asset, elements }) => elements.filter(({ legibility }) => legibility !== "ok").map((element) => ({ asset, ...element })));
+const poor = atRisk.filter(({ legibility }) => legibility === "poor");
+if (atRisk.length) {
+  process.stdout.write(`\n${poor.length} region(s) cannot carry readable evidence at 1080 wide, ${atRisk.length - poor.length} more are marginal:\n`);
+  for (const element of [...poor, ...atRisk.filter(({ legibility }) => legibility === "marginal")].slice(0, 10))
+    process.stdout.write(`  ${element.legibility.padEnd(9)}${element.asset.padEnd(18)}${element.id.padEnd(26)}${String(element.textHeightPx).padStart(3)}px in ${String(element.width).padStart(4)}px -> ${String(element.renderedTextPx).padStart(3)}px on frame\n`);
+  process.stdout.write(`  Poor needs a re-capture at a smaller viewport, not a different crop. Marginal\n  depends on contrast: 25-26px dark-on-white reads, 23px light grey does not.\n`);
+}
+
 function rectFields(rect) {
   return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, aspect: Number((rect.width / rect.height).toFixed(3)) };
 }
+
+// Whether a region's text can survive the frame it will be shown in.
+//
+// Learned the hard way on the `control` claim. Its assurance sentence -- "Stage
+// this email as a draft in your inbox, you review and send it manually" -- OCRs
+// perfectly from the desktop screenshot, and reads fine when you crop to it and
+// zoom. It is still unusable as evidence: the sentence is 460 source pixels wide
+// with 11px type, so the most a 1080-wide vertical frame can give it is 2.35x,
+// or 26px. Every string the composite check reliably reads is 27-38px. Four
+// renders went into discovering that, and none of them could have succeeded.
+//
+// The limit is arithmetic and knowable before anything renders: at best a region
+// fills the frame width, so its type lands at `height * 1080 / width`. A region
+// that fails here needs a capture change -- a smaller viewport or a zoomed page
+// so the words are physically larger in the source -- not a different crop.
 
 // Words fully inside the region, plus their boxes. The boxes are kept because
 // the resolver has to reject a crop that would cut a word in half -- an earlier

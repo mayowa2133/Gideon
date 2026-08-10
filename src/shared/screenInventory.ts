@@ -28,6 +28,12 @@ export interface InventoryElement {
   trim?: number;
   text: string;
   words: InventoryWord[];
+  // How well this region's text would survive a 1080-wide vertical frame.
+  // Computed by the inventory builder, not here, because it is a property of the
+  // capture rather than of any particular film.
+  textHeightPx?: number;
+  renderedTextPx?: number;
+  legibility?: "ok" | "marginal" | "poor";
 }
 export interface InventoryScreen { asset: string; trim: number; width: number; height: number; elements: InventoryElement[] }
 export interface ScreenInventory { schemaVersion: "1"; product: string; source: { width: number; height: number }; screens: InventoryScreen[] }

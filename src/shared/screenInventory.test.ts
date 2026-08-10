@@ -30,6 +30,24 @@ describe("screen inventory", () => {
     }
   });
 
+  // The rule the `control` claim paid four renders to learn: a region whose text
+  // cannot survive the frame is not evidence, however well it OCRs on a desktop
+  // screenshot. Knowable before anything renders -- at best a region fills the
+  // frame width, so its type lands at height * 1080 / width.
+  it("grades whether each region's text can survive the frame", () => {
+    for (const screen of inventory.screens) {
+      for (const element of screen.elements) {
+        expect(element.legibility, `${screen.asset}/${element.id}`).toMatch(/^(ok|marginal|poor)$/);
+        const expected = Math.round((element.textHeightPx ?? 0) * (1080 / element.width));
+        expect(element.renderedTextPx, `${screen.asset}/${element.id}`).toBe(expected);
+      }
+    }
+    const all = inventory.screens.flatMap(({ elements }) => elements);
+    // Both ends of the grade are represented, or the rule is not discriminating.
+    expect(all.some(({ legibility }) => legibility === "ok")).toBe(true);
+    expect(all.some(({ legibility }) => legibility === "poor")).toBe(true);
+  });
+
   it("keeps approved and proposed regions distinct", () => {
     const all = inventory.screens.flatMap(({ elements }) => elements);
     expect(all.filter(({ provenance }) => provenance === "approved").length).toBeGreaterThan(10);
