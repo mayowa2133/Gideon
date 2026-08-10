@@ -11,7 +11,7 @@ import { chromium } from "playwright";
 import { measureDecodedMedia } from "./lib/creator-story-decoded-quality.mjs";
 import { measureV22Motion } from "./lib/creator-story-v22-motion.mjs";
 import { measureV22Palette } from "./lib/creator-story-v22-palette.mjs";
-import { criticStatus } from "./lib/creator-story-frame-critic.mjs";
+import { criticStatus, extractCriticFrames, writeCriticWorklist } from "./lib/creator-story-frame-critic.mjs";
 import { evaluateV22HeldStability, measureV22HeldStability } from "./lib/creator-story-v22-stability.mjs";
 
 const require=createRequire(import.meta.url);
@@ -505,7 +505,19 @@ function strip(frames,scale){
   const columns=Math.min(frames.length,Math.ceil(Math.sqrt(frames.length*2)));
   return `select='${frames.map((frame)=>`eq(n,${frame})`).join("+")}',scale=${scale},tile=${columns}x${Math.ceil(frames.length/columns)}`;
 }
-async function qualityAudit(files){const decoded=await measureDecodedMedia(files.master),sections=[{id:"opening",fromSeconds:0,toSeconds:4.4},{id:"mechanism",fromSeconds:14,toSeconds:24.5},{id:"payoff",fromSeconds:27.5,toSeconds:32},{id:"cta",fromSeconds:32,toSeconds:FILM_SECONDS}],motion=await measureV22Motion(files.master,sections),ocr=await ocrAudit(files.master),composite=await compositeAudit(files.master),layout=layoutAudit(),bounds=auditV22RenderedBounds(manifest.scenes.map((scene)=>({id:scene.id,layout:scene.layout,camera:scene.camera,mascotRole:scene.mascot.role}))),mascot=await mascotAudit(),mascotBoundaries=await mascotBoundaryContinuityAudit(),captionCollisions=captionCollisionAudit(),frameCritic=await criticStatus(path.join(root,"fixtures","creator-story","critic-eval","calibration-receipt.json")),phone=phoneAudit(ocr,mascot,captionCollisions),transitions=transitionAudit(motion),motionBands=evaluateV22MotionBands(motion),shotBands=evaluateV22ShotBands(decoded.shots),palette=await measureV22Palette(files.master),paletteBands=evaluateV22PaletteBands(palette),sceneDurations=auditV22SceneDurations(manifest.scenes),presenterOccupancy=auditV22PresenterOccupancy(manifest.scenes),mascotDropouts=await mascotDropoutAudit(files.master),transcript=await narrationAudit(files.master,files.narration),metadata=decoded.metadata,manifestAudit=auditSolomonCreatorStoryV22(manifest),narrationGaps=await narrationGapAudit(),numeralAnchorsDecoded=await numeralAnchorAudit(),heldStability=await heldStabilityAudit(files.master),captionSync=auditCaptionSync(transcript),baseline=JSON.parse(await fs.readFile(path.join(output,"baseline","v21-authoritative-baseline.json"),"utf8"));
+
+// Extracts the sampled frames and writes the worklist an agent judges, then
+// reports whether the critic is allowed to speak at all. Two frames per scene at
+// 20% and 65%, the same sampling the scene audits use.
+async function stageCriticPass(master){
+  const dir=path.join(output,"critic");
+  const frames=sceneSampleFrames();
+  await extractCriticFrames(master,frames,dir);
+  const worklist=await writeCriticWorklist(frames.map((frame)=>({frame,file:path.join(dir,`critic-${String(frame).padStart(4,"0")}.png`)})),dir);
+  const status=await criticStatus(path.join(root,"fixtures","creator-story","critic-eval","calibration-receipt.json"));
+  return{...status,stagedFrames:worklist.frames.length,worklist:path.join(dir,"worklist.json")};
+}
+async function qualityAudit(files){const decoded=await measureDecodedMedia(files.master),sections=[{id:"opening",fromSeconds:0,toSeconds:4.4},{id:"mechanism",fromSeconds:14,toSeconds:24.5},{id:"payoff",fromSeconds:27.5,toSeconds:32},{id:"cta",fromSeconds:32,toSeconds:FILM_SECONDS}],motion=await measureV22Motion(files.master,sections),ocr=await ocrAudit(files.master),composite=await compositeAudit(files.master),layout=layoutAudit(),bounds=auditV22RenderedBounds(manifest.scenes.map((scene)=>({id:scene.id,layout:scene.layout,camera:scene.camera,mascotRole:scene.mascot.role}))),mascot=await mascotAudit(),mascotBoundaries=await mascotBoundaryContinuityAudit(),captionCollisions=captionCollisionAudit(),frameCritic=await stageCriticPass(files.master),phone=phoneAudit(ocr,mascot,captionCollisions),transitions=transitionAudit(motion),motionBands=evaluateV22MotionBands(motion),shotBands=evaluateV22ShotBands(decoded.shots),palette=await measureV22Palette(files.master),paletteBands=evaluateV22PaletteBands(palette),sceneDurations=auditV22SceneDurations(manifest.scenes),presenterOccupancy=auditV22PresenterOccupancy(manifest.scenes),mascotDropouts=await mascotDropoutAudit(files.master),transcript=await narrationAudit(files.master,files.narration),metadata=decoded.metadata,manifestAudit=auditSolomonCreatorStoryV22(manifest),narrationGaps=await narrationGapAudit(),numeralAnchorsDecoded=await numeralAnchorAudit(),heldStability=await heldStabilityAudit(files.master),captionSync=auditCaptionSync(transcript),baseline=JSON.parse(await fs.readFile(path.join(output,"baseline","v21-authoritative-baseline.json"),"utf8"));
   const decodedFrames=decoded.metadata.frameCount,expectedFrames=FILM_FRAMES;
   const durationFrames=Math.round(decoded.metadata.durationSeconds*30);
   const fullDecode=decodedFrames===expectedFrames&&Math.abs(decodedFrames-durationFrames)<=1;
