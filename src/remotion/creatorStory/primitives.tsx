@@ -49,6 +49,27 @@ export const EvidenceCrop: React.FC<{ crop: SceneProductCrop; width: number; hei
   </div>;
 };
 
+// A positioned card and the crop inside it, sized once.
+//
+// EvidenceCrop takes width and height because it has to solve cover-fit, and for
+// as long as callers passed those separately from the box they were drawing,
+// nothing stopped the two disagreeing. One did: a crop was given 735 for a
+// 530-tall box, cover-fit solved on height instead of width, and 54 source
+// pixels went off each side taking a RECRUITER badge with them. It rendered as
+// "REC" and shipped, because no gate compares a prop to a style.
+//
+// This makes the box the single source of both. A caller states where and how
+// big once; the card and the crop cannot disagree because there is nothing left
+// to disagree about.
+export interface EvidenceBox { left: number; top: number; width: number; height: number }
+export const EvidenceRegion: React.FC<{ box: EvidenceBox; crop: SceneProductCrop; frame: number; border?: string; style?: React.CSSProperties; children?: React.ReactNode }> = ({ box, crop, frame, border, style, children }) =>
+  <div style={{ position: "absolute", left: box.left, top: box.top, width: box.width, height: box.height, ...style }}>
+    <EvidenceCard border={border}>
+      <EvidenceCrop crop={crop} width={box.width} height={box.height} frame={frame} />
+      {children}
+    </EvidenceCard>
+  </div>;
+
 export const EvidenceCard: React.FC<React.PropsWithChildren<{ border?: string }>> = ({ children, border }) =>
   <div style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: 32, background: WHITE, border: border ? `5px solid ${border}` : "none", boxShadow: "0 28px 70px rgba(7,17,31,.18)" }}>{children}</div>;
 

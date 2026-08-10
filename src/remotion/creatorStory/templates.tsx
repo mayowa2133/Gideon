@@ -1,7 +1,7 @@
 import { AbsoluteFill, interpolate, spring, useCurrentFrame } from "remotion";
 import type { FilmScene } from "../../shared/creatorStoryFilm";
 import type { SceneProductCrop } from "../../shared/types";
-import { Backdrop, CONTENT_FLOOR_BOTTOM, Cursor, EvidenceCard, EvidenceCrop, GREEN, INK, MINT, ProofLabel, StatePill, WHITE, placeholderSurface } from "./primitives";
+import { Backdrop, CONTENT_FLOOR_BOTTOM, Cursor, EvidenceCrop, EvidenceRegion, GREEN, INK, MINT, ProofLabel, StatePill, WHITE, placeholderSurface } from "./primitives";
 
 // Seven content patterns covering the eighteen scenes the reference film draws
 // with fifteen bespoke components. The generalisation is arrangement math: where
@@ -78,12 +78,9 @@ export const EvidenceBandTemplate: React.FC<TemplateProps> = ({ scene, frame }) 
   const reveal = interpolate(frame, [10, 55], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const settle = spring({ frame: Math.max(0, frame - swapAt), fps: 30, config: { damping: 20, stiffness: 180 }, durationInFrames: 16 });
   return <AbsoluteFill>
-    <div style={{ position: "absolute", left: box.left + Math.round((box.width - size.width) / 2), top: box.top, width: size.width, height: size.height }}>
-      <EvidenceCard border={complete && options.highlight ? GREEN : undefined}>
-        <EvidenceCrop crop={crop} width={size.width} height={size.height} frame={frame} />
-        {options.highlight && <div style={{ position: "absolute", left: Math.round(size.width * .035), top: Math.round(size.height * .76), width: Math.round(size.width * .93) * reveal, height: Math.round(size.height * .2), borderRadius: 12, background: "rgba(57,242,181,.24)", borderBottom: `7px solid ${MINT}` }} />}
-      </EvidenceCard>
-    </div>
+    <EvidenceRegion box={{ left: box.left + Math.round((box.width - size.width) / 2), top: box.top, width: size.width, height: size.height }} crop={crop} frame={frame} border={complete && options.highlight ? GREEN : undefined}>
+      {options.highlight && <div style={{ position: "absolute", left: Math.round(size.width * .035), top: Math.round(size.height * .76), width: Math.round(size.width * .93) * reveal, height: Math.round(size.height * .2), borderRadius: 12, background: "rgba(57,242,181,.24)", borderBottom: `7px solid ${MINT}` }} />}
+    </EvidenceRegion>
     {options.labels?.length ? (
       <div style={{ position: "absolute", left: box.left + 4, right: 1080 - box.left - box.width + 4, top: box.top + size.height + 34, display: "grid", gap: 10, justifyItems: "start" }}>
         {options.labels.map((text, index) => <ProofLabel key={text} text={text} primary={index === 0} delay={index * 7} frame={frame} />)}
@@ -113,9 +110,7 @@ export const StateSwapTemplate: React.FC<TemplateProps> = ({ scene, frame }) => 
   const size = cardSize(crop, box.width, box.height);
   const pulse = spring({ frame: Math.max(0, frame - swapAt + 2), fps: 30, config: { damping: 20, stiffness: 190 }, durationInFrames: 16 });
   return <AbsoluteFill>
-    <div style={{ position: "absolute", left: box.left + Math.round((box.width - size.width) / 2), top: box.top, width: size.width, height: size.height }}>
-      <EvidenceCard><EvidenceCrop crop={crop} width={size.width} height={size.height} frame={frame} /></EvidenceCard>
-    </div>
+    <EvidenceRegion box={{ left: box.left + Math.round((box.width - size.width) / 2), top: box.top, width: size.width, height: size.height }} crop={crop} frame={frame} />
     {options.pills && <div style={{ position: "absolute", left: 120, right: 120, top: box.top + size.height + 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 22, fontSize: 34, fontWeight: 950 }}>
       <StatePill text={options.pills[0]} active={!swapped} />
       <span style={{ fontSize: 54, color: GREEN }}>&#8594;</span>
@@ -182,9 +177,7 @@ export const CardFieldTemplate: React.FC<TemplateProps> = ({ scene, frame }) => 
       })}
       {result && (() => {
         const size = cardSize(result, box.width, box.height);
-        return <div style={{ position: "absolute", left: box.left + (box.width - size.width) / 2, top: box.top + (box.height - size.height) / 2, width: size.width, height: size.height, opacity: progress, transform: `scale(${.65 + .35 * progress})` }}>
-          <EvidenceCard border={GREEN}><EvidenceCrop crop={result} width={size.width} height={size.height} frame={frame} /></EvidenceCard>
-        </div>;
+        return <EvidenceRegion box={{ left: box.left + (box.width - size.width) / 2, top: box.top + (box.height - size.height) / 2, width: size.width, height: size.height }} crop={result} frame={frame} border={GREEN} style={{ opacity: progress, transform: `scale(${.65 + .35 * progress})` }} />;
       })()}
     </AbsoluteFill>;
   }

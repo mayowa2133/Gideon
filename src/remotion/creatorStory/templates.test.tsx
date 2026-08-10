@@ -111,6 +111,29 @@ describe("creator story templates", () => {
     expect(new Set(widths).size, "cards should differ in width").toBeGreaterThan(1);
   });
 
+  // The class of bug EvidenceRegion exists to make unrepresentable. A crop given
+  // a size that disagrees with the box it sits in makes cover-fit solve on the
+  // wrong axis: one was passed 735 for a 530-tall box, threw away 54 source
+  // pixels from each side, and clipped a RECRUITER badge down to "REC" in a
+  // shipped film. No gate compares a prop to a style, so nothing caught it.
+  it("sizes every crop from the box it is drawn in", () => {
+    for (const scene of film.filter((candidate) => candidate.productCrops.length)) {
+      const markup = draw(scene.id, Math.floor((scene.to - scene.from) * .4));
+      // Each product image is wrapped by exactly one sized box; the image's own
+      // geometry is solved from that box, so a mismatch cannot be expressed.
+      const boxes = [...markup.matchAll(/width:(\d+);height:(\d+)[^"]*"><div style="position:absolute;inset:0;overflow:hidden;border-radius:32/g)];
+      for (const box of boxes) {
+        expect(Number(box[1]), `${scene.id} box width`).toBeGreaterThan(0);
+        expect(Number(box[2]), `${scene.id} box height`).toBeGreaterThan(0);
+      }
+    }
+    // And the primitive that could express one is no longer reachable from the
+    // templates: they hand a box, not a width and a height.
+    const source = readFileSync(path.join(__dirname, "templates.tsx"), "utf8");
+    expect(source).not.toMatch(/<EvidenceCard\b/);
+    expect(source).toMatch(/<EvidenceRegion\b/);
+  });
+
   it("never draws a card over the presenter", () => {
     // Overlap is two-dimensional. An earlier version of this compared only the
     // vertical edge and flagged `friction`, whose flank cards sit beside the
