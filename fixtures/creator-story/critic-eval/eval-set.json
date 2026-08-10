@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1",
+  "note": "Good frames are real frames from a shipped master. Bad frames are synthetic single-defect variants of those frames; they test category detection, not this project's specific history.",
+  "sourceMaster": "tmp/solomon-creator-story-v22-performance/final/solomon-creator-story-v22-performance-master-NOT-FOR-PUBLICATION.mp4",
+  "samples": [
+    {
+      "id": "good-120",
+      "file": "fixtures/creator-story/critic-eval/good-120.png",
+      "expectedDefect": false,
+      "kind": "none",
+      "provenance": "real"
+    },
+    {
+      "id": "good-350",
+      "file": "fixtures/creator-story/critic-eval/good-350.png",
+      "expectedDefect": false,
+      "kind": "none",
+      "provenance": "real"
+    },
+    {
+      "id": "good-620",
+      "file": "fixtures/creator-story/critic-eval/good-620.png",
+      "expectedDefect": false,
+      "kind": "none",
+      "provenance": "real"
+    },
+    {
+      "id": "good-900",
+      "file": "fixtures/creator-story/critic-eval/good-900.png",
+      "expectedDefect": false,
+      "kind": "none",
+      "provenance": "real"
+    },
+    {
+      "id": "good-1100",
+      "file": "fixtures/creator-story/critic-eval/good-1100.png",
+      "expectedDefect": false,
+      "kind": "none",
+      "provenance": "real"
+    },
+    {
+      "id": "bad-occlusion",
+      "file": "fixtures/creator-story/critic-eval/bad-occlusion.png",
+      "expectedDefect": true,
+      "kind": "occlusion",
+      "provenance": "synthetic"
+    },
+    {
+      "id": "bad-clipped",
+      "file": "fixtures/creator-story/critic-eval/bad-clipped.png",
+      "expectedDefect": true,
+      "kind": "clipped",
+      "provenance": "synthetic"
+    },
+    {
+      "id": "bad-empty",
+      "file": "fixtures/creator-story/critic-eval/bad-empty.png",
+      "expectedDefect": true,
+      "kind": "empty",
+      "provenance": "synthetic"
+    }
+  ]
+}
