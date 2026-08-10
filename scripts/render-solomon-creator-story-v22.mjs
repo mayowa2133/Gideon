@@ -690,7 +690,7 @@ function captionCollisionAudit(){
   return{schemaVersion:"10.1",method:"Declared caption rects via auditV22Layout, plus overlapping caption windows and drawn caption bands measured against the scene-content ceiling.",collisionCount,overlaps,bandBreaches,declared,passed:collisionCount===0};
 }
 
-function phoneAudit(ocr,mascot,captionCollisions){const input={requiredTextCoverage:ocr.requiredCoverage,primaryFocalPoints:2,contactReadable:ocr.recognized.includes("avery")&&ocr.recognized.includes("senior technical recruiter"),messageReadable:ocr.recognized.includes("technical hiring"),mascotFaceReadable:mascot.renderedFaceStateCount>=6,captionCollisionCount:captionCollisions.collisionCount,evidencePixelsArePrimary:false};return{schemaVersion:"10.1",method:"360×640 decoded strips and 2× OCR inputs from exact master.",input,...auditV22PhoneScale(input)};}
+function phoneAudit(ocr,mascot,captionCollisions){const input={requiredTextCoverage:ocr.requiredCoverage,contactReadable:ocr.recognized.includes("avery")&&ocr.recognized.includes("senior technical recruiter"),messageReadable:ocr.recognized.includes("technical hiring"),mascotFaceReadable:mascot.renderedFaceStateCount>=6,captionCollisionCount:captionCollisions.collisionCount};return{schemaVersion:"10.1",method:"360×640 decoded strips and 2× OCR inputs from exact master.",input,...auditV22PhoneScale(input)};}
 // Declared transition metadata is now reconciled against decoded pixels per
 // boundary. V19 only counted declared kinds, so "zero dissolves" could pass
 // while every scene actually faded its own content in from zero.

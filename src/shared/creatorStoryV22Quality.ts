@@ -133,8 +133,15 @@ export function auditV22CompositionSimilarity(fingerprints: V22CompositionFinger
   return { passed:repeats.length===0,repeats,maximumUnchangedFrames };
 }
 
-export function auditV22PhoneScale(input:{requiredTextCoverage:number;primaryFocalPoints:number;contactReadable:boolean;messageReadable:boolean;mascotFaceReadable:boolean;captionCollisionCount:number;evidencePixelsArePrimary:boolean}){
-  const failures=[input.requiredTextCoverage<.9?"required_text":undefined,input.primaryFocalPoints>2?"too_many_focal_points":undefined,!input.contactReadable?"contact_small":undefined,!input.messageReadable?"message_small":undefined,!input.mascotFaceReadable?"mascot_face_small":undefined,input.captionCollisionCount>0?"caption_collision":undefined,input.evidencePixelsArePrimary?"labels_replace_proof":undefined].filter((value):value is string=>Boolean(value));
+// `primaryFocalPoints` and `evidencePixelsArePrimary` are gone rather than
+// implemented. Both were literals supplied by the caller -- 2 and false, on every
+// render this project has done -- so the gate was checking numbers it had been
+// handed. Both ask what a frame is mostly showing, which is a judgement about a
+// picture, not a geometric fact: that is the frame critic's question and it now
+// answers it. Reimplementing them here would have meant inventing a proxy for
+// something already measured properly elsewhere.
+export function auditV22PhoneScale(input:{requiredTextCoverage:number;contactReadable:boolean;messageReadable:boolean;mascotFaceReadable:boolean;captionCollisionCount:number;}){
+  const failures=[input.requiredTextCoverage<.9?"required_text":undefined,!input.contactReadable?"contact_small":undefined,!input.messageReadable?"message_small":undefined,!input.mascotFaceReadable?"mascot_face_small":undefined,input.captionCollisionCount>0?"caption_collision":undefined].filter((value):value is string=>Boolean(value));
   return{passed:failures.length===0,failures};
 }
 

@@ -43,7 +43,7 @@ describe("Creator Story V22 quality gates",()=>{
   it("enforces decisive transition and phone-scale policies",()=>{
     expect(auditV22Transitions([{type:"cut",purpose:"beat"},{type:"dissolve",purpose:"memory"},{type:"slide",purpose:"causal"}]).passed).toBe(true);
     expect(auditV22Transitions(Array.from({length:3},()=>({type:"dissolve" as const,purpose:"float"}))).passed).toBe(false);
-    expect(auditV22PhoneScale({requiredTextCoverage:1,primaryFocalPoints:2,contactReadable:true,messageReadable:true,mascotFaceReadable:true,captionCollisionCount:0,evidencePixelsArePrimary:false}).passed).toBe(true);
+    expect(auditV22PhoneScale({requiredTextCoverage:1,contactReadable:true,messageReadable:true,mascotFaceReadable:true,captionCollisionCount:0}).passed).toBe(true);
   });
   it("rejects unchanged compositions beyond two seconds",()=>{
     const shared={product:null,mascot:null,background:"mint",cameraScale:1,semanticState:"hold"};
