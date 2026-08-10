@@ -1,0 +1,117 @@
+import { type InventoryElement, type ScreenInventory } from "./screenInventory";
+
+// Picks the claims a film is allowed to make, from what the product actually
+// shows.
+//
+// This is inverted on purpose, and the inversion is the whole lesson of the
+// crop resolver. The reference film wrote its claims first and checked them
+// against pixels afterwards, and four of six turned out to be unprovable: `role`
+// named a screen where its words do not appear, `control` demanded buttons the
+// product does not have, `draft` asked for four strings no single region
+// carries, and `relevance` quoted a phrase OCR cannot reproduce. Each passed the
+// film's OCR gate anyway, because the film prints those words itself.
+//
+// A generated film cannot survive that. So claims are selected from approved,
+// legible regions -- the evidence comes first and the sentence is written to fit
+// it, which makes `requiredOcr` true by construction rather than by luck.
+export interface SelectableClaim {
+  id: string;
+  assetId: string;
+  elementId: string;
+  requiredReadableText: string[];
+  renderedTextPx: number;
+  /** Words the region contains, for a writer to draw a sentence from. */
+  evidenceText: string;
+}
+
+export interface ClaimSelectionIssue { assetId: string; elementId: string; reason: string }
+
+// A region must be legible before it can carry a claim. `poor` means its text
+// cannot reach a readable size in a 1080-wide frame at any crop -- knowable
+// before rendering, and the thing that cost four renders to learn on `control`.
+// `marginal` is allowed but reported, because 25-26px dark-on-white reads and
+// 23px light grey does not, and only a look settles which one a region is.
+const USABLE = new Set(["ok", "marginal"]);
+
+// Tokens a claim can require. Short words and stopwords are dropped: OCR
+// reproduces "Recruiter" reliably and "at" unreliably, and a claim that hinges
+// on a two-letter word fails on the reader rather than on the evidence.
+const STOPWORDS = new Set(["a", "an", "and", "at", "by", "for", "from", "in", "is", "it", "of", "on", "or", "the", "to", "with", "your", "you"]);
+// Capitalised words first, then longer ones. Taking tokens in reading order gave
+// "Select batch email" -- the checkbox above a contact card, which is chrome
+// rather than evidence -- and let an OCR typo through as "Stage this emall".
+// Proper nouns and UI labels are both capitalised and both survive OCR better
+// than lowercase body text, so preferring them buys accuracy and meaning at once.
+function candidateTokens(text: string) {
+  const seen = new Set<string>();
+  const words = text.split(/\s+/)
+    .map((word) => word.replace(/[^A-Za-z0-9]/g, ""))
+    .filter((word) => word.length >= 4 && !STOPWORDS.has(word.toLowerCase()))
+    .filter((word) => { const key = word.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true; });
+  return words.sort((left, right) => {
+    const capitalised = (word: string) => (/^[A-Z]/.test(word) ? 0 : 1);
+    return capitalised(left) - capitalised(right) || right.length - left.length;
+  });
+}
+
+// Two crops of the same card are one piece of evidence. `outreachBlank` and
+// `outreachDraftCard` overlap almost entirely and produced identical tokens, so
+// a film would have made the same claim twice and called it two.
+function overlaps(left: InventoryElement, right: InventoryElement) {
+  const width = Math.max(0, Math.min(left.x + left.width, right.x + right.width) - Math.max(left.x, right.x));
+  const height = Math.max(0, Math.min(left.y + left.height, right.y + right.height) - Math.max(left.y, right.y));
+  return (width * height) / Math.max(1, Math.min(left.width * left.height, right.width * right.height)) > .6;
+}
+
+export function selectClaims(
+  inventory: ScreenInventory,
+  options: { maxClaims?: number; tokensPerClaim?: number; allowCandidates?: boolean } = {}
+) {
+  const { maxClaims = 6, tokensPerClaim = 3, allowCandidates = false } = options;
+  const issues: ClaimSelectionIssue[] = [];
+  const claims: SelectableClaim[] = [];
+
+  const usable: Array<{ assetId: string; element: InventoryElement }> = [];
+  for (const screen of inventory.screens) {
+    for (const element of screen.elements) {
+      if (!allowCandidates && element.provenance !== "approved") continue;
+      if (!USABLE.has(element.legibility ?? "poor")) {
+        issues.push({ assetId: screen.asset, elementId: element.id, reason: `legibility_${element.legibility ?? "unknown"}` });
+        continue;
+      }
+      if (candidateTokens(element.text).length < tokensPerClaim) {
+        issues.push({ assetId: screen.asset, elementId: element.id, reason: "too_few_distinct_words" });
+        continue;
+      }
+      usable.push({ assetId: screen.asset, element });
+    }
+  }
+
+  // Most legible first, then smallest: a claim wants the clearest evidence it
+  // can get, and among equals the tighter region magnifies better.
+  usable.sort((left, right) =>
+    (right.element.renderedTextPx ?? 0) - (left.element.renderedTextPx ?? 0)
+    || left.element.width * left.element.height - right.element.width * right.element.height);
+
+  // One claim per screen before a second from any: a film whose every claim
+  // comes off one page is not showing a product, it is showing a screenshot.
+  const perAsset = new Map<string, number>();
+  for (const round of [0, 1, 2]) {
+    for (const { assetId, element } of usable) {
+      if (claims.length >= maxClaims) break;
+      if ((perAsset.get(assetId) ?? 0) !== round) continue;
+      if (claims.some((claim) => claim.elementId === element.id)) continue;
+      if (claims.some((claim) => claim.assetId === assetId && overlaps(element, usable.find(({ element: other }) => other.id === claim.elementId)!.element))) continue;
+      perAsset.set(assetId, round + 1);
+      claims.push({
+        id: `${assetId}-${element.id}`,
+        assetId,
+        elementId: element.id,
+        requiredReadableText: candidateTokens(element.text).slice(0, tokensPerClaim),
+        renderedTextPx: element.renderedTextPx ?? 0,
+        evidenceText: element.text
+      });
+    }
+  }
+  return { claims, issues, usableRegions: usable.length };
+}
