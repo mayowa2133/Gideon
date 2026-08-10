@@ -132,6 +132,18 @@ describe("angle blueprint", () => {
     expect(reference.scenes.some(({ contentOptions }) => "labels" in contentOptions || "pills" in contentOptions)).toBe(true);
   });
 
+  // The gap that made every other gate here meaningless: the compiler wrote one
+  // crop, the renderer read a different field, and nothing compared them.
+  it("hands the renderer the crop it resolved, not the reference film's", () => {
+    for (const scene of blueprint.scenes) {
+      const drawn = buildFilmScenes(blueprint).find((entry) => entry.id === scene.id)!.productCrops;
+      expect(drawn.map(({ assetId }) => assetId), scene.id).toEqual(scene.productCrop ? [scene.productCrop.assetId] : []);
+      if (scene.productCrop) expect(drawn[0], scene.id).toEqual(scene.productCrop);
+    }
+    // And the reference really does carry crops that would otherwise win.
+    expect(reference.scenes.some((scene) => (scene.productCrops?.length ?? 0) > 1)).toBe(true);
+  });
+
   // A film paced from too few beats is the quiet failure: nothing overflows,
   // every scene just gets longer, and it renders as a slideshow.
   it("reports a beat count that cannot reach the reference pace", () => {

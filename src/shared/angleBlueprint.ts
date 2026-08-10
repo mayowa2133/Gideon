@@ -176,7 +176,13 @@ export function compileAngleBlueprint(input: {
       typography: [],
       backdrop,
       background: { kind: backdrop.tier === "deep" ? "dark" : "light" },
-      productCrop
+      productCrop,
+      // Both, and explicitly. The renderer prefers the plural array, so
+      // spreading the reference scene carried its four crops straight past the
+      // resolved one -- three of four proof beats drew the contact card no
+      // matter which claim they were making. Every compile-time gate passed,
+      // because they all read the blueprint and none read the film.
+      productCrops: productCrop ? [productCrop] : []
     };
     startMs = endMs;
     return scene;
