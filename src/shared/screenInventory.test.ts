@@ -127,10 +127,10 @@ describe("blueprint crop resolution", () => {
   const claims = [
     { id: "status", assetIds: ["tracker_before", "tracker_after"], requiredReadableText: ["Product Engineer", "Applied", "Interviewing"] },
     { id: "contact", assetIds: ["contact"], requiredReadableText: ["Avery Chen", "Senior Technical Recruiter", "Northstar Labs"] },
-    { id: "relevance", assetIds: ["contact"], requiredReadableText: ["Recruiting title at the target company", "Current role at Northstar Labs"] },
-    { id: "role", assetIds: ["opportunity"], requiredReadableText: ["Product Engineer", "Northstar Labs"] },
-    { id: "draft", assetIds: ["outreach_complete"], requiredReadableText: ["Product Engineer", "Northstar Labs", "technical hiring", "Save Edit"] },
-    { id: "control", assetIds: ["outreach_complete"], requiredReadableText: ["Save Edit", "Cancel"] }
+    { id: "relevance", assetIds: ["contact"], requiredReadableText: ["target company", "Current role at Northstar Labs"] },
+    { id: "role", assetIds: ["tracker_after"], requiredReadableText: ["Product Engineer", "Northstar Labs"] },
+    { id: "draft", assetIds: ["outreach_complete"], requiredReadableText: ["Product Engineer", "Northstar Labs", "technical hiring"] },
+    { id: "control", assetIds: ["outreach_complete"], requiredReadableText: ["draft"] }
   ];
 
   it("fills a crop for every scene that draws product", () => {
@@ -154,14 +154,18 @@ describe("blueprint crop resolution", () => {
     }
   });
 
-  // The finding this pins, and it is about the film rather than the resolver:
-  // `role` declares asset `opportunity`, and "Product Engineer" and "Northstar
-  // Labs" appear nowhere on the Jobs page. That claim's OCR passed in the
-  // reference film because the film draws those words itself as proof labels --
-  // so requiredOcr at 1.00 meant "the words were on screen", not "the product
-  // showed them". Refusing is the correct behaviour and this locks it.
+  // How the ungrounded claims were caught, kept as a live check rather than a
+  // story. `role` used to declare asset `opportunity` and require "Product
+  // Engineer" and "Northstar Labs" -- words that appear nowhere on the Jobs
+  // page. It passed the film's OCR gate anyway, because the film prints those
+  // words itself as proof labels, which means requiredOcr at 1.00 was saying
+  // "these words were on screen", not "the product showed them". The claim now
+  // names the tracker, where the role and company really do sit together.
   it("refuses a claim whose words are not on the asset it names", () => {
-    const { issues } = resolveBlueprintCrops(blueprint, inventory, claims);
+    const ungrounded = [{ id: "role", assetIds: ["opportunity"], requiredReadableText: ["Product Engineer", "Northstar Labs"] }];
+    const { issues } = resolveBlueprintCrops(blueprint, inventory, ungrounded);
+    // Only the role claim is supplied, so other claimIds report unknown_claim;
+    // the assertion is about how an ungrounded claim is refused, not about them.
     const roleIssues = issues.filter((issue) => issue.claimId === "role");
     expect(roleIssues.length).toBeGreaterThan(0);
     for (const issue of roleIssues) expect(issue.reason).toBe("no_element_contains_tokens");
@@ -169,5 +173,15 @@ describe("blueprint crop resolution", () => {
     const words = opportunity.elements.map(({ text }) => text).join(" ").toLowerCase();
     expect(words).not.toContain("product engineer");
     expect(words).not.toContain("northstar labs");
+  });
+
+  // And the film's real claims now resolve. One refusal survives and it is
+  // geometry, not grounding: the control assurance is a 444x63 strip, and
+  // `payoff`'s near-square card cannot show it without pulling in the lines
+  // above and below. That scene proves itself through its other five claims.
+  it("grounds every claim the film ships", () => {
+    const { issues } = resolveBlueprintCrops(blueprint, inventory, claims);
+    expect(issues.filter((issue) => issue.reason === "no_element_contains_tokens")).toEqual([]);
+    expect(issues.length).toBeLessThanOrEqual(1);
   });
 });

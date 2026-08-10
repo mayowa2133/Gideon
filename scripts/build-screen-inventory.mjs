@@ -47,6 +47,16 @@ const composition = await fs.readFile(path.join(root, "src", "remotion", "solomo
 const APPROVED = {};
 for (const match of composition.match(/const CROPS=\{([\s\S]*?)\} satisfies/)[1].matchAll(/(\w+):\{x:(\d+),y:(\d+),width:(\d+),height:(\d+),trim:(\d+)/g))
   APPROVED[match[1]] = { x: +match[2], y: +match[3], width: +match[4], height: +match[5], trim: +match[6] };
+// Regions a human has approved that no shipped film happens to crop yet. The
+// approved set should not be limited to what one story needed: the product's own
+// control assurance -- "Stage this email as a draft in your inbox, you review and
+// send it manually" -- is the sentence that proves the control claim, and the
+// reference film never framed it because it drew its own chip over the top
+// instead.
+const EXTRA_APPROVED = {
+  messageAssurance: { asset: "outreach_complete", x: 600, y: 674, width: 444, height: 63, trim: 180 }
+};
+
 const ASSET_FOR_CROP = {
   trackerBefore: "tracker_before", trackerAfter: "tracker_after", trackerControl: "tracker_after",
   opportunityHeader: "opportunity", opportunityTitle: "opportunity", opportunityPanel: "opportunity",
@@ -65,6 +75,10 @@ for (const screen of SCREENS) {
   for (const [id, rect] of Object.entries(APPROVED)) {
     if (ASSET_FOR_CROP[id] !== screen.asset) continue;
     elements.push({ id, provenance: "approved", ...rectFields(rect), ...textFor(words, rect) });
+  }
+  for (const [id, extra] of Object.entries(EXTRA_APPROVED)) {
+    if (extra.asset !== screen.asset) continue;
+    elements.push({ id, provenance: "approved", trim: extra.trim, ...rectFields(extra), ...textFor(words, extra) });
   }
   // Candidates are only offered where the approved set does not already cover
   // the region: an angle that needs the Jobs title has it, and one that needs a

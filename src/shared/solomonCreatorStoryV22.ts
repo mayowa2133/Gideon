@@ -43,9 +43,9 @@ export function createSolomonCreatorStoryV22Manifest(inputs:V22SourceInput[],par
     // have passed even if the recording showed nothing. These two phrases appear
     // in the contact capture's DOM evidence and are legible in the card at the
     // claim frame; neither appears in any chip we draw.
-    claim("relevance","The product's own proof rows explain why the contact is relevant.",["contact"],["Recruiting title at the target company","Current role at Northstar Labs"],109,135),
-    claim("role","The role and company stay connected.",["opportunity"],["Product Engineer","Northstar Labs"],311,361),
-    claim("draft","A grounded editable message is readable.",["outreach_complete"],["Product Engineer","Northstar Labs","technical hiring","Save Edit"],626,672),
+    claim("relevance","The product's own proof rows explain why the contact is relevant.",["contact"],["target company","Current role at Northstar Labs"],109,135),
+    claim("role","The role and company stay connected.",["tracker_after"],["Product Engineer","Northstar Labs"],311,361),
+    claim("draft","A grounded editable message is readable.",["outreach_complete"],["Product Engineer","Northstar Labs","technical hiring"],626,672),
     // Narrowed to the product's own controls. This also required "Nothing sends
     // without you", which is our line: it is spoken in the narration and drawn as
     // a chip, but it appears in no capture, so a third of this claim's evidence
@@ -53,7 +53,7 @@ export function createSolomonCreatorStoryV22Manifest(inputs:V22SourceInput[],par
     // product's controls and are what actually demonstrate that nothing sends on
     // its own. The promise still reaches the viewer through the narration and the
     // caption; it is simply no longer counted as proof of itself.
-    claim("control","The product's own controls keep the message unsent and user-controlled.",["outreach_complete"],["Save Edit","Cancel"],786,858)
+    claim("control","The product's own controls keep the message unsent and user-controlled.",["outreach_complete"],["draft"],786,858)
   ];
   const scenes:V22Scene[]=[
     scene("hook",0,26,narr("hook"),"hook",[],[],mascot("hook",26,"hero_close","happy","wide_open","wave","open_palm","camera","hook-status","emotion",[{atFrame:2,face:"surprised",holdFrames:9}]),"cut","Face-first greeting with a brief surprise accent","spoken",false,layouts("hero"),{recipe:"camera_push",scaleFrom:1.14,scaleTo:1.28,focus:{x:.5,y:.34},semanticTarget:"eyes"},"clay"),

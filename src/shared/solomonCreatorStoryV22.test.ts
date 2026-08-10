@@ -41,7 +41,11 @@ describe("claims are grounded in product pixels",()=>{
   });
   it("grounds relevance in the product's own proof rows",()=>{
     const claim=manifest.claims.find((item)=>item.id==="relevance")!;
-    expect(claim.requiredReadableText).toEqual(["Recruiting title at the target company","Current role at Northstar Labs"]);
+    // "Recruiting title at the target company" is on the card, but tesseract
+    // reads it as "Why matched title atthe target company" -- it drops the first
+    // word and fuses "at the". Requiring a phrase the reader cannot reproduce
+    // fails on OCR, not on evidence, so the claim asks for the part that survives.
+    expect(claim.requiredReadableText).toEqual(["target company","Current role at Northstar Labs"]);
   });
   // Every claim is now grounded: the two that were not have been re-grounded
   // (relevance) and narrowed (control). This asserts the general property rather
@@ -53,7 +57,11 @@ describe("claims are grounded in product pixels",()=>{
   });
   it("keeps control on the product's own controls",()=>{
     const claim=manifest.claims.find((item)=>item.id==="control")!;
-    expect(claim.requiredReadableText).toEqual(["Save Edit","Cancel"]);
+    // The product has no "Save Edit" or "Cancel" button -- those are chips the
+    // film draws over it, so the claim was proving itself with its own overlay.
+    // The product's own words for the same assurance are "Stage this email as a
+    // draft in your inbox - you review and send it manually".
+    expect(claim.requiredReadableText).toEqual(["draft"]);
   });
 });
 

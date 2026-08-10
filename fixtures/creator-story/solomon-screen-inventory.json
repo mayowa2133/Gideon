@@ -5014,6 +5014,215 @@
           ]
         },
         {
+          "id": "messageAssurance",
+          "provenance": "approved",
+          "trim": 180,
+          "x": 600,
+          "y": 674,
+          "width": 444,
+          "height": 63,
+          "aspect": 7.048,
+          "text": "‘Stage this emall as a draft in your inbox — you review and send it manually Connect Gmail or Outlook in Settings to stage drafts in your inbox.",
+          "words": [
+            {
+              "text": "‘Stage",
+              "x": 618,
+              "y": 688,
+              "width": 31,
+              "height": 11
+            },
+            {
+              "text": "this",
+              "x": 654,
+              "y": 689,
+              "width": 19,
+              "height": 8
+            },
+            {
+              "text": "emall",
+              "x": 677,
+              "y": 688,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "as",
+              "x": 710,
+              "y": 690,
+              "width": 11,
+              "height": 7
+            },
+            {
+              "text": "a",
+              "x": 726,
+              "y": 690,
+              "width": 3,
+              "height": 7
+            },
+            {
+              "text": "draft",
+              "x": 735,
+              "y": 688,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "in",
+              "x": 765,
+              "y": 690,
+              "width": 8,
+              "height": 7
+            },
+            {
+              "text": "your",
+              "x": 778,
+              "y": 690,
+              "width": 23,
+              "height": 9
+            },
+            {
+              "text": "inbox",
+              "x": 805,
+              "y": 688,
+              "width": 29,
+              "height": 9
+            },
+            {
+              "text": "—",
+              "x": 838,
+              "y": 693,
+              "width": 10,
+              "height": 1
+            },
+            {
+              "text": "you",
+              "x": 852,
+              "y": 690,
+              "width": 18,
+              "height": 9
+            },
+            {
+              "text": "review",
+              "x": 875,
+              "y": 690,
+              "width": 35,
+              "height": 7
+            },
+            {
+              "text": "and",
+              "x": 914,
+              "y": 688,
+              "width": 19,
+              "height": 9
+            },
+            {
+              "text": "send",
+              "x": 937,
+              "y": 688,
+              "width": 25,
+              "height": 9
+            },
+            {
+              "text": "it",
+              "x": 967,
+              "y": 689,
+              "width": 6,
+              "height": 8
+            },
+            {
+              "text": "manually",
+              "x": 977,
+              "y": 688,
+              "width": 49,
+              "height": 11
+            },
+            {
+              "text": "Connect",
+              "x": 618,
+              "y": 712,
+              "width": 45,
+              "height": 9
+            },
+            {
+              "text": "Gmail",
+              "x": 668,
+              "y": 712,
+              "width": 30,
+              "height": 9
+            },
+            {
+              "text": "or",
+              "x": 702,
+              "y": 714,
+              "width": 10,
+              "height": 7
+            },
+            {
+              "text": "Outlook",
+              "x": 716,
+              "y": 712,
+              "width": 42,
+              "height": 9
+            },
+            {
+              "text": "in",
+              "x": 763,
+              "y": 714,
+              "width": 8,
+              "height": 7
+            },
+            {
+              "text": "Settings",
+              "x": 776,
+              "y": 712,
+              "width": 44,
+              "height": 11
+            },
+            {
+              "text": "to",
+              "x": 825,
+              "y": 713,
+              "width": 10,
+              "height": 8
+            },
+            {
+              "text": "stage",
+              "x": 839,
+              "y": 713,
+              "width": 29,
+              "height": 10
+            },
+            {
+              "text": "drafts",
+              "x": 873,
+              "y": 712,
+              "width": 31,
+              "height": 9
+            },
+            {
+              "text": "in",
+              "x": 909,
+              "y": 714,
+              "width": 8,
+              "height": 7
+            },
+            {
+              "text": "your",
+              "x": 921,
+              "y": 714,
+              "width": 23,
+              "height": 9
+            },
+            {
+              "text": "inbox.",
+              "x": 949,
+              "y": 712,
+              "width": 28,
+              "height": 9
+            }
+          ]
+        },
+        {
           "id": "outreach_completeCandidate1",
           "provenance": "candidate",
           "trim": 180,
@@ -5803,215 +6012,6 @@
           "id": "outreach_completeCandidate6",
           "provenance": "candidate",
           "trim": 180,
-          "x": 600,
-          "y": 674,
-          "width": 444,
-          "height": 63,
-          "aspect": 7.048,
-          "text": "‘Stage this emall as a draft in your inbox — you review and send it manually Connect Gmail or Outlook in Settings to stage drafts in your inbox.",
-          "words": [
-            {
-              "text": "‘Stage",
-              "x": 618,
-              "y": 688,
-              "width": 31,
-              "height": 11
-            },
-            {
-              "text": "this",
-              "x": 654,
-              "y": 689,
-              "width": 19,
-              "height": 8
-            },
-            {
-              "text": "emall",
-              "x": 677,
-              "y": 688,
-              "width": 29,
-              "height": 9
-            },
-            {
-              "text": "as",
-              "x": 710,
-              "y": 690,
-              "width": 11,
-              "height": 7
-            },
-            {
-              "text": "a",
-              "x": 726,
-              "y": 690,
-              "width": 3,
-              "height": 7
-            },
-            {
-              "text": "draft",
-              "x": 735,
-              "y": 688,
-              "width": 25,
-              "height": 9
-            },
-            {
-              "text": "in",
-              "x": 765,
-              "y": 690,
-              "width": 8,
-              "height": 7
-            },
-            {
-              "text": "your",
-              "x": 778,
-              "y": 690,
-              "width": 23,
-              "height": 9
-            },
-            {
-              "text": "inbox",
-              "x": 805,
-              "y": 688,
-              "width": 29,
-              "height": 9
-            },
-            {
-              "text": "—",
-              "x": 838,
-              "y": 693,
-              "width": 10,
-              "height": 1
-            },
-            {
-              "text": "you",
-              "x": 852,
-              "y": 690,
-              "width": 18,
-              "height": 9
-            },
-            {
-              "text": "review",
-              "x": 875,
-              "y": 690,
-              "width": 35,
-              "height": 7
-            },
-            {
-              "text": "and",
-              "x": 914,
-              "y": 688,
-              "width": 19,
-              "height": 9
-            },
-            {
-              "text": "send",
-              "x": 937,
-              "y": 688,
-              "width": 25,
-              "height": 9
-            },
-            {
-              "text": "it",
-              "x": 967,
-              "y": 689,
-              "width": 6,
-              "height": 8
-            },
-            {
-              "text": "manually",
-              "x": 977,
-              "y": 688,
-              "width": 49,
-              "height": 11
-            },
-            {
-              "text": "Connect",
-              "x": 618,
-              "y": 712,
-              "width": 45,
-              "height": 9
-            },
-            {
-              "text": "Gmail",
-              "x": 668,
-              "y": 712,
-              "width": 30,
-              "height": 9
-            },
-            {
-              "text": "or",
-              "x": 702,
-              "y": 714,
-              "width": 10,
-              "height": 7
-            },
-            {
-              "text": "Outlook",
-              "x": 716,
-              "y": 712,
-              "width": 42,
-              "height": 9
-            },
-            {
-              "text": "in",
-              "x": 763,
-              "y": 714,
-              "width": 8,
-              "height": 7
-            },
-            {
-              "text": "Settings",
-              "x": 776,
-              "y": 712,
-              "width": 44,
-              "height": 11
-            },
-            {
-              "text": "to",
-              "x": 825,
-              "y": 713,
-              "width": 10,
-              "height": 8
-            },
-            {
-              "text": "stage",
-              "x": 839,
-              "y": 713,
-              "width": 29,
-              "height": 10
-            },
-            {
-              "text": "drafts",
-              "x": 873,
-              "y": 712,
-              "width": 31,
-              "height": 9
-            },
-            {
-              "text": "in",
-              "x": 909,
-              "y": 714,
-              "width": 8,
-              "height": 7
-            },
-            {
-              "text": "your",
-              "x": 921,
-              "y": 714,
-              "width": 23,
-              "height": 9
-            },
-            {
-              "text": "inbox.",
-              "x": 949,
-              "y": 712,
-              "width": 28,
-              "height": 9
-            }
-          ]
-        },
-        {
-          "id": "outreach_completeCandidate7",
-          "provenance": "candidate",
-          "trim": 180,
           "x": 94,
           "y": 639,
           "width": 187,
@@ -6071,7 +6071,7 @@
           ]
         },
         {
-          "id": "outreach_completeCandidate8",
+          "id": "outreach_completeCandidate7",
           "provenance": "candidate",
           "trim": 180,
           "x": 1082,
