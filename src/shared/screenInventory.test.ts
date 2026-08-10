@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { isResolved, resolveCrop, type ScreenInventory } from "./screenInventory";
+import { isResolved, resolveBlueprintCrops, resolveCrop, type ScreenInventory } from "./screenInventory";
 
 // Exercised against the real inventory, not a fixture of convenience: the whole
 // question is whether the resolver picks good regions of an actual product's UI,
@@ -115,5 +115,59 @@ describe("crop resolution", () => {
       const result = resolve(["Avery", "Chen"], aspect);
       expect(isResolved(result), `aspect ${aspect}`).toBe(true);
     }
+  });
+});
+
+describe("blueprint crop resolution", () => {
+  const blueprint = JSON.parse(
+    readFileSync(path.join(__dirname, "..", "..", "fixtures", "creator-story", "solomon-v22.blueprint.json"), "utf8")
+  ) as { scenes: Array<Record<string, unknown>> };
+  // The claims as the reference film declares them, including which asset each
+  // says proves it.
+  const claims = [
+    { id: "status", assetIds: ["tracker_before", "tracker_after"], requiredReadableText: ["Product Engineer", "Applied", "Interviewing"] },
+    { id: "contact", assetIds: ["contact"], requiredReadableText: ["Avery Chen", "Senior Technical Recruiter", "Northstar Labs"] },
+    { id: "relevance", assetIds: ["contact"], requiredReadableText: ["Recruiting title at the target company", "Current role at Northstar Labs"] },
+    { id: "role", assetIds: ["opportunity"], requiredReadableText: ["Product Engineer", "Northstar Labs"] },
+    { id: "draft", assetIds: ["outreach_complete"], requiredReadableText: ["Product Engineer", "Northstar Labs", "technical hiring", "Save Edit"] },
+    { id: "control", assetIds: ["outreach_complete"], requiredReadableText: ["Save Edit", "Cancel"] }
+  ];
+
+  it("fills a crop for every scene that draws product", () => {
+    const { blueprint: filled } = resolveBlueprintCrops(blueprint, inventory, claims);
+    const needsProduct = blueprint.scenes.filter((scene) => (scene.productCrops as unknown[] | undefined)?.length);
+    const resolved = filled.scenes.filter((scene) => (scene.productCrops as unknown[] | undefined)?.length);
+    expect(resolved).toHaveLength(needsProduct.length);
+    for (const scene of resolved) {
+      for (const crop of scene.productCrops as Array<{ width: number; height: number; trim: number }>) {
+        expect(crop.width, String(scene.id)).toBeGreaterThan(80);
+        expect(crop.height, String(scene.id)).toBeGreaterThan(60);
+        expect(Number.isFinite(crop.trim)).toBe(true);
+      }
+    }
+  });
+
+  it("leaves presenter-only scenes without product", () => {
+    const { blueprint: filled } = resolveBlueprintCrops(blueprint, inventory, claims);
+    for (const scene of filled.scenes.filter((candidate) => candidate.contentPattern === "ambient" || candidate.contentPattern === "comment_card")) {
+      expect((scene.productCrops as unknown[] | undefined) ?? [], String(scene.id)).toHaveLength(0);
+    }
+  });
+
+  // The finding this pins, and it is about the film rather than the resolver:
+  // `role` declares asset `opportunity`, and "Product Engineer" and "Northstar
+  // Labs" appear nowhere on the Jobs page. That claim's OCR passed in the
+  // reference film because the film draws those words itself as proof labels --
+  // so requiredOcr at 1.00 meant "the words were on screen", not "the product
+  // showed them". Refusing is the correct behaviour and this locks it.
+  it("refuses a claim whose words are not on the asset it names", () => {
+    const { issues } = resolveBlueprintCrops(blueprint, inventory, claims);
+    const roleIssues = issues.filter((issue) => issue.claimId === "role");
+    expect(roleIssues.length).toBeGreaterThan(0);
+    for (const issue of roleIssues) expect(issue.reason).toBe("no_element_contains_tokens");
+    const opportunity = inventory.screens.find((screen) => screen.asset === "opportunity")!;
+    const words = opportunity.elements.map(({ text }) => text).join(" ").toLowerCase();
+    expect(words).not.toContain("product engineer");
+    expect(words).not.toContain("northstar labs");
   });
 });

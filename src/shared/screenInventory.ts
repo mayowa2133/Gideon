@@ -47,8 +47,14 @@ export interface ResolveFailure { reason: "no_element_contains_tokens" | "no_fit
 // ~0.75 canvas pixels, and 1.02 pushes the edge out by ~1% of the region.
 const MARGIN = 14;
 
-function normalise(text: string) {
-  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+// Stopwords are dropped from claim tokens. A claim reads "Recruiting title at
+// the target company", and requiring OCR to have produced "at" and "the" as
+// separate confident words fails on phrasing rather than on evidence -- the
+// resolver was rejecting regions that plainly contained the claim.
+const STOPWORDS = new Set(["a", "an", "and", "at", "by", "for", "from", "in", "is", "of", "on", "or", "the", "to", "with", "your"]);
+function normalise(text: string, dropStopwords = false) {
+  const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  return dropStopwords ? words.filter((word) => !STOPWORDS.has(word)) : words;
 }
 
 // A token matches on word-prefix rather than equality: OCR renders "Recruiter"
@@ -136,7 +142,7 @@ export function resolveCrop(
   containerAspect: number,
   options: { assetId?: string; allowCandidates?: boolean } = {}
 ): ResolvedCrop | ResolveFailure {
-  const tokens = claimTokens.flatMap(normalise);
+  const tokens = claimTokens.flatMap((token) => normalise(token, true));
   const screens = options.assetId ? inventory.screens.filter((screen) => screen.asset === options.assetId) : inventory.screens;
   const considered: string[] = [];
 
@@ -185,3 +191,55 @@ export function resolveCrop(
 export function isResolved(result: ResolvedCrop | ResolveFailure): result is ResolvedCrop {
   return "elementId" in result;
 }
+
+// Fills a blueprint's product crops by resolving each scene's claims against the
+// inventory, in place of crops transcribed by hand.
+//
+// This is the join that makes a generated film possible: a scene says which
+// claims it supports, the claim says which words prove it, and the inventory
+// says where those words are. Nothing in the chain names a pixel rect.
+//
+// The container aspect comes from the scene's own declared product rect, so a
+// crop is fitted to the card that will actually show it rather than to a guess.
+// Patterns that draw several crops resolve one per claim and fall back to the
+// claim's asset when a scene has fewer claims than card slots.
+export interface CropResolutionIssue { sceneId: string; claimId?: string; reason: string; considered?: number }
+
+export function resolveBlueprintCrops(
+  blueprint: { scenes: Array<Record<string, unknown>> },
+  inventory: ScreenInventory,
+  claims: Array<{ id: string; assetIds?: string[]; requiredReadableText?: string[] }>,
+  options: { allowCandidates?: boolean } = {}
+) {
+  const byId = new Map(claims.map((claim) => [claim.id, claim]));
+  const issues: CropResolutionIssue[] = [];
+  const scenes = blueprint.scenes.map((scene) => {
+    const claimIds = (scene.supportedClaimIds as string[] | undefined) ?? [];
+    const rects = (scene.layoutRects as SceneLayoutRectLike[] | undefined) ?? [];
+    const product = rects.find(({ kind }) => kind === "product");
+    // No product rect means the pattern draws no product -- `ambient` and the
+    // CTA. Resolving a crop for those would put evidence where the beat wants
+    // the presenter alone.
+    if (!product || !claimIds.length) return scene;
+    const aspect = ((product.right - product.left) * 1080) / ((product.bottom - product.top) * 1920);
+    const resolved: Array<Record<string, unknown>> = [];
+    for (const claimId of claimIds) {
+      const claim = byId.get(claimId);
+      if (!claim) { issues.push({ sceneId: String(scene.id), claimId, reason: "unknown_claim" }); continue; }
+      for (const assetId of claim.assetIds?.length ? claim.assetIds : [undefined]) {
+        const result = resolveCrop(inventory, claim.requiredReadableText ?? [], aspect, { assetId, allowCandidates: options.allowCandidates });
+        if (!isResolved(result)) {
+          issues.push({ sceneId: String(scene.id), claimId, reason: result.reason, considered: result.considered.length });
+          continue;
+        }
+        if (resolved.some((crop) => crop.assetId === result.assetId && crop.x === result.x && crop.y === result.y)) continue;
+        resolved.push({ assetId: result.assetId, x: result.x, y: result.y, width: result.width, height: result.height, trim: result.trim });
+      }
+    }
+    if (!resolved.length) return scene;
+    return { ...scene, productCrop: resolved[0], productCrops: resolved };
+  });
+  return { blueprint: { ...blueprint, scenes }, issues };
+}
+
+interface SceneLayoutRectLike { kind: string; left: number; top: number; right: number; bottom: number }
