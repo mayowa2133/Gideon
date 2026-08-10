@@ -1,7 +1,7 @@
 import { type AngleBrief, type ScriptBeat } from "./angleBrief";
 import { type SelectableClaim } from "./claimSelection";
 import { MIN_SCENE_FRAMES, SHOT_BANDS } from "./creatorStoryQuality";
-import { resolveCrop, type ScreenInventory } from "./screenInventory";
+import { resolveCrop, type InventoryElement, type ScreenInventory } from "./screenInventory";
 import type { CreativeBlueprint, SceneComposition } from "./types";
 
 // Compiles a validated script into a blueprint the generic renderer can draw.
@@ -51,7 +51,15 @@ function defaultShot(beat: { spoken: boolean; claimId?: string }, isLast: boolea
 // consecutive scenes, which is a still held across a cut no matter which
 // template draws it -- the thing the composition-similarity gate exists to
 // catch. Wide then tight is a pair; wide, wide, tight is a pause.
-const ESTABLISH_LEAD = 1;
+// Zero, and the measurement is why. An establishing shot has to be wider than
+// the proof to be worth cutting from, and these screens do not have the pixels
+// for it: 1.8x around a region that renders at 22px lands at 12, and a shot that
+// looks like content and carries none is worse than the plain backdrop it
+// replaced. Raise this only for screens whose type survives the pull-back --
+// the gate below will say so.
+const ESTABLISH_LEAD = 0;
+// How much wider than the proof's own region an establishing shot frames.
+const ESTABLISH_ZOOM = 1.8;
 
 // A template's options carry both how a scene is arranged and what it says. Only
 // the first half transfers. Inheriting the reference scene's options wholesale
@@ -61,6 +69,30 @@ const ESTABLISH_LEAD = 1;
 const TEXT_OPTIONS = new Set(["labels", "pills", "headline", "lines", "caption", "title", "note"]);
 function layoutOnly(options: Record<string, unknown> = {}) {
   return Object.fromEntries(Object.entries(options).filter(([key]) => !TEXT_OPTIONS.has(key)));
+}
+
+// Roughly how wide, in frame pixels, each template draws its product card. The
+// numbers matter only as a ratio against the crop width, which is what decides
+// how big the product's own type lands on screen.
+const CONTAINER_PX: Record<string, number> = {
+  evidence_band: 1000, composed_board: 1000, card_field: 500, state_swap: 900, filmstrip: 320, comment_card: 900, ambient: 900
+};
+// The floor a region's text must clear once it is drawn. `marginal` in the
+// inventory is 20px and that is the same floor here, because it is the same
+// question asked at the only moment that counts.
+const READABLE_PX = 20;
+
+// What the region's own type measures once this crop is drawn at this size.
+//
+// The inventory grades legibility on the region. The film draws a crop. Those
+// are different rectangles and the grade does not survive the difference: the
+// outreach board graded 22px, resolved to a full-width 1440px crop, and landed
+// on screen at 7 -- a claim present and unreadable, which the grade exists to
+// prevent and could not, because nothing re-asked the question after the crop
+// was chosen.
+function renderedOnCrop(element: InventoryElement, cropWidth: number, pattern: string) {
+  const sourceTextHeight = (element.renderedTextPx ?? 0) * (element.width / 1080);
+  return (sourceTextHeight * (CONTAINER_PX[pattern] ?? 900)) / Math.max(1, cropWidth);
 }
 
 export interface AngleCompileIssue { sceneId?: string; reason: string; detail?: string }
@@ -139,11 +171,28 @@ export function compileAngleBlueprint(input: {
       // the composition-similarity gate is right to call it one. Wide then tight
       // is the pair that makes the tight shot mean something.
       const screen = inventory.screens.find(({ asset }) => asset === establishing.assetId);
-      if (screen) {
+      const element = screen?.elements.find(({ id }) => id === establishing.elementId);
+      if (screen && element) {
+        // A pull-back, not the whole application. Showing the full 1440x900
+        // screen put every label at six pixels: it looked like content and
+        // carried none, which is worse than the plain backdrop it replaced.
+        // Widening around the region the proof will cut to keeps the shot
+        // readable and still makes the cut mean something.
+        const grow = (span: number, by: number, limit: number, origin: number) => {
+          const width = Math.min(limit, span * by);
+          return { start: Math.max(0, Math.min(limit - width, origin - (width - span) / 2)), size: width };
+        };
+        const horizontal = grow(element.width, ESTABLISH_ZOOM, screen.width, element.x);
+        const vertical = grow(element.height, ESTABLISH_ZOOM, screen.height, element.y);
         productCrop = {
-          assetId: establishing.assetId, x: 0, y: 0, width: screen.width, height: screen.height,
+          assetId: establishing.assetId,
+          x: Math.round(horizontal.start), y: Math.round(vertical.start),
+          width: Math.round(horizontal.size), height: Math.round(vertical.size),
           trim: reference.scenes.find((scene) => scene.productCrop?.assetId === establishing.assetId)?.productCrop?.trim ?? 0
         };
+        if (renderedOnCrop(element, productCrop.width, shot.contentPattern ?? "") < READABLE_PX) {
+          issues.push({ sceneId: beat.id, reason: "establishing_illegible", detail: `${Math.round(renderedOnCrop(element, productCrop.width, shot.contentPattern ?? ""))}px` });
+        }
       }
     }
     if (claim) {
@@ -155,10 +204,20 @@ export function compileAngleBlueprint(input: {
       // tracker not yet updated. The recording moment is a property of the
       // screen, so it is carried over from wherever the reference film already
       // framed that asset rather than guessed at here.
-      else productCrop = {
+      else {
+        const element = inventory.screens.find(({ asset }) => asset === claim.assetId)?.elements.find(({ id }) => id === claim.elementId);
+        const px = element ? renderedOnCrop(element, resolved.width, shot.contentPattern ?? "") : READABLE_PX;
+        // An unreadable proof is not a weaker proof, it is a shot claiming to
+        // show something a viewer cannot see. Drop the picture and report it,
+        // rather than render evidence nobody can read.
+        if (px < READABLE_PX) {
+          issues.push({ sceneId: beat.id, reason: "claim_illegible_at_crop", detail: `${claim.elementId} lands at ${Math.round(px)}px, floor is ${READABLE_PX}` });
+        }
+        else productCrop = {
         assetId: claim.assetId, x: resolved.x, y: resolved.y, width: resolved.width, height: resolved.height,
         trim: reference.scenes.find((scene) => scene.productCrop?.assetId === claim.assetId)?.productCrop?.trim ?? 0
-      };
+        };
+      }
     }
 
     const scene: SceneComposition = {
@@ -171,7 +230,7 @@ export function compileAngleBlueprint(input: {
       contentOptions: layoutOnly((shot.contentPattern === template.contentPattern ? template.contentOptions : {}) as Record<string, unknown>),
       presenter: { ...template.presenter, visible: shot.shotType !== "product_fullscreen" },
       productAssetIds: productCrop ? [productCrop.assetId] : [],
-      supportedClaimIds: claim ? [claim.id] : [],
+      supportedClaimIds: claim && productCrop ? [claim.id] : [],
       captions: [],
       typography: [],
       backdrop,

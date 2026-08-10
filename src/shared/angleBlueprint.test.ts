@@ -41,7 +41,7 @@ describe("angle blueprint", () => {
 
   it("compiles a script the brief accepts into a blueprint the validator accepts", () => {
     expect(validateAngleScript(brief, script).filter(({ reason }) => reason !== "film_word_budget")).toEqual([]);
-    expect(issues.filter(({ reason }) => reason !== "too_few_beats_for_pace")).toEqual([]);
+    expect(issues.filter(({ reason }) => reason !== "too_few_beats_for_pace" && reason !== "claim_illegible_at_crop")).toEqual([]);
     expect(validateCreativeBlueprint(blueprint).filter(({ severity }) => severity === "blocking")).toEqual([]);
   });
 
@@ -89,9 +89,17 @@ describe("angle blueprint", () => {
     }
   });
 
-  // Claims are the only scenes that assert anything, but binding product
-  // presence to claims alone left 13 of 18 scenes as a presenter on a colour.
-  it("stays on the product between proofs without claiming anything there", () => {
+  // An unreadable proof is not a weaker proof, it is a shot claiming to show
+  // something the viewer cannot see. Three of the four claims the Solomon
+  // inventory offers land between 7 and 19 pixels once their crop is drawn, so
+  // they are reported and not rendered.
+  //
+  // This replaces a test that asserted the opposite -- that non-claim beats
+  // establish the screen a proof is heading for. That behaviour was measured out
+  // rather than argued out: a 1.8x pull-back around a region grading 22px lands
+  // at 12px, and a shot that looks like content and carries none is worse than
+  // the backdrop it replaced.
+  it("does not draw a claim it cannot draw legibly", () => {
     const paced = buildAngleBrief({
       topic: "paced", product: "Solomon", claims, filmFrames: FILM_FRAMES, speechRateBand: SPEECH_RATE_BAND,
       beats: planBeats({ beatCount: 18, claimIds: claims.map(({ id }) => id) })
@@ -100,13 +108,17 @@ describe("angle blueprint", () => {
     const { blueprint: film } = compileAngleBlueprint({ brief: paced, script: written, claims, inventory, reference });
 
     const shown = film.scenes.filter(({ productCrop }) => productCrop);
-    expect(shown.length).toBeGreaterThan(claims.length);
-    // Showing is not claiming. An establishing shot asserts nothing, so nothing
-    // is added to what the OCR gate has to find.
-    for (const scene of shown.filter(({ supportedClaimIds }) => !supportedClaimIds.length)) {
-      expect(scene.productCrop!.width, scene.id).toBeGreaterThan(reference.scenes.find((entry) => entry.productCrop)!.productCrop!.width);
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.length).toBeLessThan(claims.length);
+    // A dropped picture drops its claim with it: a scene must never keep a claim
+    // whose evidence it no longer shows.
+    for (const scene of film.scenes) {
+      expect(scene.supportedClaimIds.length > 0, scene.id).toBe(Boolean(scene.productCrop));
     }
-    expect(film.scenes.flatMap(({ supportedClaimIds }) => supportedClaimIds)).toEqual(claims.map(({ id }) => id));
+    // And every drop is reported, never silent.
+    const dropped = claims.length - shown.length;
+    expect(compileAngleBlueprint({ brief: paced, script: written, claims, inventory, reference })
+      .issues.filter(({ reason }) => reason === "claim_illegible_at_crop")).toHaveLength(dropped);
 
     // Wide then tight is a pair; wide, wide, tight is a still held across a cut.
     for (const [index, scene] of film.scenes.slice(1).entries()) {
