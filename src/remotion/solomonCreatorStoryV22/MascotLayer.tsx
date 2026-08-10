@@ -22,6 +22,8 @@ import { RobotMascotV22Rig } from "../mascotV22/RobotMascotV22Rig";
 // attention with highlight outlines and zooms rather than presenter-to-content
 // connectors; the mascot's point gesture carries the same intent.
 const SLIDE_FRAMES = 10;
+// Far enough below the rect that the rig is off the bottom edge at slide start.
+const ENTRY_RISE = 520;
 
 // Widened to the fields this layer actually reads -- id, from, to, mascot and
 // layout -- so the generic renderer can drive the same presenter without a
@@ -36,7 +38,21 @@ export const MascotLayer: React.FC<{ scenes: Array<{ id: string; from: number; t
   const sinceCut = frame - scene.from;
   const slide = Math.min(1, Math.max(0, sinceCut / SLIDE_FRAMES));
 
-  const from = mascotBoxForScene(previous), to = mascotBoxForScene(scene);
+  const to = mascotBoxForScene(scene);
+  // Returning from an absent scene, the presenter rises into its rect instead of
+  // travelling across the frame.
+  //
+  // `payoff` declares no mascot rect at all, so lerping from
+  // mascotBoxForScene(previous) started the slide at that fallback box -- high in
+  // the frame -- and for six of the ten slide frames the rig passed straight over
+  // the result board, covering the "Message to Avery Chen" row. The collision
+  // audit cannot see it: a rect says where the presenter ends up, not where it
+  // travels, so the declared boxes never intersect and the picture is still wrong.
+  //
+  // Rising from below keeps the whole path inside the band the rig ends in, which
+  // makes the transit as safe as the destination.
+  const returning = previous.mascot.role === "absent" || !previous.layout.some(({ kind }) => kind === "mascot");
+  const from = returning ? { ...to, y: to.y + ENTRY_RISE } : mascotBoxForScene(previous);
   const eased = slide * slide * (3 - 2 * slide);
   const box = { x: lerp(from.x, to.x, eased), y: lerp(from.y, to.y, eased), scale: lerp(from.scale, to.scale, eased) };
   // Squash-and-stretch on landing gives the slide weight without a fade.
