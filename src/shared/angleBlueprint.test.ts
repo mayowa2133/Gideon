@@ -119,6 +119,19 @@ describe("angle blueprint", () => {
     }
   });
 
+  it("never inherits the reference film's copy", () => {
+    // Words on screen that no line in this script supports are the same defect
+    // as a caption nobody speaks. The reference scene's arrangement transfers;
+    // its chips and headlines do not.
+    for (const scene of blueprint.scenes) {
+      for (const key of ["labels", "pills", "headline", "lines"]) {
+        expect(scene.contentOptions, `${scene.id}.${key}`).not.toHaveProperty(key);
+      }
+    }
+    // The reference does carry that copy, so this is a real subtraction.
+    expect(reference.scenes.some(({ contentOptions }) => "labels" in contentOptions || "pills" in contentOptions)).toBe(true);
+  });
+
   // A film paced from too few beats is the quiet failure: nothing overflows,
   // every scene just gets longer, and it renders as a slideshow.
   it("reports a beat count that cannot reach the reference pace", () => {

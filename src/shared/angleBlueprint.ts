@@ -53,6 +53,16 @@ function defaultShot(beat: { spoken: boolean; claimId?: string }, isLast: boolea
 // catch. Wide then tight is a pair; wide, wide, tight is a pause.
 const ESTABLISH_LEAD = 1;
 
+// A template's options carry both how a scene is arranged and what it says. Only
+// the first half transfers. Inheriting the reference scene's options wholesale
+// put V22's chips -- "AVERY CHEN", "SENIOR TECHNICAL RECRUITER" -- on a
+// generated film whose narration says no such thing, which is the same defect as
+// a caption nobody speaks: words on screen that no line in this script supports.
+const TEXT_OPTIONS = new Set(["labels", "pills", "headline", "lines", "caption", "title", "note"]);
+function layoutOnly(options: Record<string, unknown> = {}) {
+  return Object.fromEntries(Object.entries(options).filter(([key]) => !TEXT_OPTIONS.has(key)));
+}
+
 export interface AngleCompileIssue { sceneId?: string; reason: string; detail?: string }
 
 export function compileAngleBlueprint(input: {
@@ -158,7 +168,7 @@ export function compileAngleBlueprint(input: {
       endMs,
       shotType: shot.shotType,
       contentPattern: shot.contentPattern,
-      contentOptions: shot.contentPattern === template.contentPattern ? template.contentOptions : {},
+      contentOptions: layoutOnly((shot.contentPattern === template.contentPattern ? template.contentOptions : {}) as Record<string, unknown>),
       presenter: { ...template.presenter, visible: shot.shotType !== "product_fullscreen" },
       productAssetIds: productCrop ? [productCrop.assetId] : [],
       supportedClaimIds: claim ? [claim.id] : [],
