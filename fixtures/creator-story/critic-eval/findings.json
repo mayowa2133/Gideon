@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "1",
+  "promptVersion": "frame-critic-v1",
+  "judgedBy": "claude-opus-5 via Claude Code (no API key; the agent is the model)",
+  "findings": [
+    {
+      "id": "good-120",
+      "occlusion": false,
+      "clippedText": true,
+      "illegibleRegion": false,
+      "collision": false,
+      "emptyFrame": false,
+      "notes": "RECRUITER is cut to 'REC' by the right edge of the contact card."
+    },
+    {
+      "id": "good-350",
+      "occlusion": false,
+      "clippedText": false,
+      "illegibleRegion": false,
+      "collision": false,
+      "emptyFrame": false,
+      "notes": ""
+    },
+    {
+      "id": "good-620",
+      "occlusion": false,
+      "clippedText": false,
+      "illegibleRegion": true,
+      "collision": false,
+      "emptyFrame": false,
+      "notes": "The four filmstrip cards carry body text far too small to read at this size."
+    },
+    {
+      "id": "good-900",
+      "occlusion": false,
+      "clippedText": false,
+      "illegibleRegion": false,
+      "collision": false,
+      "emptyFrame": false,
+      "notes": ""
+    },
+    {
+      "id": "good-1100",
+      "occlusion": false,
+      "clippedText": false,
+      "illegibleRegion": false,
+      "collision": false,
+      "emptyFrame": false,
+      "notes": ""
+    },
+    {
+      "id": "bad-occlusion",
+      "occlusion": true,
+      "clippedText": false,
+      "illegibleRegion": false,
+      "collision": true,
+      "emptyFrame": false,
+      "notes": "A black panel covers the Jobs card heading and subtitle."
+    },
+    {
+      "id": "bad-clipped",
+      "occlusion": false,
+      "clippedText": true,
+      "illegibleRegion": false,
+      "collision": false,
+      "emptyFrame": false,
+      "notes": "Cards are cut at both frame edges: 'ortunitie', 'ss JSear', 'Recruite'."
+    },
+    {
+      "id": "bad-empty",
+      "occlusion": false,
+      "clippedText": false,
+      "illegibleRegion": true,
+      "collision": false,
+      "emptyFrame": true,
+      "notes": "The frame is washed out and blurred with no readable content."
+    }
+  ]
+}

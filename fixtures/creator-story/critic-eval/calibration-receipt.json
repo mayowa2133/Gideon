@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1",
+  "promptVersion": "frame-critic-v1",
+  "generatedAt": "2026-08-10T02:38:51.751389+00:00",
+  "judgedBy": "claude-opus-5 via Claude Code",
+  "method": "Agent read each frame directly. Bad frames viewed full size; good frames judged from a five-up sheet at 360x640, which is a harder test than full size, not an easier one.",
+  "samples": 8,
+  "truePositives": 3,
+  "falseNegatives": 0,
+  "falsePositives": 2,
+  "recall": 1.0,
+  "precision": 0.6,
+  "passed": true,
+  "disputedFalsePositives": [
+    {
+      "id": "good-120",
+      "note": "Flagged clippedText for RECRUITER cut to 'REC' by the contact card edge. Reviewing the frame, this looks like a real defect in the shipped master rather than a critic error - the same class as 'Senior Technical Recruite'. Counted against precision anyway, because relabelling a sample to make a score look better is how a calibration stops meaning anything."
+    },
+    {
+      "id": "good-620",
+      "note": "Flagged illegibleRegion for the filmstrip cards' body text. Defensible: those cards are tokens, not evidence, so unreadable body text there is intended. A future prompt revision should let the critic say 'small but not load-bearing'."
+    }
+  ]
+}

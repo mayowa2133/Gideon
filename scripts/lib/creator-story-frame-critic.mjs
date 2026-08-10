@@ -7,6 +7,13 @@
 // the metrics average them away. A vision model looking at the picture is the
 // only mechanism here that substitutes for a person looking at it.
 //
+// **The agent is the model.** There is no API call in here and no provider
+// dependency: the render extracts frames and writes a worklist, whichever agent
+// is driving -- Claude Code, Codex -- looks at those frames and writes its
+// findings back, and the gate reads the file. That keeps the vision work inside
+// the agent session that is already running instead of turning every render into
+// metered API traffic, and it is the same shape as the rest of the agent surface.
+//
 // The rule this module is built around, learned the hard way elsewhere in this
 // repo: **an uncalibrated critic reports blocked, never passed.** A checker that
 // has not been shown to catch the failures it exists for manufactures
@@ -70,6 +77,32 @@ export function parseCriticReply(text) {
     finding[kind] = parsed[kind];
   }
   return finding;
+}
+
+// The worklist an agent is asked to judge. Written next to the frames so the
+// task is self-contained: a path, the prompt, and where to put the answer.
+export async function writeCriticWorklist(frames, outputDir) {
+  const worklist = {
+    schemaVersion: "1",
+    promptVersion: CRITIC_PROMPT_VERSION,
+    prompt: CRITIC_PROMPT,
+    instructions: "Look at each frame listed below and append one finding per frame to findings.json in this directory, in the reply shape the prompt describes plus the frame's id.",
+    findingsFile: path.join(outputDir, "findings.json"),
+    frames: frames.map(({ frame, file }) => ({ id: String(frame), file }))
+  };
+  await fs.writeFile(path.join(outputDir, "worklist.json"), `${JSON.stringify(worklist, null, 2)}\n`);
+  return worklist;
+}
+
+// Findings written by the agent. Every frame in the worklist must be answered:
+// a missing frame is an unjudged frame, and silently treating it as clean is the
+// failure this module exists to avoid.
+export async function readCriticFindings(outputDir, expectedIds) {
+  const parsed = JSON.parse(await fs.readFile(path.join(outputDir, "findings.json"), "utf8"));
+  const byId = new Map(parsed.findings.map((finding) => [String(finding.id), finding]));
+  const missing = expectedIds.filter((id) => !byId.has(String(id)));
+  if (missing.length) throw new Error(`Frame critic findings are incomplete: ${missing.length} frame(s) unjudged (${missing.slice(0, 5).join(", ")}).`);
+  return expectedIds.map((id) => ({ id: String(id), ...parseCriticReply(JSON.stringify(byId.get(String(id)))) }));
 }
 
 export function findingIsClean(finding) {
