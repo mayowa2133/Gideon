@@ -14,7 +14,7 @@
   "disputedFalsePositives": [
     {
       "id": "good-120",
-      "note": "Flagged clippedText for RECRUITER cut to 'REC' by the contact card edge. Reviewing the frame, this looks like a real defect in the shipped master rather than a critic error - the same class as 'Senior Technical Recruite'. Counted against precision anyway, because relabelling a sample to make a score look better is how a calibration stops meaning anything."
+      "note": "Flagged clippedText for RECRUITER cut to \"REC\" by the contact card edge. This was a real defect in the shipped master and has since been fixed: the crop was passed a height of 735 for a 530-tall box, so cover-fit solved on height and discarded 54 source pixels from each side. The critic was right and the label was wrong. Left counted against precision, because the score records what happened on the run."
     },
     {
       "id": "good-620",
