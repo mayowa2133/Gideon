@@ -58,8 +58,19 @@ function stripLiterals(source) {
   return out;
 }
 
+// Member names are not identifier reads. `realized.scenes` does not read a
+// binding called `scenes` and `process.env` does not read one called `env`, but
+// a bare word match says they do -- which is why widening this check beyond the
+// render scripts produced nineteen findings of which most were noise. Property
+// keys in object literals are dropped for the same reason: `{ width: 4 }` is not
+// a read of `width`.
 function identifiers(text) {
-  return new Set((text.match(/[A-Za-z_$][A-Za-z0-9_$]*/g) ?? []).filter((word) => !KEYWORDS.has(word)));
+  // The shebang is not code. `#!/usr/bin/env node` was reported as a read of a
+  // binding named `env`.
+  const withoutMembers = text.replace(/^#!.*$/m, " ")
+    .replace(/\??\.\s*[A-Za-z_$][A-Za-z0-9_$]*/g, " ")
+    .replace(/([A-Za-z_$][A-Za-z0-9_$]*)\s*:/g, " ");
+  return new Set((withoutMembers.match(/[A-Za-z_$][A-Za-z0-9_$]*/g) ?? []).filter((word) => !KEYWORDS.has(word)));
 }
 
 export function analyzeHoisting(source) {

@@ -39,6 +39,7 @@ if (dryRun) {
   process.exit(0);
 }
 
+const errors = [];
 const resolvedEvidencePath = evidencePath ?? findUniqueFile(archiveDir, evidenceFilename);
 const resolvedProviderReportPath = providerReportPath ?? findUniqueFile(archiveDir, providerReportFilename);
 const resolvedReleaseReceiptPath = allowSkipPackage ? null : (releaseReceiptPath ?? findUniqueFile(archiveDir, releaseReceiptFilename));
@@ -56,7 +57,6 @@ const evidence = readJson(resolvedEvidencePath, "evidence");
 const providerReport = readJson(resolvedProviderReportPath, "provider canary report");
 const releaseReceipt = resolvedReleaseReceiptPath ? readJson(resolvedReleaseReceiptPath, "release receipt") : null;
 const receipt = readJson(resolvedReceiptPath, "receipt");
-const errors = [];
 
 validateArchiveConsistency({
   evidence,

@@ -41,7 +41,7 @@ checkTrackedPathPolicy(files);
 checkTextFilePolicy(files);
 checkCompletionEstimateSync();
 checkPackageContract();
-checkRenderScriptHoisting();
+checkScriptHoisting();
 
 if (errors.length > 0) {
   console.error("Repository lint failed:");
@@ -69,13 +69,23 @@ if (warnings.length > 0) {
 // declared beside the function that reads it is still in its temporal dead zone
 // when top-level code calls that function. Four renders have died this way; the
 // note in the render script asking for hoisting was never enforced until now.
-function checkRenderScriptHoisting() {
-  const scriptsDir = path.join(rootDir, "scripts");
-  if (!fs.existsSync(scriptsDir)) return;   // lint also runs against fixture roots
-  for (const name of fs.readdirSync(scriptsDir)) {
-    if (!/^render-solomon-creator-story-v\d+\.mjs$/.test(name)) continue;
-    for (const violation of analyzeHoisting(fs.readFileSync(path.join(scriptsDir, name), "utf8"))) {
-      errors.push(`scripts/${name}:${violation.line} reads '${violation.binding}' ${violation.via}, but it is declared at line ${violation.declaredAt} (temporal dead zone). Hoist it above the top-level code.`);
+// Every script, not only the render scripts it was written for. The bug it
+// catches -- a helper called from top-level code reading a `const` declared
+// below it -- is a property of any module with top-level await, and scoping the
+// check to one filename pattern meant build-screen-inventory.mjs threw on its
+// first run with the gate sitting right there, green. Fourth occurrence of this
+// class in the project and the first one the gate could have caught but did not.
+function checkScriptHoisting() {
+  const roots = [path.join(rootDir, "scripts"), path.join(rootDir, "scripts", "lib")];
+  for (const dir of roots) {
+    if (!fs.existsSync(dir)) continue;   // lint also runs against fixture roots
+    for (const name of fs.readdirSync(dir)) {
+      if (!name.endsWith(".mjs")) continue;
+      const file = path.join(dir, name);
+      if (!fs.statSync(file).isFile()) continue;
+      for (const violation of analyzeHoisting(fs.readFileSync(file, "utf8"))) {
+        errors.push(`${path.relative(rootDir, file)}:${violation.line} reads '${violation.binding}' ${violation.via}, but it is declared at line ${violation.declaredAt} (temporal dead zone). Hoist it above the top-level code.`);
+      }
     }
   }
 }
