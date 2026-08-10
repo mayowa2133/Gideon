@@ -28,13 +28,30 @@ const CONTAINER_ASPECT: Record<string, number> = {
 // implemented and a generated film that reaches for all of them looks restless.
 // An agent editing the blueprint can choose any implemented pair; this is what
 // it gets without asking.
-function defaultShot(beat: { spoken: boolean; claimId?: string }, isLast: boolean): Pick<SceneComposition, "shotType" | "contentPattern"> {
+function defaultShot(beat: { spoken: boolean; claimId?: string }, isLast: boolean, establishing: boolean): Pick<SceneComposition, "shotType" | "contentPattern"> {
   if (isLast) return { shotType: "cta_end_card", contentPattern: "comment_card" };
+  // Setting up a screen is a composed board, not a proof band: the whole thing
+  // at once, so the tight cut that follows has somewhere to come from.
+  if (establishing) return { shotType: "split_presenter_product", contentPattern: "composed_board" };
   if (!beat.claimId) return { shotType: "presenter_fullscreen", contentPattern: "ambient" };
   return beat.spoken
     ? { shotType: "split_presenter_product", contentPattern: "evidence_band" }
     : { shotType: "product_fullscreen", contentPattern: "evidence_band" };
 }
+
+// How many beats ahead of a proof still show its screen. Claims are the only
+// scenes that assert anything, but they are not the only scenes allowed to show
+// the product: with four claims in an eighteen-beat film, binding product
+// presence to claims alone left thirteen scenes as a presenter on a colour --
+// 72% of the film with nothing in it. The reference stays on the product between
+// proofs, wide, and cuts tight only when it has something to prove. That is
+// ordinary film grammar and it costs no claim.
+//
+// One beat, not two. A lead of two put the same full-screen rect on two
+// consecutive scenes, which is a still held across a cut no matter which
+// template draws it -- the thing the composition-similarity gate exists to
+// catch. Wide then tight is a pair; wide, wide, tight is a pause.
+const ESTABLISH_LEAD = 1;
 
 export interface AngleCompileIssue { sceneId?: string; reason: string; detail?: string }
 
@@ -94,15 +111,31 @@ export function compileAngleBlueprint(input: {
   let startMs = 0;
   const scenes: SceneComposition[] = script.map((beat, index) => {
     const slot = brief.beats[index]!;
-    const shot = input.shots?.[beat.id] ?? defaultShot(slot, index === script.length - 1);
+    const claim = beat.claimId ? claimById.get(beat.claimId) : undefined;
+    // The screen this beat is heading towards, if a proof is close enough that
+    // showing it now reads as setting up rather than as wandering.
+    const establishing = claim ? undefined : script.slice(index + 1, index + 1 + ESTABLISH_LEAD)
+      .map((ahead) => (ahead.claimId ? claimById.get(ahead.claimId) : undefined)).find(Boolean);
+    const shot = input.shots?.[beat.id] ?? defaultShot(slot, index === script.length - 1, Boolean(establishing));
     const endMs = startMs + Math.round((durations[index]! / fps) * 1000);
     const template = reference.scenes.find((scene) => scene.contentPattern === shot.contentPattern) ?? reference.scenes[0]!;
     const tier = cadence[index % cadence.length]!;
     const options = byTier(tier);
     const backdrop = options[Math.floor(index / cadence.length) % Math.max(1, options.length)] ?? template.backdrop!;
 
-    const claim = beat.claimId ? claimById.get(beat.claimId) : undefined;
     let productCrop: SceneComposition["productCrop"];
+    if (!claim && establishing) {
+      // Wide, not the proof band: the same rect twice running is a still, and
+      // the composition-similarity gate is right to call it one. Wide then tight
+      // is the pair that makes the tight shot mean something.
+      const screen = inventory.screens.find(({ asset }) => asset === establishing.assetId);
+      if (screen) {
+        productCrop = {
+          assetId: establishing.assetId, x: 0, y: 0, width: screen.width, height: screen.height,
+          trim: reference.scenes.find((scene) => scene.productCrop?.assetId === establishing.assetId)?.productCrop?.trim ?? 0
+        };
+      }
+    }
     if (claim) {
       const aspect = CONTAINER_ASPECT[shot.contentPattern ?? ""] ?? 1.6;
       const resolved = resolveCrop(inventory, claim.requiredReadableText, aspect, { assetId: claim.assetId });
@@ -127,7 +160,7 @@ export function compileAngleBlueprint(input: {
       contentPattern: shot.contentPattern,
       contentOptions: shot.contentPattern === template.contentPattern ? template.contentOptions : {},
       presenter: { ...template.presenter, visible: shot.shotType !== "product_fullscreen" },
-      productAssetIds: claim ? [claim.assetId] : [],
+      productAssetIds: productCrop ? [productCrop.assetId] : [],
       supportedClaimIds: claim ? [claim.id] : [],
       captions: [],
       typography: [],

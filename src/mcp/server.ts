@@ -264,6 +264,31 @@ const tools = [
       runId: { type: "string" },
       ...hostedTransportSchema
     }, ["projectId", "runId"])
+  },
+  {
+    name: "gideon_creator_story_brief",
+    description: "Start a creator video for a topic. Returns the beat plan, per-beat word budgets, and the approved screen evidence each claim may draw on. Writes brief.json and BRIEF.md. No model is called: you write the script.",
+    inputSchema: objectSchema({
+      topic: { type: "string", description: "The angle, in the viewer's terms. For example: land a marketing internship." },
+      seconds: { type: "number", description: "Running time. Defaults to 38.5, which is the reference film's length." },
+      outDir: optionalString("Directory for brief.json, BRIEF.md, script.json and blueprint.json. Defaults to tmp/creator-story.")
+    }, ["topic"])
+  },
+  {
+    name: "gideon_creator_story_compile",
+    description: "Check a written script against its brief and compile it into a render-ready blueprint. Rejects invented figures, budget overruns, and beats that do not match the plan. Returns issues rather than a blueprint when the script does not hold.",
+    inputSchema: objectSchema({
+      script: {
+        type: "array",
+        description: "One entry per beat, in the brief's order: { id, vo, claimId? }. Silent beats take an empty vo.",
+        items: objectSchema({
+          id: { type: "string" },
+          vo: { type: "string" },
+          claimId: optionalString("Exactly the claim id the brief assigned to this beat.")
+        }, ["id", "vo"])
+      },
+      outDir: optionalString("The directory the brief was written to. Defaults to tmp/creator-story.")
+    }, ["script"])
   }
 ];
 
@@ -337,6 +362,12 @@ export async function callTool(name: string, args: Record<string, unknown> = {})
       return textResult(await captureRunControlTool(args));
     case "gideon_capture_evidence":
       return textResult(await captureEvidenceTool(args));
+    case "gideon_creator_story_brief":
+      return textResult(await creatorStoryCli(["brief", "--topic", requireString(args.topic, "topic"),
+        ...(typeof args.seconds === "number" ? ["--seconds", String(args.seconds)] : []),
+        ...(typeof args.outDir === "string" ? ["--out", args.outDir] : [])]));
+    case "gideon_creator_story_compile":
+      return textResult(await creatorStoryCompile(args));
     default:
       throw new Error(`Unknown Gideon tool: ${name}`);
   }
@@ -1096,6 +1127,39 @@ function sanitizeRecord(value: unknown): Record<string, JsonValue> {
     return {};
   }
   return JSON.parse(JSON.stringify(value)) as Record<string, JsonValue>;
+}
+
+// Both creator-story tools shell out to the same CLI the terminal uses.
+//
+// That is deliberate rather than lazy. This server is consumed over stdio by
+// Claude Code and by Codex alike, and the capability has to behave identically
+// in all three places -- a second implementation here would be a second thing to
+// keep true, and the one most likely to drift is the one nobody runs by hand.
+async function creatorStoryCli(argv: string[]): Promise<unknown> {
+  const script = path.join(__dirname, "..", "..", "scripts", "generate-creator-story.mjs");
+  const { execFile } = await import("node:child_process");
+  return await new Promise((resolve, reject) => {
+    // No shell: argv goes to the process as argv, so a topic containing quotes,
+    // semicolons or backticks is a topic and not a command.
+    execFile(process.execPath, [script, ...argv], { cwd: path.join(__dirname, "..", "..") }, (error, stdout) => {
+      // The CLI exits non-zero when a script fails validation and still prints
+      // the issues, which is the useful half. Parse first, reject only if there
+      // is nothing to read.
+      try {
+        resolve(JSON.parse(stdout) as unknown);
+      } catch {
+        reject(error ?? new Error(`Creator story CLI produced no JSON: ${stdout.slice(0, 400)}`));
+      }
+    });
+  });
+}
+
+async function creatorStoryCompile(args: Record<string, unknown>): Promise<unknown> {
+  if (!Array.isArray(args.script)) throw new Error("script must be an array of beats.");
+  const outDir = typeof args.outDir === "string" ? args.outDir : path.join(__dirname, "..", "..", "tmp", "creator-story");
+  await fs.mkdir(outDir, { recursive: true });
+  await fs.writeFile(path.join(outDir, "script.json"), `${JSON.stringify(args.script, null, 2)}\n`, "utf8");
+  return await creatorStoryCli(["compile", "--out", outDir]);
 }
 
 function textResult(value: unknown): ToolResult {

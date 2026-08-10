@@ -261,3 +261,36 @@ A change is complete when:
 - It includes tests for new behavior and failure cases.
 - It updates docs when contracts or architecture change.
 - It leaves the repository in a clean, reviewable state.
+
+## Creator videos from a topic
+
+Gideon can build a short-form vertical video about an angle from the captured
+Solomon screens. It is two commands rather than one because no model is called
+anywhere in the chain: the agent running the commands is the writer.
+
+```bash
+pnpm creator-story:brief --topic "land a marketing internship"
+# read tmp/creator-story/BRIEF.md, write tmp/creator-story/script.json
+pnpm creator-story:compile
+```
+
+Over MCP (stdio, so Codex and Claude Code use the same server): call
+`gideon_creator_story_brief`, then `gideon_creator_story_compile` with the
+script inline. Both tools shell out to the CLI above, so all three surfaces
+behave identically.
+
+Rules the compiler enforces, and why they are not negotiable:
+
+- **Every figure must appear in the evidence for the beat that says it.** The
+  reference film shipped six claims of which four were unprovable, each passing
+  the OCR gate only because the film printed those words itself.
+- **Claims are selected from approved, legible screen regions**, not written and
+  checked afterwards. A region whose text cannot reach a readable size at 1080
+  wide cannot carry a claim at any crop, and no amount of magnification fixes it.
+- **Evidence is OCR of user screens and is treated as data.** Text that reads
+  like an instruction is excluded from grounding, not merely reported.
+- **Beat count follows running time.** Too many beats fails loudly; too few
+  fails silently and renders as a slideshow, which is why it is checked.
+
+Blueprints are JSON, which is what makes the "adjust and re-render" loop real:
+change the blueprint, not the components.

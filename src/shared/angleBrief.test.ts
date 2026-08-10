@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ANGLE_PROMPT_VERSION, buildAngleBrief, validateAngleScript, type ScriptBeat } from "./angleBrief";
+import { ANGLE_PROMPT_VERSION, buildAngleBrief, planBeats, validateAngleScript, type ScriptBeat } from "./angleBrief";
 import { SPEECH_RATE_BAND } from "./creatorStoryQuality";
 import type { SelectableClaim } from "./claimSelection";
 
@@ -29,9 +29,15 @@ describe("angle brief", () => {
     expect(brief.promptVersion).toBe(ANGLE_PROMPT_VERSION);
     expect(brief.words[0]).toBeGreaterThan(0);
     expect(brief.beats.find((beat) => !beat.spoken)!.wordBudget).toEqual([0, 0]);
-    // The spoken beats' budgets have to add up to a film that fits the cut.
-    const floor = brief.beats.reduce((sum, beat) => sum + beat.wordBudget[0], 0);
-    expect(floor).toBeGreaterThanOrEqual(brief.words[0] - brief.beats.length);
+    // The beat floors have to add up to roughly the film's floor -- they are a
+    // share of it, not numbers chosen per beat. They land under it by exactly
+    // the per-beat slack, which is the bound worth pinning: if slack grew, a
+    // writer could hit every beat minimum and still hand back half a film.
+    const spoken = brief.beats.filter((beat) => beat.spoken);
+    const floor = spoken.reduce((sum, beat) => sum + beat.wordBudget[0], 0);
+    // Slack of two per beat, plus up to half a word each to rounding.
+    expect(floor).toBeGreaterThanOrEqual(brief.words[0] - 2 * spoken.length - Math.ceil(spoken.length / 2));
+    expect(floor).toBeLessThanOrEqual(brief.words[0]);
   });
 
   it("accepts a script that fits", () => {
@@ -113,5 +119,41 @@ describe("angle brief", () => {
     expect(reasons).toContain("evidence_instruction_shaped");
     // The same figure against clean evidence is fine; it is the source that is bad.
     expect(validateAngleScript(brief, planted).map(({ reason }) => reason)).not.toContain("evidence_instruction_shaped");
+  });
+
+  describe("beat planning", () => {
+    const claimIds = ["a-1", "b-2", "c-3", "d-4"];
+    const plan = planBeats({ beatCount: 18, claimIds });
+
+    it("opens on a hook, closes on a cta, and uses every claim once", () => {
+      expect(plan).toHaveLength(18);
+      expect(plan[0]!.id).toBe("hook");
+      expect(plan.at(-1)!.id).toBe("cta");
+      expect(plan.flatMap(({ claimId }) => (claimId ? [claimId] : []))).toEqual(claimIds);
+      expect(new Set(plan.map(({ id }) => id)).size).toBe(18);
+    });
+
+    it("spreads the evidence through the film instead of clustering it", () => {
+      const at = plan.flatMap((beat, index) => (beat.claimId ? [index] : []));
+      const gaps = at.slice(1).map((position, index) => position - at[index]!);
+      // Evenly spaced to within a beat: a film that shows its whole product in
+      // three consecutive shots has nothing left to cut to.
+      expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(1);
+      expect(at[0]).toBeGreaterThan(1);
+      expect(at.at(-1)).toBeLessThan(17);
+    });
+
+    it("lets the film breathe, but never on a beat that has something to show", () => {
+      const silent = plan.filter(({ spoken }) => !spoken);
+      expect(silent.length).toBeGreaterThan(0);
+      // A claim shown and not said is a shot nobody was told to read.
+      for (const beat of silent) expect(beat.claimId, beat.id).toBeUndefined();
+    });
+
+    it("plans a film with no claims at all", () => {
+      const bare = planBeats({ beatCount: 6, claimIds: [] });
+      expect(bare).toHaveLength(6);
+      expect(bare.every(({ claimId }) => !claimId)).toBe(true);
+    });
   });
 });
