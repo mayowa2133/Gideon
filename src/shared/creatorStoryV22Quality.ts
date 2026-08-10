@@ -527,7 +527,7 @@ export const V22_PRODUCT_STILLS=[
   {asset:"opportunity",trim:52},{asset:"opportunity",trim:142},
   {asset:"contact",trim:130},{asset:"contact",trim:140},
   {asset:"outreach_blank",trim:85},
-  {asset:"outreach_complete",trim:180,frames:12,step:3},{asset:"outreach_complete",trim:75,frames:12,step:3},{asset:"outreach_complete",trim:20,frames:12,step:3},
+  {asset:"outreach_complete",trim:180,frames:12,step:3},{asset:"outreach_complete",trim:75,frames:12,step:3},{asset:"outreach_complete",trim:20,frames:12,step:3},{asset:"outreach_complete",trim:53},
 ] as const;
 
 // A still sequence, not a video. Product proof was frozen because fifteen
