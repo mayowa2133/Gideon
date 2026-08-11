@@ -170,11 +170,20 @@ for (const screen of fromRun ? [] : SCREENS) {
   process.stdout.write(`${screen.asset.padEnd(20)}${String(words.length).padStart(4)} words  ${String(elements.filter((element) => element.provenance === "approved").length).padStart(2)} approved  ${String(elements.filter((element) => element.provenance === "candidate").length).padStart(2)} candidate\n`);
 }
 
-const inventory = { schemaVersion: "1", product: "solomon", source: { width: SOURCE_WIDTH, height: SOURCE_HEIGHT }, screens };
-await fs.mkdir(path.dirname(target), { recursive: true });
-await fs.writeFile(path.resolve(flag("out") ?? target), `${JSON.stringify(inventory, null, 2)}\n`);
+// The source dimensions describe the screens actually in this inventory, not
+// the constants a previous film was captured at.
+const source = screens[0] ? { width: screens[0].width, height: screens[0].height } : { width: SOURCE_WIDTH, height: SOURCE_HEIGHT };
+const inventory = { schemaVersion: "1", product: "solomon", source, screens };
+// Report where it wrote, not where it usually writes. This line named the
+// shipped fixture unconditionally, so every run with --out looked like it had
+// just overwritten the regression floor. It had not -- but reading a log
+// instead of the filesystem cost six unnecessary restores and a bug report
+// against code that was correct.
+const written = path.resolve(flag("out") ?? target);
+await fs.mkdir(path.dirname(written), { recursive: true });
+await fs.writeFile(written, `${JSON.stringify(inventory, null, 2)}\n`);
 const total = screens.reduce((sum, screen) => sum + screen.elements.length, 0);
-process.stdout.write(`\n${total} elements across ${screens.length} screens -> ${path.relative(root, target)}\n`);
+process.stdout.write(`\n${total} elements across ${screens.length} screens -> ${path.relative(root, written)}\n`);
 
 // Reported rather than dropped. An illegible region is still a true description
 // of the product; what it cannot be is evidence in a vertical frame, and the fix
