@@ -32,7 +32,10 @@ const brief = buildAngleBrief({
 // brief set. What is being tested is the compile, not the prose.
 const script: ScriptBeat[] = brief.beats.map((slot) => ({
   id: slot.id,
-  vo: slot.spoken ? Array.from({ length: slot.wordBudget[0] + 1 }, () => "solomon").join(" ") : "",
+  vo: slot.spoken
+    ? [...Array.from({ length: slot.wordBudget[0] + (slot.claimId ? 0 : 1) }, () => "solomon"),
+       ...(slot.claimId ? [claims.find(({ id }) => id === slot.claimId)!.requiredReadableText[0]!] : [])].join(" ")
+    : "",
   claimId: slot.claimId
 }));
 
@@ -104,7 +107,14 @@ describe("angle blueprint", () => {
       topic: "paced", product: "Solomon", claims, filmFrames: FILM_FRAMES, speechRateBand: SPEECH_RATE_BAND,
       beats: planBeats({ beatCount: 18, claimIds: claims.map(({ id }) => id) })
     });
-    const written = paced.beats.map((slot) => ({ id: slot.id, vo: slot.spoken ? Array.from({ length: slot.wordBudget[0] }, () => "solomon").join(" ") : "", claimId: slot.claimId }));
+    const written = paced.beats.map((slot) => ({
+      id: slot.id,
+      vo: slot.spoken
+        ? [...Array.from({ length: slot.wordBudget[0] - (slot.claimId ? 1 : 0) }, () => "solomon"),
+           ...(slot.claimId ? [claims.find(({ id }) => id === slot.claimId)!.requiredReadableText[0]!] : [])].join(" ")
+        : "",
+      claimId: slot.claimId
+    }));
     const { blueprint: film } = compileAngleBlueprint({ brief: paced, script: written, claims, inventory, reference });
 
     const shown = film.scenes.filter(({ productCrop }) => productCrop);

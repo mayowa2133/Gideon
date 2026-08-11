@@ -18,9 +18,13 @@ const brief = buildAngleBrief({ topic: "land a marketing internship", product: "
 // A script that satisfies every rule, built from the brief's own budgets so it
 // stays valid if the band moves.
 const line = (count: number) => Array.from({ length: count }, (_, index) => `w${"o".repeat((index % 4) + 1)}rd`).join(" ");
+// A claim beat has to say something about its claim, so the filler carries one
+// of the claim's own tokens.
 const good = (): ScriptBeat[] => brief.beats.map((slot) => ({
   id: slot.id,
-  vo: slot.spoken ? line(Math.round((slot.wordBudget[0] + slot.wordBudget[1]) / 2)) : "",
+  vo: slot.spoken
+    ? `${line(Math.round((slot.wordBudget[0] + slot.wordBudget[1]) / 2) - (slot.claimId ? 1 : 0))}${slot.claimId ? " Avery" : ""}`
+    : "",
   claimId: slot.claimId
 }));
 
@@ -73,11 +77,20 @@ describe("angle brief", () => {
     const invented = good();
     // "3x faster" is the sentence every marketing video wants and almost none
     // can support. The evidence for this beat says "4 open roles" and nothing else.
-    invented[1] = { ...invented[1]!, vo: `${line(brief.beats[1]!.wordBudget[0] - 2)} 3x faster` };
+    invented[1] = { ...invented[1]!, vo: `${line(brief.beats[1]!.wordBudget[0] - 3)} Avery 3x faster` };
     expect(validateAngleScript(brief, invented).map(({ detail }) => detail)).toContain("3");
     const grounded = good();
-    grounded[1] = { ...grounded[1]!, vo: `${line(brief.beats[1]!.wordBudget[0] - 1)} 4` };
+    grounded[1] = { ...grounded[1]!, vo: `${line(brief.beats[1]!.wordBudget[0] - 2)} Avery 4` };
     expect(validateAngleScript(brief, grounded)).toEqual([]);
+  });
+
+  it("rejects a beat that names a claim and then talks about something else", () => {
+    const wandering = good();
+    wandering[1] = { ...wandering[1]!, vo: line(brief.beats[1]!.wordBudget[0]) };
+    const reasons = validateAngleScript(brief, wandering).map(({ reason }) => reason);
+    expect(reasons).toContain("beat_does_not_mention_claim");
+    // And a beat with no claim is free to say anything.
+    expect(validateAngleScript(brief, good())).toEqual([]);
   });
 
   it("does not let a beat quote evidence it was not given", () => {
