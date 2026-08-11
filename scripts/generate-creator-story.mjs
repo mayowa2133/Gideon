@@ -38,7 +38,8 @@ const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
 // is planned per angle the inventory is an output of the film being made, so the
 // path has to be an argument -- passing a plan while still reading the library
 // it was meant to replace is exactly the mismatch this stage exists to end.
-const inventory = readJson(flag("inventory", path.join(ROOT, "fixtures", "creator-story", "solomon-screen-inventory.json")));
+const inventoryPath = path.resolve(flag("inventory", path.join(ROOT, "fixtures", "creator-story", "solomon-screen-inventory.json")));
+const inventory = readJson(inventoryPath);
 const reference = readJson(path.join(ROOT, "fixtures", "creator-story", "solomon-v22.blueprint.json"));
 
 function briefCommand() {
@@ -68,7 +69,11 @@ function briefCommand() {
   });
 
   mkdirSync(outDir, { recursive: true });
-  writeFileSync(path.join(outDir, "brief.json"), `${JSON.stringify({ brief, claims }, null, 2)}\n`);
+  // The inventory travels with the brief. Passing --inventory to `brief` and
+  // forgetting it on `compile` silently resolved crops against the shipped
+  // library instead of the film's own capture -- a film briefed on one set of
+  // screens and framed against another, with nothing to say so.
+  writeFileSync(path.join(outDir, "brief.json"), `${JSON.stringify({ brief, claims, inventoryPath }, null, 2)}\n`);
   writeFileSync(path.join(outDir, "BRIEF.md"), renderBriefMarkdown(brief));
   return {
     command: "brief", topic, filmFrames, beatCount,
@@ -133,8 +138,14 @@ function compileCommand() {
   const briefFile = flag("brief", path.join(outDir, "brief.json"));
   const scriptFile = flag("script", path.join(outDir, "script.json"));
   if (!existsSync(scriptFile)) throw new Error(`No script at ${scriptFile}. Run the brief command first and write the script.`);
-  const { brief, claims } = readJson(briefFile);
+  const briefFileJson = readJson(briefFile);
+  const { brief, claims } = briefFileJson;
   const script = readJson(scriptFile);
+  // An explicit --inventory still wins; otherwise use the one the brief was
+  // built from, which is the only inventory whose claims this script can prove.
+  const resolved = args.includes("--inventory") || !briefFileJson.inventoryPath
+    ? inventory
+    : readJson(briefFileJson.inventoryPath);
 
   const scriptIssues = validateAngleScript(brief, script);
   if (scriptIssues.length) {
@@ -142,7 +153,7 @@ function compileCommand() {
     // film that fails them too, twenty-five minutes of render later.
     return { command: "compile", ok: false, stage: "script", issues: scriptIssues };
   }
-  const { blueprint, issues } = compileAngleBlueprint({ brief, script, claims, inventory, reference });
+  const { blueprint, issues } = compileAngleBlueprint({ brief, script, claims, inventory: resolved, reference });
   const blueprintFile = path.join(outDir, "blueprint.json");
   writeFileSync(blueprintFile, `${JSON.stringify(blueprint, null, 2)}\n`);
   return {
