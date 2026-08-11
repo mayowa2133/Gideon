@@ -288,7 +288,14 @@ export interface CaptureShotVerdict {
   cropWidthPx?: number;
   renderedTextPx?: number;
   withinBudget?: boolean;
-  legible?: boolean;
+  /**
+   * Never optional. An uncaptured shot is not legible, and saying nothing let a
+   * reader treat a missing answer as an absent problem -- the same shape as a
+   * gate that cannot fail. A verdict answers every question it is asked.
+   */
+  legible: boolean;
+  /** Why this shot could not be judged, when it could not be. */
+  unjudged?: string;
 }
 
 export interface CapturePlanVerification {
@@ -308,11 +315,11 @@ export interface CapturePlanVerification {
 export function verifyCapturePlan(plan: CapturePlan, inventory: ScreenInventory): CapturePlanVerification {
   const issues: CapturePlanIssue[] = [];
   const shots = plan.shots.map((shot) => {
-    const verdict: CaptureShotVerdict = { claimId: shot.claimId, regionId: shot.regionId, captured: false, missingFixture: [] };
+    const verdict: CaptureShotVerdict = { claimId: shot.claimId, regionId: shot.regionId, captured: false, missingFixture: [], legible: false };
     const screen = inventory.screens.find(({ asset }) => asset === shot.surfaceId);
-    if (!screen) { issues.push({ claimId: shot.claimId, reason: "surface_not_captured", detail: shot.surfaceId }); return verdict; }
+    if (!screen) { issues.push({ claimId: shot.claimId, reason: "surface_not_captured", detail: shot.surfaceId }); return { ...verdict, unjudged: "surface_not_captured" }; }
     const element = screen.elements.find(({ id }) => id === shot.regionId);
-    if (!element) { issues.push({ claimId: shot.claimId, reason: "region_not_captured", detail: shot.regionId }); return verdict; }
+    if (!element) { issues.push({ claimId: shot.claimId, reason: "region_not_captured", detail: shot.regionId }); return { ...verdict, unjudged: "region_not_captured" }; }
     verdict.captured = true;
     verdict.regionPx = { width: element.width, height: element.height };
 

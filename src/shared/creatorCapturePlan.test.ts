@@ -81,6 +81,23 @@ function capturedAsPlanned(overrides: Partial<Record<string, { width: number; he
 }
 
 describe("creator capture plan", () => {
+  // A verdict that omits `legible` reads as an absent problem rather than an
+  // unanswered question, which is how a partial verdict crashed a reader that
+  // trusted the field to exist.
+  it("answers every question for every shot, including the ones it could not judge", () => {
+    const empty = verifyCapturePlan(plan, { schemaVersion: "1", product: "solomon", source: { width: 1440, height: 900 }, screens: [] });
+    expect(empty.shots).toHaveLength(plan.shots.length);
+    for (const verdict of empty.shots) {
+      expect(typeof verdict.legible, verdict.claimId).toBe("boolean");
+      expect(verdict.legible, verdict.claimId).toBe(false);
+      expect(verdict.unjudged, verdict.claimId).toBeTruthy();
+    }
+    // A judged shot says nothing about being unjudged.
+    for (const verdict of verifyCapturePlan(plan, inventory).shots.filter(({ captured }) => captured)) {
+      expect(verdict.unjudged, verdict.claimId).toBeUndefined();
+    }
+  });
+
   it("plans one shot per claim, on the beat the film will show it", () => {
     expect(plan.issues).toEqual([]);
     expect(plan.shots.map(({ claimId }) => claimId)).toEqual(["role-moves", "who-to-ask"]);
