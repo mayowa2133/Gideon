@@ -82,8 +82,64 @@ function withLegibility(fields, words) {
   return { ...fields, textHeightPx, renderedTextPx, legibility };
 }
 
-const screens = [];
-for (const screen of SCREENS) {
+const flag = (name) => { const i = process.argv.indexOf(`--${name}`); return i === -1 ? undefined : process.argv[i + 1]; };
+
+// Built from a capture run rather than from the reference film's clips.
+//
+// The two halves of the pipeline did not meet: capture emits stills plus the
+// element boxes it measured from the DOM, and this script discovered its own
+// stills and re-derived geometry by clustering tesseract words. Clustering was
+// always a guess at something the browser could simply be asked, and with an
+// angle-driven capture there is no film to discover clips from anyway.
+//
+// So this path trusts the capture for geometry and uses OCR only for text and
+// legibility -- which is what OCR is actually good for.
+async function inventoryFromCapture(runFile) {
+  const run = JSON.parse(await fs.readFile(runFile, "utf8"));
+  const byAsset = new Map();
+  const pageWords = new Map();
+  for (const shot of run.shots) {
+    const still = path.join(root, shot.still);
+    if (!pageWords.has(shot.assetId)) pageWords.set(shot.assetId, await ocrWords(still));
+    const words = pageWords.get(shot.assetId);
+    const content = textFor(words, shot.region);
+    const element = {
+      id: shot.regionId, provenance: "approved", trim: 0,
+      ...withLegibility(rectFields(shot.region), content.words), ...content
+    };
+    const asset = byAsset.get(shot.assetId) ?? {
+      asset: shot.assetId, trim: 0,
+      width: run.viewport?.width ?? SOURCE_WIDTH, height: run.viewport?.height ?? SOURCE_HEIGHT,
+      elements: []
+    };
+    asset.elements.push(element);
+    byAsset.set(shot.assetId, asset);
+  }
+
+  // The resolver snaps a crop clear of any word it would otherwise cut in half,
+  // and it gathers those words from the screen's elements. Recording only the
+  // captured regions left it blind to everything around them: fitting a 116x20
+  // role label to a 2.47 band grew it downward into the chips beneath and sliced
+  // "DIRECTOR" through the middle, because nothing told it that row was there.
+  //
+  // So every screen carries its whole page of words as a candidate element.
+  // Candidate, not approved, so no claim can be selected from it -- it exists to
+  // be avoided, not to be shown.
+  for (const [assetId, asset] of byAsset) {
+    const words = pageWords.get(assetId) ?? [];
+    if (!words.length) continue;
+    asset.elements.push({
+      id: `${assetId}PageWords`, provenance: "candidate", trim: 0,
+      ...rectFields({ x: 0, y: 0, width: asset.width, height: asset.height }),
+      text: "", words, textHeightPx: 0, renderedTextPx: 0, legibility: "poor"
+    });
+  }
+  return [...byAsset.values()];
+}
+
+const fromRun = flag("from");
+const screens = fromRun ? await inventoryFromCapture(path.resolve(fromRun)) : [];
+for (const screen of fromRun ? [] : SCREENS) {
   const still = path.join(studyDir, `${screen.asset}.png`);
   await run("ffmpeg", ["-y", "-loglevel", "error", "-i", path.join(reference, screen.clip), "-vf", `select='eq(n,${screen.trim})'`, "-vsync", "0", "-frames:v", "1", still]);
   const words = await ocrWords(still);
@@ -116,7 +172,7 @@ for (const screen of SCREENS) {
 
 const inventory = { schemaVersion: "1", product: "solomon", source: { width: SOURCE_WIDTH, height: SOURCE_HEIGHT }, screens };
 await fs.mkdir(path.dirname(target), { recursive: true });
-await fs.writeFile(target, `${JSON.stringify(inventory, null, 2)}\n`);
+await fs.writeFile(path.resolve(flag("out") ?? target), `${JSON.stringify(inventory, null, 2)}\n`);
 const total = screens.reduce((sum, screen) => sum + screen.elements.length, 0);
 process.stdout.write(`\n${total} elements across ${screens.length} screens -> ${path.relative(root, target)}\n`);
 

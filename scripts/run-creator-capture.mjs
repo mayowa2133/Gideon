@@ -73,11 +73,26 @@ try {
       await page.goto(`${baseUrl}${shot.route}`, { waitUntil: "networkidle" });
       await hold(page, 900);
 
-      // The element that carries the claim, by the locator the plan chose.
-      // getByRole over a CSS selector on purpose: the plan is written against
-      // what a viewer sees, and a role and a name survive a restyle.
-      const target = page.getByRole(shot.locator.role, { name: new RegExp(shot.locator.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") }).first();
-      await target.waitFor({ state: "visible", timeout: 15000 });
+      // The element that carries the claim. Role first, because the plan is
+      // written against what a viewer sees and a role plus a name survives a
+      // restyle -- then plain text, because most product copy is not a role at
+      // all. Requiring a role timed out on three of four shots whose text was
+      // demonstrably on the page: the contact's name and title render as text in
+      // a card, which is what the V22 capture matched too.
+      const pattern = new RegExp(shot.locator.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      // A container region records the box around the text, not the text. The
+      // contact card is a plain div with no role and no name, so role-and-name
+      // addressing returns the 116x20 name line -- a region hemmed in by its
+      // neighbours that no aspect could crop without cutting one.
+      let target = shot.locator.container
+        ? page.locator(shot.locator.container).filter({ hasText: pattern }).first()
+        : page.getByRole(shot.locator.role, { name: pattern }).first();
+      try {
+        await target.waitFor({ state: "visible", timeout: 5000 });
+      } catch {
+        target = page.getByText(pattern).first();
+        await target.waitFor({ state: "visible", timeout: 10000 });
+      }
       await target.scrollIntoViewIfNeeded();
       await hold(page, 600);
 

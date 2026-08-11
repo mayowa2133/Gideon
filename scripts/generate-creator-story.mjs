@@ -57,7 +57,7 @@ function briefCommand() {
   // Engineer. Both paths select from legible, approved regions -- the plan's
   // claims are additionally checked against the angle's own seed data.
   const planFile = flag("plan");
-  const planned = planFile ? claimsFromPlan(readJson(planFile), inventory) : null;
+  const planned = planFile ? claimsFromPlan(readJson(planFile), inventory, { tokensPerClaim: 2 }) : null;
   const { claims, issues, usableRegions } = planned
     ? { claims: planned.claims, issues: planned.issues, usableRegions: planned.claims.length }
     : selectClaims(inventory);

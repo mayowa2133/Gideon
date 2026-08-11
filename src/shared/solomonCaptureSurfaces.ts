@@ -25,7 +25,14 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
   // The framing budgets below are only true at this size, because
   // `sourceTextPx` was measured here. Recapture at another viewport and the
   // numbers move with the layout.
-  viewport: { width: 1440, height: 900 },
+  // 1024x640, not 1440x900. Legibility is the ratio of a region's text to the
+  // region's width, and a narrower viewport improves both terms: the layout
+  // reflows to fewer columns so a card is a larger share of the frame, while
+  // the type stays the same CSS size. At 1440 the contact card rendered at
+  // 12.8px against a 20px floor and there was no crop that fixed it -- the
+  // inventory builder had been saying so all along: poor needs a re-capture at
+  // a smaller viewport, not a different crop.
+  viewport: { width: 1024, height: 640 },
   fields: [
     { path: "opportunity.title", shownAs: "the role on the tracked opportunity" },
     { path: "opportunity.company", shownAs: "the company hiring for it" },
@@ -77,9 +84,15 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       regions: [
         {
           id: "trackerCardAfter",
-          purpose: "the opportunity showing the stage the user just chose",
+          // The card carries the role and the company. It does not carry the
+          // stage: the stage is the column the card sits in, drawn outside the
+          // card's own box. Declaring it here made the planner demand a fixture
+          // the region can never show, and the capture proved it -- the recorded
+          // box reads "Marketing Intern Northstar Labs Toronto, Canada" and
+          // nothing about Interviewing.
+          purpose: "the opportunity as it appears in the stage the user just chose",
           locator: { role: "button", name: "{opportunity.title} {opportunity.company}" },
-          fields: ["opportunity.title", "opportunity.company", "opportunity.resultStage"],
+          fields: ["opportunity.title", "opportunity.company"],
           sourceTextPx: 10
         },
         {
@@ -126,6 +139,23 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
         "Scroll the contact into view before recording its boxes."
       ],
       regions: [
+        {
+          // The whole card, not a line inside it. A region bounded by denser
+          // content can never be cropped: expanding contactRole -- 116x20, with
+          // the name above it and the chips below -- to any aspect at all cuts a
+          // neighbouring word, and all four content patterns refused it. A card
+          // is bounded by its own whitespace, which is why the tracker's claim
+          // resolves and the contact's did not.
+          id: "contactCard",
+          purpose: "the contact as a whole: who they are and what they do",
+          // The card carries no role and no accessible name -- it is a plain
+          // div -- so it is addressed as the container holding the contact's
+          // name rather than by role. Without this the locator returns the
+          // 116x20 name line, which is the region that could not be cropped.
+          locator: { role: "text", name: "{contact.name}", container: "[class*='group/card']" },
+          fields: ["contact.name", "contact.role"],
+          sourceTextPx: 9
+        },
         {
           id: "contactName",
           purpose: "who the contact is",

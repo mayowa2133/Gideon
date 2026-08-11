@@ -26,11 +26,15 @@ const marketing: CaptureRequirement[] = [
     id: "role-moves",
     surfaceId: "tracker_after",
     regionId: "trackerCardAfter",
-    says: "the internship moves to interviewing when you say it does",
+    // The card shows the role and the company; the stage is the column it sits
+    // in, drawn outside the card's own box. Capturing it proved that -- the
+    // recorded region reads "Marketing Intern Northstar Labs Toronto, Canada"
+    // and nothing about Interviewing -- so the surface no longer claims it and
+    // this fixture no longer asks for it.
+    says: "the internship you are chasing, tracked by name",
     fixture: {
       "opportunity.title": "Marketing Intern",
-      "opportunity.company": "Northstar Labs",
-      "opportunity.resultStage": "Interviewing"
+      "opportunity.company": "Northstar Labs"
     }
   },
   {
@@ -244,7 +248,7 @@ describe("creator capture plan inputs", () => {
   it("reports every field of a region the angle did not choose", () => {
     const result = plans([{ ...marketing[0]!, fixture: { "opportunity.title": "Marketing Intern" } }]);
     expect(result.issues.filter(({ reason }) => reason === "fixture_field_missing").map(({ detail }) => detail))
-      .toEqual(["opportunity.company", "opportunity.resultStage"]);
+      .toEqual(["opportunity.company"]);
   });
 
   // Noisy: values arrive with the whitespace of wherever they were written.

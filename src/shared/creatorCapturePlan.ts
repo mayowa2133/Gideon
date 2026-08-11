@@ -49,7 +49,7 @@ export interface SurfaceRegion {
    * half of the fix -- a card rect drawn by hand around it is what put four
    * claims below the floor.
    */
-  locator: { role: string; name: string };
+  locator: { role: string; name: string; container?: string };
   /** Which declared fields' values appear inside this region. */
   fields: string[];
   /**
@@ -112,7 +112,7 @@ export interface CaptureShot {
   purpose: string;
   says: string;
   reach: string[];
-  locator: { role: string; name: string };
+  locator: { role: string; name: string; container?: string };
   /** The seed values that must be on screen, quoted as data. */
   fixture: Array<{ path: string; shownAs: string; value: string }>;
   framing: CaptureFraming;
@@ -260,7 +260,7 @@ export function planCapture(input: {
       purpose: region.purpose,
       says: quoted(requirement.says),
       reach: surface.reach,
-      locator: { role: region.locator.role, name: locatorName },
+      locator: { role: region.locator.role, name: locatorName, ...(region.locator.container ? { container: region.locator.container } : {}) },
       fixture,
       framing
     });
