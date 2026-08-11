@@ -143,8 +143,14 @@ describe("angle brief", () => {
       expect(at.at(-1)).toBeLessThan(17);
     });
 
-    it("lets the film breathe, but never on a beat that has something to show", () => {
-      const silent = plan.filter(({ spoken }) => !spoken);
+    it("plans no silent beats unless asked, and never on a beat that shows something", () => {
+      // A rest works when there is something to look at during it. With nothing
+      // shown, a silent beat is a presenter standing still on a colour saying
+      // nothing -- not a rest, a hole. It is a dial now, off by default.
+      expect(plan.every(({ spoken }) => spoken)).toBe(true);
+
+      const breathing = planBeats({ beatCount: 18, claimIds, silentEvery: 4 });
+      const silent = breathing.filter(({ spoken }) => !spoken);
       expect(silent.length).toBeGreaterThan(0);
       // A claim shown and not said is a shot nobody was told to read.
       for (const beat of silent) expect(beat.claimId, beat.id).toBeUndefined();

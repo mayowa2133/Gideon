@@ -123,14 +123,32 @@ const captions = gaps.map((gap) => {
   const scene = scenes.find((entry) => entry.id === gap.id);
   const words = script.find((beat) => beat.id === gap.id).vo.split(/\s+/).filter(Boolean);
   const from = scene.from + HEAD, span = Math.round(gap.seconds * FPS);
-  const groups = Array.from({ length: Math.ceil(words.length / GROUP) }, (_, index) => words.slice(index * GROUP, index * GROUP + GROUP).join(" "));
+
+  // Break at punctuation first, then at three words. Fixed grouping put
+  // "MARKETING INTERNSHIPS. ALMOST" on screen -- a group straddling a sentence
+  // boundary reads as a sentence that is not one.
+  const groups = [];
+  let current = [];
+  for (const word of words) {
+    current.push(word);
+    if (/[.,;:!?]$/.test(word) || current.length >= GROUP) { groups.push(current); current = []; }
+  }
+  if (current.length) groups.push(current);
+
+  // Time each group by how long it takes to say, not by how many there are.
+  // An even split drifts against the voice as soon as the groups differ in
+  // length, which is every line -- "a channel." and "Product Engineer at" are
+  // not the same duration and were being given the same slice.
+  const weight = (group) => group.join(" ").replace(/[^A-Za-z0-9]/g, "").length + 1;
+  const total = groups.reduce((sum, group) => sum + weight(group), 0);
+  let spent = 0;
   return {
     id: gap.id, from, to: from + span,
-    wordGroups: groups.map((text, index) => ({
-      text: text.toUpperCase(),
-      from: Math.round((span * index) / groups.length),
-      to: Math.round((span * (index + 1)) / groups.length)
-    }))
+    wordGroups: groups.map((group) => {
+      const start = Math.round((span * spent) / total);
+      spent += weight(group);
+      return { text: group.join(" ").toUpperCase(), from: start, to: Math.round((span * spent) / total) };
+    })
   };
 });
 
