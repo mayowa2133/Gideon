@@ -133,6 +133,17 @@ export function compileAngleBlueprint(input: {
   const issues: AngleCompileIssue[] = [];
   const fps = 30;
   const claimById = new Map(claims.map((claim) => [claim.id, claim]));
+  // Which captured still to draw, taken from the inventory that produced it.
+  //
+  // This used to read the reference film's trim for the same asset, which is a
+  // different film's frame of a different recording -- for a generated film it
+  // pointed at V22's job-search footage, the exact thing angle-driven capture
+  // exists to replace. It had to be hand-patched after every compile. The
+  // inventory is built from the run that made the stills, so it is the only
+  // thing that knows which frame they are.
+  const trimFor = (assetId: string) => inventory.screens.find(({ asset }) => asset === assetId)?.trim
+    ?? reference.scenes.find((scene) => scene.productCrop?.assetId === assetId)?.productCrop?.trim
+    ?? 0;
 
   // Durations from speech, floored, then conserved. Settling every duration
   // before placing a single boundary is not a style choice: shifting boundaries
@@ -212,7 +223,7 @@ export function compileAngleBlueprint(input: {
           assetId: establishing.assetId,
           x: Math.round(horizontal.start), y: Math.round(vertical.start),
           width: Math.round(horizontal.size), height: Math.round(vertical.size),
-          trim: reference.scenes.find((scene) => scene.productCrop?.assetId === establishing.assetId)?.productCrop?.trim ?? 0
+          trim: trimFor(establishing.assetId)
         };
         if (renderedOnCrop(element, productCrop.width, shot.contentPattern ?? "") < READABLE_PX) {
           issues.push({ sceneId: beat.id, reason: "establishing_illegible", detail: `${Math.round(renderedOnCrop(element, productCrop.width, shot.contentPattern ?? ""))}px` });
@@ -239,7 +250,7 @@ export function compileAngleBlueprint(input: {
         }
         else productCrop = {
         assetId: claim.assetId, x: resolved.x, y: resolved.y, width: resolved.width, height: resolved.height,
-        trim: reference.scenes.find((scene) => scene.productCrop?.assetId === claim.assetId)?.productCrop?.trim ?? 0
+        trim: trimFor(claim.assetId)
         };
       }
     }

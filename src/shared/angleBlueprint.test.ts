@@ -141,6 +141,20 @@ describe("angle blueprint", () => {
     }
   });
 
+  // Which still to draw comes from the inventory that produced it. Reading the
+  // reference film's trim pointed a generated film at another film's recording
+  // -- the job-search footage angle-driven capture exists to replace -- and had
+  // to be hand-patched after every compile.
+  it("takes the still trim from the inventory, not the reference film", () => {
+    const stamped: ScreenInventory = { ...inventory, screens: inventory.screens.map((screen) => ({ ...screen, trim: 777 })) };
+    const { blueprint: film } = compileAngleBlueprint({ brief, script, claims, inventory: stamped, reference });
+    const drawn = film.scenes.flatMap(({ productCrop }) => (productCrop ? [productCrop.trim] : []));
+    expect(drawn.length).toBeGreaterThan(0);
+    for (const trim of drawn) expect(trim).toBe(777);
+    // And the reference really does carry a different trim, so this is a choice.
+    expect(reference.scenes.some((scene) => (scene.productCrop?.trim ?? 0) !== 777)).toBe(true);
+  });
+
   it("never inherits the reference film's copy", () => {
     // Words on screen that no line in this script supports are the same defect
     // as a caption nobody speaks. The reference scene's arrangement transfers;
