@@ -25,14 +25,18 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
   // The framing budgets below are only true at this size, because
   // `sourceTextPx` was measured here. Recapture at another viewport and the
   // numbers move with the layout.
-  // 1024x640, not 1440x900. Legibility is the ratio of a region's text to the
-  // region's width, and a narrower viewport improves both terms: the layout
-  // reflows to fewer columns so a card is a larger share of the frame, while
-  // the type stays the same CSS size. At 1440 the contact card rendered at
-  // 12.8px against a 20px floor and there was no crop that fixed it -- the
-  // inventory builder had been saying so all along: poor needs a re-capture at
-  // a smaller viewport, not a different crop.
-  viewport: { width: 1024, height: 640 },
+  // 1440x900. A narrower viewport was tried and reverted: it cuts both ways,
+  // and only one way was reasoned about. Rendered legibility improved -- the
+  // tracker claim went 31.8px to 41.3px, because a card is a larger share of a
+  // narrower frame -- while the screenshot handed tesseract fewer source pixels,
+  // so the card's own text stopped being readable back. "Marketing Intern" and
+  // "Northstar Labs" fell out of the OCR, the fixture check correctly failed,
+  // and the film ended up with no claims at all.
+  //
+  // Legibility on the frame is worth nothing if the capture cannot prove what it
+  // recorded. Raise this only alongside a way to verify fixtures that does not
+  // depend on OCR of the same pixels.
+  viewport: { width: 1440, height: 900 },
   fields: [
     { path: "opportunity.title", shownAs: "the role on the tracked opportunity" },
     { path: "opportunity.company", shownAs: "the company hiring for it" },
