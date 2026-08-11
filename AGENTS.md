@@ -121,6 +121,11 @@ The exact commands should be verified in package.json once code exists. The inte
 - pnpm creator-editorial:reference-rhythm:pilot:solomon
 - pnpm creator-editorial:v6:pilot:solomon
 - pnpm creator-editorial:v7:pilot:solomon
+- pnpm creator-story:surfaces
+- pnpm creator-story:capture-plan
+- pnpm creator-story:capture-verify
+- pnpm creator-story:brief
+- pnpm creator-story:compile
 - pnpm creator-story:v6:solomon
 - pnpm creator-story:v7:baseline
 - pnpm creator-story:v7:compare
@@ -278,6 +283,45 @@ Over MCP (stdio, so Codex and Claude Code use the same server): call
 `gideon_creator_story_brief`, then `gideon_creator_story_compile` with the
 script inline. Both tools shell out to the CLI above, so all three surfaces
 behave identically.
+
+### Capture is planned from the angle, not consulted from a library
+
+The screens a film shows are supposed to be an output of the film being made. A
+fixed inventory built from one previous capture run is the alternative, and it
+fails twice: a film about a marketing internship showed "Product Engineer at
+Northstar Labs" because that is what the last recording happened to contain, and
+three of the four claims it offered were framed for a different film and landed
+at 7px, 10px and 19px against a 20px readable floor.
+
+So the capture stage runs first and is planned:
+
+```bash
+pnpm creator-story:surfaces                 # the product's routes and regions
+# write tmp/creator-story/requirements.json: what this angle needs proved
+pnpm creator-story:capture-plan --topic "land a marketing internship"
+# run the capture against CAPTURE-PLAN.md, then build the inventory from it
+pnpm creator-story:capture-verify --inventory <built inventory>
+pnpm creator-story:brief --topic "land a marketing internship" --plan tmp/creator-story/capture-plan.json
+```
+
+Over MCP: `gideon_creator_capture_plan` with `action: surfaces | plan | verify`,
+then `gideon_creator_story_brief` with `fromCapturePlan: true`.
+
+What the plan adds beyond a list of routes:
+
+- **The angle's own data is stated per screen.** Every field a region shows must
+  be chosen by this angle, because the ones nobody chooses keep the last
+  capture's answers.
+- **Framing is budgeted at capture time.** Each shot carries the source-pixel box
+  its region must fit inside, derived from the crop the beat's template will
+  actually draw. The 7px failure was a capture-time problem discovered at render
+  time; magnification cannot fix it, because zooming grows the type and the crop
+  together. The only lever is editorial -- record the element that carries the
+  claim, not the card it sits in.
+- **Verification re-runs the compiler's own path.** `verify` resolves the crop
+  and measures the type on it rather than modelling the answer, because two
+  representations of one fact with no check between them is how every legibility
+  bug in this pipeline has shipped.
 
 Rules the compiler enforces, and why they are not negotiable:
 

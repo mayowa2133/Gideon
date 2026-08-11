@@ -20,7 +20,12 @@ import type { CreativeBlueprint, SceneComposition } from "./types";
 // editorial strip beat magnifying a whole card by every measure. A crop is
 // resolved against the shape it will actually occupy, so cover-fit has nothing
 // left to discard.
-const CONTAINER_ASPECT: Record<string, number> = {
+//
+// Exported because the capture plan has to ask the same question with the same
+// numbers. A plan that carried its own copy of the container geometry would be a
+// second representation of one fact with no check between it and the film -- the
+// shape of every legibility bug this file records.
+export const CONTAINER_ASPECT: Record<string, number> = {
   evidence_band: 2.47, state_swap: 1.57, card_field: 1.6, composed_board: 1.55, filmstrip: 1.2, comment_card: 1.9, ambient: 1.6
 };
 
@@ -28,7 +33,7 @@ const CONTAINER_ASPECT: Record<string, number> = {
 // implemented and a generated film that reaches for all of them looks restless.
 // An agent editing the blueprint can choose any implemented pair; this is what
 // it gets without asking.
-function defaultShot(beat: { spoken: boolean; claimId?: string }, isLast: boolean, establishing: boolean): Pick<SceneComposition, "shotType" | "contentPattern"> {
+export function defaultShot(beat: { spoken: boolean; claimId?: string }, isLast: boolean, establishing: boolean): Pick<SceneComposition, "shotType" | "contentPattern"> {
   if (isLast) return { shotType: "cta_end_card", contentPattern: "comment_card" };
   // Setting up a screen is a composed board, not a proof band: the whole thing
   // at once, so the tight cut that follows has somewhere to come from.
@@ -74,13 +79,33 @@ function layoutOnly(options: Record<string, unknown> = {}) {
 // Roughly how wide, in frame pixels, each template draws its product card. The
 // numbers matter only as a ratio against the crop width, which is what decides
 // how big the product's own type lands on screen.
-const CONTAINER_PX: Record<string, number> = {
+export const CONTAINER_PX: Record<string, number> = {
   evidence_band: 1000, composed_board: 1000, card_field: 500, state_swap: 900, filmstrip: 320, comment_card: 900, ambient: 900
 };
 // The floor a region's text must clear once it is drawn. `marginal` in the
 // inventory is 20px and that is the same floor here, because it is the same
 // question asked at the only moment that counts.
-const READABLE_PX = 20;
+export const READABLE_PX = 20;
+
+// What type of a given source size measures once a crop of a given width is
+// drawn into a given template.
+//
+// The whole of the film's legibility is this one line, which is why the capture
+// plan imports it rather than restating it. Note what is *not* in it: any term
+// that scales with the capture's zoom. Magnifying the page grows the type and
+// the crop together and the ratio does not move, so the only lever capture has
+// is editorial -- frame the words that carry the claim and leave the card they
+// sit in out of the shot.
+export function renderedTextPxOnCrop(sourceTextPx: number, cropWidth: number, pattern: string) {
+  return (sourceTextPx * (CONTAINER_PX[pattern] ?? 900)) / Math.max(1, cropWidth);
+}
+
+// A region's type height back in source pixels. The inventory stores the size it
+// would reach at 1080 wide, which is a different number for every region width;
+// undoing that is what makes two regions comparable.
+export function sourceTextPxOf(element: InventoryElement) {
+  return (element.renderedTextPx ?? 0) * (element.width / 1080);
+}
 
 // What the region's own type measures once this crop is drawn at this size.
 //
@@ -91,8 +116,7 @@ const READABLE_PX = 20;
 // prevent and could not, because nothing re-asked the question after the crop
 // was chosen.
 function renderedOnCrop(element: InventoryElement, cropWidth: number, pattern: string) {
-  const sourceTextHeight = (element.renderedTextPx ?? 0) * (element.width / 1080);
-  return (sourceTextHeight * (CONTAINER_PX[pattern] ?? 900)) / Math.max(1, cropWidth);
+  return renderedTextPxOnCrop(sourceTextPxOf(element), cropWidth, pattern);
 }
 
 export interface AngleCompileIssue { sceneId?: string; reason: string; detail?: string }

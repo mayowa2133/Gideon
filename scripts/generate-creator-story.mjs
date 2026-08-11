@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = (name) => path.join(ROOT, "dist", "main", "shared", name);
 const { selectClaims } = await import(dist("claimSelection.js"));
+const { claimsFromPlan } = await import(dist("creatorCapturePlan.js"));
 const { buildAngleBrief, planBeats, validateAngleScript } = await import(dist("angleBrief.js"));
 const { compileAngleBlueprint } = await import(dist("angleBlueprint.js"));
 const { SPEECH_RATE_BAND, SHOT_BANDS } = await import(dist("creatorStoryQuality.js"));
@@ -33,7 +34,11 @@ const flag = (name, fallback) => {
 };
 const outDir = path.resolve(flag("out", path.join(ROOT, "tmp", "creator-story")));
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
-const inventory = readJson(path.join(ROOT, "fixtures", "creator-story", "solomon-screen-inventory.json"));
+// The shipped inventory is the fallback, not the source of truth. Once capture
+// is planned per angle the inventory is an output of the film being made, so the
+// path has to be an argument -- passing a plan while still reading the library
+// it was meant to replace is exactly the mismatch this stage exists to end.
+const inventory = readJson(flag("inventory", path.join(ROOT, "fixtures", "creator-story", "solomon-screen-inventory.json")));
 const reference = readJson(path.join(ROOT, "fixtures", "creator-story", "solomon-v22.blueprint.json"));
 
 function briefCommand() {
@@ -46,7 +51,16 @@ function briefCommand() {
   // no version of this that is also six.
   const beatCount = Number(flag("beats", Math.round(seconds / ((SHOT_BANDS.meanShotSeconds[0] + SHOT_BANDS.meanShotSeconds[1]) / 2))));
 
-  const { claims, issues, usableRegions } = selectClaims(inventory);
+  // With a capture plan, the claims are the ones this film went and captured;
+  // without one they are whatever the inventory happens to hold, which is the
+  // old behaviour and the reason a marketing film talked about a Product
+  // Engineer. Both paths select from legible, approved regions -- the plan's
+  // claims are additionally checked against the angle's own seed data.
+  const planFile = flag("plan");
+  const planned = planFile ? claimsFromPlan(readJson(planFile), inventory) : null;
+  const { claims, issues, usableRegions } = planned
+    ? { claims: planned.claims, issues: planned.issues, usableRegions: planned.claims.length }
+    : selectClaims(inventory);
   const brief = buildAngleBrief({
     topic, product: flag("product", "Solomon"), claims, filmFrames,
     speechRateBand: SPEECH_RATE_BAND,

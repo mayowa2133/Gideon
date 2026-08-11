@@ -42,7 +42,7 @@ const STOPWORDS = new Set(["a", "an", "and", "at", "by", "for", "from", "in", "i
 // rather than evidence -- and let an OCR typo through as "Stage this emall".
 // Proper nouns and UI labels are both capitalised and both survive OCR better
 // than lowercase body text, so preferring them buys accuracy and meaning at once.
-function candidateTokens(text: string) {
+export function candidateTokens(text: string) {
   const seen = new Set<string>();
   const words = text.split(/\s+/)
     .map((word) => word.replace(/[^A-Za-z0-9]/g, ""))

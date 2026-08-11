@@ -266,11 +266,35 @@ const tools = [
     }, ["projectId", "runId"])
   },
   {
+    name: "gideon_creator_capture_plan",
+    description: "Plan the capture run an angle needs, before anything is recorded. 'surfaces' lists the product's routes and the regions on them; 'plan' turns chosen requirements into capture instructions, including the pixel budget each region must be framed inside to stay readable once cropped; 'verify' checks a built inventory against the plan that asked for it.",
+    inputSchema: objectSchema({
+      action: { type: "string", enum: ["surfaces", "plan", "verify"] },
+      topic: optionalString("The angle, in the viewer's terms. Required to plan."),
+      seconds: { type: "number", description: "Running time. Defaults to 38.5, which is the reference film's length." },
+      requirements: {
+        type: "array",
+        description: "What the angle needs the product to prove, one entry per claim: { id, surfaceId, regionId, says, fixture }. Surface and region ids come from the surfaces action.",
+        items: objectSchema({
+          id: { type: "string" },
+          surfaceId: { type: "string" },
+          regionId: { type: "string" },
+          says: { type: "string", description: "What the beat showing this will assert." },
+          fixture: { type: "object", description: "Field path to the value this angle needs on screen, for every field the region shows.", additionalProperties: { type: "string" } }
+        }, ["id", "surfaceId", "regionId", "says", "fixture"])
+      },
+      inventoryPath: optionalString("Inventory to verify against. Defaults to the shipped Solomon inventory."),
+      outDir: optionalString("Directory for requirements.json, capture-plan.json and CAPTURE-PLAN.md. Defaults to tmp/creator-story.")
+    }, ["action"])
+  },
+  {
     name: "gideon_creator_story_brief",
     description: "Start a creator video for a topic. Returns the beat plan, per-beat word budgets, and the approved screen evidence each claim may draw on. Writes brief.json and BRIEF.md. No model is called: you write the script.",
     inputSchema: objectSchema({
       topic: { type: "string", description: "The angle, in the viewer's terms. For example: land a marketing internship." },
       seconds: { type: "number", description: "Running time. Defaults to 38.5, which is the reference film's length." },
+      fromCapturePlan: { type: "boolean", description: "Draw claims from capture-plan.json in outDir rather than from whatever the shipped inventory holds." },
+      inventoryPath: optionalString("Screen inventory to read. Defaults to the shipped Solomon inventory; pass the one this film's capture run produced."),
       outDir: optionalString("Directory for brief.json, BRIEF.md, script.json and blueprint.json. Defaults to tmp/creator-story.")
     }, ["topic"])
   },
@@ -287,6 +311,7 @@ const tools = [
           claimId: optionalString("Exactly the claim id the brief assigned to this beat.")
         }, ["id", "vo"])
       },
+      inventoryPath: optionalString("Screen inventory to read. Must be the one the brief was built against."),
       outDir: optionalString("The directory the brief was written to. Defaults to tmp/creator-story.")
     }, ["script"])
   }
@@ -362,10 +387,16 @@ export async function callTool(name: string, args: Record<string, unknown> = {})
       return textResult(await captureRunControlTool(args));
     case "gideon_capture_evidence":
       return textResult(await captureEvidenceTool(args));
-    case "gideon_creator_story_brief":
+    case "gideon_creator_capture_plan":
+      return textResult(await creatorCapturePlanTool(args));
+    case "gideon_creator_story_brief": {
+      const briefOut = typeof args.outDir === "string" ? args.outDir : defaultCreatorStoryDir();
       return textResult(await creatorStoryCli(["brief", "--topic", requireString(args.topic, "topic"),
         ...(typeof args.seconds === "number" ? ["--seconds", String(args.seconds)] : []),
+        ...(args.fromCapturePlan === true ? ["--plan", path.join(briefOut, "capture-plan.json")] : []),
+        ...(typeof args.inventoryPath === "string" ? ["--inventory", args.inventoryPath] : []),
         ...(typeof args.outDir === "string" ? ["--out", args.outDir] : [])]));
+    }
     case "gideon_creator_story_compile":
       return textResult(await creatorStoryCompile(args));
     default:
@@ -1135,8 +1166,40 @@ function sanitizeRecord(value: unknown): Record<string, JsonValue> {
 // Claude Code and by Codex alike, and the capability has to behave identically
 // in all three places -- a second implementation here would be a second thing to
 // keep true, and the one most likely to drift is the one nobody runs by hand.
+function defaultCreatorStoryDir(): string {
+  return path.join(__dirname, "..", "..", "tmp", "creator-story");
+}
+
+// The capture stage, over the same CLI the terminal uses. Requirements arrive
+// inline and are written to disk exactly as `gideon_creator_story_compile`
+// writes the script, so a plan made over MCP is the same artifact a plan made in
+// a shell is and `verify` cannot tell which produced it.
+async function creatorCapturePlanTool(args: Record<string, unknown>): Promise<unknown> {
+  const action = requireString(args.action, "action");
+  const outDir = typeof args.outDir === "string" ? args.outDir : defaultCreatorStoryDir();
+  if (action === "surfaces") return await creatorCapturePlanCli(["surfaces"]);
+  if (action === "verify") {
+    return await creatorCapturePlanCli(["verify", "--out", outDir,
+      ...(typeof args.inventoryPath === "string" ? ["--inventory", args.inventoryPath] : [])]);
+  }
+  if (action !== "plan") throw new Error(`Unknown capture plan action: ${action}`);
+  if (!Array.isArray(args.requirements)) throw new Error("requirements must be an array. Call the surfaces action first.");
+  await fs.mkdir(outDir, { recursive: true });
+  await fs.writeFile(path.join(outDir, "requirements.json"), `${JSON.stringify(args.requirements, null, 2)}\n`, "utf8");
+  return await creatorCapturePlanCli(["plan", "--topic", requireString(args.topic, "topic"),
+    ...(typeof args.seconds === "number" ? ["--seconds", String(args.seconds)] : []),
+    "--out", outDir]);
+}
+
+async function creatorCapturePlanCli(argv: string[]): Promise<unknown> {
+  return await runCreatorCli(path.join(__dirname, "..", "..", "scripts", "plan-creator-capture.mjs"), argv);
+}
+
 async function creatorStoryCli(argv: string[]): Promise<unknown> {
-  const script = path.join(__dirname, "..", "..", "scripts", "generate-creator-story.mjs");
+  return await runCreatorCli(path.join(__dirname, "..", "..", "scripts", "generate-creator-story.mjs"), argv);
+}
+
+async function runCreatorCli(script: string, argv: string[]): Promise<unknown> {
   const { execFile } = await import("node:child_process");
   return await new Promise((resolve, reject) => {
     // No shell: argv goes to the process as argv, so a topic containing quotes,
@@ -1159,7 +1222,8 @@ async function creatorStoryCompile(args: Record<string, unknown>): Promise<unkno
   const outDir = typeof args.outDir === "string" ? args.outDir : path.join(__dirname, "..", "..", "tmp", "creator-story");
   await fs.mkdir(outDir, { recursive: true });
   await fs.writeFile(path.join(outDir, "script.json"), `${JSON.stringify(args.script, null, 2)}\n`, "utf8");
-  return await creatorStoryCli(["compile", "--out", outDir]);
+  return await creatorStoryCli(["compile", "--out", outDir,
+    ...(typeof args.inventoryPath === "string" ? ["--inventory", args.inventoryPath] : [])]);
 }
 
 function textResult(value: unknown): ToolResult {

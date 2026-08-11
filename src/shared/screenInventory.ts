@@ -51,7 +51,8 @@ export interface ResolveFailure { reason: "no_element_contains_tokens" | "no_fit
 // Margin around the words, in source pixels. Sized so the composition's 1.02
 // focus scale cannot reach a glyph: at the widest region a source pixel is
 // ~0.75 canvas pixels, and 1.02 pushes the edge out by ~1% of the region.
-const MARGIN = 14;
+export const CROP_MARGIN = 14;
+const MARGIN = CROP_MARGIN;
 
 // Stopwords are dropped from claim tokens. A claim reads "Recruiting title at
 // the target company", and requiring OCR to have produced "at" and "the" as
@@ -140,6 +141,19 @@ function fitToAspect(region: { x: number; y: number; width: number; height: numb
     height = target;
   }
   return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) };
+}
+
+// The widest crop this region can produce for a given container.
+//
+// It is the width before `snapClearOfWords` runs, and snapping only ever moves
+// an edge inward, so the real crop is never wider than this. That direction is
+// the point: a capture plan budgeting against this number can promise that a
+// region inside the budget will read, and never promise it about one that will
+// not. Bounds clamping only narrows it further, so it is left out.
+export function cropWidthForRegion(region: { width: number; height: number }, containerAspect: number) {
+  const width = region.width + MARGIN * 2;
+  const height = region.height + MARGIN * 2;
+  return width / height < containerAspect ? height * containerAspect : width;
 }
 
 export function resolveCrop(
