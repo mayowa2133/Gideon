@@ -103,7 +103,26 @@ export function renderedTextPxOnCrop(sourceTextPx: number, cropWidth: number, pa
 // A region's type height back in source pixels. The inventory stores the size it
 // would reach at 1080 wide, which is a different number for every region width;
 // undoing that is what makes two regions comparable.
-export function sourceTextPxOf(element: InventoryElement) {
+export function sourceTextPxOf(element: InventoryElement, tokens: readonly string[] = []) {
+  // Measured on the words that carry the claim, not on the median of everything
+  // in the region.
+  //
+  // A contact card holds a large name and a row of small chips. The median lands
+  // near the chips, so the card graded 4.8 source pixels and would have needed to
+  // be drawn 1690px wide to clear the floor -- impossible in a 1080 frame at any
+  // aspect, which made it look like the shot vocabulary was wrong when the metric
+  // was. "Head of Marketing" is 10px in that same card and reads comfortably.
+  //
+  // A region is judged on whether its evidence can be read, and the evidence is
+  // the tokens. Falls back to the median when nothing matches, because a claim
+  // whose words cannot be found is a different failure and resolveCrop reports it.
+  const matched = tokens.length
+    ? element.words.filter(({ text }) => tokens.some((token) => text.toLowerCase().startsWith(token.toLowerCase().slice(0, 4))))
+    : [];
+  if (matched.length) {
+    const heights = matched.map(({ height }) => height).sort((left, right) => left - right);
+    return heights[Math.floor(heights.length / 2)]!;
+  }
   return (element.renderedTextPx ?? 0) * (element.width / 1080);
 }
 
@@ -115,8 +134,8 @@ export function sourceTextPxOf(element: InventoryElement) {
 // on screen at 7 -- a claim present and unreadable, which the grade exists to
 // prevent and could not, because nothing re-asked the question after the crop
 // was chosen.
-function renderedOnCrop(element: InventoryElement, cropWidth: number, pattern: string) {
-  return renderedTextPxOnCrop(sourceTextPxOf(element), cropWidth, pattern);
+function renderedOnCrop(element: InventoryElement, cropWidth: number, pattern: string, tokens: readonly string[] = []) {
+  return renderedTextPxOnCrop(sourceTextPxOf(element, tokens), cropWidth, pattern);
 }
 
 export interface AngleCompileIssue { sceneId?: string; reason: string; detail?: string }
@@ -241,7 +260,7 @@ export function compileAngleBlueprint(input: {
       // framed that asset rather than guessed at here.
       else {
         const element = inventory.screens.find(({ asset }) => asset === claim.assetId)?.elements.find(({ id }) => id === claim.elementId);
-        const px = element ? renderedOnCrop(element, resolved.width, shot.contentPattern ?? "") : READABLE_PX;
+        const px = element ? renderedOnCrop(element, resolved.width, shot.contentPattern ?? "", claim.requiredReadableText) : READABLE_PX;
         // An unreadable proof is not a weaker proof, it is a shot claiming to
         // show something a viewer cannot see. Drop the picture and report it,
         // rather than render evidence nobody can read.

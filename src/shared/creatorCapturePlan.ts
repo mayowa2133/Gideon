@@ -335,10 +335,11 @@ export function verifyCapturePlan(plan: CapturePlan, inventory: ScreenInventory)
       issues.push({ claimId: shot.claimId, reason: "fixture_absent", detail: path });
     }
 
-    const resolved = resolveCrop(inventory, candidateTokens(element.text).slice(0, 3), shot.framing.containerAspect, { assetId: shot.surfaceId });
+    const claimTokens = candidateTokens(element.text).slice(0, 3);
+    const resolved = resolveCrop(inventory, claimTokens, shot.framing.containerAspect, { assetId: shot.surfaceId });
     if (!isResolved(resolved)) { issues.push({ claimId: shot.claimId, reason: "crop_unresolved", detail: resolved.reason }); return verdict; }
     verdict.cropWidthPx = resolved.width;
-    verdict.renderedTextPx = Math.round(renderedTextPxOnCrop(sourceTextPxOf(element), resolved.width, shot.framing.contentPattern) * 10) / 10;
+    verdict.renderedTextPx = Math.round(renderedTextPxOnCrop(sourceTextPxOf(element, claimTokens), resolved.width, shot.framing.contentPattern) * 10) / 10;
     verdict.withinBudget = cropWidthForRegion(element, shot.framing.containerAspect) <= shot.framing.maxCropWidthPx;
     verdict.legible = verdict.renderedTextPx >= shot.framing.readableFloorPx;
     if (!verdict.legible) {
