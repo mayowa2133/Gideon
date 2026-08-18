@@ -22,7 +22,18 @@
 export interface InventoryWord { text: string; x: number; y: number; width: number; height: number }
 export interface InventoryElement {
   id: string;
-  provenance: "approved" | "candidate";
+  /**
+   * `approved` regions may carry a claim. `candidate` regions are clustered text
+   * offered for angles nobody has framed yet, and must be opted into.
+   *
+   * `screen` is neither: it is the route's whole page, and it exists to be shown
+   * rather than to prove anything. It is kept out of claim resolution on purpose.
+   * Marked `approved` it did both of the things a full-page region should never
+   * do -- it satisfied claims whose words live nowhere anybody vetted, which is
+   * exactly what the approved/candidate split exists to prevent, and it covered
+   * every clustered block so no candidate was ever offered again.
+   */
+  provenance: "approved" | "candidate" | "screen";
   x: number; y: number; width: number; height: number;
   aspect: number;
   trim?: number;
@@ -35,7 +46,24 @@ export interface InventoryElement {
   renderedTextPx?: number;
   legibility?: "ok" | "marginal" | "poor";
 }
-export interface InventoryScreen { asset: string; trim: number; width: number; height: number; elements: InventoryElement[] }
+export interface InventoryScreen {
+  asset: string;
+  trim: number;
+  width: number;
+  height: number;
+  elements: InventoryElement[];
+  /**
+   * The image these boxes were measured on, repo-relative.
+   *
+   * Carried here because it is the same fact as the geometry and had been
+   * living somewhere else: the renderer loads `still-<asset>-<trim>.png` from a
+   * shared public directory, capture writes `capture/<asset>.png`, and a person
+   * copied between them. Two names for one picture with a hand in between is
+   * how a film compiled against a fresh capture rendered the previous capture's
+   * screens -- every crop correct, every pixel from another recording.
+   */
+  still?: string;
+}
 export interface ScreenInventory { schemaVersion: "1"; product: string; source: { width: number; height: number }; screens: InventoryScreen[] }
 
 export interface ResolvedCrop {
@@ -83,12 +111,42 @@ function tokensPresent(haystack: string[], tokens: string[]) {
   });
 }
 
+// Words the crop neither shows whole nor leaves alone.
+//
+// Measured on the word grown by the guard, not on the word. A word wholly inside
+// the rect by one pixel is "contained" by any strict comparison and still comes
+// out shaved: the card has a border, the crop is drawn at three or four times
+// source scale, and the composition's 1.02 focus push takes the rest. A rendered
+// strip cut "Review before it reaches Gmail or Outlook" through the middle of
+// its letterforms with the word's own box a pixel inside the crop, and nothing
+// here objected -- the check said contained, the frame said clipped.
 function bisected(rect: { x: number; y: number; width: number; height: number }, words: InventoryWord[]) {
   return words.filter((word) => {
-    const intersects = word.x < rect.x + rect.width && word.x + word.width > rect.x && word.y < rect.y + rect.height && word.y + word.height > rect.y;
-    const contained = word.x >= rect.x && word.y >= rect.y && word.x + word.width <= rect.x + rect.width && word.y + word.height <= rect.y + rect.height;
+    const left = word.x - GLYPH_GUARD, top = word.y - GLYPH_GUARD;
+    const right = word.x + word.width + GLYPH_GUARD, bottom = word.y + word.height + GLYPH_GUARD;
+    const intersects = left < rect.x + rect.width && right > rect.x && top < rect.y + rect.height && bottom > rect.y;
+    const contained = left >= rect.x && top >= rect.y && right <= rect.x + rect.width && bottom <= rect.y + rect.height;
     return intersects && !contained;
   });
+}
+
+// Clearance, in source pixels, between a crop's edge and any word left outside
+// it -- and between the edge and the words the crop exists to show.
+//
+// Snapping flush to a neighbour's OCR box is not clear of it. The box is tight
+// to the ink tesseract found, glyph antialiasing runs a pixel or two past that,
+// and the composition's 1.02 focus scale pushes the edge out again. A rendered
+// strip carried three grey stubs along its top edge -- the descenders of the row
+// above, snapped to exactly -- which is the "J off Jobs" defect from the other
+// side: not a word cut in half, a word cut down to a smear.
+export const GLYPH_GUARD = 4;
+
+// A rect that holds every one of these words with the guard clear on all sides.
+function holds(rect: { x: number; y: number; width: number; height: number }, words: readonly InventoryWord[]) {
+  return words.every((word) =>
+    word.x - GLYPH_GUARD >= rect.x && word.y - GLYPH_GUARD >= rect.y
+    && word.x + word.width + GLYPH_GUARD <= rect.x + rect.width
+    && word.y + word.height + GLYPH_GUARD <= rect.y + rect.height);
 }
 
 // Snap each edge past the words it bisects, rather than rejecting the crop.
@@ -104,25 +162,39 @@ function bisected(rect: { x: number; y: number; width: number; height: number },
 // contact screen's 230 re-bisected another, and six passes ended where they
 // began. Inward-only strictly shrinks the rect, so it terminates, and it can
 // never grow into a word it had not already met.
-function snapClearOfWords(rect: { x: number; y: number; width: number; height: number }, words: InventoryWord[]) {
+//
+// `keep` is what the crop is for. Without it the cheapest move is sometimes the
+// one that steps over the claim's own words: the rect ends up beside the
+// evidence rather than around it, `bisected` is satisfied because the words are
+// now entirely outside, and every later measurement still grades the element's
+// type as though it were on screen. So a move that would drop a kept word is
+// passed over for the next-cheapest one that would not.
+function snapClearOfWords(rect: { x: number; y: number; width: number; height: number }, words: InventoryWord[], keep: readonly InventoryWord[] = []) {
+  // With words to hold, `holds` is the floor and a stricter one: the crop cannot
+  // be smaller than the evidence plus its clearance. The absolute minimum is
+  // only for a region OCR found nothing in, where there is nothing to measure
+  // against and a sliver is the only thing left to guard against.
+  const viable = (next: { x: number; y: number; width: number; height: number }) =>
+    keep.length ? holds(next, keep) : next.width >= 40 && next.height >= 40;
   let current = { ...rect };
   for (let pass = 0; pass < 40; pass += 1) {
     const offenders = bisected(current, words);
-    if (!offenders.length) return current;
+    if (!offenders.length) return viable(current) ? current : null;
     const word = offenders[0]!;
     const left = current.x, right = current.x + current.width, top = current.y, bottom = current.y + current.height;
-    const moves = [
-      { cost: word.x + word.width - left, apply: () => ({ x: word.x + word.width, y: top, width: right - (word.x + word.width), height: current.height }) },
-      { cost: right - word.x, apply: () => ({ x: left, y: top, width: word.x - left, height: current.height }) },
-      { cost: word.y + word.height - top, apply: () => ({ x: left, y: word.y + word.height, width: current.width, height: bottom - (word.y + word.height) }) },
-      { cost: bottom - word.y, apply: () => ({ x: left, y: top, width: current.width, height: word.y - top }) }
-    ].filter(({ cost }) => cost > 0).sort((a, b) => a.cost - b.cost);
-    if (!moves.length) return null;
-    const next = moves[0]!.apply();
-    if (next.width < 40 || next.height < 40) return null;
+    const wordRight = word.x + word.width + GLYPH_GUARD, wordBottom = word.y + word.height + GLYPH_GUARD;
+    const wordLeft = word.x - GLYPH_GUARD, wordTop = word.y - GLYPH_GUARD;
+    const next = [
+      { cost: wordRight - left, apply: () => ({ x: wordRight, y: top, width: right - wordRight, height: current.height }) },
+      { cost: right - wordLeft, apply: () => ({ x: left, y: top, width: wordLeft - left, height: current.height }) },
+      { cost: wordBottom - top, apply: () => ({ x: left, y: wordBottom, width: current.width, height: bottom - wordBottom }) },
+      { cost: bottom - wordTop, apply: () => ({ x: left, y: top, width: current.width, height: wordTop - top }) }
+    ].filter(({ cost }) => cost > 0).sort((a, b) => a.cost - b.cost)
+      .map(({ apply }) => apply()).find(viable);
+    if (!next) return null;
     current = next;
   }
-  return bisected(current, words).length ? null : current;
+  return bisected(current, words).length || !viable(current) ? null : current;
 }
 
 // Grow the region to the container's aspect. Growing rather than cropping is
@@ -167,6 +239,9 @@ export function resolveCrop(
   const considered: string[] = [];
 
   const scored = screens.flatMap((screen) => screen.elements
+    // Never the page. A region spanning the whole route contains every word on
+    // it, so it satisfies any claim asked of it and proves none of them.
+    .filter((element) => element.provenance !== "screen")
     .filter((element) => options.allowCandidates || element.provenance === "approved")
     .map((element) => {
       considered.push(element.id);
@@ -191,7 +266,13 @@ export function resolveCrop(
     // Every word on the screen, not only this element's: growing sideways can
     // reach into a neighbour and clip it.
     const allWords = screen.elements.flatMap(({ words }) => words);
-    const snapped = snapClearOfWords(fitToAspect(padded, containerAspect, bounds), allWords);
+    // The words that carry the claim are the ones the crop must still hold when
+    // the snapping is done. Falling back to the element's own words when no
+    // token matched keeps a tokenless resolve honest rather than unconstrained.
+    const carries = matched.length
+      ? element.words.filter(({ text }) => tokensPresent([...normalise(text)], matched).length)
+      : element.words;
+    const snapped = snapClearOfWords(fitToAspect(padded, containerAspect, bounds), allWords, carries);
     if (!snapped) continue;
     const fitted = { x: Math.round(snapped.x), y: Math.round(snapped.y), width: Math.round(snapped.width), height: Math.round(snapped.height) };
     if (bisected(fitted, allWords).length) continue;

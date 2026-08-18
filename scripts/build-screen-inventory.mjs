@@ -110,10 +110,32 @@ async function inventoryFromCapture(runFile) {
     const asset = byAsset.get(shot.assetId) ?? {
       asset: shot.assetId, trim: 0,
       width: run.viewport?.width ?? SOURCE_WIDTH, height: run.viewport?.height ?? SOURCE_HEIGHT,
+      // The image these boxes were measured on travels with them. The renderer
+      // needs a picture and the inventory is the only thing that knows which
+      // one; without this the two were joined by hand.
+      still: shot.still,
       elements: []
     };
     asset.elements.push(element);
     byAsset.set(shot.assetId, asset);
+  }
+
+  // The page itself, as a region the film may draw.
+  //
+  // Approved, because a human declared the route worth filming when they wrote
+  // the requirement that visits it, and what this frames is that route's own
+  // content box rather than a rect somebody guessed. It grades `poor` on the
+  // proof scale and that is correct: it can never carry a claim. What it can do
+  // is show the application, which nothing else in this inventory can.
+  for (const screen of run.screens ?? []) {
+    const asset = byAsset.get(screen.assetId);
+    if (!asset) continue;
+    const words = pageWords.get(screen.assetId) ?? [];
+    const content = textFor(words, screen.region);
+    asset.elements.push({
+      id: `${screen.assetId}Screen`, provenance: "screen", trim: 0,
+      ...withLegibility(rectFields(screen.region), content.words), ...content
+    });
   }
 
   // The resolver snaps a crop clear of any word it would otherwise cut in half,
@@ -166,6 +188,15 @@ for (const screen of fromRun ? [] : SCREENS) {
     const content = textFor(words, block);
     elements.push({ id: `${screen.asset}Candidate${candidateIndex}`, provenance: "candidate", trim: screen.trim, ...withLegibility(rectFields(block), content.words), ...content });
   }
+  // The frame itself, so a film built from this inventory can also draw the
+  // product as a product. Appended after clustering, because a region covering
+  // the whole frame covers every block in it and would otherwise suppress every
+  // candidate the screen has. These stills are full-viewport captures, so the
+  // screen region is the frame; the capture path asks the browser for a tighter
+  // content box because it can.
+  const frame = { x: 0, y: 0, width: SOURCE_WIDTH, height: SOURCE_HEIGHT };
+  const frameContent = textFor(words, frame);
+  elements.push({ id: `${screen.asset}Screen`, provenance: "screen", trim: screen.trim, ...withLegibility(rectFields(frame), frameContent.words), ...frameContent });
   screens.push({ asset: screen.asset, trim: screen.trim, width: SOURCE_WIDTH, height: SOURCE_HEIGHT, elements });
   process.stdout.write(`${screen.asset.padEnd(20)}${String(words.length).padStart(4)} words  ${String(elements.filter((element) => element.provenance === "approved").length).padStart(2)} approved  ${String(elements.filter((element) => element.provenance === "candidate").length).padStart(2)} candidate\n`);
 }

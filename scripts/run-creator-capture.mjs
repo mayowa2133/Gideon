@@ -62,7 +62,21 @@ const browser = await chromium.launch({
 const hold = (page, ms) => page.waitForTimeout(ms);
 
 const shots = [];
+const screens = new Map();
 const issues = [];
+
+// A still cannot show what the screenshot does not contain. `main` runs to the
+// bottom of the document -- 3487px on the dashboard against a 900px viewport --
+// and an unclamped box would have the renderer draw two thirds empty card. Every
+// recorded region is clamped, not just the page's: a region scrolled half out of
+// frame was never capturable either.
+const clampToViewport = (box) => {
+  if (!box) return null;
+  const x = Math.max(0, Math.round(box.x)), y = Math.max(0, Math.round(box.y));
+  const width = Math.min(viewport.width - x, Math.round(box.width));
+  const height = Math.min(viewport.height - y, Math.round(box.height));
+  return width > 0 && height > 0 ? { x, y, width, height } : null;
+};
 try {
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
   const page = await context.newPage();
@@ -105,9 +119,24 @@ try {
         continue;
       }
 
-      const box = await target.boundingBox();
+      const box = clampToViewport(await target.boundingBox());
       if (!box) { issues.push({ claimId: shot.claimId, reason: "region_has_no_box" }); continue; }
       await page.screenshot({ path: still, scale: "css" });
+
+      // The page itself, once per surface.
+      //
+      // Not a planned shot and never a claim: it is the establishing wide, and
+      // it is recorded here rather than requested because every surface the film
+      // visits should be showable as itself. Without it a generated film can
+      // only draw what a claim points at, so a viewer sees six magnified card
+      // fragments and never the application -- true in every frame, and useless
+      // as marketing.
+      if (!screens.has(shot.surfaceId)) {
+        const main = page.locator("main").first();
+        const content = clampToViewport(await main.boundingBox().catch(() => null));
+        if (content) screens.set(shot.surfaceId, { assetId: shot.surfaceId, still: path.relative(root, still), region: content });
+        else issues.push({ claimId: shot.claimId, reason: "surface_has_no_content_box", detail: shot.surfaceId });
+      }
 
       // The budget is a promise about the crop the film will draw. Recording a
       // region wider than it does not fail the run -- `verify` resolves the real
@@ -140,7 +169,8 @@ try {
 
 const runFile = path.join(outDir, "capture-run.json");
 await fs.writeFile(runFile, `${JSON.stringify({
-  planVersion: plan.planVersion, topic: plan.topic, viewport, capturedAt: new Date().toISOString(), shots, issues
+  planVersion: plan.planVersion, topic: plan.topic, viewport, capturedAt: new Date().toISOString(),
+  shots, screens: [...screens.values()], issues
 }, null, 2)}\n`);
 
 report({

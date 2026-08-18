@@ -59,6 +59,31 @@ describe("screen inventory", () => {
     expect(isResolved(strict)).toBe(false);
     expect(isResolved(resolve(["saved", "contacts", "grouped"], 1.6, { allowCandidates: true }))).toBe(true);
   });
+
+  // The page is a third thing, and it must never answer a claim.
+  //
+  // It spans the whole route, so it contains every word on it and would satisfy
+  // any tokens asked of it -- including tokens whose words sit in chrome nobody
+  // approved. Opting into candidates is the case that matters: that path relaxes
+  // the provenance filter, and relaxing it far enough to reach the page turns
+  // "this claim is unprovable" into "here is the entire screen".
+  it("never answers a claim with the whole page", () => {
+    const pages = inventory.screens.flatMap(({ elements }) => elements).filter(({ provenance }) => provenance === "screen");
+    expect(pages.length, "the fixture should carry page regions at all").toBeGreaterThan(0);
+    for (const page of pages) expect(page.width).toBeGreaterThan(1000);
+
+    // "Dashboard" and "Resumes" are nav-rail labels: they appear inside the page
+    // region and inside no approved or candidate region on any screen. That is
+    // the shape that reaches the page -- the resolver takes the smallest match,
+    // so the page only ever wins when it is the only one.
+    for (const options of [{}, { allowCandidates: true }]) {
+      for (const tokens of [["Dashboard", "Resumes"], ["saved", "contacts", "grouped"], ["Avery", "Chen"], ["Northstar", "Labs"]]) {
+        const result = resolve(tokens, 1.6, options);
+        if (!isResolved(result)) continue;
+        expect(result.elementId, `${JSON.stringify(tokens)} resolved to a page`).not.toMatch(/Screen$/);
+      }
+    }
+  });
 });
 
 describe("crop resolution", () => {
@@ -114,6 +139,85 @@ describe("crop resolution", () => {
     const nearestTop = Math.min(...inside.map((word) => word.y - result.y));
     expect(nearestLeft).toBeGreaterThanOrEqual(8);
     expect(nearestTop).toBeGreaterThanOrEqual(8);
+  });
+
+  // Two properties that "does not cut a word in half" does not cover, both of
+  // which reached a rendered frame.
+  describe("what the crop keeps and what it leaves behind", () => {
+    // A row of three lines with no gutters between them. Snapping the top edge
+    // to exactly the bottom of the row above leaves that row's last pixels
+    // inside the card -- three grey stubs along the top edge of a rendered
+    // strip. A word is either wholly in the shot with clearance, or wholly out
+    // of it with clearance; flush against the edge is neither.
+    const stacked: ScreenInventory = {
+      schemaVersion: "1", product: "test", source: { width: 1440, height: 900 },
+      screens: [{
+        asset: "panel", trim: 0, width: 1440, height: 900,
+        elements: [
+          { id: "above", provenance: "approved", x: 300, y: 480, width: 200, height: 16, aspect: 12.5, text: "Ninety Percent", legibility: "ok", renderedTextPx: 54,
+            words: [{ text: "Ninety", x: 302, y: 482, width: 60, height: 12 }, { text: "Percent", x: 368, y: 482, width: 66, height: 12 }] },
+          { id: "claim", provenance: "approved", x: 300, y: 500, width: 200, height: 16, aspect: 12.5, text: "Response Rate", legibility: "ok", renderedTextPx: 54,
+            words: [{ text: "Response", x: 302, y: 503, width: 78, height: 11 }, { text: "Rate", x: 386, y: 503, width: 38, height: 11 }] },
+          { id: "below", provenance: "approved", x: 300, y: 522, width: 200, height: 16, aspect: 12.5, text: "Total Entries", legibility: "ok", renderedTextPx: 54,
+            words: [{ text: "Total", x: 302, y: 525, width: 44, height: 12 }, { text: "Entries", x: 352, y: 525, width: 62, height: 12 }] }
+        ]
+      }]
+    };
+
+    it("leaves no sliver of the row it snapped away from", () => {
+      const result = resolveCrop(stacked, ["Response", "Rate"], 5.5, { assetId: "panel" });
+      expect(isResolved(result)).toBe(true);
+      if (!isResolved(result)) return;
+      // Grown by the guard, a word is either wholly in the shot or wholly out of
+      // it. Testing the ungrown box is what makes this vacuous: a word snapped to
+      // exactly the edge does not "intersect" the crop by any strict comparison,
+      // and it is the case the guard exists for.
+      for (const word of stacked.screens[0]!.elements.flatMap(({ words }) => words)) {
+        const grown = { x: word.x - 4, y: word.y - 4, width: word.width + 8, height: word.height + 8 };
+        const inside = grown.x >= result.x && grown.y >= result.y
+          && grown.x + grown.width <= result.x + result.width && grown.y + grown.height <= result.y + result.height;
+        const clear = !(grown.x < result.x + result.width && grown.x + grown.width > result.x
+          && grown.y < result.y + result.height && grown.y + grown.height > result.y);
+        expect(inside || clear, `"${word.text}" is neither clear of the crop edge nor clear inside it`).toBe(true);
+      }
+    });
+
+    // The hole underneath every legibility number in this pipeline. Snapping
+    // takes the cheapest edge, and the cheapest edge is sometimes the one that
+    // steps over the claim's own words: the crop ends up beside the evidence,
+    // `bisected` is satisfied because those words are now entirely outside, and
+    // `renderedTextPxOnCrop` still grades the element's type as though it were
+    // in the shot. A claim measured at 40px, drawn, and absent.
+    it("never resolves a crop the claim's words are outside of", () => {
+      // One tall OCR box overlapping the claim from just above it. Tesseract
+      // produces these on real product chrome -- a checkbox glyph came back as
+      // 10x30 and a divider as 3x32 on Solomon's contact card -- and the cheapest
+      // way to clear one is to pull the bottom edge up above where it starts,
+      // which lands the whole crop above the claim. Nothing downstream notices:
+      // the words are outside rather than cut, so `bisected` is satisfied, and
+      // the legibility grade is still computed from the element's own type.
+      const stepover: ScreenInventory = {
+        ...stacked,
+        screens: [{
+          ...stacked.screens[0]!,
+          elements: [
+            stacked.screens[0]!.elements.find(({ id }) => id === "claim")!,
+            {
+              id: "chrome", provenance: "candidate" as const, x: 300, y: 498, width: 220, height: 122,
+              aspect: 1.8, text: "", legibility: "poor" as const, renderedTextPx: 0,
+              words: [{ text: "chrome", x: 300, y: 498, width: 220, height: 122 }]
+            }
+          ]
+        }]
+      };
+      const result = resolveCrop(stepover, ["Response", "Rate"], 5.5, { assetId: "panel" });
+      // Refusing is a fine answer. Returning a crop the evidence is not in is not.
+      for (const word of stepover.screens[0]!.elements.find(({ id }) => id === "claim")!.words) {
+        if (!isResolved(result)) break;
+        expect(word.x >= result.x && word.x + word.width <= result.x + result.width, `drops "${word.text}" sideways`).toBe(true);
+        expect(word.y >= result.y && word.y + word.height <= result.y + result.height, `drops "${word.text}" vertically`).toBe(true);
+      }
+    });
   });
 
   it("reports honestly when nothing proves the claim", () => {

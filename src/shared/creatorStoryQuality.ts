@@ -58,6 +58,28 @@ export {
 
 export type { V22Rect as LayoutRect, V22SemanticEvent as SemanticEvent, V22CompositionFingerprint as CompositionFingerprint } from "./creatorStoryV22Quality";
 
+// The size product type has to reach in a shot whose job is recognition rather
+// than proof.
+//
+// This is a second floor, and it exists because one floor was wrong. `READABLE_
+// PX` is 20 and it is right for a band that carries a claim: a viewer asked to
+// take a figure on trust has to be able to read it. Applied to every product
+// shot it forbids the one thing a marketing video most needs -- a look at the
+// actual application -- because a screen only reads at 20px if it is magnified
+// three or four times, and a screen magnified four times is a fragment of a card.
+//
+// Measured on the reference, not chosen. OCR of V22's two widest product shots
+// puts their body type at a median of 14px (the Jobs page, frame 300) and 10px
+// (the message composer, frame 960) once rendered into the 1080-wide frame. Both
+// are the shots that make Solomon recognisable, and both would have been rejected
+// by the 20px floor -- the generated film's crops sit at 222-389 source pixels
+// and 2.6-4.5x magnification precisely because nothing else could pass.
+//
+// So: 10, from the narrower of the two. A shot at this size is not evidence and
+// is never allowed to carry a claim; it is the establishing wide that gives the
+// tight proof cut somewhere to come from.
+export const SCREEN_RECOGNISABLE_PX = 10;
+
 // What a film's contract checks, derived rather than restated.
 //
 // `scenes.length === 18` used to be asserted directly and it was the one rule

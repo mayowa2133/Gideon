@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { buildFilmScenes } from "../../shared/creatorStoryFilm";
 import type { CreativeBlueprint } from "../../shared/types";
-import { AmbientTemplate, CardFieldTemplate, ComposedBoardTemplate, CommentCardTemplate, EvidenceBandTemplate, FilmstripTemplate, StateSwapTemplate } from "./templates";
+import { WIDE_STRIP_LAYOUT } from "../../shared/angleBlueprint";
+import { AmbientTemplate, CardFieldTemplate, ComposedBoardTemplate, CommentCardTemplate, EvidenceBandTemplate, FilmstripTemplate, StateSwapTemplate, WideStripTemplate } from "./templates";
 
 // Every template exercised against the scenes it will actually draw, from the
 // parity blueprint rather than from invented fixtures. This is the check that a
@@ -132,6 +133,47 @@ describe("creator story templates", () => {
     const source = readFileSync(path.join(__dirname, "templates.tsx"), "utf8");
     expect(source).not.toMatch(/<EvidenceCard\b/);
     expect(source).toMatch(/<EvidenceRegion\b/);
+  });
+
+  // The eighth pattern has no scene in the reference film, so it is drawn from
+  // the layout the compiler synthesizes for it rather than one V22 supplies.
+  describe("wide_strip", () => {
+    const scene = {
+      ...film.find((candidate) => candidate.contentPattern === "evidence_band" && candidate.productCrops.length)!,
+      id: "strip", contentPattern: "wide_strip" as const, contentOptions: {},
+      layout: WIDE_STRIP_LAYOUT.map((rect) => ({ ...rect })),
+      // A one-line region at the aspect the container resolves to.
+      productCrops: [{ assetId: "contact", x: 98, y: 586, width: 389, height: 71, trim: 0 }]
+    };
+    const markup = (frame: number) => renderToString(WideStripTemplate({ scene, frame }) as React.ReactNode);
+
+    it("draws the band inside its own product rect, clear of the presenter", () => {
+      const drawn = markup(30);
+      expect(drawn).toContain("data-cs-product");
+      const product = scene.layout.find(({ kind }) => kind === "product")!;
+      const mascot = scene.layout.find(({ kind }) => kind === "mascot")!;
+      const cards = [...drawn.matchAll(/left:(-?\d+(?:\.\d+)?);top:(-?\d+(?:\.\d+)?);width:(\d+);height:(\d+)/g)]
+        .map((match) => ({ top: Number(match[2]), bottom: Number(match[2]) + Number(match[4]), left: Number(match[1]), right: Number(match[1]) + Number(match[3]) }));
+      expect(cards.length).toBeGreaterThan(0);
+      for (const card of cards) {
+        expect(card.top, "above the product rect").toBeGreaterThanOrEqual(product.top * 1920 - 1);
+        expect(card.bottom, "below into the presenter").toBeLessThanOrEqual(mascot.top * 1920);
+        expect(card.left).toBeGreaterThanOrEqual(product.left * 1080 - 1);
+        expect(card.right).toBeLessThanOrEqual(product.right * 1080 + 1);
+      }
+    });
+
+    // A still band on a two-second shot reads as a freeze. The sweep is the
+    // beat's motion and it carries no words, because copy on a generated film
+    // has to come from the script or not at all.
+    it("moves across the shot without printing anything the script did not say", () => {
+      expect(markup(9)).not.toBe(markup(38));
+      for (const frame of [0, 20, 60]) expect(markup(frame)).not.toMatch(/>[A-Za-z]{3,}</);
+    });
+
+    it("draws nothing rather than an empty card when the crop is missing", () => {
+      expect(renderToString(WideStripTemplate({ scene: { ...scene, productCrops: [] }, frame: 10 }) as React.ReactNode)).toBe("");
+    });
   });
 
   it("never draws a card over the presenter", () => {

@@ -952,6 +952,26 @@ export interface SceneLayoutRect {
 //   filmstrip      a row of crops with a progress marker travelling between them
 //   composed_board one large multi-region board assembled from several crops
 //   comment_card   the CTA's comment box and handle
+//
+// Two more are not in V22 as patterns, though V22 draws both as bespoke scenes:
+//
+//   wide_strip     one crop of a single line of product UI, drawn as a band
+//   product_screen the route's own page, near 1:1 -- what the product looks like
+//
+// `product_screen` is the shot a film about a product cannot do without and the
+// generated pipeline had no way to make. Every crop it drew had to clear a 20px
+// proof floor, which at Solomon's type sizes means 2.6-4.5x magnification, which
+// means a slice of one card. A viewer could read every claim and still not know
+// what the application is. This pattern carries no claim and is held to
+// `SCREEN_RECOGNISABLE_PX` instead.
+//
+// A one-line field is the most legible thing a product screen has -- the
+// contact's title grades 83px against a 20px floor, the best region in the
+// Solomon inventory -- and it was unusable, because the narrowest container the
+// film had was 2.47 and growing a 116x20 label to 2.47 reaches into the name
+// above it and the chips below. The resolver refuses that crop, correctly. At
+// 5.5 the label needs no vertical growth at all, so the region that reads best
+// becomes the one the film can actually show.
 export type SceneContentPattern =
   | "ambient"
   | "evidence_band"
@@ -959,7 +979,9 @@ export type SceneContentPattern =
   | "card_field"
   | "filmstrip"
   | "composed_board"
-  | "comment_card";
+  | "comment_card"
+  | "wide_strip"
+  | "product_screen";
 
 // What a pattern needs beyond its crops. Kept as a small typed bag rather than
 // bespoke fields per pattern, because the alternative is what V22 did: fifteen

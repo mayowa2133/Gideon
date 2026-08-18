@@ -322,6 +322,47 @@ What the plan adds beyond a list of routes:
   and measures the type on it rather than modelling the answer, because two
   representations of one fact with no check between them is how every legibility
   bug in this pipeline has shipped.
+- **A requirement may name the shape its proof is drawn in.** `pattern` on a
+  requirement picks the container, and it has to be stated before capture because
+  the container's aspect is what sets the framing budget and what the crop is
+  resolved against. It then travels on the claim to the compiler, which reports
+  `claim_pattern_mismatch` rather than drawing a shot nothing measured. The case
+  it exists for is `wide_strip` at 5.5: a single line of product UI is the most
+  legible thing on a screen and the least croppable, because every container
+  narrower than the line's own aspect grows the crop vertically into the rows
+  above and below it.
+
+- **A film has two kinds of product shot, and one floor was doing the work of
+  two.** `READABLE_PX` is 20 and it is right for a band a viewer is asked to read
+  a claim off. Applied to every shot it forbids the one thing a marketing video
+  most needs: a look at the actual application. Solomon's type only reaches 20px
+  under three to four times magnification, so every crop the pipeline could pass
+  was a slice of one card, and a viewer could take in six claims without ever
+  learning what the product is. Establishing shots are the route's own page and
+  are held to `SCREEN_RECOGNISABLE_PX` instead -- 10, measured off the reference
+  film's two widest product shots, which render at 10 and 14px and would both
+  have failed the proof floor. A `screen` region is never allowed to carry a
+  claim: it spans the whole route, so it contains every word on it and proves
+  none of them.
+
+The render is the fourth stage and it is not a detail:
+
+```bash
+node scripts/render-creator-story.mjs --in tmp/creator-story-mkt
+```
+
+- **The film publishes its own screens.** The renderer asks for
+  `still-<asset>-<trim>.png` and capture writes `capture/<asset>.png`, and the
+  join used to be a person copying between two directories -- so a film compiled
+  against a fresh capture could render the previous one, every crop correct and
+  every pixel from another recording. The inventory now carries the image each
+  screen was measured on, and the render publishes from it into its own public
+  directory.
+- **Captions are force-aligned, or say they are not.** Word timings come from a
+  transcription of each narration clip, mapped onto the script's own words --
+  whisper supplies when, never what. `caption-alignment.json` records the source
+  and coverage per beat, because a track that was quietly estimated looks exactly
+  like one that was aligned.
 
 Rules the compiler enforces, and why they are not negotiable:
 

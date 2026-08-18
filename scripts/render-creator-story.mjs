@@ -17,6 +17,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
+import { alignClip } from "./lib/creator-story-alignment.mjs";
 
 const run = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -32,15 +33,49 @@ const flag = (name, fallback) => {
 };
 const inDir = path.resolve(flag("in", path.join(root, "tmp", "creator-story")));
 const outDir = path.resolve(flag("out", path.join(inDir, "render")));
-// The stills and sound design the V22 capture produced. A generated film reuses
-// the captured product screens; it does not re-record the product.
-const publicDir = path.join(root, "tmp", "solomon-creator-story-v22-performance", "remotion-public");
+// The sound design the V22 capture produced. Nothing else is borrowed from it.
+const referenceDir = path.join(root, "tmp", "solomon-creator-story-v22-performance", "remotion-public");
+// This film's own public directory, assembled per render.
+//
+// It used to be V22's, which meant the product screens a generated film drew
+// were whatever `still-<asset>-<trim>.png` happened to be sitting there. Capture
+// writes `capture/<asset>.png` and the renderer reads that other name, so the
+// join was a person copying files between two directories -- and the moment the
+// hand is skipped the film compiles against a fresh capture and renders the
+// previous one. Every crop correct, every pixel from another recording, and no
+// gate anywhere in the chain able to tell.
+const publicDir = path.join(outDir, "public");
 
 const blueprint = JSON.parse(await fs.readFile(path.join(inDir, "blueprint.json"), "utf8"));
 const script = JSON.parse(await fs.readFile(path.join(inDir, "script.json"), "utf8"));
 await fs.mkdir(outDir, { recursive: true, mode: 0o700 });
 const clips = path.join(outDir, "clips");
 await fs.mkdir(clips, { recursive: true, mode: 0o700 });
+await fs.mkdir(publicDir, { recursive: true, mode: 0o700 });
+
+// Publish the screens this blueprint's crops were resolved against, under the
+// names the renderer asks for. The inventory is the source: it is what the crops
+// were measured on, so it is the only thing that knows which image each screen
+// is. A crop whose screen is not in it stops the render here rather than
+// rendering a missing image as a white card.
+const inventoryPath = flag("inventory", JSON.parse(await fs.readFile(path.join(inDir, "brief.json"), "utf8")).inventoryPath);
+const inventory = JSON.parse(await fs.readFile(inventoryPath, "utf8"));
+const stillFor = new Map(inventory.screens.map((screen) => [screen.asset, screen.still]));
+const wanted = new Map(blueprint.scenes.flatMap((scene) => (scene.productCrops ?? []).map((crop) => [`${crop.assetId}-${crop.trim}`, crop])));
+for (const [name, crop] of wanted) {
+  const captured = stillFor.get(crop.assetId);
+  // An inventory built from a capture run names its own image. The shipped
+  // fixture inventory was built from the reference film's clips and does not, so
+  // that path still resolves against the frames V22 extracted -- and only that
+  // path, which is the point: a film that captured its own screens can never
+  // silently fall back to another film's.
+  const source = captured ? path.resolve(root, captured) : path.join(referenceDir, `still-${name}.png`);
+  if (!existsSync(source)) throw new Error(`Blueprint draws ${crop.assetId} at trim ${crop.trim}, and neither ${path.relative(root, inventoryPath)} nor the reference stills have that screen.`);
+  await fs.copyFile(source, path.join(publicDir, `still-${name}.png`));
+}
+process.stdout.write(`published ${wanted.size} product still(s) from ${path.relative(root, inventoryPath)}\n`);
+const soundDesign = path.join(referenceDir, "sound-design.wav");
+if (existsSync(soundDesign)) await fs.copyFile(soundDesign, path.join(publicDir, "sound-design.wav"));
 
 const ffprobeDuration = async (file) => {
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file]);
@@ -114,43 +149,72 @@ await run("ffmpeg", ["-y", "-loglevel", "error",
   "-map", "[out]", "-ar", "48000", "-ac", "2", narration]);
 
 const scenes = buildFilmScenes(blueprint, realized);
-// Captions from the same lines the voice is reading, in groups of three words
-// spread across the clip. Not word-accurate -- that needs forced alignment --
-// but every word on screen is a word that is said, which is the property that
-// matters and the one V22 kept breaking.
-const GROUP = 3;
-const captions = gaps.map((gap) => {
+// Captions from the same lines the voice is reading, grouped for reading and
+// timed from where the words are actually spoken.
+//
+// The timings used to be a model of speech -- each group's share of the clip in
+// proportion to its characters -- and a model drifts in the direction that
+// shows. `alignClip` transcribes the clip with word timestamps and maps them
+// onto the script's own words, so the group under the voice is the group being
+// said. The words on screen are still the script's; whisper supplies when, never
+// what.
+// Caption groups are budgeted in characters as well as words, because the band
+// they sit in is measured in pixels and three words are not a fixed width.
+// "GROWTH MARKETING MANAGER." wrapped to three lines at 80px, and three lines
+// from a top of 116 at a line height of .94 reach 342 -- past the 326 where the
+// product rect starts. It rendered as a caption sitting on the evidence card.
+//
+// 18 characters is the budget and 0.855em is where it comes from: the widest
+// per-character advance measured on this face in a rendered frame ("GROWTH" at
+// 80px spans 410px). At that advance an 18-character group is 1231px against a
+// 960px line, so it can reach two lines and never three.
+const GROUP = 3, GROUP_CHARS = 18;
+const CAPTION_SIZE = 80, CAPTION_LINE = 960, WIDEST_ADVANCE_EM = 0.855;
+const alignment = [];
+const captions = [];
+for (const gap of gaps) {
   const scene = scenes.find((entry) => entry.id === gap.id);
-  const words = script.find((beat) => beat.id === gap.id).vo.split(/\s+/).filter(Boolean);
+  const line = script.find((beat) => beat.id === gap.id).vo;
+  const words = line.split(/\s+/).filter(Boolean);
   const from = scene.from + HEAD, span = Math.round(gap.seconds * FPS);
 
-  // Break at punctuation first, then at three words. Fixed grouping put
-  // "MARKETING INTERNSHIPS. ALMOST" on screen -- a group straddling a sentence
-  // boundary reads as a sentence that is not one.
+  // Break at punctuation first, then at three words or eighteen characters,
+  // whichever comes first. Fixed grouping put "MARKETING INTERNSHIPS. ALMOST" on
+  // screen -- a group straddling a sentence boundary reads as a sentence that is
+  // not one -- and unbounded width put a third line over the product card.
   const groups = [];
+  const width = (indices) => indices.reduce((sum, index) => sum + words[index].length, 0) + Math.max(0, indices.length - 1);
   let current = [];
-  for (const word of words) {
-    current.push(word);
-    if (/[.,;:!?]$/.test(word) || current.length >= GROUP) { groups.push(current); current = []; }
+  for (const [index, word] of words.entries()) {
+    if (current.length && (current.length >= GROUP || width([...current, index]) > GROUP_CHARS)) { groups.push(current); current = []; }
+    current.push(index);
+    if (/[.,;:!?]$/.test(word)) { groups.push(current); current = []; }
   }
   if (current.length) groups.push(current);
+  // A single word longer than the budget cannot be split, so the budget cannot
+  // promise two lines on its own. Say so here rather than discover it in a
+  // frame: this is the one case the grouping does not cover.
+  for (const indices of groups) {
+    const lines = Math.ceil((width(indices) * WIDEST_ADVANCE_EM * CAPTION_SIZE) / CAPTION_LINE);
+    if (lines > 2) throw new Error(`Caption group "${indices.map((index) => words[index]).join(" ")}" in ${gap.id} needs ${lines} lines; the caption band holds two.`);
+  }
 
-  // Time each group by how long it takes to say, not by how many there are.
-  // An even split drifts against the voice as soon as the groups differ in
-  // length, which is every line -- "a channel." and "Product Engineer at" are
-  // not the same duration and were being given the same slice.
-  const weight = (group) => group.join(" ").replace(/[^A-Za-z0-9]/g, "").length + 1;
-  const total = groups.reduce((sum, group) => sum + weight(group), 0);
-  let spent = 0;
-  return {
+  const timed = await alignClip(gap.wav, line, gap.seconds);
+  alignment.push({ id: gap.id, source: timed.source, coverage: Number(timed.coverage.toFixed(2)), reason: timed.reason });
+  captions.push({
     id: gap.id, from, to: from + span,
-    wordGroups: groups.map((group) => {
-      const start = Math.round((span * spent) / total);
-      spent += weight(group);
-      return { text: group.join(" ").toUpperCase(), from: start, to: Math.round((span * spent) / total) };
-    })
-  };
-});
+    wordGroups: groups.map((indices) => ({
+      text: indices.map((index) => words[index]).join(" ").toUpperCase(),
+      from: Math.round(timed.words[indices[0]].from * FPS),
+      to: Math.round(timed.words[indices.at(-1)].to * FPS)
+    }))
+  });
+}
+// Said out loud, because a caption track that was quietly estimated looks
+// exactly like one that was aligned.
+const estimated = alignment.filter(({ source }) => source === "estimated");
+process.stdout.write(`captions: ${alignment.length - estimated.length}/${alignment.length} force-aligned\n`);
+for (const beat of estimated) process.stdout.write(`  estimated ${beat.id}: ${beat.reason ?? "unknown"}\n`);
 
 const durationInFrames = scenes.at(-1).to;
 process.stdout.write(`${scenes.length} scenes, ${durationInFrames} frames (${(durationInFrames / FPS).toFixed(2)}s), ${captions.length} captions\n`);
@@ -162,6 +226,9 @@ const inputProps = {
   disclosure: { fromFrame: 45, durationInFrames: Math.max(1, durationInFrames - 196) }
 };
 await fs.writeFile(path.join(outDir, "input-props.json"), `${JSON.stringify(inputProps, null, 2)}\n`);
+// The alignment receipt travels with the render, so "the captions are aligned"
+// is a claim somebody can check afterwards rather than a line in a log.
+await fs.writeFile(path.join(outDir, "caption-alignment.json"), `${JSON.stringify({ beats: alignment }, null, 2)}\n`);
 
 process.stdout.write("bundling…\n");
 const serveUrl = await bundle({ entryPoint: path.join(root, "src", "remotion", "creatorStory", "index.ts"), publicDir, outDir: path.join(outDir, "bundle") });
