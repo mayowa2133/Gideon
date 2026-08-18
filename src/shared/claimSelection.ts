@@ -1,4 +1,5 @@
 import { type InventoryElement, type ScreenInventory } from "./screenInventory";
+import type { SceneContentPattern } from "./types";
 
 // Picks the claims a film is allowed to make, from what the product actually
 // shows.
@@ -22,6 +23,15 @@ export interface SelectableClaim {
   renderedTextPx: number;
   /** Words the region contains, for a writer to draw a sentence from. */
   evidenceText: string;
+  /**
+   * The container this claim's crop was resolved and measured against, when a
+   * capture plan chose one. Legibility is a property of the crop that is drawn,
+   * and the crop is a function of the container's aspect -- so a claim that
+   * passed `verify` passed it for one pattern, and the compiler draws that one
+   * or reports why it did not. Absent for claims picked straight out of an
+   * inventory, which the compiler frames with its own default.
+   */
+  contentPattern?: SceneContentPattern;
 }
 
 export interface ClaimSelectionIssue { assetId: string; elementId: string; reason: string }
@@ -74,6 +84,8 @@ export function selectClaims(
   const usable: Array<{ assetId: string; element: InventoryElement }> = [];
   for (const screen of inventory.screens) {
     for (const element of screen.elements) {
+      // The page is shown, never claimed: it contains every word on the route.
+      if (element.provenance === "screen") continue;
       if (!allowCandidates && element.provenance !== "approved") continue;
       if (!USABLE.has(element.legibility ?? "poor")) {
         issues.push({ assetId: screen.asset, elementId: element.id, reason: `legibility_${element.legibility ?? "unknown"}` });

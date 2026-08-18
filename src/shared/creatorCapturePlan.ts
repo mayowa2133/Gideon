@@ -2,6 +2,7 @@ import { INJECTION_SHAPES, planBeats } from "./angleBrief";
 import { CONTAINER_ASPECT, CONTAINER_PX, READABLE_PX, defaultShot, renderedTextPxOnCrop, sourceTextPxOf } from "./angleBlueprint";
 import { candidateTokens, type SelectableClaim } from "./claimSelection";
 import { CROP_MARGIN, cropWidthForRegion, isResolved, resolveCrop, type ScreenInventory } from "./screenInventory";
+import type { SceneContentPattern } from "./types";
 
 // Turns an angle into the capture run that would prove it.
 //
@@ -89,6 +90,17 @@ export interface CaptureRequirement {
   says: string;
   /** Field path -> the value this angle needs on screen. */
   fixture: Record<string, string>;
+  /**
+   * How this proof is drawn, when the default band is the wrong shape for it.
+   *
+   * Editorial, and it has to be stated before capture rather than after, because
+   * the container's aspect is what sets the framing budget and what the crop is
+   * resolved against. The case this exists for: a single line of product UI is
+   * the most legible thing on a screen and the least croppable, since growing it
+   * to a 2.47 band reaches into whatever sits above and below. `wide_strip` at
+   * 5.5 asks for no vertical growth at all.
+   */
+  pattern?: SceneContentPattern;
 }
 
 export interface CaptureFraming {
@@ -242,7 +254,10 @@ export function planCapture(input: {
       if (!region.fields.includes(path) && !placeholders.includes(path)) issues.push({ claimId: requirement.id, reason: "fixture_not_shown_here", detail: path });
     }
 
-    const shot = defaultShot({ spoken: placed.beat.spoken, claimId: requirement.id }, false, false);
+    const shot = defaultShot({ spoken: placed.beat.spoken, claimId: requirement.id }, false, false, requirement.pattern);
+    if (requirement.pattern && !(requirement.pattern in CONTAINER_ASPECT)) {
+      issues.push({ claimId: requirement.id, reason: "unknown_pattern", detail: requirement.pattern });
+    }
     const framing = framingFor(region.sourceTextPx, shot.contentPattern ?? "");
     // One line of the product's own type has to fit inside the budget, or no
     // framing of this region can carry a claim in this template and the answer
@@ -378,7 +393,12 @@ export function claimsFromPlan(plan: CapturePlan, inventory: ScreenInventory, op
       elementId: shot.regionId,
       requiredReadableText: tokens,
       renderedTextPx: element.renderedTextPx ?? 0,
-      evidenceText: element.text
+      evidenceText: element.text,
+      // The pattern travels with the claim rather than being re-derived by the
+      // compiler. `verify` measured this region's type on the crop this
+      // container produced; a compiler that picked its own container would be
+      // drawing a shot nothing ever measured.
+      contentPattern: shot.framing.contentPattern as SceneContentPattern
     });
   }
   return { claims, issues };

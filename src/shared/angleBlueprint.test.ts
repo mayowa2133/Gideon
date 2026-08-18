@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { buildAngleBrief, planBeats, validateAngleScript, type ScriptBeat } from "./angleBrief";
-import { compileAngleBlueprint } from "./angleBlueprint";
-import { selectClaims } from "./claimSelection";
+import { CONTAINER_ASPECT, compileAngleBlueprint } from "./angleBlueprint";
+import { candidateTokens, selectClaims } from "./claimSelection";
 import { buildFilmScenes } from "./creatorStoryFilm";
 import { MIN_SCENE_FRAMES, SPEECH_RATE_BAND } from "./creatorStoryQuality";
 import { validateCreativeBlueprint } from "./creativeBlueprint";
-import type { ScreenInventory } from "./screenInventory";
+import { isResolved, resolveCrop, type ScreenInventory } from "./screenInventory";
 import type { CreativeBlueprint } from "./types";
 
 const fixture = (name: string) => JSON.parse(readFileSync(path.join(__dirname, "..", "..", "fixtures", "creator-story", name), "utf8"));
@@ -97,11 +97,9 @@ describe("angle blueprint", () => {
   // inventory offers land between 7 and 19 pixels once their crop is drawn, so
   // they are reported and not rendered.
   //
-  // This replaces a test that asserted the opposite -- that non-claim beats
-  // establish the screen a proof is heading for. That behaviour was measured out
-  // rather than argued out: a 1.8x pull-back around a region grading 22px lands
-  // at 12px, and a shot that looks like content and carries none is worse than
-  // the backdrop it replaced.
+  // Only the proof cut is held to this. Establishing shots are wide and are
+  // asked to be recognised rather than read, and they are covered by the test
+  // below.
   it("does not draw a claim it cannot draw legibly", () => {
     const paced = buildAngleBrief({
       topic: "paced", product: "Solomon", claims, filmFrames: FILM_FRAMES, speechRateBand: SPEECH_RATE_BAND,
@@ -117,13 +115,21 @@ describe("angle blueprint", () => {
     }));
     const { blueprint: film } = compileAngleBlueprint({ brief: paced, script: written, claims, inventory, reference });
 
-    const shown = film.scenes.filter(({ productCrop }) => productCrop);
+    // Claim-bearing scenes, not scenes with a picture. Those were the same thing
+    // while claims were the only reason to show the product; they stopped being
+    // the same thing when establishing shots came back, and counting pictures
+    // would now pass while every claim was silently dropped.
+    const shown = film.scenes.filter(({ supportedClaimIds }) => supportedClaimIds.length);
     expect(shown.length).toBeGreaterThan(0);
     expect(shown.length).toBeLessThan(claims.length);
     // A dropped picture drops its claim with it: a scene must never keep a claim
-    // whose evidence it no longer shows.
-    for (const scene of film.scenes) {
-      expect(scene.supportedClaimIds.length > 0, scene.id).toBe(Boolean(scene.productCrop));
+    // whose evidence it no longer shows. One direction only -- this was written
+    // as an equivalence, which held while claims were the sole reason to draw
+    // product and became false the moment establishing shots did too. A scene
+    // with a picture and no claim is the wide; a scene with a claim and no
+    // picture is the bug.
+    for (const scene of film.scenes.filter(({ supportedClaimIds }) => supportedClaimIds.length)) {
+      expect(scene.productCrop, scene.id).toBeDefined();
     }
     // And every drop is reported, never silent.
     const dropped = claims.length - shown.length;
@@ -168,6 +174,102 @@ describe("angle blueprint", () => {
     expect(reference.scenes.some(({ contentOptions }) => "labels" in contentOptions || "pills" in contentOptions)).toBe(true);
   });
 
+  // The shot a film about a product cannot do without, and the one the pipeline
+  // had no way to make. Every crop it drew had to clear the 20px proof floor,
+  // which at Solomon's type sizes is three to four times magnification, which is
+  // a slice of one card -- so a viewer could take in every claim and still not
+  // know what the application looks like. The establishing shot is the route's
+  // own page, held to a recognition floor instead.
+  it("shows the product as a product, not only as evidence", () => {
+    const paced = buildAngleBrief({
+      topic: "wide", product: "Solomon", claims, filmFrames: FILM_FRAMES, speechRateBand: SPEECH_RATE_BAND,
+      beats: planBeats({ beatCount: 18, claimIds: claims.map(({ id }) => id) })
+    });
+    const written = paced.beats.map((slot) => ({
+      id: slot.id,
+      vo: slot.spoken
+        ? [...Array.from({ length: slot.wordBudget[0] - (slot.claimId ? 1 : 0) }, () => "solomon"),
+           ...(slot.claimId ? [claims.find(({ id }) => id === slot.claimId)!.requiredReadableText[0]!] : [])].join(" ")
+        : "",
+      claimId: slot.claimId
+    }));
+    const { blueprint: film } = compileAngleBlueprint({ brief: paced, script: written, claims, inventory, reference });
+
+    const establishing = film.scenes.filter((scene) => scene.contentPattern === "product_screen");
+    expect(establishing.length, "a film with claims should establish their screens").toBeGreaterThan(0);
+    for (const scene of establishing) {
+      // Wide: several times the area of any proof band on the same screen, or it
+      // is not establishing anything.
+      expect(scene.productCrop!.width, scene.id).toBeGreaterThan(700);
+      // And never evidence. A shot at recognition size that carries a claim is a
+      // claim a viewer is asked to take on trust.
+      expect(scene.supportedClaimIds, scene.id).toEqual([]);
+    }
+    // The proof cuts stay tight, so the pair still means something.
+    for (const scene of film.scenes.filter(({ supportedClaimIds }) => supportedClaimIds.length)) {
+      expect(scene.productCrop!.width, scene.id).toBeLessThan(700);
+    }
+
+    // A film that proves several things off one page establishes that page
+    // several times, and the crop is a function of the page alone -- so it drew
+    // the identical rect three times, which reads as going back to a screenshot
+    // it already showed. The screenshot is wider and taller than the crop, so
+    // the second and third framings were captured and going unused.
+    // Two claims off one page, which is the case that produced the repeat: the
+    // marketing film proved three things off Solomon's dashboard. Built by hand
+    // because `selectClaims` deliberately spreads one claim per screen before
+    // taking a second from any -- a capture plan has no such rule, and this is
+    // the shape a plan produces.
+    const contact = inventory.screens.find(({ asset }) => asset === "contact")!;
+    const shared = contact.elements
+      .filter((element) => element.provenance === "approved" && candidateTokens(element.text).length >= 2)
+      .slice(0, 2)
+      .map((element) => ({
+        id: `contact-${element.id}`, assetId: "contact", elementId: element.id,
+        requiredReadableText: candidateTokens(element.text).slice(0, 2),
+        renderedTextPx: element.renderedTextPx ?? 0, evidenceText: element.text
+      }));
+    expect(shared.length, "the fixture should offer two claims on one screen").toBeGreaterThan(1);
+    const sharedBrief = buildAngleBrief({
+      topic: "one page", product: "Solomon", claims: shared, filmFrames: FILM_FRAMES, speechRateBand: SPEECH_RATE_BAND,
+      beats: planBeats({ beatCount: 18, claimIds: shared.map(({ id }) => id) })
+    });
+    const sharedScript = sharedBrief.beats.map((slot) => ({
+      id: slot.id,
+      vo: [...Array.from({ length: slot.wordBudget[0] - (slot.claimId ? 1 : 0) }, () => "solomon"),
+           ...(slot.claimId ? [shared.find(({ id }) => id === slot.claimId)!.requiredReadableText[0]!] : [])].join(" "),
+      claimId: slot.claimId
+    }));
+    const repeats = compileAngleBlueprint({ brief: sharedBrief, script: sharedScript, claims: shared, inventory, reference })
+      .blueprint.scenes.filter((scene) => scene.contentPattern === "product_screen").map(({ productCrop }) => productCrop!);
+    const framings = repeats.map((crop) => `${crop.assetId} ${crop.x},${crop.y} ${crop.width}x${crop.height}`);
+    expect(framings.length).toBeGreaterThan(1);
+    expect(new Set(framings).size, `${framings.length} establishing shots from ${new Set(framings).size} framing(s)`).toBe(framings.length);
+
+    // And no horizontal edge lands on a line of type. A vertical edge cutting a
+    // panel reads as the page continuing off screen; a horizontal one bisects
+    // every glyph in the line at once and reads as broken.
+    // The left edge is held to the same rule, and it is the one that bit: a
+    // left-aligned page keeps its identity on the left, so panning sideways cut
+    // "Application Tracker" down to "Tracker" -- a shot whose entire job is to
+    // say what the product is, failing to say it.
+    // Checked over the repeated framings too, and that is where it bites: the
+    // first look at a page is the page's own box, which by construction starts
+    // left of everything on it. Only the second and third are moved.
+    for (const crop of [...establishing.map(({ productCrop }) => productCrop!), ...repeats]) {
+      const words = inventory.screens.find(({ asset }) => asset === crop.assetId)!.elements.flatMap(({ words: each }) => each);
+      const overlaps = (word: { x: number; y: number; width: number; height: number }) =>
+        word.x < crop.x + crop.width && word.x + word.width > crop.x
+        && word.y < crop.y + crop.height && word.y + word.height > crop.y;
+      const cuts = (edge: number, start: (word: { x: number; y: number; width: number; height: number }) => number, span: (word: { x: number; y: number; width: number; height: number }) => number) =>
+        words.filter((word) => overlaps(word) && start(word) < edge && start(word) + span(word) > edge).map(({ text }) => text);
+      const where = `${crop.assetId} ${crop.x},${crop.y} ${crop.width}x${crop.height}`;
+      expect(cuts(crop.y, (word) => word.y, (word) => word.height), `${where} cuts a line of type at its top`).toEqual([]);
+      expect(cuts(crop.y + crop.height, (word) => word.y, (word) => word.height), `${where} cuts a line of type at its bottom`).toEqual([]);
+      expect(cuts(crop.x, (word) => word.x, (word) => word.width), `${where} cuts a word at its left edge`).toEqual([]);
+    }
+  });
+
   // The gap that made every other gate here meaningless: the compiler wrote one
   // crop, the renderer read a different field, and nothing compared them.
   it("hands the renderer the crop it resolved, not the reference film's", () => {
@@ -190,6 +292,103 @@ describe("angle blueprint", () => {
     });
     const script18 = paced.beats.map((slot) => ({ id: slot.id, vo: Array.from({ length: slot.wordBudget[0] }, () => "solomon").join(" ") }));
     expect(compileAngleBlueprint({ brief: paced, script: script18, claims, inventory, reference }).issues).toEqual([]);
+  });
+
+  // The eighth pattern, and what it is actually for.
+  //
+  // A one-line field is the most legible region a product screen has and the
+  // hardest to frame: every container narrower than the line's own aspect grows
+  // the crop vertically, and vertical is where a line of text has neighbours.
+  // The measured case is Solomon's dashboard promise -- 361x20, a padded aspect
+  // of 8.1 -- which at 2.47 resolves to a 158px crop carrying two rows the claim
+  // is not about, and at 5.5 to 71px carrying only itself.
+  describe("wide_strip", () => {
+    const line = (id: string, y: number, text: string, width: number) => ({
+      id, provenance: "approved" as const, x: 112, y, width, height: 20, aspect: width / 20,
+      text, renderedTextPx: Math.round(10 * (1080 / width)), legibility: "ok" as const,
+      words: text.split(" ").map((word, index) => ({ text: word, x: 112 + index * 60, y: y + 5, width: 50, height: 10 }))
+    });
+    // Three rows of a panel. The neighbours sit 66px away, which is generous for
+    // a product screen and still inside the reach of a 2.47 crop.
+    const panel: ScreenInventory = {
+      schemaVersion: "1", product: "solomon", source: { width: 1440, height: 900 },
+      screens: [{
+        asset: "panel", trim: 0, width: 1440, height: 900,
+        elements: [
+          line("above", 545, "Jobs Tracked Twelve", 300),
+          line("promise", 611, "staged draft through every step", 361),
+          line("below", 675, "Drafts Created Three", 300)
+        ]
+      }]
+    };
+    const tokens = ["through", "staged"];
+    const foreignWords = (crop: { y: number; height: number }) => panel.screens[0]!.elements
+      .filter(({ id }) => id !== "promise")
+      .flatMap(({ words }) => words)
+      .filter((word) => word.y >= crop.y && word.y + word.height <= crop.y + crop.height).length;
+
+    it("frames the line that carries the claim instead of the rows around it", () => {
+      const band = resolveCrop(panel, tokens, CONTAINER_ASPECT.evidence_band!, { assetId: "panel" });
+      const strip = resolveCrop(panel, tokens, CONTAINER_ASPECT.wide_strip!, { assetId: "panel" });
+      if (!isResolved(band) || !isResolved(strip)) throw new Error("both containers should resolve this region");
+
+      // Same width, so this is not a legibility trade: the region is wider than
+      // both containers, so neither grows sideways and the type lands at the same
+      // size either way. What changes is how much of the panel comes with it.
+      expect(strip.width).toBe(band.width);
+      expect(strip.height).toBeLessThan(band.height / 2);
+      expect(foreignWords(band), "the 2.47 band pulls in a neighbouring row").toBeGreaterThan(0);
+      expect(foreignWords(strip), "the 5.5 strip carries only its own line").toBe(0);
+      // And the claim's own words are still in frame, which is the property the
+      // whole chain exists to guarantee.
+      expect(strip.matchedTokens.sort()).toEqual([...tokens].sort());
+    });
+
+    // Legibility is a property of the crop that is drawn. The plan budgets one
+    // container, `verify` measures the crop that container produces, and the
+    // compiler has to draw that same container or the measurement was of a shot
+    // nobody is watching.
+    const wideClaims = [{
+      id: "promise", assetId: "panel", elementId: "promise",
+      requiredReadableText: tokens, renderedTextPx: 30,
+      evidenceText: "staged draft through every step", contentPattern: "wide_strip" as const
+    }];
+    const wideBrief = buildAngleBrief({
+      topic: "wide", product: "Solomon", claims: wideClaims, filmFrames: FILM_FRAMES, speechRateBand: SPEECH_RATE_BAND,
+      beats: planBeats({ beatCount: 18, claimIds: ["promise"] })
+    });
+    const wideScript = wideBrief.beats.map((slot) => ({
+      id: slot.id,
+      vo: [...Array.from({ length: slot.wordBudget[0] - (slot.claimId ? 1 : 0) }, () => "solomon"), ...(slot.claimId ? ["through"] : [])].join(" "),
+      claimId: slot.claimId
+    }));
+    const compileWide = (shots?: Parameters<typeof compileAngleBlueprint>[0]["shots"]) =>
+      compileAngleBlueprint({ brief: wideBrief, script: wideScript, claims: wideClaims, inventory: panel, reference, shots });
+
+    it("draws a claim in the container it was verified against", () => {
+      const { blueprint: film, issues } = compileWide();
+      const proof = film.scenes.find(({ supportedClaimIds }) => supportedClaimIds.includes("promise"))!;
+      expect(proof.contentPattern).toBe("wide_strip");
+      expect(issues.filter(({ reason }) => reason === "claim_pattern_mismatch")).toEqual([]);
+      // The reference film has no wide_strip scene, so the geometry cannot be
+      // inherited. Falling through to scenes[0] gave the hook -- no product rect
+      // at all -- and the template drew its band into a hardcoded default while
+      // the collision audit checked a rect nothing corresponded to.
+      const product = proof.layoutRects!.find(({ kind }) => kind === "product")!;
+      const mascot = proof.layoutRects!.find(({ kind }) => kind === "mascot")!;
+      expect(product).toBeDefined();
+      expect(product.bottom).toBeLessThanOrEqual(mascot.top);
+      expect(reference.scenes.some((scene) => scene.contentPattern === "wide_strip")).toBe(false);
+    });
+
+    // Run against the defect it exists for: force the scene to a container the
+    // claim was never measured in and the compiler must say so.
+    it("reports a scene drawn in a container its claim was not verified in", () => {
+      const proofBeat = wideBrief.beats.find(({ claimId }) => claimId)!.id;
+      const { issues } = compileWide({ [proofBeat]: { shotType: "split_presenter_product", contentPattern: "evidence_band" } });
+      expect(issues.filter(({ reason }) => reason === "claim_pattern_mismatch"))
+        .toEqual([{ sceneId: proofBeat, reason: "claim_pattern_mismatch", detail: "verified as wide_strip, drawn as evidence_band" }]);
+    });
   });
 
   it("reports rather than truncates when the beats cannot fit the running time", () => {

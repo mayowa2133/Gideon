@@ -105,6 +105,13 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           locator: { role: "button", name: "{opportunity.resultStage}" },
           fields: ["opportunity.resultStage"],
           sourceTextPx: 10
+        },
+        {
+          id: "trackerTotalActive",
+          purpose: "the pipeline counted in one place, above the columns",
+          locator: { role: "text", name: "Total Active" },
+          fields: [],
+          sourceTextPx: 9
         }
       ]
     },
@@ -168,6 +175,20 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           sourceTextPx: 9
         },
         {
+          // Still uncroppable, and now for a measured reason rather than a
+          // guessed one. `wide_strip` was added on the theory that 116x20 fails
+          // only because 2.47 grows it vertically into its neighbours, and at
+          // 5.5 there is indeed no vertical growth -- the padded 144x48 becomes
+          // 264x48 and keeps its height. It is still refused, because the
+          // padding alone is more clearance than this card has: OCR puts the
+          // name's box at 501-531 and the role's words at 531-544, touching, and
+          // a divider glyph one pixel below at 545. Snapping clear of the name
+          // leaves a 29px crop whose top edge sits on the glyph tops, so the
+          // composition's 1.02 focus scale would shave them.
+          //
+          // Nothing about the aspect fixes that. The fix is a product with more
+          // air between its rows, or a region that is bounded by whitespace --
+          // which is what the card is and why the card resolves.
           id: "contactRole",
           purpose: "the contact's title -- the fact an angle most often needs to be its own",
           locator: { role: "text", name: "{contact.role}" },
@@ -180,6 +201,115 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           locator: { role: "definition", name: "{contact.reason}" },
           fields: ["contact.reason"],
           sourceTextPx: 9
+        }
+      ]
+    },
+    {
+      // The product's own account of what it does, on the route that states it.
+      //
+      // Every surface above this one is a record: a job, a person, a draft. Two
+      // records is all a film about landing a role needs, and a film needs more
+      // than two shots -- the last generated cut had sixteen of eighteen scenes
+      // showing a presenter on a colour because nothing else was capturable
+      // without clicking through the product first.
+      //
+      // These regions are static copy, which is why they carry no fields. That
+      // is not a weaker kind of evidence: "Review before it reaches Gmail or
+      // Outlook" is the product asserting the control claim in its own words, on
+      // its own screen, and the reference film made that claim by drawing a chip
+      // over the top of a screen that never said it.
+      id: "first_win_path",
+      route: "/dashboard",
+      purpose: "Solomon's own four-step path, and what it promises at the end of it",
+      reach: [
+        "Open /dashboard and wait for the First Win Path panel.",
+        "No interaction: the panel renders with the workspace."
+      ],
+      regions: [
+        {
+          id: "pathPromise",
+          purpose: "the whole loop in one line, in the product's words",
+          locator: { role: "text", name: "Job to staged draft, with proof carried through each step." },
+          fields: [],
+          sourceTextPx: 10
+        },
+        {
+          id: "pathStepStage",
+          purpose: "the last step of the path, named by the product",
+          locator: { role: "text", name: "Stage the draft" },
+          fields: [],
+          sourceTextPx: 10
+        },
+        {
+          id: "pathStepContact",
+          purpose: "the step that replaces applying with knowing someone",
+          locator: { role: "text", name: "Find a trusted contact" },
+          fields: [],
+          sourceTextPx: 10
+        },
+        {
+          id: "pathStageNote",
+          // The control claim, sourced from the product rather than asserted
+          // over it. `draftAssurance` is the same sentence one screen deeper and
+          // needs a draft generated first, which the capture runner cannot reach.
+          purpose: "the product's sentence saying a draft is reviewed before it goes anywhere",
+          locator: { role: "text", name: "Review before it reaches Gmail or Outlook" },
+          fields: [],
+          sourceTextPx: 9
+        }
+      ]
+    },
+    {
+      id: "people_search",
+      route: "/people",
+      purpose: "what the product says it will go and find, before it has found it",
+      reach: [
+        "Open /people and wait for the Search by Company panel.",
+        "No interaction: the panel is the top of the route."
+      ],
+      regions: [
+        {
+          id: "peoplePurpose",
+          purpose: "who the product looks for -- the answer to 'apply to whom'",
+          locator: { role: "text", name: "Find recruiters, managers, and peers." },
+          fields: [],
+          sourceTextPx: 10
+        },
+        {
+          id: "peopleSearchHeading",
+          purpose: "that the search starts from a company rather than a job board",
+          locator: { role: "text", name: "Search by Company" },
+          fields: [],
+          sourceTextPx: 11
+        }
+      ]
+    },
+    {
+      id: "outreach_queue",
+      route: "/outreach",
+      purpose: "the queue of drafts waiting on the user, which is where they stay",
+      reach: [
+        "Open /outreach and wait for the Needs attention list.",
+        "No interaction: the queue renders with the workspace."
+      ],
+      regions: [
+        {
+          // Captured once and unusable: OCR returns no words inside the badge at
+          // all, so the region grades 0px and can carry no claim. Kept declared
+          // because it is a true description of the surface, and the inventory is
+          // the right place for that verdict to be recorded rather than a comment.
+          id: "queueUnsent",
+          purpose: "the state a generated draft sits in until a person sends it",
+          locator: { role: "text", name: "Unsent draft" },
+          fields: [],
+          sourceTextPx: 9
+        },
+        {
+          id: "queueResponseRate",
+          purpose: "that the product counts replies, not sends",
+          locator: { role: "text", name: "Response Rate" },
+          fields: [],
+          sourceTextPx: 10
         }
       ]
     },

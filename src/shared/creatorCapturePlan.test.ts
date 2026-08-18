@@ -156,6 +156,40 @@ describe("creator capture plan", () => {
     expect(wide.shots.find(({ claimId }) => claimId === "who-to-ask")!.withinBudget).toBe(false);
   });
 
+  // A requirement may name the shape its proof is drawn in, and that choice has
+  // to reach three places without being restated in any of them: the framing
+  // budget capture is held to, the container `verify` resolves the crop against,
+  // and the template the compiler draws. The budget for a 5.5 strip and a 2.47
+  // band differ by more than a factor of two in height, so a plan that budgeted
+  // one and rendered the other is a shot nothing measured.
+  it("carries a requirement's chosen container through to the claim", () => {
+    const stripPlan = planCapture({
+      topic: "wide", surfaces: SOLOMON_SURFACES, filmFrames: FILM_FRAMES, beatCount: BEAT_COUNT,
+      requirements: marketing.map((requirement) => (requirement.id === "who-to-ask" ? { ...requirement, pattern: "wide_strip" as const } : requirement))
+    });
+    const strip = stripPlan.shots.find(({ claimId }) => claimId === "who-to-ask")!;
+    expect(strip.framing.contentPattern).toBe("wide_strip");
+    expect(strip.framing.containerAspect).toBe(CONTAINER_ASPECT.wide_strip);
+    // The other shot is untouched, so this is a per-claim choice rather than a
+    // film-wide switch.
+    expect(stripPlan.shots.find(({ claimId }) => claimId === "role-moves")!.framing.contentPattern).toBe("evidence_band");
+    // A strip is a shorter budget than a band at the same type size, which is
+    // the trade: less room above and below, and no vertical growth to pay for.
+    expect(strip.framing.maxRegionHeightPx).toBeLessThan(plan.shots.find(({ claimId }) => claimId === "who-to-ask")!.framing.maxRegionHeightPx);
+
+    const { claims } = claimsFromPlan(stripPlan, capturedAsPlanned(), { tokensPerClaim: 2 });
+    expect(claims.find(({ id }) => id === "who-to-ask")!.contentPattern).toBe("wide_strip");
+    expect(claims.find(({ id }) => id === "role-moves")!.contentPattern).toBe("evidence_band");
+  });
+
+  it("reports a pattern no container knows about", () => {
+    const bogus = planCapture({
+      topic: "bogus", surfaces: SOLOMON_SURFACES, filmFrames: FILM_FRAMES, beatCount: BEAT_COUNT,
+      requirements: marketing.map((requirement) => ({ ...requirement, pattern: "hologram" as never }))
+    });
+    expect(bogus.issues.filter(({ reason }) => reason === "unknown_pattern")).toHaveLength(marketing.length);
+  });
+
   it("reports a surface or region that was never captured", () => {
     const missing = verifyCapturePlan(plan, { ...capturedAsPlanned(), screens: [] });
     expect(missing.issues.map(({ reason }) => reason)).toEqual(["surface_not_captured", "surface_not_captured"]);

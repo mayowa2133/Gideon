@@ -1,8 +1,8 @@
 import { type AngleBrief, type ScriptBeat } from "./angleBrief";
 import { type SelectableClaim } from "./claimSelection";
-import { MIN_SCENE_FRAMES, SHOT_BANDS } from "./creatorStoryQuality";
-import { resolveCrop, type InventoryElement, type ScreenInventory } from "./screenInventory";
-import type { CreativeBlueprint, SceneComposition } from "./types";
+import { MIN_SCENE_FRAMES, SCREEN_RECOGNISABLE_PX, SHOT_BANDS } from "./creatorStoryQuality";
+import { GLYPH_GUARD as CROP_GUARD, resolveCrop, type InventoryElement, type ScreenInventory } from "./screenInventory";
+import type { CreativeBlueprint, SceneComposition, SceneContentPattern, SceneLayoutRect } from "./types";
 
 // Compiles a validated script into a blueprint the generic renderer can draw.
 //
@@ -26,23 +26,83 @@ import type { CreativeBlueprint, SceneComposition } from "./types";
 // second representation of one fact with no check between it and the film -- the
 // shape of every legibility bug this file records.
 export const CONTAINER_ASPECT: Record<string, number> = {
-  evidence_band: 2.47, state_swap: 1.57, card_field: 1.6, composed_board: 1.55, filmstrip: 1.2, comment_card: 1.9, ambient: 1.6
+  evidence_band: 2.47, state_swap: 1.57, card_field: 1.6, composed_board: 1.55, filmstrip: 1.2, comment_card: 1.9, ambient: 1.6,
+  // 5.5, and the number comes from the regions rather than from a preference.
+  // A single line of product UI -- `contactRole` at 116x20, the most legible
+  // region Solomon has -- is 3.0 once the crop margin is added, and every
+  // container narrower than that grows the crop vertically to reach its aspect.
+  // Vertical is the one direction a line of text has no room in: the name sits
+  // above it and the chips below, `snapClearOfWords` refuses to cut either, and
+  // the claim is dropped. Any aspect above 3.0 leaves the height alone; 5.5 is
+  // far enough clear of it that a two-line region still fits, and near enough
+  // that the band is not a hairline.
+  wide_strip: 5.5,
+  // The application's own shape. Solomon's content box is 1280x843 at the
+  // capture viewport, which is 1.52. A page cropped far from its own aspect
+  // stops looking like the page, which is the whole job of this shot.
+  product_screen: 1.52
 };
 
-// A default shot for each kind of beat. Deliberately small: seven pairs are
+// A default shot for each kind of beat. Deliberately small: eight patterns are
 // implemented and a generated film that reaches for all of them looks restless.
 // An agent editing the blueprint can choose any implemented pair; this is what
 // it gets without asking.
-export function defaultShot(beat: { spoken: boolean; claimId?: string }, isLast: boolean, establishing: boolean): Pick<SceneComposition, "shotType" | "contentPattern"> {
+//
+// `pattern` is the one the capture plan budgeted and `verify` measured for this
+// claim, and it wins because the alternative is two answers to one question.
+// The plan's framing budget, the crop the resolver returns and the card the
+// template draws are all functions of the container aspect: pick a different
+// pattern here and the shot on screen is not the shot that was proved legible.
+export function defaultShot(
+  beat: { spoken: boolean; claimId?: string },
+  isLast: boolean,
+  establishing: boolean,
+  pattern?: SceneContentPattern
+): Pick<SceneComposition, "shotType" | "contentPattern"> {
   if (isLast) return { shotType: "cta_end_card", contentPattern: "comment_card" };
-  // Setting up a screen is a composed board, not a proof band: the whole thing
-  // at once, so the tight cut that follows has somewhere to come from.
-  if (establishing) return { shotType: "split_presenter_product", contentPattern: "composed_board" };
+  // Setting up a screen is the screen, at the size it really is -- the whole
+  // page at once, so the tight cut that follows has somewhere to come from.
+  if (establishing) return { shotType: "split_presenter_product", contentPattern: "product_screen" };
   if (!beat.claimId) return { shotType: "presenter_fullscreen", contentPattern: "ambient" };
+  // A band is a band whether or not anyone speaks over it; what changes with
+  // speech is whether the presenter is in the frame to say it.
   return beat.spoken
-    ? { shotType: "split_presenter_product", contentPattern: "evidence_band" }
-    : { shotType: "product_fullscreen", contentPattern: "evidence_band" };
+    ? { shotType: "split_presenter_product", contentPattern: pattern ?? "evidence_band" }
+    : { shotType: "product_fullscreen", contentPattern: pattern ?? "evidence_band" };
 }
+
+// The geometry a pattern the reference film never drew has to be given.
+//
+// A generated scene inherits its rects from whichever reference scene draws the
+// same pattern. That works for the seven V22 uses and cannot work for an eighth,
+// and falling through to `scenes[0]` is worse than useless: the hook has no
+// product rect at all, so the template would draw its band into a hardcoded
+// default while the collision audit checked a rect nothing used.
+//
+// The numbers are the band's own. A 5.5 strip drawn across the 0.04-0.96 product
+// column is 181px tall, so the rect is 211 -- the card plus air -- rather than
+// the split's 710, which would leave a 500px hole beneath the strip. It sits at
+// 0.30 rather than under the caption because the presenter is bottom-anchored at
+// 1075px: centring the band in the space between the caption floor and the
+// presenter's head is what keeps the frame from reading as empty at one end.
+export const WIDE_STRIP_LAYOUT: SceneLayoutRect[] = [
+  { id: "wide-strip-product", kind: "product", left: .04, top: .30, right: .96, bottom: .41 },
+  { id: "wide-strip-mascot", kind: "mascot", left: .23, top: .56, right: .77, bottom: .975 },
+  { id: "wide-strip-caption", kind: "caption", left: .05, top: .04, right: .95, bottom: .16 }
+];
+// The page gets the frame's whole upper two thirds and the presenter stands in
+// front of its lower edge, which is the reference film's arrangement for the
+// same shot: a 1010-wide page at 1.52 is 664 tall, so the rect is the card plus
+// a little air, and the presenter's declared box starts below it.
+export const PRODUCT_SCREEN_LAYOUT: SceneLayoutRect[] = [
+  { id: "product-screen-product", kind: "product", left: .032, top: .175, right: .968, bottom: .545 },
+  { id: "product-screen-mascot", kind: "mascot", left: .23, top: .56, right: .77, bottom: .975 },
+  { id: "product-screen-caption", kind: "caption", left: .05, top: .04, right: .95, bottom: .16 }
+];
+const PATTERN_LAYOUT: Partial<Record<SceneContentPattern, SceneLayoutRect[]>> = {
+  wide_strip: WIDE_STRIP_LAYOUT,
+  product_screen: PRODUCT_SCREEN_LAYOUT
+};
 
 // How many beats ahead of a proof still show its screen. Claims are the only
 // scenes that assert anything, but they are not the only scenes allowed to show
@@ -52,19 +112,25 @@ export function defaultShot(beat: { spoken: boolean; claimId?: string }, isLast:
 // proofs, wide, and cuts tight only when it has something to prove. That is
 // ordinary film grammar and it costs no claim.
 //
-// One beat, not two. A lead of two put the same full-screen rect on two
-// consecutive scenes, which is a still held across a cut no matter which
-// template draws it -- the thing the composition-similarity gate exists to
-// catch. Wide then tight is a pair; wide, wide, tight is a pause.
-// Zero, and the measurement is why. An establishing shot has to be wider than
-// the proof to be worth cutting from, and these screens do not have the pixels
-// for it: 1.8x around a region that renders at 22px lands at 12, and a shot that
-// looks like content and carries none is worse than the plain backdrop it
-// replaced. Raise this only for screens whose type survives the pull-back --
-// the gate below will say so.
-const ESTABLISH_LEAD = 0;
-// How much wider than the proof's own region an establishing shot frames.
-const ESTABLISH_ZOOM = 1.8;
+// One beat, not two. A lead of two put the same rect on two consecutive scenes,
+// which is a still held across a cut no matter which template draws it -- the
+// thing the composition-similarity gate exists to catch. Wide then tight is a
+// pair; wide, wide, tight is a pause.
+//
+// This was zero, and the reasoning for zero was wrong in an instructive way. It
+// said the screens have no pixels for an establishing shot, because 1.8x around
+// a region that renders at 22px lands at 12. Both halves are true and the
+// conclusion does not follow: 12px is a fine establishing shot. It is only a
+// failure when measured with `READABLE_PX`, which is the floor for a band a
+// viewer is asked to read a claim off. An establishing shot is asked to be
+// recognised, not read, and the reference film's own widest product shots sit at
+// 10-14px -- they would have failed that gate too.
+//
+// The other half of the mistake was framing. A 1.8x pull-back around a claim's
+// region is an arbitrary zoom on a card; it looks like content and carries none,
+// which is what the old comment correctly complained about. The establishing
+// shot here is the route's own page, which looks like the product because it is.
+const ESTABLISH_LEAD = 1;
 
 // A template's options carry both how a scene is arranged and what it says. Only
 // the first half transfers. Inheriting the reference scene's options wholesale
@@ -80,7 +146,8 @@ function layoutOnly(options: Record<string, unknown> = {}) {
 // numbers matter only as a ratio against the crop width, which is what decides
 // how big the product's own type lands on screen.
 export const CONTAINER_PX: Record<string, number> = {
-  evidence_band: 1000, composed_board: 1000, card_field: 500, state_swap: 900, filmstrip: 320, comment_card: 900, ambient: 900
+  evidence_band: 1000, composed_board: 1000, card_field: 500, state_swap: 900, filmstrip: 320, comment_card: 900, ambient: 900,
+  wide_strip: 1000, product_screen: 1010
 };
 // The floor a region's text must clear once it is drawn. `marginal` in the
 // inventory is 20px and that is the same floor here, because it is the same
@@ -123,6 +190,13 @@ export function sourceTextPxOf(element: InventoryElement, tokens: readonly strin
     const heights = matched.map(({ height }) => height).sort((left, right) => left - right);
     return heights[Math.floor(heights.length / 2)]!;
   }
+  // `textHeightPx` is this number, measured. Reconstructing it from
+  // `renderedTextPx` -- which the inventory rounds to a whole pixel before
+  // storing -- is a lossy round-trip of the same fact, and the loss is not
+  // academic: a page whose type is 9.48 source pixels came back as 9.996 on a
+  // crop budgeted to land it at exactly 10, so four establishing shots were
+  // dropped for being a thousandth of a pixel under their floor.
+  if (element.textHeightPx) return element.textHeightPx;
   return (element.renderedTextPx ?? 0) * (element.width / 1080);
 }
 
@@ -136,6 +210,50 @@ export function sourceTextPxOf(element: InventoryElement, tokens: readonly strin
 // was chosen.
 function renderedOnCrop(element: InventoryElement, cropWidth: number, pattern: string, tokens: readonly string[] = []) {
   return renderedTextPxOnCrop(sourceTextPxOf(element, tokens), cropWidth, pattern);
+}
+
+// Every word the capture found on a screen, whichever region holds it. The page
+// region carries them all, but a crop has to avoid words in regions it merely
+// overlaps too.
+function allWordsOn(inventory: ScreenInventory, assetId: string) {
+  return inventory.screens.find(({ asset }) => asset === assetId)?.elements.flatMap(({ words }) => words) ?? [];
+}
+
+// Pull a screen crop's edges off any word they cut -- every edge but the right.
+//
+// Three of the four, and the exception is direction of reading. A page runs out
+// of the right of the frame the way it runs out of the right of a browser
+// window: the reference film's widest shot cuts five labels that way and it
+// looks deliberate. Every other edge reads as damage. A horizontal edge through
+// a line bisects every glyph in it at once -- the dashboard's four step labels
+// came out sliced through their descenders. A left edge is worse still, because
+// the left of a page is where its identity lives: panning the tracker sideways
+// cut "Application Tracker" down to "Tracker", which is a shot whose whole job
+// is to say what the product is, failing to say it.
+//
+// Same rule as `snapClearOfWords` without the token machinery that protects a
+// claim this shot does not make. Iterated, because clearing one edge can bring a
+// word on another into range, and every move shrinks the rect so it terminates.
+function framedClearOfCutWords(
+  crop: { x: number; y: number; width: number; height: number },
+  words: readonly { x: number; y: number; width: number; height: number }[]
+) {
+  let current = { ...crop };
+  for (let pass = 0; pass < 12; pass += 1) {
+    const left = current.x, right = current.x + current.width;
+    const top = current.y, bottom = current.y + current.height;
+    const overlaps = (word: { x: number; y: number; width: number; height: number }) =>
+      word.x - CROP_GUARD < right && word.x + word.width + CROP_GUARD > left
+      && word.y - CROP_GUARD < bottom && word.y + word.height + CROP_GUARD > top;
+    const cut = (edge: number, start: (word: { x: number; y: number; width: number; height: number }) => number, span: (word: { x: number; y: number; width: number; height: number }) => number) =>
+      words.filter((word) => overlaps(word) && start(word) - CROP_GUARD < edge && start(word) + span(word) + CROP_GUARD > edge);
+    const nextTop = cut(top, (word) => word.y, (word) => word.height).reduce((low, word) => Math.max(low, word.y + word.height + CROP_GUARD), top);
+    const nextBottom = cut(bottom, (word) => word.y, (word) => word.height).reduce((high, word) => Math.min(high, word.y - CROP_GUARD), bottom);
+    const nextLeft = cut(left, (word) => word.x, (word) => word.width).reduce((low, word) => Math.max(low, word.x + word.width + CROP_GUARD), left);
+    if (nextTop === top && nextBottom === bottom && nextLeft === left) return current;
+    current = { x: nextLeft, y: nextTop, width: Math.max(0, right - nextLeft), height: Math.max(0, nextBottom - nextTop) };
+  }
+  return current;
 }
 
 export interface AngleCompileIssue { sceneId?: string; reason: string; detail?: string }
@@ -205,6 +323,10 @@ export function compileAngleBlueprint(input: {
   const cadence = ["bright", "mid", "deep"];
 
   let startMs = 0;
+  // How many times each screen has already been established, so a film that
+  // proves three things off one page does not show that page identically three
+  // times.
+  const established = new Map<string, number>();
   const scenes: SceneComposition[] = script.map((beat, index) => {
     const slot = brief.beats[index]!;
     const claim = beat.claimId ? claimById.get(beat.claimId) : undefined;
@@ -212,41 +334,92 @@ export function compileAngleBlueprint(input: {
     // showing it now reads as setting up rather than as wandering.
     const establishing = claim ? undefined : script.slice(index + 1, index + 1 + ESTABLISH_LEAD)
       .map((ahead) => (ahead.claimId ? claimById.get(ahead.claimId) : undefined)).find(Boolean);
-    const shot = input.shots?.[beat.id] ?? defaultShot(slot, index === script.length - 1, Boolean(establishing));
+    const shot = input.shots?.[beat.id] ?? defaultShot(slot, index === script.length - 1, Boolean(establishing), claim?.contentPattern);
+    // The claim was budgeted, cropped and measured at one container aspect. If
+    // the scene ends up drawing a different one -- through an explicit `shots`
+    // override, or a default that stopped agreeing with the plan -- then the
+    // legibility this claim passed on belongs to a shot that is not on screen.
+    // Two representations of one fact with no check between them is the shape of
+    // every defect this file records, so the check is here.
+    if (claim?.contentPattern && shot.contentPattern !== claim.contentPattern) {
+      issues.push({ sceneId: beat.id, reason: "claim_pattern_mismatch", detail: `verified as ${claim.contentPattern}, drawn as ${shot.contentPattern}` });
+    }
     const endMs = startMs + Math.round((durations[index]! / fps) * 1000);
-    const template = reference.scenes.find((scene) => scene.contentPattern === shot.contentPattern) ?? reference.scenes[0]!;
+    // Same pattern first, then same shot type, and `scenes[0]` only as a last
+    // resort. A pattern the reference film does not draw used to land on the
+    // hook -- presenter fullscreen, no product rect -- so the band was drawn
+    // into a hardcoded default box while the collision audit checked a rect
+    // nothing on screen corresponded to.
+    const template = reference.scenes.find((scene) => scene.contentPattern === shot.contentPattern)
+      ?? reference.scenes.find((scene) => scene.shotType === shot.shotType)
+      ?? reference.scenes[0]!;
+    const layoutRects = PATTERN_LAYOUT[shot.contentPattern!] ?? template.layoutRects;
     const tier = cadence[index % cadence.length]!;
     const options = byTier(tier);
     const backdrop = options[Math.floor(index / cadence.length) % Math.max(1, options.length)] ?? template.backdrop!;
 
     let productCrop: SceneComposition["productCrop"];
     if (!claim && establishing) {
-      // Wide, not the proof band: the same rect twice running is a still, and
-      // the composition-similarity gate is right to call it one. Wide then tight
-      // is the pair that makes the tight shot mean something.
+      // The route's own page. Not a pull-back around the claim's card, which is
+      // an arbitrary zoom that looks like content and carries none -- the page,
+      // which looks like the product because it is the product.
+      //
+      // The crop is the screen region verbatim, narrowed only so the type lands
+      // at the recognition floor. Nothing is resolved from tokens and nothing is
+      // snapped clear of words: both exist to protect a claim's evidence, and
+      // this shot has no claim to protect. What it must not do is silently
+      // become unreadable, which is what the gate below is for -- and the gate
+      // is `SCREEN_RECOGNISABLE_PX`, not `READABLE_PX`, because a shot asked to
+      // be recognised and a shot asked to be read are not the same shot.
       const screen = inventory.screens.find(({ asset }) => asset === establishing.assetId);
-      const element = screen?.elements.find(({ id }) => id === establishing.elementId);
-      if (screen && element) {
-        // A pull-back, not the whole application. Showing the full 1440x900
-        // screen put every label at six pixels: it looked like content and
-        // carried none, which is worse than the plain backdrop it replaced.
-        // Widening around the region the proof will cut to keeps the shot
-        // readable and still makes the cut mean something.
-        const grow = (span: number, by: number, limit: number, origin: number) => {
-          const width = Math.min(limit, span * by);
-          return { start: Math.max(0, Math.min(limit - width, origin - (width - span) / 2)), size: width };
-        };
-        const horizontal = grow(element.width, ESTABLISH_ZOOM, screen.width, element.x);
-        const vertical = grow(element.height, ESTABLISH_ZOOM, screen.height, element.y);
+      const page = screen?.elements.find(({ id }) => id === `${establishing.assetId}Screen`);
+      if (screen && page) {
+        const aspect = CONTAINER_ASPECT[shot.contentPattern ?? ""] ?? 1.52;
+        const containerPx = CONTAINER_PX[shot.contentPattern ?? ""] ?? 1010;
+        const sourceTextPx = sourceTextPxOf(page);
+        // Widest crop whose type still reaches the floor, then the page's own
+        // box clamped to it. The same inversion the proof budget does, against
+        // the other floor.
+        const widest = sourceTextPx > 0 ? (sourceTextPx * containerPx) / SCREEN_RECOGNISABLE_PX : page.width;
+        let width = Math.min(page.width, Math.round(widest));
+        let height = Math.min(page.height, Math.round(width / aspect));
+        // A different framing each time the page is established.
+        //
+        // Three claims came off Solomon's dashboard, so the film established it
+        // three times, and the crop is a function of the page alone -- the same
+        // rect, three times, which reads as going back to a screenshot it already
+        // showed.
+        //
+        // Closer, and lower down where the page is tall enough. Not sideways: a
+        // left-aligned page keeps its identity on the left, and sliding the frame
+        // right cut "Application Tracker" down to "Tracker" -- a shot whose whole
+        // job is to say what the product is, failing to say it. Snapping the left
+        // edge clear of the word instead only traded that for a narrower crop,
+        // which is the fragment problem coming back. So the horizontal origin is
+        // fixed at the content box's own left edge, where nothing starts before
+        // it, and the variation is a push-in plus a scroll.
+        const seen = established.get(establishing.assetId) ?? 0;
+        established.set(establishing.assetId, seen + 1);
+        const closer = [1, .78, .88][seen % 3]!;
+        const drop = [0, 1, .5][seen % 3]!;
+        width = Math.round(width * closer);
+        height = Math.min(page.height, Math.round(width / aspect));
+        const origin = { x: page.x, y: page.y + Math.round((page.height - height) * drop) };
         productCrop = {
           assetId: establishing.assetId,
-          x: Math.round(horizontal.start), y: Math.round(vertical.start),
-          width: Math.round(horizontal.size), height: Math.round(vertical.size),
+          ...framedClearOfCutWords({ ...origin, width, height }, allWordsOn(inventory, establishing.assetId)),
           trim: trimFor(establishing.assetId)
         };
-        if (renderedOnCrop(element, productCrop.width, shot.contentPattern ?? "") < READABLE_PX) {
-          issues.push({ sceneId: beat.id, reason: "establishing_illegible", detail: `${Math.round(renderedOnCrop(element, productCrop.width, shot.contentPattern ?? ""))}px` });
+        const rendered = renderedTextPxOnCrop(sourceTextPx, width, shot.contentPattern ?? "");
+        if (rendered < SCREEN_RECOGNISABLE_PX) {
+          issues.push({ sceneId: beat.id, reason: "establishing_illegible", detail: `${Math.round(rendered)}px, floor is ${SCREEN_RECOGNISABLE_PX}` });
+          productCrop = undefined;
         }
+      } else if (screen) {
+        // A surface captured before screens were recorded. Say so rather than
+        // quietly drawing a presenter on a colour and calling it an establishing
+        // shot.
+        issues.push({ sceneId: beat.id, reason: "no_screen_region", detail: establishing.assetId });
       }
     }
     if (claim) {
@@ -289,6 +462,7 @@ export function compileAngleBlueprint(input: {
       typography: [],
       backdrop,
       background: { kind: backdrop.tier === "deep" ? "dark" : "light" },
+      layoutRects,
       productCrop,
       // Both, and explicitly. The renderer prefers the plural array, so
       // spreading the reference scene carried its four crops straight past the

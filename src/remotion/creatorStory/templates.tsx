@@ -96,6 +96,82 @@ export const EvidenceBandTemplate: React.FC<TemplateProps> = ({ scene, frame }) 
   </AbsoluteFill>;
 };
 
+// --------------------------------------------------------- product_screen
+
+// The route's own page, near the size it really is.
+//
+// The one shot the generated pipeline could not make, and the reason a viewer
+// could watch the whole film and not know what Solomon is. Every other pattern
+// draws a crop chosen to prove something, which means a crop magnified until its
+// type clears the proof floor, which means a slice of one card. This draws the
+// page: heading, panels, the shape of the application.
+//
+// No border and no highlight. A proof band is framed because the film is
+// pointing at it; a screen is not being pointed at, it is being shown, and a
+// green rule around it makes it look like evidence for a claim nobody made.
+export const ProductScreenTemplate: React.FC<TemplateProps> = ({ scene, frame }) => {
+  const box = productBox(scene);
+  const crop = scene.productCrops[0];
+  if (!crop) return null;
+  const size = cardSize(crop, box.width, box.height);
+  const enter = spring({ frame, fps: 30, config: { damping: 24, stiffness: 150 }, durationInFrames: 18 });
+  // A slow drift rather than a push. The shot is long enough to read across and
+  // a static full page reads as a screenshot pasted into a video; the camera
+  // already handles the push, so this only has to not be still.
+  const drift = interpolate(frame, [0, 90], [0, -10], { extrapolateRight: "clamp" });
+  return <AbsoluteFill>
+    <EvidenceRegion
+      box={{
+        left: box.left + Math.round((box.width - size.width) / 2),
+        top: box.top + Math.round((box.height - size.height) / 2),
+        width: size.width, height: size.height
+      }}
+      crop={crop} frame={frame}
+      style={{ opacity: enter, transform: `translateY(${Math.round((1 - enter) * 26 + drift)}px)` }}
+    />
+  </AbsoluteFill>;
+};
+
+// ------------------------------------------------------------- wide_strip
+
+// One crop of a single line of product UI, drawn as a band across the frame.
+//
+// The pattern exists for a shape the other seven cannot frame. A one-line field
+// is the most legible region a product screen has -- Solomon's contact title
+// grades 83px against a 20px floor, the best in its inventory -- and the
+// narrowest container the film had was 2.47, which grows a 116x20 label
+// vertically into the name above it and the chips below. `snapClearOfWords`
+// refuses that crop and the claim is dropped. At 5.5 there is no vertical
+// growth to refuse.
+//
+// The underline is the beat's motion and it is deliberately not a label: it
+// sweeps the width of the strip and says nothing. Every text option a template
+// can draw is copy, and copy on a generated film has to come from the script or
+// not at all -- a chip reading "SENIOR TECHNICAL RECRUITER" over a screen the
+// narration never mentions is the same defect as a caption nobody speaks.
+export const WideStripTemplate: React.FC<TemplateProps> = ({ scene, frame }) => {
+  const box = productBox(scene);
+  const crop = scene.productCrops[0];
+  if (!crop) return null;
+  const size = cardSize(crop, box.width, box.height);
+  const left = box.left + Math.round((box.width - size.width) / 2);
+  const top = box.top + Math.round((box.height - size.height) / 2);
+  const enter = spring({ frame, fps: 30, config: { damping: 22, stiffness: 170 }, durationInFrames: 14 });
+  const sweep = interpolate(frame, [8, 40], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  return <AbsoluteFill>
+    <EvidenceRegion
+      box={{ left, top, width: size.width, height: size.height }}
+      crop={crop} frame={frame} border={GREEN}
+      style={{ opacity: enter, transform: `translateY(${Math.round((1 - enter) * 34)}px)` }}
+    />
+    <div style={{
+      position: "absolute", left, top: top + size.height + 12,
+      width: Math.round(size.width * sweep), height: 9, borderRadius: 999,
+      background: MINT, boxShadow: "0 0 22px rgba(57,242,181,.75)"
+    }} />
+  </AbsoluteFill>;
+};
+
 // ------------------------------------------------------------- state_swap
 
 // Two crops of the same surface before and after an action, with the states
@@ -298,6 +374,8 @@ export const CommentCardTemplate: React.FC<TemplateProps> = ({ scene, frame }) =
 const TEMPLATES = {
   ambient: AmbientTemplate,
   evidence_band: EvidenceBandTemplate,
+  wide_strip: WideStripTemplate,
+  product_screen: ProductScreenTemplate,
   state_swap: StateSwapTemplate,
   card_field: CardFieldTemplate,
   filmstrip: FilmstripTemplate,
