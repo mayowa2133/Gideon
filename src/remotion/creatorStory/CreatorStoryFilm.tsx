@@ -72,7 +72,21 @@ const CaptionLayer: React.FC<{ caption: FilmCaption; scenes: FilmScene[] }> = ({
   // the extra one sat 0.33s inside `sting`, on no scene boundary at all.
   const opacity = interpolate(frame, [Math.max(0, durationInFrames - 10), durationInFrames], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const local = frame + caption.from;
-  const group = caption.wordGroups.find((item) => local >= item.from && local < item.to) ?? caption.wordGroups.at(-1);
+  // The group being spoken; failing that, the one most recently spoken.
+  //
+  // The fallback used to be `at(-1)`, and it is why a frame-space bug looked
+  // like a design choice rather than a defect: every caption whose groups were
+  // in the wrong space matched nothing, took the last group, and rendered a
+  // legible, uncollided, perfectly plausible final fragment of the line. It
+  // survived a thirty-six frame review because each frame showed *a* caption.
+  //
+  // The most recent started group is also the right answer for the real case
+  // this has to handle, which is the pause between two spoken groups: forced
+  // alignment leaves genuine gaps, and the words on screen during one should be
+  // the words just said, not the words that end the sentence.
+  const group = caption.wordGroups.find((item) => local >= item.from && local < item.to)
+    ?? [...caption.wordGroups].reverse().find((item) => local >= item.from)
+    ?? caption.wordGroups[0];
   if (!group) return null;
   const sinceSwap = local - group.from;
   const pop = spring({ frame: Math.max(0, sinceSwap), fps: 30, config: { damping: 20, stiffness: 190 }, durationInFrames: 12 });
