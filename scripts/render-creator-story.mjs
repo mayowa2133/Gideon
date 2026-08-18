@@ -201,14 +201,41 @@ for (const gap of gaps) {
 
   const timed = await alignClip(gap.wav, line, gap.seconds);
   alignment.push({ id: gap.id, source: timed.source, coverage: Number(timed.coverage.toFixed(2)), reason: timed.reason });
+  // Group boundaries are absolute film frames, like the caption's own window.
+  //
+  // They were clip-relative, which is a second frame space for one fact and the
+  // renderer only knows about the first: `CaptionLayer` resolves a group against
+  // the film's timeline, so every caption after the hook began past its own last
+  // group, matched nothing, and fell through to `at(-1)`. Each line rendered as
+  // its final two or three words, frozen for the whole scene. The hook alone
+  // looked right, because its window starts at frame 4 and overlaps the relative
+  // range by accident.
+  //
+  // V22's `buildWordGroups` has always emitted absolute frames. This is the
+  // producer agreeing with the other producer rather than the consumer being
+  // taught a second convention.
   captions.push({
     id: gap.id, from, to: from + span,
     wordGroups: groups.map((indices) => ({
       text: indices.map((index) => words[index]).join(" ").toUpperCase(),
-      from: Math.round(timed.words[indices[0]].from * FPS),
-      to: Math.round(timed.words[indices.at(-1)].to * FPS)
+      from: from + Math.round(timed.words[indices[0]].from * FPS),
+      to: from + Math.round(timed.words[indices.at(-1)].to * FPS)
     }))
   });
+}
+// Every group has to sit inside the window that draws it.
+//
+// This is the check that was missing when word groups were emitted in a second
+// frame space: the renderer resolves a group against the film's timeline, so a
+// group outside its caption's window can never be selected and the line silently
+// renders as whatever the fallback picks. Cheap to state, and it fails here
+// rather than twelve minutes into a render.
+for (const caption of captions) {
+  for (const group of caption.wordGroups) {
+    if (group.from < caption.from || group.to > caption.to) {
+      throw new Error(`Caption ${caption.id}: word group "${group.text}" spans ${group.from}-${group.to}, outside its window ${caption.from}-${caption.to}.`);
+    }
+  }
 }
 // Said out loud, because a caption track that was quietly estimated looks
 // exactly like one that was aligned.
