@@ -252,6 +252,19 @@ function rectFields(rect) {
 // crop sat flush to an element edge and PRODUCT_FOCUS_SCALE's 1.02 pushed the
 // "J" off "Jobs".
 function textFor(words, rect) {
+  // Full containment, deliberately, and it costs a usable region.
+  //
+  // Attributing by word centre instead recovers regions whose DOM box is tighter
+  // than tesseract's boxes -- "Total Active" is a 16px line that comes back 29px
+  // tall, so it contains none of its own words and grades 0px. But the same
+  // inflated height is what `sourceTextPxOf` measures type from, so centre
+  // attribution graded that region at 128px against a true rendered size near
+  // 45. A region wrongly called unusable fails closed and is reported; a region
+  // graded three times more legible than it is fails open, and that is the exact
+  // shape of every legibility bug this pipeline has shipped.
+  //
+  // The fix is a glyph height OCR does not give us. Until there is one, this
+  // stays strict.
   const inside = words.filter((word) => word.x >= rect.x && word.y >= rect.y && word.x + word.width <= rect.x + rect.width && word.y + word.height <= rect.y + rect.height);
   return { text: inside.map(({ text }) => text).join(" "), words: inside.map(({ text, x, y, width, height }) => ({ text, x, y, width, height })) };
 }
@@ -285,8 +298,22 @@ function clusterWords(words) {
   }).sort((a, b) => b.width * b.height - a.width * a.height);
 }
 
+// Page segmentation mode 3, not 6.
+//
+// 6 means "assume a single uniform block of text", and a product page is not
+// one: it is a heading, a stat row, a kanban of cards, a side panel. The mode
+// held while the layout happened to sit still and broke the moment it moved --
+// promoting one job to the top of a column made tesseract lose "Northstar Labs",
+// "Toronto, Canada" and the entire stat row, all of them plainly legible in the
+// screenshot and all of them read correctly the run before. A claim then failed
+// its fixture check for text that was on the screen the whole time.
+//
+// 3 is automatic page segmentation, which is the shape these screens actually
+// have: 71 words against 6's 56 on the same still, with both lost regions back.
+// The sparse modes (11, 12) find a few more and are meant for text with no
+// layout at all, which is the opposite of this.
 async function ocrWords(file) {
-  const { stdout } = await run("tesseract", [file, "stdout", "--psm", "6", "tsv"]);
+  const { stdout } = await run("tesseract", [file, "stdout", "--psm", "3", "tsv"]);
   return stdout.split("\n").slice(1).map((line) => line.split("\t")).filter((cells) => cells.length >= 12 && Number(cells[11 - 1]) > 60 && cells[11]?.trim())
     .map((cells) => ({ x: Number(cells[6]), y: Number(cells[7]), width: Number(cells[8]), height: Number(cells[9]), confidence: Number(cells[10]), text: cells[11].trim() }));
 }
