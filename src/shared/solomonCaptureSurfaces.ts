@@ -246,6 +246,23 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           sourceTextPx: 10
         },
         {
+          // The title line, and it draws two icon fragments along its top edge.
+          //
+          // The line is 269x20, which is 13.5 wide; every container is narrower,
+          // so the crop grows vertically to reach one and arrives in the row of
+          // status icons above. The rendered band carries half a checkmark and
+          // the tail of an icon. No word-clearing gate can prevent it: an icon
+          // has no OCR box, so the crop is provably clear of every word the
+          // inventory knows about and still cuts ink.
+          //
+          // Framing the step card instead -- `container: "a.rounded-lg"` -- was
+          // tried and reverted. It fixes the fragments and measures 295x110,
+          // whose OCR text runs on into the panel's footer note, so `stage` and
+          // `review` came back requiring the same two words and the film would
+          // have made one claim twice. A cosmetic edge beats two claims that are
+          // secretly one. The fix that would work is an ink-aware crop -- the
+          // compiler seeing pixels rather than word boxes -- which is a larger
+          // change than this shot is worth.
           id: "pathStepStage",
           purpose: "the last step of the path, named by the product",
           locator: { role: "text", name: "Stage the draft" },
@@ -395,9 +412,21 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           sourceTextPx: 9
         },
         {
+          // The tile, not the label.
+          //
+          // This was `{ role: "text", name: "Response Rate" }`, which addresses
+          // the label text node, and the label is a 223x20 strip with the
+          // number outside it. The film then said "it tracks your response rate"
+          // over a band reading "Response Rate" and nothing else -- a metric's
+          // name with no metric, which proves the claim to nobody.
+          //
+          // Nothing caught it because nothing could: a crop is graded on whether
+          // the words that carry the claim are legible inside it, and they were.
+          // The words that carry this claim are the label AND its value, and only
+          // the region declaration knows that.
           id: "queueResponseRate",
           purpose: "that the product counts replies, not sends",
-          locator: { role: "text", name: "Response Rate" },
+          locator: { role: "text", name: "Response Rate", container: ".grid-cols-2 > div" },
           fields: [],
           sourceTextPx: 10
         }

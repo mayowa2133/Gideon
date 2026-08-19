@@ -54,13 +54,41 @@ const STOPWORDS = new Set(["a", "an", "and", "at", "by", "for", "from", "in", "i
 // than lowercase body text, so preferring them buys accuracy and meaning at once.
 export function candidateTokens(text: string) {
   const seen = new Set<string>();
-  const words = text.split(/\s+/)
-    .map((word) => word.replace(/[^A-Za-z0-9]/g, ""))
-    .filter((word) => word.length >= 4 && !STOPWORDS.has(word.toLowerCase()))
+  // A number is a token however short it is, and in a short label it sorts
+  // first.
+  //
+  // The four-character floor is there to drop noise words, and it dropped every
+  // measurement: "0% Response Rate" yielded ["Response", "Rate"], so the claim
+  // that Solomon counts replies required only the metric's NAME to be legible.
+  // The resolver, free to exclude the rest, framed the label -- and the film
+  // said "it tracks your response rate" over a band reading "Response Rate"
+  // and no rate. A metric's value is the part that makes it evidence, so it is
+  // the part that has to be required.
+  //
+  // Short tokens are safe to require because `tokensPresent` only prefix-matches
+  // at four characters or more; below that it demands equality, so "0" matches
+  // "0" and nothing else.
+  //
+  // Punctuation SPLITS a word here, as it does in the resolver's `normalise`.
+  // It used to be deleted, which is the same fact represented two ways with no
+  // check between them: "Applied: 8/3/2026" became the token "832026" while the
+  // resolver read the same text as "8", "3", "2026", so a claim could be issued
+  // carrying a token no crop could ever satisfy. Invisible until numbers were
+  // allowed to rank, and then it dropped a claim outright.
+  const hasDigit = (word: string) => /\d/.test(word);
+  // A number leads only where the text is a label rather than a paragraph. On a
+  // stat tile the value IS the claim; in a card's worth of prose a stray date is
+  // the least distinctive thing on it.
+  const isLabel = text.trim().split(/\s+/).length <= 4;
+  const words = text.split(/[^A-Za-z0-9]+/)
+    .filter((word) => (word.length >= 4 || hasDigit(word)) && !STOPWORDS.has(word.toLowerCase()))
     .filter((word) => { const key = word.toLowerCase(); if (seen.has(key)) return false; seen.add(key); return true; });
   return words.sort((left, right) => {
     const capitalised = (word: string) => (/^[A-Z]/.test(word) ? 0 : 1);
-    return capitalised(left) - capitalised(right) || right.length - left.length;
+    const numberFirst = (word: string) => (isLabel && hasDigit(word) ? 0 : 1);
+    return numberFirst(left) - numberFirst(right)
+      || capitalised(left) - capitalised(right)
+      || right.length - left.length;
   });
 }
 

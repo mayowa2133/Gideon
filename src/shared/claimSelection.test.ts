@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { selectClaims } from "./claimSelection";
+import { candidateTokens, selectClaims } from "./claimSelection";
 import { resolveCrop, type ScreenInventory } from "./screenInventory";
 
 const inventory = JSON.parse(
@@ -77,5 +77,38 @@ describe("claim selection", () => {
       }))
     };
     expect(selectClaims(poor).claims).toEqual([]);
+  });
+
+  // A measurement's value is the part that makes it evidence.
+  //
+  // The film claimed "it tracks your response rate" over a band reading
+  // "Response Rate" and no rate: the tokens came out ["Response", "Rate"], the
+  // resolver was free to frame the label alone, and every gate passed because
+  // the words it was asked to make legible were legible. The claim asked for
+  // less than it asserted.
+  it("requires a measurement's value, not just its name", () => {
+    const tokens = candidateTokens("0% Response Rate");
+    expect(tokens, "the number is the evidence and must be required").toContain("0");
+    expect(tokens[0], "and it is the most distinctive part, so it is asked for first").toBe("0");
+
+    // Through the resolver, which is what the film actually depends on: a crop
+    // of the label alone must no longer satisfy the claim.
+    const tile: ScreenInventory = {
+      schemaVersion: "1", product: "solomon", source: { width: 1440, height: 900 },
+      screens: [{
+        asset: "queue", trim: 0, width: 1440, height: 900,
+        elements: [{
+          id: "label", provenance: "approved", x: 347, y: 580, width: 223, height: 20, aspect: 11.15,
+          text: "Response Rate", textHeightPx: 12, renderedTextPx: 54, legibility: "ok",
+          words: [{ text: "Response", x: 348, y: 585, width: 61, height: 12 }, { text: "Rate", x: 414, y: 585, width: 30, height: 12 }]
+        }, {
+          id: "tile", provenance: "approved", x: 347, y: 548, width: 223, height: 52, aspect: 4.29,
+          text: "0% Response Rate", textHeightPx: 12, renderedTextPx: 54, legibility: "ok",
+          words: [{ text: "0%", x: 348, y: 552, width: 40, height: 24 }, { text: "Response", x: 348, y: 585, width: 61, height: 12 }, { text: "Rate", x: 414, y: 585, width: 30, height: 12 }]
+        }]
+      }]
+    };
+    const resolved = resolveCrop(tile, tokens, 5.5, { assetId: "queue" });
+    expect("elementId" in resolved ? resolved.elementId : resolved).toBe("tile");
   });
 });

@@ -159,6 +159,13 @@ export const READABLE_PX = 20;
 // with the single still the same screen's proof shots draw.
 export const MOTION_TRIM_BASE = 1000;
 
+// How many proofs a recap needs before it reads as a row rather than a mistake.
+// Two cards with a marker travelling between them is not a strip, it is a pair
+// with a dot.
+const FILMSTRIP_MINIMUM = 3;
+// How many cards the row holds before they stop being legible as proofs.
+const FILMSTRIP_CARDS = 4;
+
 // What type of a given source size measures once a crop of a given width is
 // drawn into a given template.
 //
@@ -502,6 +509,61 @@ export function compileAngleBlueprint(input: {
     startMs = endMs;
     return scene;
   });
+
+  // The recap: every piece of evidence the film just showed, in a row, with the
+  // marker travelling between them.
+  //
+  // This is the reference film's signature shot and the generated one had never
+  // drawn it -- `filmstrip`, `card_field` and `state_swap` are all implemented
+  // and `defaultShot` reaches for none of them, so eighteen beats resolve onto
+  // three patterns and the film has one idea about what a shot is. The strip is
+  // the one worth having without inventing anything: it needs no copy, no second
+  // capture and no arrangement nobody asked for, because its content is the
+  // film's own proofs in the order it made them.
+  //
+  // It carries no `supportedClaimIds`. Each of these crops already proved its
+  // claim on its own beat; claiming them again here would count one piece of
+  // evidence twice.
+  // Four, like the reference, and for the same reason: the strip is sized from a
+  // shared height inside a 1000px budget, so six proofs are 160px cards and the
+  // row stops reading as evidence. One per screen where possible, so the recap
+  // is four different places in the product rather than one page four times.
+  // The recap is built from the page shots, not the proof bands.
+  //
+  // Proof bands were the obvious choice and they render wrong: the strip sizes
+  // cards from a shared height and cover-fits them, so a 12:1 band drawn into a
+  // near-square card discards most of its width. Four cards came out reading
+  // "Growth Mark", "Message to Aver", "Resp" and "First Win Pa" -- four cut
+  // words, which is the one thing this pipeline refuses everywhere else.
+  //
+  // Honouring the bands' own aspects is no better: four of them at a shared
+  // height need 27 times that height in width, so a 1000px row makes them 37px
+  // tall. A page crop is about 1.5:1, four fit at a readable height, and the
+  // recap says something truer anyway -- four places in the product rather than
+  // four fragments of one.
+  type Crop = NonNullable<SceneComposition["productCrop"]>;
+  const perScreen = new Map<string, Crop>();
+  for (const scene of scenes) {
+    if (scene.contentPattern !== "product_screen" || !scene.productCrop) continue;
+    if (!perScreen.has(scene.productCrop.assetId)) perScreen.set(scene.productCrop.assetId, scene.productCrop);
+  }
+  const proved = [...perScreen.values()].slice(0, FILMSTRIP_CARDS);
+  let recapIndex = -1;
+  for (let index = scenes.length - 2; index > 0; index -= 1) {
+    if (!scenes[index]!.supportedClaimIds.length && !scenes[index]!.productCrop) { recapIndex = index; break; }
+  }
+  if (proved.length >= FILMSTRIP_MINIMUM && recapIndex > 0) {
+    const template = reference.scenes.find((scene) => scene.contentPattern === "filmstrip");
+    scenes[recapIndex] = {
+      ...scenes[recapIndex]!,
+      shotType: "split_presenter_product",
+      contentPattern: "filmstrip",
+      layoutRects: template?.layoutRects ?? scenes[recapIndex]!.layoutRects,
+      productAssetIds: [...new Set(proved.map(({ assetId }) => assetId))],
+      productCrop: proved[0],
+      productCrops: proved
+    };
+  }
 
   return {
     blueprint: {
