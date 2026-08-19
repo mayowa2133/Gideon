@@ -42,7 +42,12 @@ const marketing: CaptureRequirement[] = [
     surfaceId: "contact",
     regionId: "contactRole",
     says: "it finds the person who actually hires interns",
-    fixture: { "contact.role": "Marketing Recruiter" }
+    // `contact.company` drives the filmed interaction rather than appearing in
+    // the region: the contact surface narrows its list by typing the company,
+    // and a value the capture types is as much this shot's fixture as one it
+    // reads. Without it the plan reports `locator_unresolved`, which is the
+    // check that stopped a run from typing "{contact.company}" into the product.
+    fixture: { "contact.role": "Marketing Recruiter", "contact.company": "Northstar Labs" }
   }
 ];
 
@@ -180,6 +185,31 @@ describe("creator capture plan", () => {
     const { claims } = claimsFromPlan(stripPlan, capturedAsPlanned(), { tokensPerClaim: 2 });
     expect(claims.find(({ id }) => id === "who-to-ask")!.contentPattern).toBe("wide_strip");
     expect(claims.find(({ id }) => id === "role-moves")!.contentPattern).toBe("evidence_band");
+  });
+
+  // A filmed interaction is an instruction a machine runs against the product, so
+  // every placeholder in it has to be resolved before the run starts. The first
+  // capture typed the literal "{contact.company}" into the filter, emptied the
+  // list, and the difference gate passed it at 13.2 -- because emptying a list is
+  // a very large change. A gate that measures whether pixels moved cannot tell
+  // working from broken; this is the one that can.
+  it("resolves the filmed interaction's own values, or says which it could not", () => {
+    const filmed = plan.shots.find(({ claimId }) => claimId === "who-to-ask")!;
+    expect(filmed.motion, "the contact surface declares an interaction").toBeDefined();
+    for (const action of filmed.motion!.actions) {
+      expect(`${action.locator.name} ${action.text ?? ""}`).not.toMatch(/\{[^}]+\}/);
+    }
+    expect(filmed.motion!.actions[0]!.text).toBe("Northstar Labs");
+
+    // Drop the value the interaction types and the plan refuses to stay quiet.
+    const starved = planCapture({
+      topic: "starved", surfaces: SOLOMON_SURFACES, filmFrames: FILM_FRAMES, beatCount: BEAT_COUNT,
+      requirements: marketing.map((requirement) => (requirement.id === "who-to-ask"
+        ? { ...requirement, fixture: { "contact.role": "Marketing Recruiter" } }
+        : requirement))
+    });
+    expect(starved.issues.filter(({ reason }) => reason === "locator_unresolved").map(({ detail }) => detail))
+      .toContain("contact.company");
   });
 
   it("reports a pattern no container knows about", () => {

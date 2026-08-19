@@ -27,8 +27,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { chromium } from "playwright";
 
+const runFfmpeg = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -77,8 +80,91 @@ const clampToViewport = (box) => {
   const height = Math.min(viewport.height - y, Math.round(box.height));
   return width > 0 && height > 0 ? { x, y, width, height } : null;
 };
+// How much of the frame has to change between consecutive burst frames before
+// the sequence is worth calling motion.
+//
+// Measured on Solomon rather than chosen: a settled route differs by 0.000
+// between frames, page load only resolves a spinner into content, clicking a
+// card moves 0.161, and typing into the contact filter moves 1.161 because the
+// list narrows as the letters land. A floor of 0.5 separates the interaction
+// that reads on screen from the ones that do not. Below it the run records no
+// motion at all -- twelve identical frames would put `motion` in the blueprint
+// and a frozen card on the screen, a lie the manifest tells and the picture
+// does not.
+const MOTION_FLOOR = 0.5;
+const MOTION_FRAMES = 12, MOTION_INTERVAL_MS = 70, MOTION_STEP = 3, MOTION_HOLD = 4;
+
+// Mean luma of the absolute difference between two frames.
+async function frameDelta(first, second) {
+  const { stdout } = await runFfmpeg("ffmpeg", ["-v", "error", "-i", first, "-i", second, "-filter_complex",
+    "[0:v][1:v]blend=all_mode=difference,format=gray,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-",
+    "-frames:v", "1", "-f", "null", "-"]);
+  const line = stdout.split("\n").find((entry) => entry.includes("YAVG"));
+  return line ? Number(line.split("=").pop()) : 0;
+}
+
+// The same role-then-text addressing the claim regions use.
+async function locate(page, locator) {
+  const pattern = new RegExp(locator.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+  let target = locator.container
+    ? page.locator(locator.container).filter({ hasText: pattern }).first()
+    : page.getByRole(locator.role, { name: pattern }).first();
+  try { await target.waitFor({ state: "visible", timeout: 4000 }); return target; } catch { /* fall through */ }
+  target = page.getByText(pattern).first();
+  await target.waitFor({ state: "visible", timeout: 6000 });
+  return target;
+}
+
+// Perform the surface's interaction and film the product's response.
+//
+// The burst runs alongside the action rather than after it. Typing resolves in
+// well under a second, and a sequence recorded once the list has already
+// narrowed is a photograph of the answer rather than a film of the product
+// arriving at it.
+async function filmMotion(page, motion, dir, assetId) {
+  const stills = [];
+  const shoot = async () => {
+    for (let index = 0; index < MOTION_FRAMES; index += 1) {
+      const file = path.join(dir, `${assetId}-motion-${String(index).padStart(2, "0")}.png`);
+      await page.screenshot({ path: file, scale: "css" });
+      stills.push(path.relative(root, file));
+      await hold(page, MOTION_INTERVAL_MS);
+    }
+  };
+  const perform = async () => {
+    for (const action of motion.actions) {
+      // An unresolved placeholder means the plan could not fill it from this
+      // angle's fixture, and it already said so. Typing it anyway puts the
+      // literal "{contact.company}" into the product and films the empty state
+      // that comes back -- which the difference gate happily passes, because
+      // emptying a list is a very large change. A gate that measures whether
+      // pixels moved cannot tell working from broken; this one can.
+      const unresolved = `${action.locator.name} ${action.text ?? ""}`.match(/\{[^}]+\}/);
+      if (unresolved) throw new Error(`unresolved placeholder ${unresolved[0]} in the filmed interaction`);
+      const target = await locate(page, action.locator);
+      await target.scrollIntoViewIfNeeded();
+      if (action.kind === "click") { await target.click(); continue; }
+      for (const character of action.text ?? "") await target.type(character, { delay: 0 });
+    }
+  };
+  await Promise.all([shoot(), perform()]);
+  let moved = 0;
+  for (let index = 1; index < stills.length; index += 1) {
+    moved = Math.max(moved, await frameDelta(path.join(root, stills[index - 1]), path.join(root, stills[index])));
+  }
+  return {
+    shows: motion.shows, stills, frames: stills.length,
+    step: MOTION_STEP, hold: MOTION_HOLD,
+    delta: Number(moved.toFixed(3)), moved: moved >= MOTION_FLOOR, floor: MOTION_FLOOR
+  };
+}
+
 try {
-  const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+  // Animations explicitly allowed. Playwright leaves the preference to the
+  // platform, and a headless run that inherits "reduce" films a product whose
+  // transitions never play -- which is indistinguishable from a product that has
+  // none. V22's capture set this for the same reason.
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 1, reducedMotion: "no-preference" });
   const page = await context.newPage();
 
   for (const shot of plan.shots) {
@@ -136,6 +222,25 @@ try {
         const content = clampToViewport(await main.boundingBox().catch(() => null));
         if (content) screens.set(shot.surfaceId, { assetId: shot.surfaceId, still: path.relative(root, still), region: content });
         else issues.push({ claimId: shot.claimId, reason: "surface_has_no_content_box", detail: shot.surfaceId });
+
+        // The interaction, filmed once per surface and last, because it changes
+        // the page: the claim's box and the canonical still are both measured on
+        // the state before it, which is the state the crops are resolved against.
+        if (shot.motion) {
+          try {
+            const filmed = await filmMotion(page, shot.motion, stillsDir, shot.surfaceId);
+            const entry = screens.get(shot.surfaceId);
+            if (entry && filmed.moved) entry.motion = filmed;
+            if (!filmed.moved) {
+              issues.push({
+                claimId: shot.claimId, reason: "motion_did_not_move",
+                detail: `${shot.surfaceId} changed by ${filmed.delta}, floor is ${filmed.floor}`
+              });
+            }
+          } catch (error) {
+            issues.push({ claimId: shot.claimId, reason: "motion_failed", detail: error instanceof Error ? error.message.split("\n")[0] : String(error) });
+          }
+        }
       }
 
       // The budget is a promise about the crop the film will draw. Recording a

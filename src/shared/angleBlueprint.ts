@@ -408,7 +408,18 @@ export function compileAngleBlueprint(input: {
         productCrop = {
           assetId: establishing.assetId,
           ...framedClearOfCutWords({ ...origin, width, height }, allWordsOn(inventory, establishing.assetId)),
-          trim: trimFor(establishing.assetId)
+          trim: trimFor(establishing.assetId),
+          // The filmed interaction plays here and only here.
+          //
+          // The crop rect is measured on the settled page, and the motion frames
+          // are that page mid-interaction -- content sits at a different offset
+          // in them. A whole-page shot absorbs that: the drift *is* the product
+          // working, a list narrowing inside a frame that holds still. A tight
+          // proof band would instead slide off the words it exists to show, so
+          // claims keep their frozen, aligned crop.
+          ...(screen.motion
+            ? { motion: { frames: screen.motion.frames, step: screen.motion.step, hold: screen.motion.hold } }
+            : {})
         };
         const rendered = renderedTextPxOnCrop(sourceTextPx, width, shot.contentPattern ?? "");
         if (rendered < SCREEN_RECOGNISABLE_PX) {

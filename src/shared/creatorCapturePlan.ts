@@ -62,6 +62,33 @@ export interface SurfaceRegion {
   sourceTextPx: number;
 }
 
+/** One thing the capture run does to the product, so there is something to film. */
+export interface CaptureAction {
+  kind: "click" | "type";
+  locator: { role: string; name: string; container?: string };
+  /** For `type`, entered a keystroke at a time so the product responds as it goes. */
+  text?: string;
+}
+
+/**
+ * The interaction whose response is filmed as a motion sequence.
+ *
+ * A settled page is a photograph. Measured on Solomon: twelve screenshots of a
+ * settled route differ by 0.000, page load only shows a spinner resolving into
+ * content, and clicking a card moves 0.161 -- while typing into the contact
+ * filter moves 1.161, because the list narrows as the letters land. This product
+ * animates in response to being used and not otherwise, so a capture that only
+ * navigates can only ever produce stills.
+ *
+ * `reach` stays prose: it describes how a person gets to the surface, and some of
+ * it is not executable. This is the part a machine performs.
+ */
+export interface SurfaceMotion {
+  /** What a viewer sees happen, for the plan document. */
+  shows: string;
+  actions: CaptureAction[];
+}
+
 export interface ProductSurface {
   /** Becomes the inventory asset id. */
   id: string;
@@ -69,6 +96,8 @@ export interface ProductSurface {
   purpose: string;
   /** What the run must do after landing on the route before the screen is worth filming. */
   reach: string[];
+  /** Optional: an interaction to perform and film once the route has settled. */
+  motion?: SurfaceMotion;
   regions: SurfaceRegion[];
 }
 
@@ -128,6 +157,8 @@ export interface CaptureShot {
   /** The seed values that must be on screen, quoted as data. */
   fixture: Array<{ path: string; shownAs: string; value: string }>;
   framing: CaptureFraming;
+  /** The interaction to film on this surface, if it has one. */
+  motion?: SurfaceMotion;
 }
 
 export interface CapturePlanIssue { claimId?: string; reason: string; detail?: string }
@@ -244,14 +275,27 @@ export function planCapture(input: {
     // {opportunity.company}". Substituting here is what makes the plan runnable:
     // a step that says "click the card" is a note, one that says which card is an
     // instruction.
+    // Fills `{field.path}` from this requirement's own fixture.
+    const fill = (template: string) => template.replace(/\{([^}]+)\}/g, (whole, path: string) => {
+      const value = quoted(requirement.fixture[path] ?? "");
+      if (!value) { issues.push({ claimId: requirement.id, reason: "locator_unresolved", detail: path }); return whole; }
+      return value;
+    });
     const placeholders = [...region.locator.name.matchAll(/\{([^}]+)\}/g)].map(([, path]) => path!);
     const locatorName = placeholders.reduce((name, path) => {
       const value = quoted(requirement.fixture[path] ?? "");
       if (!value) issues.push({ claimId: requirement.id, reason: "locator_unresolved", detail: path });
       return name.replace(`{${path}}`, value || `{${path}}`);
     }, region.locator.name);
+    // A value the interaction types is part of this shot even when the region
+    // does not display it: filtering the contact list by company is driven by
+    // `contact.company`, and the region that carries the claim is the title.
+    const driven = (surface.motion?.actions ?? []).flatMap((action) =>
+      [...`${action.locator.name} ${action.text ?? ""}`.matchAll(/\{([^}]+)\}/g)].map(([, path]) => path!));
     for (const path of Object.keys(requirement.fixture)) {
-      if (!region.fields.includes(path) && !placeholders.includes(path)) issues.push({ claimId: requirement.id, reason: "fixture_not_shown_here", detail: path });
+      if (!region.fields.includes(path) && !placeholders.includes(path) && !driven.includes(path)) {
+        issues.push({ claimId: requirement.id, reason: "fixture_not_shown_here", detail: path });
+      }
     }
 
     const shot = defaultShot({ spoken: placed.beat.spoken, claimId: requirement.id }, false, false, requirement.pattern);
@@ -277,7 +321,21 @@ export function planCapture(input: {
       reach: surface.reach,
       locator: { role: region.locator.role, name: locatorName, ...(region.locator.container ? { container: region.locator.container } : {}) },
       fixture,
-      framing
+      framing,
+      // Placeholders resolved here, like the region locator's, so the runner
+      // receives a literal instruction rather than a template it has to fill.
+      ...(surface.motion
+        ? {
+          motion: {
+            shows: surface.motion.shows,
+            actions: surface.motion.actions.map((action) => ({
+              ...action,
+              locator: { ...action.locator, name: fill(action.locator.name) },
+              ...(action.text === undefined ? {} : { text: fill(action.text) })
+            }))
+          }
+        }
+        : {})
     });
   }
 

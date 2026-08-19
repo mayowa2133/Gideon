@@ -144,6 +144,18 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       id: "contact",
       route: "/people",
       purpose: "the saved contact Solomon suggests reaching, and why",
+      // Typing the company into the filter, which is the one thing measured to
+      // move on this route: the saved-contact list narrows as the letters land,
+      // at a frame-to-frame delta of 1.16 against 0.00 for the settled page.
+      // Filmed rather than merely performed, because a still of a filtered list
+      // and a still of an unfiltered one are both photographs -- what reads as
+      // the product working is the narrowing itself.
+      motion: {
+        shows: "the saved contacts narrowing to one company as the name is typed",
+        actions: [
+          { kind: "type", locator: { role: "textbox", name: "Filter saved contacts by company" }, text: "{contact.company}" }
+        ]
+      },
       reach: [
         "Open /people and wait for the People heading.",
         "Filter saved contacts by contact.company.",
@@ -288,6 +300,16 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       id: "outreach_queue",
       route: "/outreach",
       purpose: "the queue of drafts waiting on the user, which is where they stay",
+      // The same filter interaction the contact route has, declared here because
+      // this is a route the film actually reaches. Motion is only worth filming
+      // on a screen the cut shows: the contact route moves beautifully and the
+      // generated film never opens it, because no region on it can carry a claim.
+      motion: {
+        shows: "the outreach log narrowing to one company as the name is typed",
+        actions: [
+          { kind: "type", locator: { role: "textbox", name: "Filter contacts by company" }, text: "{contact.company}" }
+        ]
+      },
       reach: [
         "Open /outreach and wait for the Needs attention list.",
         "No interaction: the queue renders with the workspace."

@@ -130,6 +130,8 @@ async function inventoryFromCapture(runFile) {
   for (const screen of run.screens ?? []) {
     const asset = byAsset.get(screen.assetId);
     if (!asset) continue;
+    // The filmed interaction travels with the screen it was filmed on.
+    if (screen.motion) asset.motion = screen.motion;
     const words = pageWords.get(screen.assetId) ?? [];
     const content = textFor(words, screen.region);
     asset.elements.push({

@@ -63,6 +63,14 @@ export interface InventoryScreen {
    * screens -- every crop correct, every pixel from another recording.
    */
   still?: string;
+  /**
+   * A filmed interaction on this screen, as a still sequence.
+   *
+   * Present only when the capture measured the frames actually changing. A
+   * settled product page is a photograph: Solomon differs by 0.000 between
+   * consecutive screenshots of a settled route, and only moves when it is used.
+   */
+  motion?: { stills: string[]; frames: number; step: number; hold: number; delta: number };
 }
 export interface ScreenInventory { schemaVersion: "1"; product: string; source: { width: number; height: number }; screens: InventoryScreen[] }
 

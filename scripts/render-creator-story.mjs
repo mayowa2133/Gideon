@@ -72,6 +72,16 @@ for (const [name, crop] of wanted) {
   const source = captured ? path.resolve(root, captured) : path.join(referenceDir, `still-${name}.png`);
   if (!existsSync(source)) throw new Error(`Blueprint draws ${crop.assetId} at trim ${crop.trim}, and neither ${path.relative(root, inventoryPath)} nor the reference stills have that screen.`);
   await fs.copyFile(source, path.join(publicDir, `still-${name}.png`));
+
+  // A crop that plays a sequence needs every frame of it, under the trims the
+  // renderer will ask for: `crop.trim + i * step`.
+  const filmed = inventory.screens.find((screen) => screen.asset === crop.assetId)?.motion;
+  if (crop.motion && filmed) {
+    for (const [index, frame] of filmed.stills.entries()) {
+      await fs.copyFile(path.resolve(root, frame), path.join(publicDir, `still-${crop.assetId}-${crop.trim + index * crop.motion.step}.png`));
+    }
+    process.stdout.write(`published ${filmed.stills.length} motion frame(s) for ${crop.assetId}\n`);
+  }
 }
 process.stdout.write(`published ${wanted.size} product still(s) from ${path.relative(root, inventoryPath)}\n`);
 const soundDesign = path.join(referenceDir, "sound-design.wav");
