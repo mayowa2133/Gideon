@@ -64,9 +64,9 @@ export interface SurfaceRegion {
 
 /** One thing the capture run does to the product, so there is something to film. */
 export interface CaptureAction {
-  kind: "click" | "type";
+  kind: "click" | "type" | "select";
   locator: { role: string; name: string; container?: string };
-  /** For `type`, entered a keystroke at a time so the product responds as it goes. */
+  /** For `type`, entered a keystroke at a time so the product responds as it goes; for `select`, the option label. */
   text?: string;
 }
 

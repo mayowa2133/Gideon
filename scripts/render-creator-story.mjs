@@ -61,7 +61,20 @@ await fs.mkdir(publicDir, { recursive: true, mode: 0o700 });
 const inventoryPath = flag("inventory", JSON.parse(await fs.readFile(path.join(inDir, "brief.json"), "utf8")).inventoryPath);
 const inventory = JSON.parse(await fs.readFile(inventoryPath, "utf8"));
 const stillFor = new Map(inventory.screens.map((screen) => [screen.asset, screen.still]));
-const wanted = new Map(blueprint.scenes.flatMap((scene) => (scene.productCrops ?? []).map((crop) => [`${crop.assetId}-${crop.trim}`, crop])));
+// One entry per still the renderer will ask for, and a crop that plays a
+// sequence wins the slot.
+//
+// Keyed by asset and trim, both the proof band and the establishing wide of the
+// same screen are `outreach_draft-0`, so the last one seen took the slot -- and
+// the proof band comes later, carries no motion, and the sequence was silently
+// never published. The film asked for `still-outreach_draft-3` and got nothing.
+const wanted = new Map();
+for (const scene of blueprint.scenes) {
+  for (const crop of scene.productCrops ?? []) {
+    const key = `${crop.assetId}-${crop.trim}`;
+    if (!wanted.has(key) || (crop.motion && !wanted.get(key).motion)) wanted.set(key, crop);
+  }
+}
 for (const [name, crop] of wanted) {
   const captured = stillFor.get(crop.assetId);
   // An inventory built from a capture run names its own image. The shipped

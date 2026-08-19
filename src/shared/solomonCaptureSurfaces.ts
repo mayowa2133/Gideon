@@ -272,6 +272,74 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       ]
     },
     {
+      // The screen that answers "who, and how do I reach them" at once.
+      //
+      // Every other route shows one half. The tracker has the role, /people has
+      // a contact card too cramped to crop, and the outreach log has a row of
+      // drafts at nine pixels. Here the person Solomon picked, the reason it
+      // picked them, the job the draft references and the unsent draft itself
+      // are all on one page at a size a vertical frame can hold -- and getting
+      // there is four controls and a button, which is why it needed a capture
+      // that can act rather than only navigate.
+      id: "outreach_draft",
+      route: "/messages",
+      purpose: "the person Solomon found for this role, and the message waiting on the user",
+      motion: {
+        shows: "the composer filling in and the draft being written",
+        actions: [
+          { kind: "select", locator: { role: "combobox", name: "Person" }, text: "{contact.name} — {contact.role}" },
+          { kind: "select", locator: { role: "combobox", name: "Target Job (Optional)" }, text: "{opportunity.title} — {opportunity.company}" },
+          { kind: "select", locator: { role: "combobox", name: "Channel" }, text: "Email" },
+          { kind: "click", locator: { role: "button", name: "Generate Draft" } }
+        ]
+      },
+      reach: [
+        "Open /messages and wait for the New Draft panel.",
+        "Pick the contact, the job the draft should reference, and the email channel.",
+        "Generate the draft and hold once it has rendered, unsent."
+      ],
+      regions: [
+        {
+          // Who, and why. The panel that appears once a person is chosen: name,
+          // title, the badge Solomon assigned, its strategy for approaching them
+          // and the address it verified.
+          //
+          // Every line in it is a 434px column of 9px type, which is 19.5px on a
+          // 462px crop against a 20px floor. Half a pixel, and no container fixes
+          // it: the width is the panel's, not the crop's. The header row below
+          // carries the same fact -- who this message is for -- at 15px type, so
+          // that is the region the angle should claim.
+          id: "draftPerson",
+          purpose: "the person Solomon chose for this role, with its reason",
+          locator: { role: "text", name: "Recruiter strategy" },
+          fields: [],
+          sourceTextPx: 9
+        },
+        {
+          // The header row, not the heading inside it.
+          //
+          // The heading alone is 175x22 of 15px type and would render at 73px --
+          // and cannot be cropped, because "Email -- Interview Path" sits
+          // directly beneath it with no gap at all. The row that contains both,
+          // plus the DRAFT -- NOT SENT badge, is bounded by the card's own edges
+          // and says more: who the message is for, and that it has not been sent.
+          id: "draftHeading",
+          purpose: "who the message is addressed to, and that it is still a draft",
+          locator: { role: "text", name: "Message to {contact.name}", container: "[class*='justify-between']" },
+          fields: ["contact.name"],
+          sourceTextPx: 15
+        },
+        {
+          // The product's own control sentence, on the screen where it matters.
+          id: "draftAssurance",
+          purpose: "that the draft is staged for the user to send, not sent",
+          locator: { role: "text", name: "Stage this email as a draft in your inbox" },
+          fields: [],
+          sourceTextPx: 9
+        }
+      ]
+    },
+    {
       id: "people_search",
       route: "/people",
       purpose: "what the product says it will go and find, before it has found it",

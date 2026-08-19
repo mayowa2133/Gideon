@@ -66,6 +66,12 @@ const hold = (page, ms) => page.waitForTimeout(ms);
 
 const shots = [];
 const screens = new Map();
+// One filmed sequence per surface; the interaction itself is repeated per shot.
+const filmedSurfaces = new Set();
+const pendingMotion = new Map();
+// How long to let the product finish after the burst. Generating a draft is a
+// round trip to a model and takes seconds; filtering a list is instant.
+const motionSettleMs = (motion) => (motion.actions.some((action) => action.kind === "click") ? 16000 : 900);
 const issues = [];
 
 // A still cannot show what the screenshot does not contain. `main` runs to the
@@ -106,6 +112,10 @@ async function frameDelta(first, second) {
 // The same role-then-text addressing the claim regions use.
 async function locate(page, locator) {
   const pattern = new RegExp(locator.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+  if (locator.role === "combobox" || locator.role === "textbox") {
+    const labelled = page.getByLabel(pattern).first();
+    try { await labelled.waitFor({ state: "visible", timeout: 4000 }); return labelled; } catch { /* fall through */ }
+  }
   let target = locator.container
     ? page.locator(locator.container).filter({ hasText: pattern }).first()
     : page.getByRole(locator.role, { name: pattern }).first();
@@ -121,9 +131,10 @@ async function locate(page, locator) {
 // well under a second, and a sequence recorded once the list has already
 // narrowed is a photograph of the answer rather than a film of the product
 // arriving at it.
-async function filmMotion(page, motion, dir, assetId) {
+async function filmMotion(page, motion, dir, assetId, record) {
   const stills = [];
   const shoot = async () => {
+    if (!record) return;
     for (let index = 0; index < MOTION_FRAMES; index += 1) {
       const file = path.join(dir, `${assetId}-motion-${String(index).padStart(2, "0")}.png`);
       await page.screenshot({ path: file, scale: "css" });
@@ -144,6 +155,7 @@ async function filmMotion(page, motion, dir, assetId) {
       const target = await locate(page, action.locator);
       await target.scrollIntoViewIfNeeded();
       if (action.kind === "click") { await target.click(); continue; }
+      if (action.kind === "select") { await target.selectOption({ label: action.text }); continue; }
       for (const character of action.text ?? "") await target.type(character, { delay: 0 });
     }
   };
@@ -172,6 +184,33 @@ try {
     try {
       await page.goto(`${baseUrl}${shot.route}`, { waitUntil: "networkidle" });
       await hold(page, 900);
+
+      // The interaction runs before anything is measured.
+      //
+      // A composer with nobody selected has no person card and no draft on it:
+      // measuring first would record the empty form and then film the product
+      // filling it, which is the wrong way round twice over. Performed on every
+      // shot, because each shot re-navigates and the region only exists in the
+      // state the interaction produces; filmed only the first time, because one
+      // sequence per screen is all the renderer can play.
+      //
+      // It also puts the motion frames *before* the measured state rather than
+      // after it, so the sequence resolves into the frame the crops were
+      // measured on instead of drifting away from it.
+      if (shot.motion) {
+        try {
+          const filmed = await filmMotion(page, shot.motion, stillsDir, shot.surfaceId, !filmedSurfaces.has(shot.surfaceId));
+          filmedSurfaces.add(shot.surfaceId);
+          if (filmed.stills.length && !filmed.moved) {
+            issues.push({ claimId: shot.claimId, reason: "motion_did_not_move", detail: `${shot.surfaceId} changed by ${filmed.delta}, floor is ${filmed.floor}` });
+          }
+          if (filmed.stills.length && filmed.moved) pendingMotion.set(shot.surfaceId, filmed);
+          await hold(page, motionSettleMs(shot.motion));
+        } catch (error) {
+          issues.push({ claimId: shot.claimId, reason: "motion_failed", detail: error instanceof Error ? error.message.split("\n")[0] : String(error) });
+          continue;
+        }
+      }
 
       // The element that carries the claim. Role first, because the plan is
       // written against what a viewer sees and a role plus a name survives a
@@ -220,27 +259,13 @@ try {
       if (!screens.has(shot.surfaceId)) {
         const main = page.locator("main").first();
         const content = clampToViewport(await main.boundingBox().catch(() => null));
-        if (content) screens.set(shot.surfaceId, { assetId: shot.surfaceId, still: path.relative(root, still), region: content });
-        else issues.push({ claimId: shot.claimId, reason: "surface_has_no_content_box", detail: shot.surfaceId });
-
-        // The interaction, filmed once per surface and last, because it changes
-        // the page: the claim's box and the canonical still are both measured on
-        // the state before it, which is the state the crops are resolved against.
-        if (shot.motion) {
-          try {
-            const filmed = await filmMotion(page, shot.motion, stillsDir, shot.surfaceId);
-            const entry = screens.get(shot.surfaceId);
-            if (entry && filmed.moved) entry.motion = filmed;
-            if (!filmed.moved) {
-              issues.push({
-                claimId: shot.claimId, reason: "motion_did_not_move",
-                detail: `${shot.surfaceId} changed by ${filmed.delta}, floor is ${filmed.floor}`
-              });
-            }
-          } catch (error) {
-            issues.push({ claimId: shot.claimId, reason: "motion_failed", detail: error instanceof Error ? error.message.split("\n")[0] : String(error) });
-          }
+        if (content) {
+          const entry = { assetId: shot.surfaceId, still: path.relative(root, still), region: content };
+          const filmed = pendingMotion.get(shot.surfaceId);
+          if (filmed) entry.motion = filmed;
+          screens.set(shot.surfaceId, entry);
         }
+        else issues.push({ claimId: shot.claimId, reason: "surface_has_no_content_box", detail: shot.surfaceId });
       }
 
       // The budget is a promise about the crop the film will draw. Recording a

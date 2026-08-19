@@ -154,6 +154,11 @@ export const CONTAINER_PX: Record<string, number> = {
 // question asked at the only moment that counts.
 export const READABLE_PX = 20;
 
+// Where a filmed sequence's stills are numbered from. Far clear of any real
+// capture trim, so `still-<asset>-<trim>.png` for a sequence can never collide
+// with the single still the same screen's proof shots draw.
+export const MOTION_TRIM_BASE = 1000;
+
 // What type of a given source size measures once a crop of a given width is
 // drawn into a given template.
 //
@@ -417,8 +422,20 @@ export function compileAngleBlueprint(input: {
           // working, a list narrowing inside a frame that holds still. A tight
           // proof band would instead slide off the words it exists to show, so
           // claims keep their frozen, aligned crop.
+          // A sequence gets its own trim base so it cannot overwrite the still
+          // the proof cuts to.
+          //
+          // Published at `trim + i * step` from trim 0, the sequence's first
+          // frame lands on `still-<asset>-0.png` -- which is the canonical still
+          // every other crop of that screen draws. The film verified its draft
+          // claim at 20.3px and then rendered an empty white band, because the
+          // still underneath it had been replaced by a photograph of the
+          // composer before anybody had selected anything.
           ...(screen.motion
-            ? { motion: { frames: screen.motion.frames, step: screen.motion.step, hold: screen.motion.hold } }
+            ? {
+              trim: MOTION_TRIM_BASE,
+              motion: { frames: screen.motion.frames, step: screen.motion.step, hold: screen.motion.hold }
+            }
             : {})
         };
         const rendered = renderedTextPxOnCrop(sourceTextPx, width, shot.contentPattern ?? "");
