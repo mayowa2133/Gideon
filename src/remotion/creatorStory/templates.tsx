@@ -297,7 +297,22 @@ export const FilmstripTemplate: React.FC<TemplateProps> = ({ scene, frame }) => 
   // tall and the strip became unreadable. A wide crop gives up some of its width
   // instead -- discard the strip can afford, because each card is a token here,
   // not the evidence itself.
-  const naturalWidths = crops.map((crop) => baseHeight * Math.min(1.35, crop.width / crop.height));
+  // 1.6, so a page-shaped crop is shown whole.
+  //
+  // The clamp exists because four wide crops laid out honestly need more width
+  // than the row has. At 1.35 it also cropped the recap's page shots, which are
+  // 1.52, and cover-fit spent the difference on the right edge of each card --
+  // clipping the very words the cards were there to recall.
+  //
+  // The cards' own type is small and that is the pattern, not a defect: measured
+  // on the reference, whose four cards are 760x265, 430x390, 390x265 and 742x300
+  // laid into a 1000px row, its type renders at about 6px too. It labels each
+  // card instead -- JOB, PERSON, PROOF, MESSAGE -- and the labels carry the
+  // meaning while the cards carry shape. The generated strip has no labels
+  // because there is no source of short screen names it could use without
+  // inventing copy; the surface's own `route` is that source, and reaching it
+  // means carrying route from the capture plan through the inventory.
+  const naturalWidths = crops.map((crop) => baseHeight * Math.min(1.6, crop.width / crop.height));
   const naturalTotal = naturalWidths.reduce((sum, width) => sum + width, 0) + gap * (crops.length - 1);
   const fit = Math.min(1, budget / Math.max(1, naturalTotal));
   const height = Math.round(baseHeight * fit);

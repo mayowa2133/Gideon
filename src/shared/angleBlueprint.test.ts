@@ -270,6 +270,84 @@ describe("angle blueprint", () => {
     }
   });
 
+  // Eighteen beats were resolving onto three patterns. `filmstrip`, `card_field`
+  // and `state_swap` are all implemented and nothing ever selected them, so the
+  // film had one idea about what a shot is -- which is most of the distance
+  // between it and the reference, whose cut rate it already matches.
+  //
+  // The recap is the one worth having without inventing anything: its content is
+  // the film's own proofs, in the order it made them, so it needs no copy, no
+  // second capture and no arrangement nobody asked for.
+  it("recaps its own evidence as a strip rather than repeating a pattern", () => {
+    // Four screens, one claimable line each, well clear of its neighbours -- the
+    // shipped fixture only ever yields one legible proof, and a film with one
+    // proof has nothing to recap.
+    const line = (asset: string, text: string) => ({
+      asset, trim: 0, width: 1440, height: 900,
+      elements: [{
+        id: `${asset}Line`, provenance: "approved" as const, x: 112, y: 400, width: 300, height: 20, aspect: 15,
+        text, textHeightPx: 10, renderedTextPx: 36, legibility: "ok" as const,
+        words: text.split(" ").map((word, index) => ({ text: word, x: 112 + index * 70, y: 405, width: 60, height: 10 }))
+      }, {
+        // The page itself, which is what an establishing shot draws and what the
+        // recap is made of.
+        id: `${asset}Screen`, provenance: "screen" as const, x: 100, y: 60, width: 1216, height: 800, aspect: 1.52,
+        text, textHeightPx: 16, renderedTextPx: 13, legibility: "ok" as const,
+        words: text.split(" ").map((word, index) => ({ text: word, x: 112 + index * 70, y: 405, width: 60, height: 10 }))
+      }]
+    });
+    const shelf: ScreenInventory = {
+      schemaVersion: "1", product: "solomon", source: { width: 1440, height: 900 },
+      screens: [
+        line("tracker", "Growth Marketing Manager"), line("people", "Head of Marketing"),
+        line("draft", "Message Avery Chen"), line("outreach", "Response Rate Counted")
+      ]
+    };
+    const shelfClaims = shelf.screens.map(({ asset, elements }) => ({
+      id: asset, assetId: asset, elementId: elements[0]!.id,
+      requiredReadableText: candidateTokens(elements[0]!.text).slice(0, 2),
+      renderedTextPx: 36, evidenceText: elements[0]!.text
+    }));
+    const paced = buildAngleBrief({
+      topic: "recap", product: "Solomon", claims: shelfClaims, filmFrames: FILM_FRAMES, speechRateBand: SPEECH_RATE_BAND,
+      beats: planBeats({ beatCount: 18, claimIds: shelfClaims.map(({ id }) => id) })
+    });
+    const written = paced.beats.map((slot) => ({
+      id: slot.id,
+      vo: [...Array.from({ length: slot.wordBudget[0] - (slot.claimId ? 1 : 0) }, () => "solomon"),
+           ...(slot.claimId ? [shelfClaims.find(({ id }) => id === slot.claimId)!.requiredReadableText[0]!] : [])].join(" "),
+      claimId: slot.claimId
+    }));
+    const { blueprint: film } = compileAngleBlueprint({ brief: paced, script: written, claims: shelfClaims, inventory: shelf, reference });
+
+    const strip = film.scenes.find((scene) => scene.contentPattern === "filmstrip");
+    expect(strip, "a film with several proofs should recap them").toBeDefined();
+    expect(strip!.productCrops!.length).toBeGreaterThanOrEqual(3);
+    expect(strip!.productCrops!.length).toBeLessThanOrEqual(4);
+
+    // Every card is a screen the film already showed, not a new crop, and no
+    // screen appears twice -- a recap of the same page four times recaps nothing.
+    const shown = film.scenes
+      .filter(({ contentPattern }) => contentPattern === "product_screen")
+      .map(({ productCrop }) => `${productCrop!.assetId}:${productCrop!.x},${productCrop!.y}`);
+    for (const crop of strip!.productCrops!) {
+      expect(shown, `${crop.assetId} is not a screen the film showed`).toContain(`${crop.assetId}:${crop.x},${crop.y}`);
+    }
+    expect(new Set(strip!.productCrops!.map(({ assetId }) => assetId)).size).toBe(strip!.productCrops!.length);
+
+    // And no card gives up evidence to the strip's aspect clamp. The first try
+    // recapped the proof bands, whose aspects run to 12:1; cover-fitting those
+    // into a card drew "Growth Mark", "Resp" and two more cut words.
+    for (const crop of strip!.productCrops!) {
+      expect(crop.width / crop.height, `${crop.assetId} is too wide for a card`).toBeLessThanOrEqual(1.6);
+    }
+    // And it claims nothing: the evidence was already claimed on its own beat,
+    // so counting it again here would count one proof twice.
+    expect(strip!.supportedClaimIds).toEqual([]);
+    // The film now draws more than the three patterns it used to.
+    expect(new Set(film.scenes.map(({ contentPattern }) => contentPattern)).size).toBeGreaterThanOrEqual(4);
+  });
+
   // The gap that made every other gate here meaningless: the compiler wrote one
   // crop, the renderer read a different field, and nothing compared them.
   it("hands the renderer the crop it resolved, not the reference film's", () => {

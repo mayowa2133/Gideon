@@ -105,7 +105,11 @@ async function inventoryFromCapture(runFile) {
     const content = textFor(words, shot.region);
     const element = {
       id: shot.regionId, provenance: "approved", trim: 0,
-      ...withLegibility(rectFields(shot.region), content.words), ...content
+      ...withLegibility(rectFields(shot.region), content.words), ...content,
+      // What the product says, from the DOM, alongside what OCR read off the
+      // pixels. `text` stays the OCR reading because legibility and word boxes
+      // are measured from it; `sourceText` is what a claim is allowed to require.
+      ...(shot.sourceText ? { sourceText: shot.sourceText } : {})
     };
     const asset = byAsset.get(shot.assetId) ?? {
       asset: shot.assetId, trim: 0,
@@ -130,6 +134,8 @@ async function inventoryFromCapture(runFile) {
   for (const screen of run.screens ?? []) {
     const asset = byAsset.get(screen.assetId);
     if (!asset) continue;
+    // The filmed interaction travels with the screen it was filmed on.
+    if (screen.motion) asset.motion = screen.motion;
     const words = pageWords.get(screen.assetId) ?? [];
     const content = textFor(words, screen.region);
     asset.elements.push({

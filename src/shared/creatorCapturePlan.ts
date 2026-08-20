@@ -62,6 +62,33 @@ export interface SurfaceRegion {
   sourceTextPx: number;
 }
 
+/** One thing the capture run does to the product, so there is something to film. */
+export interface CaptureAction {
+  kind: "click" | "type" | "select";
+  locator: { role: string; name: string; container?: string };
+  /** For `type`, entered a keystroke at a time so the product responds as it goes; for `select`, the option label. */
+  text?: string;
+}
+
+/**
+ * The interaction whose response is filmed as a motion sequence.
+ *
+ * A settled page is a photograph. Measured on Solomon: twelve screenshots of a
+ * settled route differ by 0.000, page load only shows a spinner resolving into
+ * content, and clicking a card moves 0.161 -- while typing into the contact
+ * filter moves 1.161, because the list narrows as the letters land. This product
+ * animates in response to being used and not otherwise, so a capture that only
+ * navigates can only ever produce stills.
+ *
+ * `reach` stays prose: it describes how a person gets to the surface, and some of
+ * it is not executable. This is the part a machine performs.
+ */
+export interface SurfaceMotion {
+  /** What a viewer sees happen, for the plan document. */
+  shows: string;
+  actions: CaptureAction[];
+}
+
 export interface ProductSurface {
   /** Becomes the inventory asset id. */
   id: string;
@@ -69,6 +96,8 @@ export interface ProductSurface {
   purpose: string;
   /** What the run must do after landing on the route before the screen is worth filming. */
   reach: string[];
+  /** Optional: an interaction to perform and film once the route has settled. */
+  motion?: SurfaceMotion;
   regions: SurfaceRegion[];
 }
 
@@ -128,6 +157,8 @@ export interface CaptureShot {
   /** The seed values that must be on screen, quoted as data. */
   fixture: Array<{ path: string; shownAs: string; value: string }>;
   framing: CaptureFraming;
+  /** The interaction to film on this surface, if it has one. */
+  motion?: SurfaceMotion;
 }
 
 export interface CapturePlanIssue { claimId?: string; reason: string; detail?: string }
@@ -244,14 +275,27 @@ export function planCapture(input: {
     // {opportunity.company}". Substituting here is what makes the plan runnable:
     // a step that says "click the card" is a note, one that says which card is an
     // instruction.
+    // Fills `{field.path}` from this requirement's own fixture.
+    const fill = (template: string) => template.replace(/\{([^}]+)\}/g, (whole, path: string) => {
+      const value = quoted(requirement.fixture[path] ?? "");
+      if (!value) { issues.push({ claimId: requirement.id, reason: "locator_unresolved", detail: path }); return whole; }
+      return value;
+    });
     const placeholders = [...region.locator.name.matchAll(/\{([^}]+)\}/g)].map(([, path]) => path!);
     const locatorName = placeholders.reduce((name, path) => {
       const value = quoted(requirement.fixture[path] ?? "");
       if (!value) issues.push({ claimId: requirement.id, reason: "locator_unresolved", detail: path });
       return name.replace(`{${path}}`, value || `{${path}}`);
     }, region.locator.name);
+    // A value the interaction types is part of this shot even when the region
+    // does not display it: filtering the contact list by company is driven by
+    // `contact.company`, and the region that carries the claim is the title.
+    const driven = (surface.motion?.actions ?? []).flatMap((action) =>
+      [...`${action.locator.name} ${action.text ?? ""}`.matchAll(/\{([^}]+)\}/g)].map(([, path]) => path!));
     for (const path of Object.keys(requirement.fixture)) {
-      if (!region.fields.includes(path) && !placeholders.includes(path)) issues.push({ claimId: requirement.id, reason: "fixture_not_shown_here", detail: path });
+      if (!region.fields.includes(path) && !placeholders.includes(path) && !driven.includes(path)) {
+        issues.push({ claimId: requirement.id, reason: "fixture_not_shown_here", detail: path });
+      }
     }
 
     const shot = defaultShot({ spoken: placed.beat.spoken, claimId: requirement.id }, false, false, requirement.pattern);
@@ -277,7 +321,21 @@ export function planCapture(input: {
       reach: surface.reach,
       locator: { role: region.locator.role, name: locatorName, ...(region.locator.container ? { container: region.locator.container } : {}) },
       fixture,
-      framing
+      framing,
+      // Placeholders resolved here, like the region locator's, so the runner
+      // receives a literal instruction rather than a template it has to fill.
+      ...(surface.motion
+        ? {
+          motion: {
+            shows: surface.motion.shows,
+            actions: surface.motion.actions.map((action) => ({
+              ...action,
+              locator: { ...action.locator, name: fill(action.locator.name) },
+              ...(action.text === undefined ? {} : { text: fill(action.text) })
+            }))
+          }
+        }
+        : {})
     });
   }
 
@@ -338,11 +396,17 @@ export function verifyCapturePlan(plan: CapturePlan, inventory: ScreenInventory)
     verdict.captured = true;
     verdict.regionPx = { width: element.width, height: element.height };
 
-    // OCR of the user's own screens, treated as data throughout -- the same rule
-    // the brief states about evidence. A region whose text reads like a direction
-    // is not usable as proof no matter how legible it is.
-    const text = element.text.toLowerCase();
-    if (INJECTION_SHAPES.some((shape) => shape.test(element.text))) {
+    // The user's own screens, treated as data throughout -- the same rule the
+    // brief states about evidence. A region whose text reads like a direction is
+    // not usable as proof no matter how legible it is.
+    //
+    // Both readings are screened, because either one alone can hide an
+    // injection: OCR can mangle a direction into something the shapes miss, and
+    // a direction can be present in the DOM in text OCR never resolved. The
+    // union is the conservative choice for a check whose job is to refuse.
+    const readings = [element.text, element.sourceText ?? element.text];
+    const text = (element.sourceText ?? element.text).toLowerCase();
+    if (readings.some((reading) => INJECTION_SHAPES.some((shape) => shape.test(reading)))) {
       issues.push({ claimId: shot.claimId, reason: "evidence_instruction_shaped", detail: shot.regionId });
     }
     verdict.missingFixture = shot.fixture.filter(({ value }) => !text.includes(value.toLowerCase())).map(({ path }) => path);
@@ -350,7 +414,12 @@ export function verifyCapturePlan(plan: CapturePlan, inventory: ScreenInventory)
       issues.push({ claimId: shot.claimId, reason: "fixture_absent", detail: path });
     }
 
-    const claimTokens = candidateTokens(element.text).slice(0, 3);
+    // The product's words, matching what the brief will require of the same
+    // region. This was `element.text` -- OCR -- while the brief had moved to the
+    // DOM, so the verifier passed a claim on ["Qutiook", "Review"] that the
+    // brief then issued as ["Outlook", "Review"]: one fact, two producers,
+    // disagreeing. Three producers, in fact; this was the third.
+    const claimTokens = candidateTokens(element.sourceText ?? element.text).slice(0, 3);
     const resolved = resolveCrop(inventory, claimTokens, shot.framing.containerAspect, { assetId: shot.surfaceId });
     if (!isResolved(resolved)) { issues.push({ claimId: shot.claimId, reason: "crop_unresolved", detail: resolved.reason }); return verdict; }
     verdict.cropWidthPx = resolved.width;
@@ -382,7 +451,7 @@ export function claimsFromPlan(plan: CapturePlan, inventory: ScreenInventory, op
     const verdict = verdicts.get(shot.claimId);
     if (!verdict?.captured || !verdict.legible || verdict.missingFixture.length) continue;
     const element = inventory.screens.find(({ asset }) => asset === shot.surfaceId)?.elements.find(({ id }) => id === shot.regionId)!;
-    const tokens = candidateTokens(element.text).slice(0, tokensPerClaim);
+    const tokens = candidateTokens(element.sourceText ?? element.text).slice(0, tokensPerClaim);
     // A region that reads perfectly and offers two usable words cannot be found
     // again by the resolver, which matches on tokens. Better to say so than to
     // hand the brief a claim whose crop will not resolve.
@@ -393,7 +462,7 @@ export function claimsFromPlan(plan: CapturePlan, inventory: ScreenInventory, op
       elementId: shot.regionId,
       requiredReadableText: tokens,
       renderedTextPx: element.renderedTextPx ?? 0,
-      evidenceText: element.text,
+      evidenceText: element.sourceText ?? element.text,
       // The pattern travels with the claim rather than being re-derived by the
       // compiler. `verify` measured this region's type on the crop this
       // container produced; a compiler that picked its own container would be

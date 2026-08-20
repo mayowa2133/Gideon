@@ -80,6 +80,21 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       id: "tracker_after",
       route: "/tracker",
       purpose: "the same pipeline after the user moves the opportunity on",
+      // The largest movement Solomon has, and the one the film's opening
+      // product shot was drawing as a photograph.
+      //
+      // A settled route differs by 0.000 between consecutive screenshots, so
+      // every unfilmed surface is a still. This is two changes in one gesture:
+      // the detail column goes from "Select a job to..." to a filled panel, and
+      // then the card leaves one stage column for another and the counters above
+      // it change with it. `motion_did_not_move` decides whether that is true,
+      // not this comment.
+      motion: {
+        shows: "a card opening into its detail panel",
+        actions: [
+          { kind: "click", locator: { role: "button", name: "{opportunity.title} {opportunity.company}" } }
+        ]
+      },
       reach: [
         "Reset the tracked opportunity to opportunity.previousStage.",
         "Open /tracker, click the opportunity's card, then click the opportunity.resultStage control.",
@@ -95,9 +110,22 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           // box reads "Marketing Intern Northstar Labs Toronto, Canada" and
           // nothing about Interviewing.
           purpose: "the opportunity as it appears in the stage the user just chose",
-          locator: { role: "button", name: "{opportunity.title} {opportunity.company}" },
+          // The detail panel the click opens, not the kanban card it opens from.
+          //
+          // The card is the obvious region and it stops being readable the moment
+          // the film moves: clicking it tints its background, and the company
+          // line is muted grey, so OCR came back with "Growth Marketing Manager
+          // Toronto, Canada" and the claim was dropped for a fixture the frame
+          // plainly showed. Legible to a person, invisible to the pipeline, and
+          // the pipeline is right to refuse what it cannot read.
+          //
+          // The panel is the better region anyway: same two facts at text-base
+          // and text-sm rather than a card's small type, on an untinted
+          // background, and it exists BECAUSE of the interaction rather than in
+          // spite of it.
+          locator: { role: "heading", name: "{opportunity.title}", container: "div.space-y-1" },
           fields: ["opportunity.title", "opportunity.company"],
-          sourceTextPx: 10
+          sourceTextPx: 12
         },
         {
           id: "trackerStageAfter",
@@ -144,6 +172,18 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       id: "contact",
       route: "/people",
       purpose: "the saved contact Solomon suggests reaching, and why",
+      // Typing the company into the filter, which is the one thing measured to
+      // move on this route: the saved-contact list narrows as the letters land,
+      // at a frame-to-frame delta of 1.16 against 0.00 for the settled page.
+      // Filmed rather than merely performed, because a still of a filtered list
+      // and a still of an unfiltered one are both photographs -- what reads as
+      // the product working is the narrowing itself.
+      motion: {
+        shows: "the saved contacts narrowing to one company as the name is typed",
+        actions: [
+          { kind: "type", locator: { role: "textbox", name: "Filter saved contacts by company" }, text: "{contact.company}" }
+        ]
+      },
       reach: [
         "Open /people and wait for the People heading.",
         "Filter saved contacts by contact.company.",
@@ -234,6 +274,23 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           sourceTextPx: 10
         },
         {
+          // The title line, and it draws two icon fragments along its top edge.
+          //
+          // The line is 269x20, which is 13.5 wide; every container is narrower,
+          // so the crop grows vertically to reach one and arrives in the row of
+          // status icons above. The rendered band carries half a checkmark and
+          // the tail of an icon. No word-clearing gate can prevent it: an icon
+          // has no OCR box, so the crop is provably clear of every word the
+          // inventory knows about and still cuts ink.
+          //
+          // Framing the step card instead -- `container: "a.rounded-lg"` -- was
+          // tried and reverted. It fixes the fragments and measures 295x110,
+          // whose OCR text runs on into the panel's footer note, so `stage` and
+          // `review` came back requiring the same two words and the film would
+          // have made one claim twice. A cosmetic edge beats two claims that are
+          // secretly one. The fix that would work is an ink-aware crop -- the
+          // compiler seeing pixels rather than word boxes -- which is a larger
+          // change than this shot is worth.
           id: "pathStepStage",
           purpose: "the last step of the path, named by the product",
           locator: { role: "text", name: "Stage the draft" },
@@ -254,6 +311,74 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           // needs a draft generated first, which the capture runner cannot reach.
           purpose: "the product's sentence saying a draft is reviewed before it goes anywhere",
           locator: { role: "text", name: "Review before it reaches Gmail or Outlook" },
+          fields: [],
+          sourceTextPx: 9
+        }
+      ]
+    },
+    {
+      // The screen that answers "who, and how do I reach them" at once.
+      //
+      // Every other route shows one half. The tracker has the role, /people has
+      // a contact card too cramped to crop, and the outreach log has a row of
+      // drafts at nine pixels. Here the person Solomon picked, the reason it
+      // picked them, the job the draft references and the unsent draft itself
+      // are all on one page at a size a vertical frame can hold -- and getting
+      // there is four controls and a button, which is why it needed a capture
+      // that can act rather than only navigate.
+      id: "outreach_draft",
+      route: "/messages",
+      purpose: "the person Solomon found for this role, and the message waiting on the user",
+      motion: {
+        shows: "the composer filling in and the draft being written",
+        actions: [
+          { kind: "select", locator: { role: "combobox", name: "Person" }, text: "{contact.name} — {contact.role}" },
+          { kind: "select", locator: { role: "combobox", name: "Target Job (Optional)" }, text: "{opportunity.title} — {opportunity.company}" },
+          { kind: "select", locator: { role: "combobox", name: "Channel" }, text: "Email" },
+          { kind: "click", locator: { role: "button", name: "Generate Draft" } }
+        ]
+      },
+      reach: [
+        "Open /messages and wait for the New Draft panel.",
+        "Pick the contact, the job the draft should reference, and the email channel.",
+        "Generate the draft and hold once it has rendered, unsent."
+      ],
+      regions: [
+        {
+          // Who, and why. The panel that appears once a person is chosen: name,
+          // title, the badge Solomon assigned, its strategy for approaching them
+          // and the address it verified.
+          //
+          // Every line in it is a 434px column of 9px type, which is 19.5px on a
+          // 462px crop against a 20px floor. Half a pixel, and no container fixes
+          // it: the width is the panel's, not the crop's. The header row below
+          // carries the same fact -- who this message is for -- at 15px type, so
+          // that is the region the angle should claim.
+          id: "draftPerson",
+          purpose: "the person Solomon chose for this role, with its reason",
+          locator: { role: "text", name: "Recruiter strategy" },
+          fields: [],
+          sourceTextPx: 9
+        },
+        {
+          // The header row, not the heading inside it.
+          //
+          // The heading alone is 175x22 of 15px type and would render at 73px --
+          // and cannot be cropped, because "Email -- Interview Path" sits
+          // directly beneath it with no gap at all. The row that contains both,
+          // plus the DRAFT -- NOT SENT badge, is bounded by the card's own edges
+          // and says more: who the message is for, and that it has not been sent.
+          id: "draftHeading",
+          purpose: "who the message is addressed to, and that it is still a draft",
+          locator: { role: "text", name: "Message to {contact.name}", container: "[class*='justify-between']" },
+          fields: ["contact.name"],
+          sourceTextPx: 15
+        },
+        {
+          // The product's own control sentence, on the screen where it matters.
+          id: "draftAssurance",
+          purpose: "that the draft is staged for the user to send, not sent",
+          locator: { role: "text", name: "Stage this email as a draft in your inbox" },
           fields: [],
           sourceTextPx: 9
         }
@@ -288,6 +413,16 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       id: "outreach_queue",
       route: "/outreach",
       purpose: "the queue of drafts waiting on the user, which is where they stay",
+      // The same filter interaction the contact route has, declared here because
+      // this is a route the film actually reaches. Motion is only worth filming
+      // on a screen the cut shows: the contact route moves beautifully and the
+      // generated film never opens it, because no region on it can carry a claim.
+      motion: {
+        shows: "the outreach log narrowing to one company as the name is typed",
+        actions: [
+          { kind: "type", locator: { role: "textbox", name: "Filter contacts by company" }, text: "{contact.company}" }
+        ]
+      },
       reach: [
         "Open /outreach and wait for the Needs attention list.",
         "No interaction: the queue renders with the workspace."
@@ -305,9 +440,21 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           sourceTextPx: 9
         },
         {
+          // The tile, not the label.
+          //
+          // This was `{ role: "text", name: "Response Rate" }`, which addresses
+          // the label text node, and the label is a 223x20 strip with the
+          // number outside it. The film then said "it tracks your response rate"
+          // over a band reading "Response Rate" and nothing else -- a metric's
+          // name with no metric, which proves the claim to nobody.
+          //
+          // Nothing caught it because nothing could: a crop is graded on whether
+          // the words that carry the claim are legible inside it, and they were.
+          // The words that carry this claim are the label AND its value, and only
+          // the region declaration knows that.
           id: "queueResponseRate",
           purpose: "that the product counts replies, not sends",
-          locator: { role: "text", name: "Response Rate" },
+          locator: { role: "text", name: "Response Rate", container: ".grid-cols-2 > div" },
           fields: [],
           sourceTextPx: 10
         }

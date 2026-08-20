@@ -61,7 +61,20 @@ await fs.mkdir(publicDir, { recursive: true, mode: 0o700 });
 const inventoryPath = flag("inventory", JSON.parse(await fs.readFile(path.join(inDir, "brief.json"), "utf8")).inventoryPath);
 const inventory = JSON.parse(await fs.readFile(inventoryPath, "utf8"));
 const stillFor = new Map(inventory.screens.map((screen) => [screen.asset, screen.still]));
-const wanted = new Map(blueprint.scenes.flatMap((scene) => (scene.productCrops ?? []).map((crop) => [`${crop.assetId}-${crop.trim}`, crop])));
+// One entry per still the renderer will ask for, and a crop that plays a
+// sequence wins the slot.
+//
+// Keyed by asset and trim, both the proof band and the establishing wide of the
+// same screen are `outreach_draft-0`, so the last one seen took the slot -- and
+// the proof band comes later, carries no motion, and the sequence was silently
+// never published. The film asked for `still-outreach_draft-3` and got nothing.
+const wanted = new Map();
+for (const scene of blueprint.scenes) {
+  for (const crop of scene.productCrops ?? []) {
+    const key = `${crop.assetId}-${crop.trim}`;
+    if (!wanted.has(key) || (crop.motion && !wanted.get(key).motion)) wanted.set(key, crop);
+  }
+}
 for (const [name, crop] of wanted) {
   const captured = stillFor.get(crop.assetId);
   // An inventory built from a capture run names its own image. The shipped
@@ -72,6 +85,16 @@ for (const [name, crop] of wanted) {
   const source = captured ? path.resolve(root, captured) : path.join(referenceDir, `still-${name}.png`);
   if (!existsSync(source)) throw new Error(`Blueprint draws ${crop.assetId} at trim ${crop.trim}, and neither ${path.relative(root, inventoryPath)} nor the reference stills have that screen.`);
   await fs.copyFile(source, path.join(publicDir, `still-${name}.png`));
+
+  // A crop that plays a sequence needs every frame of it, under the trims the
+  // renderer will ask for: `crop.trim + i * step`.
+  const filmed = inventory.screens.find((screen) => screen.asset === crop.assetId)?.motion;
+  if (crop.motion && filmed) {
+    for (const [index, frame] of filmed.stills.entries()) {
+      await fs.copyFile(path.resolve(root, frame), path.join(publicDir, `still-${crop.assetId}-${crop.trim + index * crop.motion.step}.png`));
+    }
+    process.stdout.write(`published ${filmed.stills.length} motion frame(s) for ${crop.assetId}\n`);
+  }
 }
 process.stdout.write(`published ${wanted.size} product still(s) from ${path.relative(root, inventoryPath)}\n`);
 const soundDesign = path.join(referenceDir, "sound-design.wav");
@@ -214,14 +237,21 @@ for (const gap of gaps) {
   // V22's `buildWordGroups` has always emitted absolute frames. This is the
   // producer agreeing with the other producer rather than the consumer being
   // taught a second convention.
-  captions.push({
-    id: gap.id, from, to: from + span,
-    wordGroups: groups.map((indices) => ({
-      text: indices.map((index) => words[index]).join(" ").toUpperCase(),
-      from: from + Math.round(timed.words[indices[0]].from * FPS),
-      to: from + Math.round(timed.words[indices.at(-1)].to * FPS)
-    }))
-  });
+  const wordGroups = groups.map((indices) => ({
+    text: indices.map((index) => words[index]).join(" ").toUpperCase(),
+    from: from + Math.round(timed.words[indices[0]].from * FPS),
+    to: from + Math.round(timed.words[indices.at(-1)].to * FPS)
+  }));
+  // The last phrase holds to the end of its own window.
+  //
+  // Alignment ends a group on the frame its last word stops sounding, which left
+  // the caption box live and empty for the rest of the beat: measured across the
+  // film, 142 frames -- 4.7 seconds -- sat inside a caption window after its
+  // last word, and only 68% of the film carried a line at all. The window is
+  // already the bound this film chose for the phrase, and holding to it keeps
+  // the group inside the containment check below rather than reaching past it.
+  if (wordGroups.length) wordGroups.at(-1).to = from + span;
+  captions.push({ id: gap.id, from, to: from + span, wordGroups });
 }
 // Every group has to sit inside the window that draws it.
 //
