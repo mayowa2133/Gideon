@@ -7,8 +7,15 @@ import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
 
+// Both cases spawn a node process and wait for it, so their duration is set by
+// how busy the machine is rather than by anything this repository does. The lint
+// takes about 1.5 seconds on its own and tips past vitest's 5 second default
+// when 268 test files are running beside it -- a red suite that says nothing
+// about the code, which is worse than a slow one.
+const SUBPROCESS_TIMEOUT_MS = 60_000;
+
 describe("repository lint", () => {
-  it("passes the current repository", async () => {
+  it("passes the current repository", { timeout: SUBPROCESS_TIMEOUT_MS }, async () => {
     const result = await execFileAsync(process.execPath, ["scripts/lint-repository.mjs"], {
       cwd: process.cwd(),
       env: { PATH: process.env.PATH ?? "" }
@@ -17,7 +24,7 @@ describe("repository lint", () => {
     expect(result.stdout).toContain("Repository lint passed.");
   });
 
-  it("rejects committed environment files, conflict markers, live secrets, and estimate drift", async () => {
+  it("rejects committed environment files, conflict markers, live secrets, and estimate drift", { timeout: SUBPROCESS_TIMEOUT_MS }, async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gideon-lint-test-"));
     await fs.mkdir(path.join(tempDir, "docs"), { recursive: true });
     await fs.writeFile(
