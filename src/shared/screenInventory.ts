@@ -62,6 +62,16 @@ export interface InventoryElement {
 }
 export interface InventoryScreen {
   asset: string;
+  /**
+   * The route this screen was captured at, when the capture recorded one.
+   *
+   * The product's own short name for the screen, carried so the recap strip can
+   * say what each of its cards is. `asset` is a capture-surface id -- names like
+   * `tracker_after` and `outreach_queue` are this pipeline's vocabulary, not the
+   * application's, and putting them on screen would be telling a viewer about
+   * the capture rather than about the product.
+   */
+  route?: string;
   trim: number;
   width: number;
   height: number;

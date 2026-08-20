@@ -113,6 +113,9 @@ async function inventoryFromCapture(runFile) {
     };
     const asset = byAsset.get(shot.assetId) ?? {
       asset: shot.assetId, trim: 0,
+      // The product's own name for this screen, for anything that has to say
+      // which screen it is drawing. `asset` is a capture-surface id.
+      ...(shot.route ? { route: shot.route } : {}),
       width: run.viewport?.width ?? SOURCE_WIDTH, height: run.viewport?.height ?? SOURCE_HEIGHT,
       // The image these boxes were measured on travels with them. The renderer
       // needs a picture and the inventory is the only thing that knows which

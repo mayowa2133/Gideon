@@ -561,11 +561,25 @@ export function compileAngleBlueprint(input: {
   }
   if (proved.length >= FILMSTRIP_MINIMUM && recapIndex > 0) {
     const template = reference.scenes.find((scene) => scene.contentPattern === "filmstrip");
+    // Each card says which screen it is, in the product's own words.
+    //
+    // The reference labels its four cards and the labels carry the meaning,
+    // because a card at this size is a token rather than something anybody
+    // reads. This film had no source of short screen names it could use without
+    // inventing copy -- `tracker_after` is the capture's vocabulary, not the
+    // application's -- so its strip said nothing. The route is the name the
+    // product already uses, and a viewer could type it.
+    //
+    // A card whose screen has no route carries no label rather than a made-up
+    // one, and the template skips those.
+    const routeOf = new Map(inventory.screens.map((screen) => [screen.asset, screen.route]));
+    const labels = proved.map(({ assetId }) => routeOf.get(assetId) ?? "");
     scenes[recapIndex] = {
       ...scenes[recapIndex]!,
       shotType: "split_presenter_product",
       contentPattern: "filmstrip",
       layoutRects: template?.layoutRects ?? scenes[recapIndex]!.layoutRects,
+      contentOptions: { ...scenes[recapIndex]!.contentOptions, ...(labels.some(Boolean) ? { labels } : {}) },
       productAssetIds: [...new Set(proved.map(({ assetId }) => assetId))],
       productCrop: proved[0],
       productCrops: proved
