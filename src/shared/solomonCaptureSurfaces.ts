@@ -236,9 +236,22 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           sourceTextPx: 9
         },
         {
+          // The proof block, not the one line inside it.
+          //
+          // The reason is a 262x16 row in a four-row grid, 16.4 wide, and every
+          // container is narrower -- so the crop has to grow vertically into the
+          // rows above and below, and `no_fit_without_cutting_words` refused it
+          // at every aspect from 5.5 down to 1.2. The card has no vertical room
+          // to give, which is the same wall `contactRole` hits.
+          //
+          // The block has the room and is the better evidence anyway: Solomon
+          // does not just state why it picked this person, it states what it
+          // checked -- why matched, company trust, email safety, warm path -- and
+          // a claim about the product showing its reasoning should show the
+          // reasoning rather than one line of it.
           id: "contactReason",
           purpose: "Solomon's stated reason for surfacing this person",
-          locator: { role: "definition", name: "{contact.reason}" },
+          locator: { role: "definition", name: "{contact.reason}", container: "dl" },
           fields: ["contact.reason"],
           sourceTextPx: 9
         }
