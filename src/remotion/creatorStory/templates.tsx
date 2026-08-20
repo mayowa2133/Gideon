@@ -326,7 +326,7 @@ export const FilmstripTemplate: React.FC<TemplateProps> = ({ scene, frame }) => 
       const enter = spring({ frame: Math.max(0, frame - index * Math.round(held * .9)), fps: 30, config: { damping: 20, stiffness: 170 }, durationInFrames: 16 });
       return <div key={`${crop.assetId}-${index}`} style={{ position: "absolute", left: positions[index], top: 620, width: sizes[index]!.width, height: height, borderRadius: 24, overflow: "hidden", background: WHITE, border: `4px solid ${active ? GREEN : "#b9cbc4"}`, boxShadow: "0 20px 45px rgba(7,17,31,.15)", opacity: .25 + .75 * enter, transform: `translateY(${(1 - enter) * 80}px) scale(${.75 + .25 * enter})` }}>
         <EvidenceCrop crop={crop} width={sizes[index]!.width} height={sizes[index]!.height} frame={frame} />
-        {labels[index] && <div style={{ position: "absolute", left: 8, bottom: 8, padding: "5px 9px", borderRadius: 8, background: INK, color: WHITE, fontSize: 15, fontWeight: 900 }}>{labels[index]}</div>}
+        {labels[index] ? <div style={{ position: "absolute", left: 8, bottom: 8, padding: "5px 9px", borderRadius: 8, background: INK, color: WHITE, fontSize: 15, fontWeight: 900 }}>{labels[index]}</div> : null}
       </div>;
     })}
     {phase < crops.length - 1 && <div data-cs-context-dot style={{ position: "absolute", left: positions[phase]! + sizes[phase]!.width + (positions[phase + 1]! - positions[phase]! - sizes[phase]!.width) * travel, top: 620 + height + 22, width: 42, height: 42, borderRadius: 999, background: MINT, boxShadow: "0 0 24px rgba(57,242,181,.9)" }} />}

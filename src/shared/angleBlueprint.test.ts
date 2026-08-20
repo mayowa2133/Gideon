@@ -299,8 +299,10 @@ describe("angle blueprint", () => {
     const shelf: ScreenInventory = {
       schemaVersion: "1", product: "solomon", source: { width: 1440, height: 900 },
       screens: [
-        line("tracker", "Growth Marketing Manager"), line("people", "Head of Marketing"),
-        line("draft", "Message Avery Chen"), line("outreach", "Response Rate Counted")
+        { ...line("tracker", "Growth Marketing Manager"), route: "/tracker" },
+        { ...line("people", "Head of Marketing"), route: "/people" },
+        { ...line("draft", "Message Avery Chen"), route: "/messages" },
+        { ...line("outreach", "Response Rate Counted"), route: "/outreach" }
       ]
     };
     const shelfClaims = shelf.screens.map(({ asset, elements }) => ({
@@ -334,6 +336,20 @@ describe("angle blueprint", () => {
       expect(shown, `${crop.assetId} is not a screen the film showed`).toContain(`${crop.assetId}:${crop.x},${crop.y}`);
     }
     expect(new Set(strip!.productCrops!.map(({ assetId }) => assetId)).size).toBe(strip!.productCrops!.length);
+
+    // Every card says which screen it is, and says it in the product's words.
+    //
+    // The reference labels its four cards and the labels carry the meaning: a
+    // card this size is a token, not something anybody reads. An unlabelled
+    // strip is four grey rectangles. The one short name available that nobody
+    // invented is the route -- `tracker_after` is this pipeline's vocabulary,
+    // and putting it on screen would tell a viewer about the capture.
+    const labels = strip!.contentOptions.labels ?? [];
+    expect(labels.length, "every card is labelled").toBe(strip!.productCrops!.length);
+    for (const label of labels) {
+      expect(label, `${label} is not a route`).toMatch(/^\//);
+      expect(shelf.screens.map(({ route }) => route), `${label} is not one this film visited`).toContain(label);
+    }
 
     // And no card gives up evidence to the strip's aspect clamp. The first try
     // recapped the proof bands, whose aspects run to 12:1; cover-fitting those

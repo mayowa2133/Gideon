@@ -305,7 +305,15 @@ try {
         const main = page.locator("main").first();
         const content = clampToViewport(await main.boundingBox().catch(() => null));
         if (content) {
-          const entry = { assetId: shot.surfaceId, still: path.relative(root, still), region: content };
+          // The route travels with the screen.
+          //
+          // The recap strip draws four screens and cannot say what any of them
+          // is: the reference labels its cards JOB, PERSON, PROOF, MESSAGE, and
+          // nothing here has a short name for a screen that is not invented
+          // copy. The route is that name, it is the product's own, and a viewer
+          // could type it. It was known at capture and thrown away one line
+          // later.
+          const entry = { assetId: shot.surfaceId, route: shot.route, still: path.relative(root, still), region: content };
           const filmed = pendingMotion.get(shot.surfaceId);
           if (filmed) entry.motion = filmed;
           screens.set(shot.surfaceId, entry);
