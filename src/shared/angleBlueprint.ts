@@ -165,6 +165,15 @@ export const MOTION_TRIM_BASE = 1000;
 const FILMSTRIP_MINIMUM = 3;
 // How many cards the row holds before they stop being legible as proofs.
 const FILMSTRIP_CARDS = 4;
+// The proof grid's size, and the reason it can hold what the strip could not.
+//
+// `card_field`'s grid sizes every card from its crop's own aspect and never
+// cover-fits, so a 12:1 band lands as a short wide card with all of its words --
+// which is exactly the crop the filmstrip had to give up on. Four in two columns
+// of a 1000px box leaves each card 487 wide, magnifying a band rather than
+// shrinking it.
+const CARD_FIELD_MINIMUM = 3;
+const CARD_FIELD_CARDS = 4;
 
 // What type of a given source size measures once a crop of a given width is
 // drawn into a given template.
@@ -583,6 +592,79 @@ export function compileAngleBlueprint(input: {
       productAssetIds: [...new Set(proved.map(({ assetId }) => assetId))],
       productCrop: proved[0],
       productCrops: proved
+    };
+  }
+
+  // The film's proofs, all at once.
+  //
+  // `card_field` was implemented and nothing ever selected it, so eighteen beats
+  // drew one proof at a time and then recapped the screens they came from. What
+  // it adds is the argument seen whole: four bands the film has already earned,
+  // side by side, each still readable because the grid honours each crop's
+  // aspect instead of cover-fitting it.
+  //
+  // Claims nothing, for the reason the recap claims nothing: each of these was
+  // proved on its own beat, and counting it here would count one proof twice.
+  const perClaim = new Map<string, Crop>();
+  for (const scene of scenes) {
+    if (!scene.supportedClaimIds.length || !scene.productCrop) continue;
+    if (!perClaim.has(scene.productCrop.assetId)) perClaim.set(scene.productCrop.assetId, scene.productCrop);
+  }
+  const earned = [...perClaim.values()].slice(0, CARD_FIELD_CARDS);
+  // The first spare beat rather than the last, so the grid lands mid-argument
+  // and the recap still closes -- and never the beat the recap took.
+  //
+  // That last guard cannot currently fire and is kept anyway. The recap needs
+  // three page shots, three page shots mean three establishing beats, and an
+  // establishing beat carries no claim -- so whenever a recap exists there are
+  // at least three beats for the grid to choose from and it can never want the
+  // recap's. Tried to write the test that fails without it: a film packed to a
+  // single spare beat has no page shots either, so it has no recap to eat. The
+  // guard is one comparison against a future where the recap's terms change.
+  let fieldIndex = -1;
+  for (let index = 1; index < scenes.length - 1; index += 1) {
+    // Never a beat that is drawing filmed motion.
+    //
+    // The grid is four still cards. A shot where the product actually moves is
+    // the scarcer thing -- Solomon only moves when it is used, and this film has
+    // four such shots against fourteen photographs. Measured on the real film:
+    // the grid landed on `beat-1`, which was drawing the tracker opening its
+    // detail panel, and the count went from four moving shots to three.
+    //
+    // Not covered by a test. Exercising it needs the FIRST spare beat to be an
+    // establishing shot of a screen that was filmed, and in the fixture used
+    // here the first spare beat is ambient and draws nothing -- so an assertion
+    // written against it passes with the guard removed. Said plainly rather than
+    // left as a test that proves nothing.
+    if (index === recapIndex || scenes[index]!.supportedClaimIds.length) continue;
+    if (scenes[index]!.productCrop?.motion) continue;
+    fieldIndex = index; break;
+  }
+  if (earned.length >= CARD_FIELD_MINIMUM && fieldIndex > 0) {
+    // The reference's OWN grid, not just its first card_field.
+    //
+    // `card_field` covers three arrangements and they are different pictures:
+    // `friction` flanks the presenter, `collapse` converges on one result, and
+    // only `five` lays out a grid. Matching on pattern alone took `friction`'s
+    // rects -- a mascot box and no product box -- so the grid was drawn into a
+    // default rect with the presenter on top of it, and the bottom two cards
+    // came out behind a robot's head. The pattern is not the shot; the pair is.
+    const template = reference.scenes.find((scene) =>
+      scene.contentPattern === "card_field" && scene.contentOptions?.arrangement === "grid");
+    scenes[fieldIndex] = {
+      ...scenes[fieldIndex]!,
+      // Fullscreen, as the reference draws its grid. A grid needs the whole
+      // band: split with the presenter, the second row lands on the mascot.
+      shotType: "product_fullscreen",
+      contentPattern: "card_field",
+      layoutRects: template?.layoutRects ?? scenes[fieldIndex]!.layoutRects,
+      // Grid, not the reference's flank or converge: those crowd the presenter
+      // or collapse onto a single result, and this shot's job is to let four
+      // proofs be read together.
+      contentOptions: { ...scenes[fieldIndex]!.contentOptions, arrangement: "grid", placeholders: 0 },
+      productAssetIds: [...new Set(earned.map(({ assetId }) => assetId))],
+      productCrop: earned[0],
+      productCrops: earned
     };
   }
 

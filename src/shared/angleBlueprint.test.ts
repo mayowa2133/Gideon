@@ -344,6 +344,31 @@ describe("angle blueprint", () => {
     // strip is four grey rectangles. The one short name available that nobody
     // invented is the route -- `tracker_after` is this pipeline's vocabulary,
     // and putting it on screen would tell a viewer about the capture.
+    // And the proofs get a shot of their own.
+    //
+    // `card_field` was implemented and never selected, so the film drew one
+    // proof at a time and never the argument whole. It claims nothing for the
+    // same reason the recap claims nothing, and it draws proof crops -- the ones
+    // the strip had to give up on, because the grid honours each crop's aspect
+    // instead of cover-fitting it.
+    const field = film.scenes.find((scene) => scene.contentPattern === "card_field");
+    expect(field, "a film with several proofs should show them together").toBeDefined();
+    expect(field!.supportedClaimIds, "the grid re-proves nothing").toEqual([]);
+    expect(field!.contentOptions.arrangement).toBe("grid");
+    expect(field!.productCrops!.length).toBeGreaterThanOrEqual(3);
+
+    // Every card is a crop the film proved something with, and the grid comes
+    // before the recap: proofs together, then the screens they came from.
+    const provenAt = film.scenes
+      .filter(({ supportedClaimIds }) => supportedClaimIds.length)
+      .map(({ productCrop }) => `${productCrop!.assetId}:${productCrop!.x},${productCrop!.y}`);
+    for (const crop of field!.productCrops!) {
+      expect(provenAt, `${crop.assetId} is not one of the film's proofs`).toContain(`${crop.assetId}:${crop.x},${crop.y}`);
+    }
+    expect(film.scenes.indexOf(field!)).toBeLessThan(film.scenes.indexOf(strip!));
+
+
+
     const labels = strip!.contentOptions.labels ?? [];
     expect(labels.length, "every card is labelled").toBe(strip!.productCrops!.length);
     for (const label of labels) {
