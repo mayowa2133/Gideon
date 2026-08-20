@@ -101,11 +101,51 @@ function overlaps(left: InventoryElement, right: InventoryElement) {
   return (width * height) / Math.max(1, Math.min(left.width * left.height, right.width * right.height)) > .6;
 }
 
+// The tokens a claim may require of a region: words the product wrote AND the
+// capture can see.
+//
+// Tokens come from the DOM because OCR misreads words ("Outlook" as "Qutiook")
+// and a claim built on a misreading breaks the moment a later capture reads it
+// correctly. But `innerText` returns text that never renders: a `<select>`
+// carries every `<option>` in its text, so the empty composer's person picker
+// claimed "Marketing" and "Engineering" while the frame showed nothing but
+// "Select a person...". The film promised a marketing contact over an empty
+// dropdown -- the same shape as the metric label with no metric, arrived at
+// from the opposite direction.
+//
+// Each source answers only what it can witness. The DOM says what the words
+// are; OCR says they are on screen. A token needs both.
+// How many of a region's words a claim requires, and therefore how many the
+// legibility grade is measured on.
+//
+// One number because it is one decision, and it was three: `selectClaims` took
+// three, the film's brief asked for two, and the plan's verifier graded on
+// three. The verifier rejected the draft heading at 13.6px because its third
+// token was an 8px "DRAFT" chip that dragged the median down -- while the film
+// would have drawn the shot on "Message" and "Interview" and read it at 20.3.
+// Verifying one shot and shipping another is the failure this whole file is
+// arranged to prevent.
+export const CLAIM_TOKENS = 2;
+
+export function claimableTokens(element: Pick<InventoryElement, "text" | "sourceText">) {
+  if (!element.sourceText) return candidateTokens(element.text);
+  const seen = candidateTokens(element.text).map((word) => word.toLowerCase());
+  // The same prefix rule the resolver matches by, so a token that survives here
+  // is a token that can be found there.
+  const visible = (token: string) => {
+    const needle = token.toLowerCase();
+    return seen.some((word) => word === needle
+      || (needle.length >= 4 && word.startsWith(needle.slice(0, 4)))
+      || (word.length >= 4 && needle.startsWith(word.slice(0, 4))));
+  };
+  return candidateTokens(element.sourceText).filter(visible);
+}
+
 export function selectClaims(
   inventory: ScreenInventory,
   options: { maxClaims?: number; tokensPerClaim?: number; allowCandidates?: boolean } = {}
 ) {
-  const { maxClaims = 6, tokensPerClaim = 3, allowCandidates = false } = options;
+  const { maxClaims = 6, tokensPerClaim = CLAIM_TOKENS, allowCandidates = false } = options;
   const issues: ClaimSelectionIssue[] = [];
   const claims: SelectableClaim[] = [];
 
@@ -119,7 +159,7 @@ export function selectClaims(
         issues.push({ assetId: screen.asset, elementId: element.id, reason: `legibility_${element.legibility ?? "unknown"}` });
         continue;
       }
-      if (candidateTokens(element.sourceText ?? element.text).length < tokensPerClaim) {
+      if (claimableTokens(element).length < tokensPerClaim) {
         issues.push({ assetId: screen.asset, elementId: element.id, reason: "too_few_distinct_words" });
         continue;
       }
@@ -149,7 +189,7 @@ export function selectClaims(
         elementId: element.id,
         // From the DOM where the capture recorded it. A claim that requires
         // OCR's reading of a word breaks when the next capture reads it better.
-        requiredReadableText: candidateTokens(element.sourceText ?? element.text).slice(0, tokensPerClaim),
+        requiredReadableText: claimableTokens(element).slice(0, tokensPerClaim),
         renderedTextPx: element.renderedTextPx ?? 0,
         evidenceText: element.sourceText ?? element.text
       });

@@ -179,8 +179,14 @@ try {
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1, reducedMotion: "no-preference" });
   const page = await context.newPage();
 
+  // How many claims each surface carries, because that is what decides whether
+  // a shot may scroll. One shot owns its still and may put its region wherever
+  // it likes; two shots share one still and must therefore share one scroll.
+  const shotsPerSurface = plan.shots.reduce((counts, { surfaceId }) => counts.set(surfaceId, (counts.get(surfaceId) ?? 0) + 1), new Map());
+
   for (const shot of plan.shots) {
     const still = path.join(stillsDir, `${shot.surfaceId}.png`);
+    const sharesStill = (shotsPerSurface.get(shot.surfaceId) ?? 0) > 1;
     try {
       await page.goto(`${baseUrl}${shot.route}`, { waitUntil: "networkidle" });
       await hold(page, 900);
@@ -232,7 +238,20 @@ try {
         target = page.getByText(pattern).first();
         await target.waitFor({ state: "visible", timeout: 10000 });
       }
+      // Into view first so anything lazy renders, then back to the top.
+      //
+      // One surface can carry several claims, and every shot on it writes the
+      // SAME still: `<asset>.png`. Each shot used to scroll to its own region
+      // and photograph the page there, so the last shot's scroll decided the
+      // image while the earlier shots' boxes were measured against a page that
+      // had since moved. The `replies` box came back pointing at "36.5d ago"
+      // and OCR read nothing where a region plainly was -- geometry and image
+      // are one moment, and nothing was holding them to it.
+      //
+      // Invisible with one claim per surface, which is why raising claim count
+      // is what surfaced it.
       await target.scrollIntoViewIfNeeded();
+      if (sharesStill) await page.evaluate(() => window.scrollTo(0, 0));
       await hold(page, 600);
 
       // Every value the angle asked for has to be on the page. This is the
@@ -244,7 +263,17 @@ try {
         continue;
       }
 
-      const box = clampToViewport(await target.boundingBox());
+      const measured = await target.boundingBox();
+      // Clamping silently is how a region half outside the frame became a region
+      // the film measured as if it were whole. Say so instead.
+      if (measured && (measured.y + measured.height > viewport.height || measured.x + measured.width > viewport.width)) {
+        issues.push({
+          claimId: shot.claimId, reason: "region_outside_viewport",
+          detail: `${Math.round(measured.x)},${Math.round(measured.y)} ${Math.round(measured.width)}x${Math.round(measured.height)} in ${viewport.width}x${viewport.height}`
+        });
+        continue;
+      }
+      const box = clampToViewport(measured);
       if (!box) { issues.push({ claimId: shot.claimId, reason: "region_has_no_box" }); continue; }
       // The product's own words, taken from the DOM while it is open in front of
       // us.
