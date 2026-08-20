@@ -237,14 +237,21 @@ for (const gap of gaps) {
   // V22's `buildWordGroups` has always emitted absolute frames. This is the
   // producer agreeing with the other producer rather than the consumer being
   // taught a second convention.
-  captions.push({
-    id: gap.id, from, to: from + span,
-    wordGroups: groups.map((indices) => ({
-      text: indices.map((index) => words[index]).join(" ").toUpperCase(),
-      from: from + Math.round(timed.words[indices[0]].from * FPS),
-      to: from + Math.round(timed.words[indices.at(-1)].to * FPS)
-    }))
-  });
+  const wordGroups = groups.map((indices) => ({
+    text: indices.map((index) => words[index]).join(" ").toUpperCase(),
+    from: from + Math.round(timed.words[indices[0]].from * FPS),
+    to: from + Math.round(timed.words[indices.at(-1)].to * FPS)
+  }));
+  // The last phrase holds to the end of its own window.
+  //
+  // Alignment ends a group on the frame its last word stops sounding, which left
+  // the caption box live and empty for the rest of the beat: measured across the
+  // film, 142 frames -- 4.7 seconds -- sat inside a caption window after its
+  // last word, and only 68% of the film carried a line at all. The window is
+  // already the bound this film chose for the phrase, and holding to it keeps
+  // the group inside the containment check below rather than reaching past it.
+  if (wordGroups.length) wordGroups.at(-1).to = from + span;
+  captions.push({ id: gap.id, from, to: from + span, wordGroups });
 }
 // Every group has to sit inside the window that draws it.
 //

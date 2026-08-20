@@ -116,7 +116,9 @@ describe("creator capture plan", () => {
   // The instruction half. A step that says "click the card" is a note; one that
   // says which card is something a capture run can execute.
   it("resolves the angle's own data into the locator the run will use", () => {
-    expect(plan.shots[0]!.locator).toEqual({ role: "button", name: "Marketing Intern Northstar Labs" });
+    // The container travels with the locator: a region that frames a panel is
+    // useless to the run if substitution drops the selector that finds it.
+    expect(plan.shots[0]!.locator).toEqual({ role: "heading", name: "Marketing Intern", container: "div.space-y-1" });
     expect(plan.shots[1]!.locator).toEqual({ role: "text", name: "Marketing Recruiter" });
     expect(plan.shots[0]!.reach.length).toBeGreaterThan(0);
   });

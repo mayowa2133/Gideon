@@ -80,6 +80,21 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       id: "tracker_after",
       route: "/tracker",
       purpose: "the same pipeline after the user moves the opportunity on",
+      // The largest movement Solomon has, and the one the film's opening
+      // product shot was drawing as a photograph.
+      //
+      // A settled route differs by 0.000 between consecutive screenshots, so
+      // every unfilmed surface is a still. This is two changes in one gesture:
+      // the detail column goes from "Select a job to..." to a filled panel, and
+      // then the card leaves one stage column for another and the counters above
+      // it change with it. `motion_did_not_move` decides whether that is true,
+      // not this comment.
+      motion: {
+        shows: "a card opening into its detail panel",
+        actions: [
+          { kind: "click", locator: { role: "button", name: "{opportunity.title} {opportunity.company}" } }
+        ]
+      },
       reach: [
         "Reset the tracked opportunity to opportunity.previousStage.",
         "Open /tracker, click the opportunity's card, then click the opportunity.resultStage control.",
@@ -95,9 +110,22 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           // box reads "Marketing Intern Northstar Labs Toronto, Canada" and
           // nothing about Interviewing.
           purpose: "the opportunity as it appears in the stage the user just chose",
-          locator: { role: "button", name: "{opportunity.title} {opportunity.company}" },
+          // The detail panel the click opens, not the kanban card it opens from.
+          //
+          // The card is the obvious region and it stops being readable the moment
+          // the film moves: clicking it tints its background, and the company
+          // line is muted grey, so OCR came back with "Growth Marketing Manager
+          // Toronto, Canada" and the claim was dropped for a fixture the frame
+          // plainly showed. Legible to a person, invisible to the pipeline, and
+          // the pipeline is right to refuse what it cannot read.
+          //
+          // The panel is the better region anyway: same two facts at text-base
+          // and text-sm rather than a card's small type, on an untinted
+          // background, and it exists BECAUSE of the interaction rather than in
+          // spite of it.
+          locator: { role: "heading", name: "{opportunity.title}", container: "div.space-y-1" },
           fields: ["opportunity.title", "opportunity.company"],
-          sourceTextPx: 10
+          sourceTextPx: 12
         },
         {
           id: "trackerStageAfter",
