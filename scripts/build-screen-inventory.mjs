@@ -113,9 +113,6 @@ async function inventoryFromCapture(runFile) {
     };
     const asset = byAsset.get(shot.assetId) ?? {
       asset: shot.assetId, trim: 0,
-      // The product's own name for this screen, for anything that has to say
-      // which screen it is drawing. `asset` is a capture-surface id.
-      ...(shot.route ? { route: shot.route } : {}),
       width: run.viewport?.width ?? SOURCE_WIDTH, height: run.viewport?.height ?? SOURCE_HEIGHT,
       // The image these boxes were measured on travels with them. The renderer
       // needs a picture and the inventory is the only thing that knows which
@@ -139,6 +136,12 @@ async function inventoryFromCapture(runFile) {
     if (!asset) continue;
     // The filmed interaction travels with the screen it was filmed on.
     if (screen.motion) asset.motion = screen.motion;
+    // Both are properties of the SCREEN, and were being read off the claim shot
+    // that happened to create the asset entry -- which carries neither, so the
+    // route survived only by luck of also being on the shot and `becomes` did
+    // not survive at all.
+    if (screen.route) asset.route = screen.route;
+    if (screen.becomes) asset.becomes = screen.becomes;
     const words = pageWords.get(screen.assetId) ?? [];
     const content = textFor(words, screen.region);
     asset.elements.push({

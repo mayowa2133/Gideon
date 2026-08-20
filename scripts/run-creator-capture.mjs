@@ -314,6 +314,7 @@ try {
           // could type it. It was known at capture and thrown away one line
           // later.
           const entry = { assetId: shot.surfaceId, route: shot.route, still: path.relative(root, still), region: content };
+          if (shot.becomes) entry.becomes = shot.becomes;
           const filmed = pendingMotion.get(shot.surfaceId);
           if (filmed) entry.motion = filmed;
           screens.set(shot.surfaceId, entry);

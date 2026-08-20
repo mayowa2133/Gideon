@@ -299,7 +299,9 @@ describe("angle blueprint", () => {
     const shelf: ScreenInventory = {
       schemaVersion: "1", product: "solomon", source: { width: 1440, height: 900 },
       screens: [
-        { ...line("tracker", "Growth Marketing Manager"), route: "/tracker" },
+        // Declared as turning into the next screen, which is the only way the
+        // compiler can know which of two states came first.
+        { ...line("tracker", "Growth Marketing Manager"), route: "/tracker", becomes: "people" },
         { ...line("people", "Head of Marketing"), route: "/people" },
         { ...line("draft", "Message Avery Chen"), route: "/messages" },
         { ...line("outreach", "Response Rate Counted"), route: "/outreach" }
@@ -368,6 +370,21 @@ describe("angle blueprint", () => {
     expect(film.scenes.indexOf(field!)).toBeLessThan(film.scenes.indexOf(strip!));
 
 
+
+    // And a declared pair of states becomes one shot showing the change.
+    //
+    // `state_swap` was implemented and never selected: the film could show the
+    // result and never the cause. The pair cannot be inferred from a capture --
+    // both states share a route, and a film may draw the after first -- so it
+    // comes from `becomes`, declared where the surfaces are.
+    const swap = film.scenes.find((scene) => scene.contentPattern === "state_swap");
+    expect(swap, "a declared pair of states should be shown changing").toBeDefined();
+    expect(swap!.supportedClaimIds, "the swap re-proves nothing").toEqual([]);
+    expect(swap!.productCrops!.map(({ assetId }) => assetId), "before, then after").toEqual(["tracker", "people"]);
+    expect(swap!.contentOptions.swapAt, "and it swaps partway through").toBeGreaterThan(0);
+    // No borrowed copy: the reference names its states APPLIED and INTERVIEWING,
+    // which are the reference's words about the reference's product.
+    expect(swap!.contentOptions.pills, "the pills would be invented copy").toBeUndefined();
 
     const labels = strip!.contentOptions.labels ?? [];
     expect(labels.length, "every card is labelled").toBe(strip!.productCrops!.length);

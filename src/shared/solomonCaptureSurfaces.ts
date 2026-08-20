@@ -477,6 +477,9 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       id: "outreach_blank",
       route: "/messages",
       purpose: "the composer before anything is written, so the draft has a before",
+      // And this names what it becomes, so the film can show the change rather
+      // than only the result.
+      becomes: "outreach_draft",
       reach: [
         "Open /messages and wait for the Messages heading.",
         "Leave the person and job selects empty."

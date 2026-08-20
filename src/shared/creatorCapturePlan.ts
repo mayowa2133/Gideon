@@ -98,6 +98,17 @@ export interface ProductSurface {
   reach: string[];
   /** Optional: an interaction to perform and film once the route has settled. */
   motion?: SurfaceMotion;
+  /**
+   * Optional: the surface this one turns into once the user acts.
+   *
+   * Which of two states came first is a fact about the product, and nothing the
+   * capture records can infer it -- both screens carry the same route, and the
+   * film may well draw the after before the before. `outreach_blank`'s purpose
+   * already says it exists "so the draft has a before"; this is that sentence in
+   * a form the compiler can read, so a state swap pairs the two the right way
+   * round rather than by accident.
+   */
+  becomes?: string;
   regions: SurfaceRegion[];
 }
 
@@ -149,6 +160,8 @@ export interface CaptureShot {
   beatId: string;
   surfaceId: string;
   route: string;
+  /** The surface this one turns into, when the surface declares one. */
+  becomes?: string;
   regionId: string;
   purpose: string;
   says: string;
@@ -315,6 +328,7 @@ export function planCapture(input: {
       beatId: placed.beat.id,
       surfaceId: surface.id,
       route: surface.route,
+      ...(surface.becomes ? { becomes: surface.becomes } : {}),
       regionId: region.id,
       purpose: region.purpose,
       says: quoted(requirement.says),
