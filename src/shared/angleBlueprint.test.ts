@@ -348,6 +348,56 @@ describe("angle blueprint", () => {
     expect(new Set(film.scenes.map(({ contentPattern }) => contentPattern)).size).toBeGreaterThanOrEqual(4);
   });
 
+  // A dense film still recaps.
+  //
+  // The recap used to require a beat that carried no claim AND drew nothing,
+  // which held while most non-claim beats were ambient. Raising claim count to
+  // ten turned every remaining beat into an establishing shot, so no beat was
+  // empty, and the film lost its signature strip without a word being said.
+  it("still recaps when every spare beat is already showing a screen", () => {
+    const line = (asset: string, text: string) => ({
+      asset, trim: 0, width: 1440, height: 900,
+      elements: [{
+        id: `${asset}Line`, provenance: "approved" as const, x: 112, y: 400, width: 300, height: 20, aspect: 15,
+        text, textHeightPx: 10, renderedTextPx: 36, legibility: "ok" as const,
+        words: text.split(" ").map((word, index) => ({ text: word, x: 112 + index * 70, y: 405, width: 60, height: 10 }))
+      }, {
+        id: `${asset}Screen`, provenance: "screen" as const, x: 100, y: 60, width: 1216, height: 800, aspect: 1.52,
+        text, textHeightPx: 16, renderedTextPx: 13, legibility: "ok" as const,
+        words: text.split(" ").map((word, index) => ({ text: word, x: 112 + index * 70, y: 405, width: 60, height: 10 }))
+      }]
+    });
+    const names = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet"];
+    const dense: ScreenInventory = {
+      schemaVersion: "1", product: "solomon", source: { width: 1440, height: 900 },
+      screens: names.map((name, index) => line(name, `Region ${name} number ${index}`))
+    };
+    const denseClaims = dense.screens.map(({ asset, elements }) => ({
+      id: asset, assetId: asset, elementId: elements[0]!.id,
+      requiredReadableText: candidateTokens(elements[0]!.text).slice(0, 2),
+      renderedTextPx: 36, evidenceText: elements[0]!.text
+    }));
+    const paced = buildAngleBrief({
+      topic: "dense", product: "Solomon", claims: denseClaims, filmFrames: FILM_FRAMES, speechRateBand: SPEECH_RATE_BAND,
+      beats: planBeats({ beatCount: 18, claimIds: denseClaims.map(({ id }) => id) })
+    });
+    const written = paced.beats.map((slot) => ({
+      id: slot.id,
+      vo: [...Array.from({ length: slot.wordBudget[0] - (slot.claimId ? 1 : 0) }, () => "solomon"),
+           ...(slot.claimId ? [denseClaims.find(({ id }) => id === slot.claimId)!.requiredReadableText[0]!] : [])].join(" "),
+      claimId: slot.claimId
+    }));
+    const { blueprint: film } = compileAngleBlueprint({ brief: paced, script: written, claims: denseClaims, inventory: dense, reference });
+
+    // The premise the recap has to survive: between hook and CTA -- the only
+    // beats it may take -- no beat is drawing nothing.
+    const spare = film.scenes.slice(1, -1)
+      .filter((scene) => !scene.supportedClaimIds.length && scene.contentPattern !== "filmstrip" && !scene.productCrop)
+      .map(({ id }) => id);
+    expect(spare, "premise: a dense film has no empty middle beat left").toEqual([]);
+    expect(film.scenes.find((scene) => scene.contentPattern === "filmstrip"), "a dense film still recaps").toBeDefined();
+  });
+
   // The gap that made every other gate here meaningless: the compiler wrote one
   // crop, the renderer read a different field, and nothing compared them.
   it("hands the renderer the crop it resolved, not the reference film's", () => {

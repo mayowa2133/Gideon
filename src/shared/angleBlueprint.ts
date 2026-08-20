@@ -548,9 +548,16 @@ export function compileAngleBlueprint(input: {
     if (!perScreen.has(scene.productCrop.assetId)) perScreen.set(scene.productCrop.assetId, scene.productCrop);
   }
   const proved = [...perScreen.values()].slice(0, FILMSTRIP_CARDS);
+  // The last beat before the CTA that carries no claim.
+  //
+  // It used to also require the beat to be drawing nothing, which was right when
+  // most non-claim beats were ambient and wrong the moment claim count rose: at
+  // ten claims every remaining beat is an establishing shot, no beat is empty,
+  // and the film silently lost its recap. A recap is a product shot, so taking
+  // one establishing beat of seven costs the film nothing it cannot spare.
   let recapIndex = -1;
   for (let index = scenes.length - 2; index > 0; index -= 1) {
-    if (!scenes[index]!.supportedClaimIds.length && !scenes[index]!.productCrop) { recapIndex = index; break; }
+    if (!scenes[index]!.supportedClaimIds.length) { recapIndex = index; break; }
   }
   if (proved.length >= FILMSTRIP_MINIMUM && recapIndex > 0) {
     const template = reference.scenes.find((scene) => scene.contentPattern === "filmstrip");

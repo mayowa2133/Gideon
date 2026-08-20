@@ -1,6 +1,6 @@
 import { INJECTION_SHAPES, planBeats } from "./angleBrief";
 import { CONTAINER_ASPECT, CONTAINER_PX, READABLE_PX, defaultShot, renderedTextPxOnCrop, sourceTextPxOf } from "./angleBlueprint";
-import { candidateTokens, type SelectableClaim } from "./claimSelection";
+import { CLAIM_TOKENS, candidateTokens, claimableTokens, type SelectableClaim } from "./claimSelection";
 import { CROP_MARGIN, cropWidthForRegion, isResolved, resolveCrop, type ScreenInventory } from "./screenInventory";
 import type { SceneContentPattern } from "./types";
 
@@ -419,7 +419,15 @@ export function verifyCapturePlan(plan: CapturePlan, inventory: ScreenInventory)
     // DOM, so the verifier passed a claim on ["Qutiook", "Review"] that the
     // brief then issued as ["Outlook", "Review"]: one fact, two producers,
     // disagreeing. Three producers, in fact; this was the third.
-    const claimTokens = candidateTokens(element.sourceText ?? element.text).slice(0, 3);
+    // The same count the film will issue, because legibility is measured on the
+    // words that carry the claim and a different slice is a different claim.
+    //
+    // Three here against the brief's two rejected the draft heading at 13.6px:
+    // the third token was a "DRAFT" chip at 8px, and the median of three took
+    // the grade down with it. The shot the film would actually draw is graded on
+    // "Message" and "Interview" and reads at 20.3. Verifying one shot and
+    // shipping another is the shape this file exists to refuse.
+    const claimTokens = claimableTokens(element).slice(0, CLAIM_TOKENS);
     const resolved = resolveCrop(inventory, claimTokens, shot.framing.containerAspect, { assetId: shot.surfaceId });
     if (!isResolved(resolved)) { issues.push({ claimId: shot.claimId, reason: "crop_unresolved", detail: resolved.reason }); return verdict; }
     verdict.cropWidthPx = resolved.width;
@@ -441,7 +449,7 @@ export function verifyCapturePlan(plan: CapturePlan, inventory: ScreenInventory)
 // verified shots are offered, so a claim can only exist if its screen was
 // captured, carries the angle's own data, and reads at the crop the film draws.
 export function claimsFromPlan(plan: CapturePlan, inventory: ScreenInventory, options: { tokensPerClaim?: number } = {}) {
-  const { tokensPerClaim = 3 } = options;
+  const { tokensPerClaim = CLAIM_TOKENS } = options;
   const verification = verifyCapturePlan(plan, inventory);
   const verdicts = new Map(verification.shots.map((shot) => [shot.claimId, shot]));
   const claims: SelectableClaim[] = [];
@@ -451,7 +459,7 @@ export function claimsFromPlan(plan: CapturePlan, inventory: ScreenInventory, op
     const verdict = verdicts.get(shot.claimId);
     if (!verdict?.captured || !verdict.legible || verdict.missingFixture.length) continue;
     const element = inventory.screens.find(({ asset }) => asset === shot.surfaceId)?.elements.find(({ id }) => id === shot.regionId)!;
-    const tokens = candidateTokens(element.sourceText ?? element.text).slice(0, tokensPerClaim);
+    const tokens = claimableTokens(element).slice(0, tokensPerClaim);
     // A region that reads perfectly and offers two usable words cannot be found
     // again by the resolver, which matches on tokens. Better to say so than to
     // hand the brief a claim whose crop will not resolve.

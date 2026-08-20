@@ -270,8 +270,13 @@ describe("creator capture plan", () => {
     const planDropped = new Set(verified.shots.filter(({ legible }) => !legible).map(({ claimId }) => claimId));
     expect([...planDropped].sort()).toEqual([...compilerDropped].sort());
     // And this is not a vacuous agreement: the shipped inventory really does put
-    // three of its four claims under the floor.
-    expect(planDropped.size).toBe(3);
+    // half of its four claims under the floor.
+    //
+    // It was three of four while a claim was graded on three tokens. Two is the
+    // count the film actually issues, and grading on the two words that carry
+    // the claim rather than three lifted one region back over the floor -- the
+    // grade got more accurate, not more lenient.
+    expect(planDropped.size).toBe(2);
   });
 
   // Only shots that survived verification become claims, which is what makes the

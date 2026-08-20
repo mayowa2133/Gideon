@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { candidateTokens, selectClaims } from "./claimSelection";
+import { candidateTokens, claimableTokens, selectClaims } from "./claimSelection";
 import { resolveCrop, type ScreenInventory } from "./screenInventory";
 
 const inventory = JSON.parse(
@@ -105,13 +105,48 @@ describe("claim selection", () => {
     // Two runs of one screen: one where Tesseract slips, one where it does not.
     const slipped = selectClaims(misread("Review before it reaches Gmall or Qutiook")).claims[0]!;
     const clean = selectClaims(misread("Review before it reaches Gmail or Outlook")).claims[0]!;
-    expect(slipped.requiredReadableText, "the slip must not reach the claim").toEqual(clean.requiredReadableText);
-    expect(slipped.requiredReadableText.join(" ")).not.toContain("Qutiook");
+    // Not that the two runs agree word for word -- a word OCR mangled is one the
+    // capture cannot prove is on screen, so dropping it is correct. What must
+    // hold is that no misreading is ever required, and that a claim issued from
+    // either run resolves against the other. Recapturing broke both.
+    expect(slipped.requiredReadableText.join(" "), "the slip must not reach the claim").not.toContain("Qutiook");
+    expect(slipped.requiredReadableText.join(" ")).not.toContain("Gmall");
+    for (const token of [...slipped.requiredReadableText, ...clean.requiredReadableText]) {
+      expect("Review before it reaches Gmail or Outlook", `${token} is not a word the product wrote`).toContain(token);
+    }
 
     // And the claim issued from the slipped run still resolves against the clean
     // one, which is the round trip that was broken: recapturing dropped it.
     const resolved = resolveCrop(misread("Review before it reaches Gmail or Outlook"), slipped.requiredReadableText, 5.5, { assetId: "path" });
-    expect("reason" in resolved ? resolved.reason : "resolved", `claim tokens ${JSON.stringify(slipped.requiredReadableText)} did not survive a better capture`).toBe("resolved");
+    expect("elementId" in resolved ? "resolved" : resolved.reason, `claim tokens ${JSON.stringify(slipped.requiredReadableText)} did not survive a better capture`).toBe("resolved");
+    const back = resolveCrop(misread("Review before it reaches Gmall or Qutiook"), clean.requiredReadableText, 5.5, { assetId: "path" });
+    expect("elementId" in back ? "resolved" : back.reason, "and a claim from the clean run survives a worse one").toBe("resolved");
+  });
+
+  // A claim may not require words the frame does not show.
+  //
+  // Tokens come from the DOM, and `innerText` includes text that never renders:
+  // a <select> carries every <option>. The empty composer's person picker
+  // claimed "Marketing" while the frame showed "Select a person...", so the film
+  // promised a marketing contact over an empty dropdown -- a claim proved by
+  // nothing, arrived at from the opposite direction to the metric label with no
+  // metric.
+  it("will not require words that are in the DOM but not on screen", () => {
+    const picker = {
+      // What the select's innerText returns: the placeholder AND every option.
+      sourceText: "Select a person... Priya Raman Director of Growth Marketing Jamie Nguyen Frontend Engineering Manager",
+      // What OCR read off the rendered pixels: the closed select, and no more.
+      text: "Person Select a person"
+    };
+    const tokens = claimableTokens(picker);
+    expect(tokens, "an unopened option list is not evidence").not.toContain("Marketing");
+    expect(tokens, "nor is the rest of it").not.toContain("Engineering");
+    expect(tokens.join(" ").toLowerCase(), "only what the frame shows").toContain("person");
+
+    // And the reverse still holds: a word OCR misread is still claimable from
+    // the DOM, because the misreading is visibly the same word.
+    const note = { sourceText: "Review before it reaches Gmail or Outlook", text: "Review it reaches Gmall or Qutiook" };
+    expect(claimableTokens(note), "OCR saw this word, however badly").toContain("Review");
   });
 
   // A measurement's value is the part that makes it evidence.
