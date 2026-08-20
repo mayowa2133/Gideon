@@ -38,6 +38,20 @@ export interface InventoryElement {
   aspect: number;
   trim?: number;
   text: string;
+  /**
+   * The same region's text as the DOM gives it, when the capture recorded one.
+   *
+   * `text` is OCR: a reading of the pixels, and the only witness for whether the
+   * region is legible and where each word sits. It is not a witness for what the
+   * product says. Tesseract renders "Outlook" as "Qutiook" on some runs and
+   * correctly on others, so a claim whose required tokens came from `text`
+   * required "Qutiook" -- and the next capture, reading the same screen BETTER,
+   * dropped the claim for not containing it.
+   *
+   * Claims choose and match their tokens here when it is present. Legibility and
+   * crop geometry keep reading `text`.
+   */
+  sourceText?: string;
   words: InventoryWord[];
   // How well this region's text would survive a 1080-wide vertical frame.
   // Computed by the inventory builder, not here, because it is a property of the
@@ -253,7 +267,10 @@ export function resolveCrop(
     .filter((element) => options.allowCandidates || element.provenance === "approved")
     .map((element) => {
       considered.push(element.id);
-      const matched = tokensPresent(normalise(element.text), tokens);
+      // Containment is asked of the product's words, not of OCR's reading of
+      // them. Which region carries a claim is a fact about the page; whether the
+      // region is legible is the separate fact OCR is the witness for.
+      const matched = tokensPresent(normalise(element.sourceText ?? element.text), tokens);
       return { screen, element, matched, area: element.width * element.height };
     }))
     .filter(({ matched }) => tokens.length === 0 || matched.length === tokens.length)
@@ -277,9 +294,19 @@ export function resolveCrop(
     // The words that carry the claim are the ones the crop must still hold when
     // the snapping is done. Falling back to the element's own words when no
     // token matched keeps a tokenless resolve honest rather than unconstrained.
-    const carries = matched.length
+    const named = matched.length
       ? element.words.filter(({ text }) => tokensPresent([...normalise(text)], matched).length)
-      : element.words;
+      : [];
+    // Every matched token has to be findable among the OCR words before the
+    // filtered set is trusted to stand for "the words that carry the claim".
+    //
+    // Tokens are chosen from the DOM and words are read from pixels, so the two
+    // can disagree: a claim can require "Outlook" while OCR read "Qutiook", and
+    // filtering then yields a set that silently omits the very word the crop
+    // must not cut. Where OCR cannot point at a token's word, the whole region
+    // is kept instead -- a larger crop is a cost, a sliced claim is a defect.
+    const found = new Set(named.flatMap(({ text }) => tokensPresent([...normalise(text)], matched)));
+    const carries = matched.length && found.size === matched.length ? named : element.words;
     const snapped = snapClearOfWords(fitToAspect(padded, containerAspect, bounds), allWords, carries);
     if (!snapped) continue;
     const fitted = { x: Math.round(snapped.x), y: Math.round(snapped.y), width: Math.round(snapped.width), height: Math.round(snapped.height) };

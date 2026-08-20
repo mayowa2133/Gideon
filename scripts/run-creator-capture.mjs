@@ -246,6 +246,22 @@ try {
 
       const box = clampToViewport(await target.boundingBox());
       if (!box) { issues.push({ claimId: shot.claimId, reason: "region_has_no_box" }); continue; }
+      // The product's own words, taken from the DOM while it is open in front of
+      // us.
+      //
+      // Everything downstream reads text off the OCR pass, which is a reading of
+      // the pixels rather than the words themselves, and a claim's required
+      // tokens were being chosen from that reading. Tesseract renders "Outlook"
+      // as "Qutiook" and "Gmail" as "Gmall" on some runs and correctly on
+      // others, so the claim required "Qutiook" -- and the next capture, reading
+      // the SAME screen BETTER, dropped the claim for not containing it. The
+      // same run lost "carried" from another region and dropped that claim too.
+      // A pipeline where improving the input breaks the output is inverted.
+      //
+      // OCR keeps the two jobs it is the only witness for: whether the text is
+      // legible in the rendered pixels, and where each word sits so a crop can
+      // avoid cutting one. What the product SAYS is not one of them.
+      const sourceText = (await target.innerText()).replace(/\s+/g, " ").trim();
       await page.screenshot({ path: still, scale: "css" });
 
       // The page itself, once per surface.
@@ -285,6 +301,7 @@ try {
         claimId: shot.claimId, assetId: shot.surfaceId, regionId: shot.regionId, route: shot.route,
         still: path.relative(root, still),
         region: { x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), height: Math.round(box.height) },
+        sourceText,
         framing: shot.framing, withinBudget: !overBudget,
         says: shot.says,
         fixture: shot.fixture

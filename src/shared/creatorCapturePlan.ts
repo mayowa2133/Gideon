@@ -396,11 +396,17 @@ export function verifyCapturePlan(plan: CapturePlan, inventory: ScreenInventory)
     verdict.captured = true;
     verdict.regionPx = { width: element.width, height: element.height };
 
-    // OCR of the user's own screens, treated as data throughout -- the same rule
-    // the brief states about evidence. A region whose text reads like a direction
-    // is not usable as proof no matter how legible it is.
-    const text = element.text.toLowerCase();
-    if (INJECTION_SHAPES.some((shape) => shape.test(element.text))) {
+    // The user's own screens, treated as data throughout -- the same rule the
+    // brief states about evidence. A region whose text reads like a direction is
+    // not usable as proof no matter how legible it is.
+    //
+    // Both readings are screened, because either one alone can hide an
+    // injection: OCR can mangle a direction into something the shapes miss, and
+    // a direction can be present in the DOM in text OCR never resolved. The
+    // union is the conservative choice for a check whose job is to refuse.
+    const readings = [element.text, element.sourceText ?? element.text];
+    const text = (element.sourceText ?? element.text).toLowerCase();
+    if (readings.some((reading) => INJECTION_SHAPES.some((shape) => shape.test(reading)))) {
       issues.push({ claimId: shot.claimId, reason: "evidence_instruction_shaped", detail: shot.regionId });
     }
     verdict.missingFixture = shot.fixture.filter(({ value }) => !text.includes(value.toLowerCase())).map(({ path }) => path);
@@ -408,7 +414,12 @@ export function verifyCapturePlan(plan: CapturePlan, inventory: ScreenInventory)
       issues.push({ claimId: shot.claimId, reason: "fixture_absent", detail: path });
     }
 
-    const claimTokens = candidateTokens(element.text).slice(0, 3);
+    // The product's words, matching what the brief will require of the same
+    // region. This was `element.text` -- OCR -- while the brief had moved to the
+    // DOM, so the verifier passed a claim on ["Qutiook", "Review"] that the
+    // brief then issued as ["Outlook", "Review"]: one fact, two producers,
+    // disagreeing. Three producers, in fact; this was the third.
+    const claimTokens = candidateTokens(element.sourceText ?? element.text).slice(0, 3);
     const resolved = resolveCrop(inventory, claimTokens, shot.framing.containerAspect, { assetId: shot.surfaceId });
     if (!isResolved(resolved)) { issues.push({ claimId: shot.claimId, reason: "crop_unresolved", detail: resolved.reason }); return verdict; }
     verdict.cropWidthPx = resolved.width;
@@ -440,7 +451,7 @@ export function claimsFromPlan(plan: CapturePlan, inventory: ScreenInventory, op
     const verdict = verdicts.get(shot.claimId);
     if (!verdict?.captured || !verdict.legible || verdict.missingFixture.length) continue;
     const element = inventory.screens.find(({ asset }) => asset === shot.surfaceId)?.elements.find(({ id }) => id === shot.regionId)!;
-    const tokens = candidateTokens(element.text).slice(0, tokensPerClaim);
+    const tokens = candidateTokens(element.sourceText ?? element.text).slice(0, tokensPerClaim);
     // A region that reads perfectly and offers two usable words cannot be found
     // again by the resolver, which matches on tokens. Better to say so than to
     // hand the brief a claim whose crop will not resolve.
@@ -451,7 +462,7 @@ export function claimsFromPlan(plan: CapturePlan, inventory: ScreenInventory, op
       elementId: shot.regionId,
       requiredReadableText: tokens,
       renderedTextPx: element.renderedTextPx ?? 0,
-      evidenceText: element.text,
+      evidenceText: element.sourceText ?? element.text,
       // The pattern travels with the claim rather than being re-derived by the
       // compiler. `verify` measured this region's type on the crop this
       // container produced; a compiler that picked its own container would be

@@ -119,7 +119,7 @@ export function selectClaims(
         issues.push({ assetId: screen.asset, elementId: element.id, reason: `legibility_${element.legibility ?? "unknown"}` });
         continue;
       }
-      if (candidateTokens(element.text).length < tokensPerClaim) {
+      if (candidateTokens(element.sourceText ?? element.text).length < tokensPerClaim) {
         issues.push({ assetId: screen.asset, elementId: element.id, reason: "too_few_distinct_words" });
         continue;
       }
@@ -147,9 +147,11 @@ export function selectClaims(
         id: `${assetId}-${element.id}`,
         assetId,
         elementId: element.id,
-        requiredReadableText: candidateTokens(element.text).slice(0, tokensPerClaim),
+        // From the DOM where the capture recorded it. A claim that requires
+        // OCR's reading of a word breaks when the next capture reads it better.
+        requiredReadableText: candidateTokens(element.sourceText ?? element.text).slice(0, tokensPerClaim),
         renderedTextPx: element.renderedTextPx ?? 0,
-        evidenceText: element.text
+        evidenceText: element.sourceText ?? element.text
       });
     }
   }
