@@ -394,6 +394,24 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           locator: { role: "text", name: "Stage this email as a draft in your inbox" },
           fields: [],
           sourceTextPx: 9
+        },
+        {
+          // The message itself.
+          //
+          // The film's central claim is that Solomon writes the outreach, and
+          // every shot of it framed the header -- who it is to, what channel,
+          // DRAFT NOT SENT -- and never a word of what it says. Claiming and
+          // demonstrating are different, and this is the region that
+          // demonstrates.
+          //
+          // Located by the company name rather than by any of the message's own
+          // wording, because the body is written by a model at capture time and
+          // the only thing reliably in it is what it was written about.
+          id: "draftBody",
+          purpose: "the message Solomon actually wrote, in full",
+          locator: { role: "text", name: "{opportunity.company}", container: "div.whitespace-pre-wrap" },
+          fields: ["opportunity.company"],
+          sourceTextPx: 14
         }
       ]
     },

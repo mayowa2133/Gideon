@@ -30,11 +30,25 @@ const PRODUCT_FOCUS_SCALE = 1.02;
 // tree is a pure function of its props. That is what lets every template be
 // exercised in a unit test instead of only inside a 25-minute render -- the same
 // reason the mascot rig takes its frame as a prop.
+// The screenshot taken once an interaction has settled. Motion bursts are
+// written from MOTION_TRIM_BASE so this one is never overwritten by them.
+const SETTLED_TRIM = 0;
+
 export const EvidenceCrop: React.FC<{ crop: SceneProductCrop; width: number; height: number; frame: number }> = ({ crop, width, height, frame: localFrame }) => {
-  // Clamps on the last frame rather than looping, so a long scene settles
-  // instead of replaying the same few seconds.
+  // The burst plays, then the shot lands on what the interaction produced.
+  //
+  // It used to clamp on the burst's last frame, which is the wrong picture for
+  // anything slower than the burst. The burst is twelve frames at 70ms -- under
+  // a second -- and Generate Draft takes several, so the film showed the
+  // composer filling in and then held on an empty draft panel. The message
+  // Solomon wrote was in the capture the whole time, in the screenshot taken
+  // after the interaction settled, and no shot ever reached it.
+  //
+  // Trim 0 is that screenshot by construction: motion frames start at
+  // MOTION_TRIM_BASE precisely so they cannot collide with the settled still.
+  const played = crop.motion ? Math.floor(Math.max(0, localFrame) / crop.motion.hold) : 0;
   const trim = crop.motion
-    ? crop.trim + Math.min(crop.motion.frames - 1, Math.floor(Math.max(0, localFrame) / crop.motion.hold)) * crop.motion.step
+    ? (played >= crop.motion.frames ? SETTLED_TRIM : crop.trim + played * crop.motion.step)
     : crop.trim;
   const scale = Math.max(width / crop.width, height / crop.height);
   const frame = {
