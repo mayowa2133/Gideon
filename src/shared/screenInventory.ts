@@ -72,6 +72,12 @@ export interface InventoryScreen {
    * the capture rather than about the product.
    */
   route?: string;
+  /**
+   * The screen this one turns into once the user acts, when the surface declared
+   * one. Which of two states came first cannot be inferred from a capture: both
+   * carry the same route, and the film may draw the after before the before.
+   */
+  becomes?: string;
   trim: number;
   width: number;
   height: number;

@@ -353,7 +353,15 @@ export function compileAngleBlueprint(input: {
     const claim = beat.claimId ? claimById.get(beat.claimId) : undefined;
     // The screen this beat is heading towards, if a proof is close enough that
     // showing it now reads as setting up rather than as wandering.
-    const establishing = claim ? undefined : script.slice(index + 1, index + 1 + ESTABLISH_LEAD)
+    // The hook is never an establishing shot.
+    //
+    // It became one by accident: a beat with no claim becomes establishing when
+    // the next beat has one, and at ten claims the beat after the hook always
+    // does -- so the film opened cold on a screenshot of the application. The
+    // hook is the one beat that is not about the product. It names the change in
+    // the viewer's terms and it is where a viewer decides whether to stay, so it
+    // is the presenter and nothing else.
+    const establishing = claim || index === 0 ? undefined : script.slice(index + 1, index + 1 + ESTABLISH_LEAD)
       .map((ahead) => (ahead.claimId ? claimById.get(ahead.claimId) : undefined)).find(Boolean);
     const shot = input.shots?.[beat.id] ?? defaultShot(slot, index === script.length - 1, Boolean(establishing), claim?.contentPattern);
     // The claim was budgeted, cropped and measured at one container aspect. If
@@ -551,50 +559,28 @@ export function compileAngleBlueprint(input: {
   // recap says something truer anyway -- four places in the product rather than
   // four fragments of one.
   type Crop = NonNullable<SceneComposition["productCrop"]>;
-  const perScreen = new Map<string, Crop>();
-  for (const scene of scenes) {
-    if (scene.contentPattern !== "product_screen" || !scene.productCrop) continue;
-    if (!perScreen.has(scene.productCrop.assetId)) perScreen.set(scene.productCrop.assetId, scene.productCrop);
-  }
-  const proved = [...perScreen.values()].slice(0, FILMSTRIP_CARDS);
-  // The last beat before the CTA that carries no claim.
+  // A spare beat is one carrying no claim -- which at ten claims means an
+  // establishing shot, not an empty one. The recap used to demand a beat drawing
+  // nothing and silently vanished the moment claim count rose.
+  // The three composed shots pick their beats in one pass.
   //
-  // It used to also require the beat to be drawing nothing, which was right when
-  // most non-claim beats were ambient and wrong the moment claim count rose: at
-  // ten claims every remaining beat is an establishing shot, no beat is empty,
-  // and the film silently lost its recap. A recap is a product shot, so taking
-  // one establishing beat of seven costs the film nothing it cannot spare.
-  let recapIndex = -1;
-  for (let index = scenes.length - 2; index > 0; index -= 1) {
-    if (!scenes[index]!.supportedClaimIds.length) { recapIndex = index; break; }
-  }
-  if (proved.length >= FILMSTRIP_MINIMUM && recapIndex > 0) {
-    const template = reference.scenes.find((scene) => scene.contentPattern === "filmstrip");
-    // Each card says which screen it is, in the product's own words.
-    //
-    // The reference labels its four cards and the labels carry the meaning,
-    // because a card at this size is a token rather than something anybody
-    // reads. This film had no source of short screen names it could use without
-    // inventing copy -- `tracker_after` is the capture's vocabulary, not the
-    // application's -- so its strip said nothing. The route is the name the
-    // product already uses, and a viewer could type it.
-    //
-    // A card whose screen has no route carries no label rather than a made-up
-    // one, and the template skips those.
-    const routeOf = new Map(inventory.screens.map((screen) => [screen.asset, screen.route]));
-    const labels = proved.map(({ assetId }) => routeOf.get(assetId) ?? "");
-    scenes[recapIndex] = {
-      ...scenes[recapIndex]!,
-      shotType: "split_presenter_product",
-      contentPattern: "filmstrip",
-      layoutRects: template?.layoutRects ?? scenes[recapIndex]!.layoutRects,
-      contentOptions: { ...scenes[recapIndex]!.contentOptions, ...(labels.some(Boolean) ? { labels } : {}) },
-      productAssetIds: [...new Set(proved.map(({ assetId }) => assetId))],
-      productCrop: proved[0],
-      productCrops: proved
-    };
-  }
-
+  // They used to search independently and apply as they went, and the recap --
+  // which runs first and collects the page shots the film establishes -- kept a
+  // screen that a later shot then took the beat of. The strip recapped a page
+  // the film no longer showed. Allocate first, then apply, so every shot is
+  // choosing against the same scene list.
+  //
+  // A beat drawing filmed motion is spent last: Solomon only moves when it is
+  // used, so a moving shot is scarcer than any of these still compositions.
+  const spareBeats = scenes
+    .map((scene, index) => ({ scene, index }))
+    .filter(({ scene, index }) => index > 0 && index < scenes.length - 1 && !scene.supportedClaimIds.length)
+    .filter(({ scene }) => !scene.productCrop?.motion)
+    .map(({ index }) => index);
+  // Swap and grid land mid-argument, in that order; the recap closes.
+  const swapIndex = spareBeats[0] ?? -1;
+  const fieldIndex = spareBeats.find((index) => index !== swapIndex) ?? -1;
+  const recapIndex = [...spareBeats].reverse().find((index) => index !== swapIndex && index !== fieldIndex) ?? -1;
   // The film's proofs, all at once.
   //
   // `card_field` was implemented and nothing ever selected it, so eighteen beats
@@ -621,25 +607,6 @@ export function compileAngleBlueprint(input: {
   // recap's. Tried to write the test that fails without it: a film packed to a
   // single spare beat has no page shots either, so it has no recap to eat. The
   // guard is one comparison against a future where the recap's terms change.
-  let fieldIndex = -1;
-  for (let index = 1; index < scenes.length - 1; index += 1) {
-    // Never a beat that is drawing filmed motion.
-    //
-    // The grid is four still cards. A shot where the product actually moves is
-    // the scarcer thing -- Solomon only moves when it is used, and this film has
-    // four such shots against fourteen photographs. Measured on the real film:
-    // the grid landed on `beat-1`, which was drawing the tracker opening its
-    // detail panel, and the count went from four moving shots to three.
-    //
-    // Not covered by a test. Exercising it needs the FIRST spare beat to be an
-    // establishing shot of a screen that was filmed, and in the fixture used
-    // here the first spare beat is ambient and draws nothing -- so an assertion
-    // written against it passes with the guard removed. Said plainly rather than
-    // left as a test that proves nothing.
-    if (index === recapIndex || scenes[index]!.supportedClaimIds.length) continue;
-    if (scenes[index]!.productCrop?.motion) continue;
-    fieldIndex = index; break;
-  }
   if (earned.length >= CARD_FIELD_MINIMUM && fieldIndex > 0) {
     // The reference's OWN grid, not just its first card_field.
     //
@@ -665,6 +632,94 @@ export function compileAngleBlueprint(input: {
       productAssetIds: [...new Set(earned.map(({ assetId }) => assetId))],
       productCrop: earned[0],
       productCrops: earned
+    };
+  }
+
+  // The composer before and after, as one shot.
+  //
+  // `state_swap` was the last implemented pattern nothing selected. The film
+  // could say Solomon writes the message and could show the written message;
+  // what it could not show was the change -- and cause and effect is the whole
+  // point of the pattern, which is why the reference spends a beat on it.
+  //
+  // The pair comes from `becomes`, declared on the surface, because nothing a
+  // capture records can infer it: both states carry the same route, and this
+  // film draws the after on beat 2 and the before on beat 13.
+  //
+  // No pills and no cursor. The reference names its two states either side of
+  // an arrow -- APPLIED, INTERVIEWING -- and that text is the reference's, not
+  // this product's. The crops already say what they are.
+  const states = new Map<string, Crop>();
+  for (const scene of scenes) {
+    if (!scene.supportedClaimIds.length || !scene.productCrop) continue;
+    if (!states.has(scene.productCrop.assetId)) states.set(scene.productCrop.assetId, scene.productCrop);
+  }
+  const becomesOf = new Map(inventory.screens.map((screen) => [screen.asset, screen.becomes]));
+  const pair = [...states.entries()]
+    .map(([assetId, crop]) => {
+      const after = becomesOf.get(assetId);
+      const next = after ? states.get(after) : undefined;
+      return next ? ([crop, next] as const) : undefined;
+    })
+    .find(Boolean);
+  if (pair && swapIndex > 0) {
+    const template = reference.scenes.find((scene) => scene.contentPattern === "state_swap");
+    scenes[swapIndex] = {
+      ...scenes[swapIndex]!,
+      shotType: "split_presenter_product",
+      contentPattern: "state_swap",
+      layoutRects: template?.layoutRects ?? scenes[swapIndex]!.layoutRects,
+      contentOptions: { ...scenes[swapIndex]!.contentOptions, arrangement: "row", swapAt: 0.45 },
+      productAssetIds: pair.map(({ assetId }) => assetId),
+      productCrop: pair[0],
+      productCrops: [...pair]
+    };
+  }
+
+  // The recap goes last, so it recaps the film as it finally stands.
+  //
+  // It draws the page shots the film establishes, and the swap and the grid each
+  // take an establishing beat -- so collecting before they ran left the strip
+  // holding a card for a screen the film no longer showed.
+  const perScreen = new Map<string, Crop>();
+  for (const [index, scene] of scenes.entries()) {
+    // Not the beat the recap is about to take. That beat is an establishing shot
+    // right up until this replaces it, and a strip that recaps the screen whose
+    // place it took is recapping something the finished film never shows.
+    //
+    // Measured on the real film: every recap card was a screen the film still
+    // established after this, and one was not before it. Not covered by a test
+    // -- in the fixture used here the recap's beat is not an establishing shot,
+    // so an assertion written against it passes with this line removed.
+    if (index === recapIndex) continue;
+    if (scene.contentPattern !== "product_screen" || !scene.productCrop) continue;
+    if (!perScreen.has(scene.productCrop.assetId)) perScreen.set(scene.productCrop.assetId, scene.productCrop);
+  }
+  const proved = [...perScreen.values()].slice(0, FILMSTRIP_CARDS);
+  if (proved.length >= FILMSTRIP_MINIMUM && recapIndex > 0) {
+    const template = reference.scenes.find((scene) => scene.contentPattern === "filmstrip");
+    // Each card says which screen it is, in the product's own words.
+    //
+    // The reference labels its four cards and the labels carry the meaning,
+    // because a card at this size is a token rather than something anybody
+    // reads. This film had no source of short screen names it could use without
+    // inventing copy -- `tracker_after` is the capture's vocabulary, not the
+    // application's -- so its strip said nothing. The route is the name the
+    // product already uses, and a viewer could type it.
+    //
+    // A card whose screen has no route carries no label rather than a made-up
+    // one, and the template skips those.
+    const routeOf = new Map(inventory.screens.map((screen) => [screen.asset, screen.route]));
+    const labels = proved.map(({ assetId }) => routeOf.get(assetId) ?? "");
+    scenes[recapIndex] = {
+      ...scenes[recapIndex]!,
+      shotType: "split_presenter_product",
+      contentPattern: "filmstrip",
+      layoutRects: template?.layoutRects ?? scenes[recapIndex]!.layoutRects,
+      contentOptions: { ...scenes[recapIndex]!.contentOptions, ...(labels.some(Boolean) ? { labels } : {}) },
+      productAssetIds: [...new Set(proved.map(({ assetId }) => assetId))],
+      productCrop: proved[0],
+      productCrops: proved
     };
   }
 
