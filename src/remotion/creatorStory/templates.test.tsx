@@ -4,7 +4,7 @@ import path from "node:path";
 import { buildFilmScenes } from "../../shared/creatorStoryFilm";
 import type { CreativeBlueprint } from "../../shared/types";
 import { WIDE_STRIP_LAYOUT } from "../../shared/angleBlueprint";
-import { AmbientTemplate, CardFieldTemplate, ComposedBoardTemplate, CommentCardTemplate, EvidenceBandTemplate, FilmstripTemplate, StateSwapTemplate, WideStripTemplate } from "./templates";
+import { CardFieldTemplate, TEMPLATES, WideStripTemplate } from "./templates";
 
 // Every template exercised against the scenes it will actually draw, from the
 // parity blueprint rather than from invented fixtures. This is the check that a
@@ -40,11 +40,15 @@ const blueprint = JSON.parse(
   readFileSync(path.join(__dirname, "..", "..", "..", "fixtures", "creator-story", "solomon-v22.blueprint.json"), "utf8")
 ) as CreativeBlueprint;
 const film = buildFilmScenes(blueprint);
-const TEMPLATES = {
-  ambient: AmbientTemplate, evidence_band: EvidenceBandTemplate, state_swap: StateSwapTemplate,
-  card_field: CardFieldTemplate, filmstrip: FilmstripTemplate, composed_board: ComposedBoardTemplate,
-  comment_card: CommentCardTemplate
-} as const;
+// TEMPLATES is imported above rather than redeclared here.
+//
+// This file used to declare its own copy listing every pattern, which is the
+// same fact written twice with nothing comparing them -- and it drifted the
+// moment `wide_strip` and `product_screen` were added to the real one. The
+// broken typecheck was the visible half. The invisible half is worse: the case
+// below asserting that every scene in the film has a template was asserting it
+// about the copy, so the one check that would catch a pattern with no template
+// could not see the map the renderer actually uses.
 
 // Remotion's useCurrentFrame needs a composition context; the templates take the
 // frame as a prop precisely so they can be driven without one.
