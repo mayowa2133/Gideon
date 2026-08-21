@@ -723,6 +723,24 @@ export function compileAngleBlueprint(input: {
     };
   }
 
+  // The CTA says the handle it was given, or draws none.
+  //
+  // `CommentCardTemplate` falls back to "@" plus the product name when no label
+  // is supplied, which put `@SOLOMON` on the last frame of a film made to be
+  // posted -- a handle nobody had supplied, presented as the brand's. The
+  // keyword typed into the comment box is the product's name, which the film
+  // does know; the handle is not derivable from it and is only drawn when the
+  // brief carries one.
+  if (brief.handle) {
+    const cta = scenes.at(-1);
+    if (cta?.contentPattern === "comment_card") {
+      scenes[scenes.length - 1] = {
+        ...cta,
+        contentOptions: { ...cta.contentOptions, labels: [brief.product.toUpperCase(), brief.handle] }
+      };
+    }
+  }
+
   return {
     blueprint: {
       ...reference,
