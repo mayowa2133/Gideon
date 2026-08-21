@@ -63,7 +63,7 @@ function briefCommand() {
     ? { claims: planned.claims, issues: planned.issues, usableRegions: planned.claims.length }
     : selectClaims(inventory);
   const brief = buildAngleBrief({
-    topic, product: flag("product", "Solomon"), claims, filmFrames,
+    topic, product: flag("product", "Solomon"), handle: flag("handle"), claims, filmFrames,
     speechRateBand: SPEECH_RATE_BAND,
     beats: planBeats({ beatCount, claimIds: claims.map(({ id }) => id) })
   });

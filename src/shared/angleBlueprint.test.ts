@@ -313,7 +313,7 @@ describe("angle blueprint", () => {
       renderedTextPx: 36, evidenceText: elements[0]!.text
     }));
     const paced = buildAngleBrief({
-      topic: "recap", product: "Solomon", claims: shelfClaims, filmFrames: FILM_FRAMES, speechRateBand: SPEECH_RATE_BAND,
+      topic: "recap", product: "Solomon", handle: "@solomonhq", claims: shelfClaims, filmFrames: FILM_FRAMES, speechRateBand: SPEECH_RATE_BAND,
       beats: planBeats({ beatCount: 18, claimIds: shelfClaims.map(({ id }) => id) })
     });
     const written = paced.beats.map((slot) => ({
@@ -377,6 +377,16 @@ describe("angle blueprint", () => {
     // result and never the cause. The pair cannot be inferred from a capture --
     // both states share a route, and a film may draw the after first -- so it
     // comes from `becomes`, declared where the surfaces are.
+    // The CTA says the handle it was given, and nothing when it was given none.
+    //
+    // The template falls back to "@" plus the product name, which put @SOLOMON
+    // on the last frame of a film made to be posted -- a handle nobody supplied,
+    // presented as the brand's.
+    const cta = film.scenes.at(-1)!;
+    expect(cta.contentPattern).toBe("comment_card");
+    expect(cta.contentOptions.labels?.[1], "the CTA draws the handle it was given").toBe("@solomonhq");
+    expect(cta.contentOptions.labels?.[0], "and types the product's name").toBe("SOLOMON");
+
     const swap = film.scenes.find((scene) => scene.contentPattern === "state_swap");
     expect(swap, "a declared pair of states should be shown changing").toBeDefined();
     expect(swap!.supportedClaimIds, "the swap re-proves nothing").toEqual([]);
