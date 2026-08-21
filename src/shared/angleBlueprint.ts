@@ -353,7 +353,15 @@ export function compileAngleBlueprint(input: {
     const claim = beat.claimId ? claimById.get(beat.claimId) : undefined;
     // The screen this beat is heading towards, if a proof is close enough that
     // showing it now reads as setting up rather than as wandering.
-    const establishing = claim ? undefined : script.slice(index + 1, index + 1 + ESTABLISH_LEAD)
+    // The hook is never an establishing shot.
+    //
+    // It became one by accident: a beat with no claim becomes establishing when
+    // the next beat has one, and at ten claims the beat after the hook always
+    // does -- so the film opened cold on a screenshot of the application. The
+    // hook is the one beat that is not about the product. It names the change in
+    // the viewer's terms and it is where a viewer decides whether to stay, so it
+    // is the presenter and nothing else.
+    const establishing = claim || index === 0 ? undefined : script.slice(index + 1, index + 1 + ESTABLISH_LEAD)
       .map((ahead) => (ahead.claimId ? claimById.get(ahead.claimId) : undefined)).find(Boolean);
     const shot = input.shots?.[beat.id] ?? defaultShot(slot, index === script.length - 1, Boolean(establishing), claim?.contentPattern);
     // The claim was budgeted, cropped and measured at one container aspect. If

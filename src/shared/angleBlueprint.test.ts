@@ -454,6 +454,15 @@ describe("angle blueprint", () => {
       .map(({ id }) => id);
     expect(spare, "premise: a dense film has no empty middle beat left").toEqual([]);
     expect(film.scenes.find((scene) => scene.contentPattern === "filmstrip"), "a dense film still recaps").toBeDefined();
+
+    // And it still opens on the presenter alone.
+    //
+    // A beat with no claim becomes establishing when the next beat has one, and
+    // at this claim count the beat after the hook does -- so the film opened
+    // cold on a screenshot of the application, which is not where a viewer
+    // decides whether to stay.
+    expect(film.scenes[0]!.contentPattern, "the hook is the presenter, not a screen").toBe("ambient");
+    expect(film.scenes[0]!.productCrop, "and it draws no product").toBeUndefined();
   });
 
   // The gap that made every other gate here meaningless: the compiler wrote one
