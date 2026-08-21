@@ -305,15 +305,22 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           // compiler seeing pixels rather than word boxes -- which is a larger
           // change than this shot is worth.
           id: "pathStepStage",
-          purpose: "the last step of the path, named by the product",
-          locator: { role: "text", name: "Stage the draft" },
+          purpose: "the last step of the path, named by the product, with what it promises",
+          locator: { role: "text", name: "Stage the draft", container: "a.rounded-lg" },
           fields: [],
           sourceTextPx: 10
         },
         {
+          // The step card, like the stage step beside it.
+          //
+          // A step's title is a 269x20 line -- 13.4 wide -- and no container is
+          // that wide, so the crop grows vertically and every one of these
+          // resolved to the same thin strip. Four claims on this panel drew four
+          // near-identical shots. The card is 295x110, and it carries the step's
+          // detail line as well, so one shot says both halves of the step.
           id: "pathStepContact",
-          purpose: "the step that replaces applying with knowing someone",
-          locator: { role: "text", name: "Find a trusted contact" },
+          purpose: "the step that replaces applying with knowing someone, and what it means",
+          locator: { role: "text", name: "Find a trusted contact", container: "a.rounded-lg" },
           fields: [],
           sourceTextPx: 10
         },

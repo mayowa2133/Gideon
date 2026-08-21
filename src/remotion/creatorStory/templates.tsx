@@ -386,7 +386,7 @@ export const CommentCardTemplate: React.FC<TemplateProps> = ({ scene, frame }) =
   </AbsoluteFill>;
 };
 
-const TEMPLATES = {
+export const TEMPLATES = {
   ambient: AmbientTemplate,
   evidence_band: EvidenceBandTemplate,
   wide_strip: WideStripTemplate,
