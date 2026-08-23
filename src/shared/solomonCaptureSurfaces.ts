@@ -144,6 +144,70 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       ]
     },
     {
+      // What the product thinks each opening is worth your effort.
+      //
+      // The counters are buttons, which is why they are claimable: a button is
+      // sized to its content, and a block element spans its container however
+      // short its text. That is the difference between a region that can carry a
+      // claim and one that cannot -- not the words, the box.
+      id: "triage",
+      route: "/triage",
+      purpose: "openings ranked by where effort actually pays off",
+      reach: [
+        "Open /triage and wait for the ROI counters.",
+        "No interaction: the ranked queue renders with the route."
+      ],
+      regions: [
+        {
+          id: "triageLowRoi",
+          purpose: "how many openings the product rates as low return",
+          locator: { role: "button", name: "Low ROI" },
+          fields: [],
+          sourceTextPx: 16
+        },
+        {
+          id: "triageMediumRoi",
+          purpose: "how few are worth the effort, beside how many are not",
+          locator: { role: "button", name: "Medium ROI" },
+          fields: [],
+          sourceTextPx: 16
+        },
+        {
+          id: "triageJobScore",
+          purpose: "the score on the opening the angle is about",
+          locator: { role: "text", name: "48", container: "div.flex-col" },
+          fields: [],
+          sourceTextPx: 16
+        }
+      ]
+    },
+    {
+      // A saved contact, as a row rather than a page.
+      id: "people_saved",
+      route: "/people",
+      purpose: "the people already found, with what the product thinks of each",
+      reach: [
+        "Open /people and wait for the Saved Contacts panel.",
+        "No interaction: saved contacts render with the route."
+      ],
+      regions: [
+        {
+          id: "savedContact",
+          purpose: "one saved person: who they are and what they do",
+          locator: { role: "text", name: "{contact.name}", container: "div.flex-col" },
+          fields: ["contact.name"],
+          sourceTextPx: 14
+        },
+        {
+          id: "savedMatchQuality",
+          purpose: "the product's own grading of how useful this person is",
+          locator: { role: "text", name: "Direct Match", container: "div.items-center" },
+          fields: [],
+          sourceTextPx: 14
+        }
+      ]
+    },
+    {
       // Where the pipeline comes from, before any one opening is opened.
       id: "job_discovery",
       route: "/jobs",
