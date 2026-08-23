@@ -14,3 +14,6 @@ output/playwright/
 !.env.example
 coverage/
 tmp/
+
+# Rendered films. Generated artifacts and customer media never enter the repo.
+renders/

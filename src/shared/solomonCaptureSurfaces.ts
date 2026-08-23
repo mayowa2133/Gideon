@@ -144,6 +144,67 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       ]
     },
     {
+      // Where the pipeline comes from, before any one opening is opened.
+      id: "job_discovery",
+      route: "/jobs",
+      purpose: "that the jobs arrive from somewhere rather than being typed in",
+      reach: [
+        "Open /jobs and wait for the Jobs heading.",
+        "No interaction: the feed and both search panels render with the route."
+      ],
+      regions: [
+        {
+          id: "discoveryPurpose",
+          purpose: "what this page is for, in the product's words",
+          locator: { role: "text", name: "Discover opportunities across multiple sources" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        {
+          id: "discoverySources",
+          // The sources named. A claim that jobs "come from everywhere" proves
+          // nothing; a claim that names the boards is checkable by a viewer.
+          purpose: "the boards the product actually searches, named",
+          locator: { role: "text", name: "Search across JSearch" },
+          fields: [],
+          sourceTextPx: 11
+        },
+        {
+          id: "discoveryCareerPage",
+          purpose: "that a company's own careers page is a source too",
+          locator: { role: "text", name: "Search Company Career Page" },
+          fields: [],
+          sourceTextPx: 13
+        }
+      ]
+    },
+    {
+      // The queue that tells you who is owed a reply, and when.
+      id: "outreach_cadence",
+      route: "/outreach",
+      purpose: "the follow-ups the user would otherwise forget",
+      reach: [
+        "Open /outreach and wait for the Needs attention panel.",
+        "No interaction: the queue renders with the route."
+      ],
+      regions: [
+        {
+          id: "cadenceAttention",
+          purpose: "that the product keeps a list of what is owed a nudge",
+          locator: { role: "text", name: "Needs attention" },
+          fields: [],
+          sourceTextPx: 11
+        },
+        {
+          id: "cadenceStale",
+          purpose: "the product's own sentence about a draft going stale",
+          locator: { role: "text", name: "send or edit before it goes stale" },
+          fields: [],
+          sourceTextPx: 10
+        }
+      ]
+    },
+    {
       id: "opportunity",
       route: "/jobs",
       purpose: "one opportunity opened, with the role and the company stated",
