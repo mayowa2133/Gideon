@@ -144,6 +144,131 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       ]
     },
     {
+      // What the product thinks each opening is worth your effort.
+      //
+      // The counters are buttons, which is why they are claimable: a button is
+      // sized to its content, and a block element spans its container however
+      // short its text. That is the difference between a region that can carry a
+      // claim and one that cannot -- not the words, the box.
+      id: "triage",
+      route: "/triage",
+      purpose: "openings ranked by where effort actually pays off",
+      reach: [
+        "Open /triage and wait for the ROI counters.",
+        "No interaction: the ranked queue renders with the route."
+      ],
+      regions: [
+        {
+          id: "triageLowRoi",
+          purpose: "how many openings the product rates as low return",
+          locator: { role: "button", name: "Low ROI" },
+          fields: [],
+          sourceTextPx: 16
+        },
+        {
+          id: "triageMediumRoi",
+          purpose: "how few are worth the effort, beside how many are not",
+          locator: { role: "button", name: "Medium ROI" },
+          fields: [],
+          sourceTextPx: 16
+        },
+        {
+          id: "triageJobScore",
+          purpose: "the score on the opening the angle is about",
+          locator: { role: "text", name: "48", container: "div.flex-col" },
+          fields: [],
+          sourceTextPx: 16
+        }
+      ]
+    },
+    {
+      // A saved contact, as a row rather than a page.
+      id: "people_saved",
+      route: "/people",
+      purpose: "the people already found, with what the product thinks of each",
+      reach: [
+        "Open /people and wait for the Saved Contacts panel.",
+        "No interaction: saved contacts render with the route."
+      ],
+      regions: [
+        {
+          id: "savedContact",
+          purpose: "one saved person: who they are and what they do",
+          locator: { role: "text", name: "{contact.name}", container: "div.flex-col" },
+          fields: ["contact.name"],
+          sourceTextPx: 14
+        },
+        {
+          id: "savedMatchQuality",
+          purpose: "the product's own grading of how useful this person is",
+          locator: { role: "text", name: "Direct Match", container: "div.items-center" },
+          fields: [],
+          sourceTextPx: 14
+        }
+      ]
+    },
+    {
+      // Where the pipeline comes from, before any one opening is opened.
+      id: "job_discovery",
+      route: "/jobs",
+      purpose: "that the jobs arrive from somewhere rather than being typed in",
+      reach: [
+        "Open /jobs and wait for the Jobs heading.",
+        "No interaction: the feed and both search panels render with the route."
+      ],
+      regions: [
+        {
+          id: "discoveryPurpose",
+          purpose: "what this page is for, in the product's words",
+          locator: { role: "text", name: "Discover opportunities across multiple sources" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        {
+          id: "discoverySources",
+          // The sources named. A claim that jobs "come from everywhere" proves
+          // nothing; a claim that names the boards is checkable by a viewer.
+          purpose: "the boards the product actually searches, named",
+          locator: { role: "text", name: "Search across JSearch" },
+          fields: [],
+          sourceTextPx: 11
+        },
+        {
+          id: "discoveryCareerPage",
+          purpose: "that a company's own careers page is a source too",
+          locator: { role: "text", name: "Search Company Career Page" },
+          fields: [],
+          sourceTextPx: 13
+        }
+      ]
+    },
+    {
+      // The queue that tells you who is owed a reply, and when.
+      id: "outreach_cadence",
+      route: "/outreach",
+      purpose: "the follow-ups the user would otherwise forget",
+      reach: [
+        "Open /outreach and wait for the Needs attention panel.",
+        "No interaction: the queue renders with the route."
+      ],
+      regions: [
+        {
+          id: "cadenceAttention",
+          purpose: "that the product keeps a list of what is owed a nudge",
+          locator: { role: "text", name: "Needs attention" },
+          fields: [],
+          sourceTextPx: 11
+        },
+        {
+          id: "cadenceStale",
+          purpose: "the product's own sentence about a draft going stale",
+          locator: { role: "text", name: "send or edit before it goes stale" },
+          fields: [],
+          sourceTextPx: 10
+        }
+      ]
+    },
+    {
       id: "opportunity",
       route: "/jobs",
       purpose: "one opportunity opened, with the role and the company stated",
