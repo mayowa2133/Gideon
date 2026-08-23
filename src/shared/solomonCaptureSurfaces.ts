@@ -144,6 +144,32 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       ]
     },
     {
+      // What the product will and will not do on your behalf.
+      id: "settings_control",
+      route: "/settings",
+      purpose: "the choices the product hands back to the user",
+      reach: [
+        "Open /settings and wait for the Resume AI Assist panel.",
+        "No interaction: both panels render with the route."
+      ],
+      regions: [
+        {
+          id: "controlInferred",
+          purpose: "that the user decides how far the AI may go on their resume",
+          locator: { role: "text", name: "Control how aggressively" },
+          fields: [],
+          sourceTextPx: 14
+        },
+        {
+          id: "controlData",
+          purpose: "that the account and its data can be exported or deleted outright",
+          locator: { role: "text", name: "Export your data or permanently delete" },
+          fields: [],
+          sourceTextPx: 14
+        }
+      ]
+    },
+    {
       // What the product thinks each opening is worth your effort.
       //
       // The counters are buttons, which is why they are claimable: a button is
