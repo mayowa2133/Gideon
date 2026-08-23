@@ -19,6 +19,7 @@
 // established before the render rather than checked after it.
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -102,7 +103,21 @@ async function inventoryFromCapture(runFile) {
     const still = path.join(root, shot.still);
     if (!pageWords.has(shot.assetId)) pageWords.set(shot.assetId, await ocrWords(still));
     const words = pageWords.get(shot.assetId);
-    const content = textFor(words, shot.region);
+    // An approved region is read from its own crop, upscaled, not out of the
+    // full-page pass.
+    //
+    // Same pixels, better evidence. A 12px "Medium ROI" badge on its own tint
+    // comes back "(Medium Rot }" from the page pass -- mangled enough that the
+    // confidence filter drops the words -- and "1 Medium ROI" from a 3x crop.
+    // The consequence was not cosmetic: a claim requires its tokens to appear in
+    // both the DOM text and the OCR text, so a word the page pass fumbled was
+    // treated as a word that is not on screen, and legible product UI could not
+    // be claimed.
+    //
+    // Falls back to the page pass when the crop reads nothing, so a region that
+    // genuinely has no legible text still grades as it always did.
+    const cropped = await ocrRegion(still, shot.region);
+    const content = cropped.words.length ? cropped : textFor(words, shot.region);
     const element = {
       id: shot.regionId, provenance: "approved", trim: 0,
       ...withLegibility(rectFields(shot.region), content.words), ...content,
@@ -324,6 +339,39 @@ function clusterWords(words) {
 // have: 71 words against 6's 56 on the same still, with both lost regions back.
 // The sparse modes (11, 12) find a few more and are meant for text with no
 // layout at all, which is the opposite of this.
+// OCR one region, from a crop of it enlarged threefold.
+//
+// Tesseract is markedly better on large type, and the cheapest way to give it
+// large type is to enlarge the crop. Word boxes come back in crop coordinates
+// and are mapped home, so everything downstream still measures against the page.
+async function ocrRegion(file, rect) {
+  const scale = 3;
+  const crop = path.join(os.tmpdir(), `region-${process.pid}-${rect.x}-${rect.y}.png`);
+  try {
+    await run("ffmpeg", ["-v", "error", "-i", file,
+      "-vf", `crop=${rect.width}:${rect.height}:${rect.x}:${rect.y},scale=iw*${scale}:ih*${scale}:flags=lanczos`,
+      "-y", crop]);
+    // psm 6: the crop is one block by construction, which is the assumption psm 6
+    // makes and psm 3 does not.
+    const { stdout } = await run("tesseract", [crop, "stdout", "--psm", "6", "tsv"]);
+    const words = stdout.split("\n").slice(1).map((line) => line.split("\t"))
+      .filter((cells) => cells.length >= 12 && Number(cells[10]) > 60 && cells[11]?.trim())
+      .map((cells) => ({
+        text: cells[11].trim(),
+        x: rect.x + Number(cells[6]) / scale,
+        y: rect.y + Number(cells[7]) / scale,
+        width: Number(cells[8]) / scale,
+        height: Number(cells[9]) / scale
+      }))
+      .map((word) => ({ ...word, x: Math.round(word.x), y: Math.round(word.y), width: Math.round(word.width), height: Math.round(word.height) }));
+    return { text: words.map(({ text }) => text).join(" "), words };
+  } catch {
+    return { text: "", words: [] };
+  } finally {
+    await fs.rm(crop, { force: true }).catch(() => {});
+  }
+}
+
 async function ocrWords(file) {
   const { stdout } = await run("tesseract", [file, "stdout", "--psm", "3", "tsv"]);
   return stdout.split("\n").slice(1).map((line) => line.split("\t")).filter((cells) => cells.length >= 12 && Number(cells[11 - 1]) > 60 && cells[11]?.trim())
