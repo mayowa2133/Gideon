@@ -21,6 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { locate, perform } from "./lib/playwright-locate.mjs";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = (name) => path.join(ROOT, "dist", "main", "shared", name);
@@ -72,13 +73,7 @@ await page.goto(`${baseUrl}${surface.route}`, { waitUntil: "networkidle" });
 await page.waitForTimeout(6000);
 
 for (const action of surface.motion?.actions ?? []) {
-  const pattern = new RegExp(action.locator.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-  const target = action.locator.role === "combobox"
-    ? page.getByLabel(pattern).first()
-    : page.getByRole(action.locator.role, { name: pattern }).first();
-  await target.scrollIntoViewIfNeeded();
-  if (action.kind === "select") await target.selectOption({ label: action.text });
-  else await target.click();
+  await perform(page, action);
   await page.waitForTimeout(4000);
 }
 await page.waitForTimeout(6000);
