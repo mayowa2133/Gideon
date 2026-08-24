@@ -52,24 +52,41 @@ Read the relevant docs before changing architecture, API behavior, database mode
 - Keep expensive operations asynchronous and idempotent.
 - Avoid committing large generated binaries unless the repository explicitly introduces fixture storage rules.
 
-## Expected stack
+## Actual stack
 
-The planning docs recommend:
+Read from package.json, not from the planning docs. The two had drifted, and this
+file is the first thing an agent reads -- Codex loads AGENTS.md unprompted, so a
+wrong answer here is a wrong answer everywhere. Asked what this repo uses, it
+replied "Next.js App Router, pnpm, Prisma": three answers, all from the old text
+below, none of them true.
 
-- Next.js App Router and TypeScript for the web app.
-- PostgreSQL and Prisma for primary data.
-- Redis and BullMQ or equivalent for queues.
-- S3-compatible object storage for media artifacts.
-- FFmpeg for media probing, extraction, and post-processing.
-- faster-whisper or provider-backed transcription behind an adapter.
-- Provider-neutral LLM and TTS adapters.
-- Remotion for deterministic short-form video rendering, subject to license review before commercial scale.
+- **Electron** desktop app (`main: dist/main/main/main.js`), not a Next.js web app.
+- **React 19 + Vite** for the renderer.
+- **Remotion 4** for deterministic short-form video rendering.
+- **PostgreSQL via `pg`**. There is no Prisma and no ORM -- queries are written
+  against the driver.
+- **BullMQ** for queues.
+- **Vitest** for tests.
+- **FFmpeg** for probing, extraction and post-processing; **tesseract** for OCR of
+  captured screens.
 
-If implementation chooses a different stack, update the relevant docs in the same change.
+The planning docs under docs/ still describe the originally intended stack in
+places. Where a doc and package.json disagree, package.json is what runs.
+
+## Running commands
+
+The lockfile is `pnpm-lock.yaml`, but **pnpm is not necessarily installed** -- it
+is not on the machine this was last verified on. `npm run <script>` works for
+every script listed below. Substitute accordingly rather than assuming `pnpm`
+exists.
+
+`pnpm typecheck` does not currently pass: there are pre-existing errors under
+`tsconfig.renderer.json`. Typecheck the projects you touched individually
+(`tsc --noEmit -p tsconfig.main.json`, `-p tsconfig.remotion.json`).
 
 ## Repository commands
 
-The exact commands should be verified in package.json once code exists. The intended command contract is:
+Verified against package.json: 79 of the 80 below exist as scripts (`db:seed` does not).
 
 - pnpm install
 - pnpm lint
