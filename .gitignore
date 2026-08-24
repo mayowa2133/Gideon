@@ -17,3 +17,8 @@ tmp/
 
 # Rendered films. Generated artifacts and customer media never enter the repo.
 renders/
+
+# Daily-run logs: the directory must exist because launchd opens its log files
+# before the job runs, but the logs themselves are local noise.
+logs/*
+!logs/.gitkeep
