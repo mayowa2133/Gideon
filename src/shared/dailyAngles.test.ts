@@ -32,7 +32,7 @@ describe("daily angle templates", () => {
   for (const [id, angle] of angles) {
     describe(id, () => {
       it("lands inside the film's word budget on a typical feed", () => {
-        const { script } = angle.plan(feed());
+        const { script } = angle.plan(feed(), new Set());
         const { min, max } = budgetFor(angle.seconds);
         const total = wordsIn(script);
         expect(total, `${id}: ${total} words against ${min}-${max}`).toBeGreaterThanOrEqual(min);
@@ -53,7 +53,7 @@ describe("daily angle templates", () => {
             company: "General Motors Financial Services",
             location: "Toronto, ON, Canada"
           }]
-        }));
+        }), new Set());
         const { min, max } = budgetFor(angle.seconds);
         const total = wordsIn(script);
         expect(total, `${id}: ${total} words against ${min}-${max}`).toBeGreaterThanOrEqual(min);
@@ -63,7 +63,7 @@ describe("daily angle templates", () => {
       it("names its claim in the beat that carries it", () => {
         // `beat_does_not_mention_claim` is a compile gate; catching it here means
         // finding out when the template is edited rather than mid-run.
-        const { script, requirements } = angle.plan(feed());
+        const { script, requirements } = angle.plan(feed(), new Set());
         const claimIds = new Set(requirements.map((r: any) => r.id));
         for (const beat of script.filter((b: any) => b.claimId)) {
           expect(claimIds, `${id}: beat ${beat.id} names an unknown claim`).toContain(beat.claimId);
@@ -73,7 +73,7 @@ describe("daily angle templates", () => {
 
       it("asks for a surface that exists, and regions that surface has", async () => {
         const { SOLOMON_SURFACES } = await import("./solomonCaptureSurfaces");
-        const { requirements } = angle.plan(feed());
+        const { requirements } = angle.plan(feed(), new Set());
         for (const requirement of requirements) {
           const surface = SOLOMON_SURFACES.surfaces.find((s) => s.id === requirement.surfaceId);
           expect(surface, `${id}: no surface ${requirement.surfaceId}`).toBeDefined();
@@ -83,4 +83,47 @@ describe("daily angle templates", () => {
       });
     });
   }
+});
+
+describe("cross-angle exclusion", () => {
+  // The defect this guards actually shipped: on the first real batch, two of the
+  // day's three films opened their proof beat on the same Agave role with a
+  // different caption over it. Neither film was internally wrong -- the crop
+  // check only looks within one film -- so nothing caught it but looking.
+  const twoCards = () => feed({
+    top: [
+      { title: "Full-Stack Software Engineer", company: "Agave", location: "Remote" },
+      { title: "Senior Software Engineer", company: "Prequel", location: "New York City" }
+    ]
+  });
+
+  it("gives two angles different postings from the same feed", async () => {
+    const { DAILY_ANGLES: angles, cardKey } = (await import("../../scripts/daily-angles.mjs")) as any;
+    const [first, second] = Object.values(angles) as any[];
+    const spent = new Set<string>();
+
+    const one = first.plan(twoCards(), spent);
+    one.spent.forEach((key: string) => spent.add(key));
+    const two = second.plan(twoCards(), spent);
+
+    expect(one.spent[0]).toBe(cardKey({ company: "Agave", title: "Full-Stack Software Engineer" }));
+    expect(two.spent[0]).toBe(cardKey({ company: "Prequel", title: "Senior Software Engineer" }));
+    expect(two.spent[0]).not.toBe(one.spent[0]);
+  });
+
+  it("says so rather than repeating itself when the feed is exhausted", async () => {
+    const { DAILY_ANGLES: angles, cardKey } = (await import("../../scripts/daily-angles.mjs")) as any;
+    const angle = Object.values(angles)[0] as any;
+    const only = feed({ top: [{ title: "Only Role", company: "Solo", location: "Remote" }] });
+    const spent = new Set<string>([cardKey({ company: "Solo", title: "Only Role" })]);
+    // Returning null is what makes the runner report an incomplete run. Falling
+    // back to a spent card would be the bug wearing a different hat.
+    expect(angle.plan(only, spent)).toBeNull();
+  });
+
+  it("treats the same posting as the same regardless of casing or padding", async () => {
+    const { cardKey } = (await import("../../scripts/daily-angles.mjs")) as any;
+    expect(cardKey({ company: " Agave ", title: "Full-Stack Software Engineer" }))
+      .toBe(cardKey({ company: "agave", title: "full-stack software engineer" }));
+  });
 });

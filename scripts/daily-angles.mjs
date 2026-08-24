@@ -17,6 +17,28 @@
 /** First `count` words of a title, for a beat that must name the role. */
 const words = (text, count) => String(text ?? "").split(/\s+/).filter(Boolean).slice(0, count).join(" ");
 
+/**
+ * What counts as the same posting across two films.
+ *
+ * Company and role, because that is what a viewer recognises. Two angles that
+ * both sort newest-first over overlapping filters will top out on the same card
+ * whenever one posting is the freshest thing in the workspace, and on the first
+ * real batch that happened: two of the day's three films opened their proof beat
+ * on the same Agave role with a different caption over it. Nothing was wrong with
+ * either film -- the crop check only looks within one film -- and that is exactly
+ * why it needed a key that spans them.
+ */
+export const cardKey = (card) => {
+  // Each part normalised, not the joined string: trimming the join leaves the
+  // padding sitting against the separator, so " Agave " and "agave" produced two
+  // different keys for one posting -- the exact failure this key exists to stop.
+  const part = (value) => String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  return `${part(card?.company)}|${part(card?.title)}`;
+};
+
+/** The topmost card this run has not already featured, or undefined if none is left. */
+const unspent = (feed, spent) => (feed.top ?? []).find((card) => !spent.has(cardKey(card)));
+
 /** A card claim, framed on the headline block that holds role, employer and place. */
 const cardRequirement = (id, surface, region, card, says) => ({
   id,
@@ -37,9 +59,11 @@ export const DAILY_ANGLES = {
     topic: "Remote engineering jobs I found today",
     seconds: 18,
     slug: "remote-engineering-today",
-    plan: (feed) => {
-      const top = feed.top[0];
+    plan: (feed, spent = new Set()) => {
+      const top = unspent(feed, spent);
+      if (!top) return null;
       return {
+        spent: [cardKey(top)],
         requirements: [
           countRequirement("job_feed_remote", "remoteFeedCount", "It counts what matched and what is new"),
           cardRequirement("role", "job_feed_remote", "remoteFeedCard", top, "One posting, with the role and the company on it"),
@@ -65,9 +89,11 @@ export const DAILY_ANGLES = {
     topic: "Startup jobs for new grads this week",
     seconds: 18,
     slug: "newgrad-startups-this-week",
-    plan: (feed) => {
-      const top = feed.top[0];
+    plan: (feed, spent = new Set()) => {
+      const top = unspent(feed, spent);
+      if (!top) return null;
       return {
+        spent: [cardKey(top)],
         requirements: [
           countRequirement("job_feed_newgrad", "newGradFeedCount", "Every graduate-level startup role here is new this week"),
           cardRequirement("role", "job_feed_newgrad", "newGradFeedCard", top, "A role open to a new graduate"),
@@ -93,9 +119,11 @@ export const DAILY_ANGLES = {
     topic: "What Solomon found overnight",
     seconds: 18,
     slug: "found-overnight",
-    plan: (feed) => {
-      const top = feed.top[0];
+    plan: (feed, spent = new Set()) => {
+      const top = unspent(feed, spent);
+      if (!top) return null;
       return {
+        spent: [cardKey(top)],
         requirements: [
           countRequirement("job_feed_overnight", "overnightFeedCount", "How many roles matched, and how many are new"),
           cardRequirement("role", "job_feed_overnight", "overnightFeedCard", top, "One of the postings that arrived overnight"),
