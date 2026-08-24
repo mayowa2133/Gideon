@@ -78,7 +78,12 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
     // shoot, so these two are filled per run by scripts/plan-daily-jobs-film.mjs
     // from the same query the page makes.
     { path: "job.title", shownAs: "the role on the posting the film opens with" },
-    { path: "job.company", shownAs: "the company hiring for it" }
+    { path: "job.company", shownAs: "the company hiring for it" },
+    // One posting, opened. The id is in the route, so it is filled from the
+    // angle's fixture the same way a locator is.
+    { path: "job.id", shownAs: "which posting the film opens" },
+    { path: "job.duty", shownAs: "one thing the posting says the job does" },
+    { path: "job.duty2", shownAs: "a second thing the posting says the job does" }
   ],
   surfaces: [
     {
@@ -1073,6 +1078,70 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           locator: { role: "text", name: "{job.title}", container: "div.font-medium.text-sm.truncate" },
           fields: ["job.title"],
           sourceTextPx: 11
+        }
+      ]
+    },
+    // One posting, opened.
+    //
+    // Everything claimed here is above the fold and inline: the pay, the posting
+    // age, the ecosystem the company came from, and the product's own name for
+    // the panel it puts on top. Inline spans and badges are the shapes that come
+    // out narrow -- a block element is as wide as its column, whatever its text.
+    //
+    // What is NOT here, and why: the description itself.
+    //
+    // The description was worth fixing and is now readable -- it used to render
+    // as escaped markup -- but readable to a person is not the same as claimable
+    // by a film. At the 1440 capture viewport its container has `max-w-none`, so
+    // every paragraph and list item is a block 1226px wide carrying one 14px
+    // line, which crops to 8.8px against a 20px floor. Measured, not assumed.
+    // Narrowing that column to the `prose` plugin's own default would put it at
+    // 530px, which crops to about 19.7px -- still under, and still a product
+    // decision about how job descriptions should read rather than a filming one.
+    //
+    // No motion: a posting is a document. Its only controls are Apply, which
+    // leaves the product, and a star. Inventing an interaction here would film
+    // Gideon rather than Solomon.
+    {
+      id: "job_posting",
+      route: "/jobs/{job.id}",
+      purpose: "one posting, with what it pays and what the product makes of it",
+      reach: [
+        "Open the posting's own page and wait for the title.",
+        "No interaction and no scroll: everything claimed sits above the fold."
+      ],
+      regions: [
+        {
+          id: "postingSalary",
+          // The value's own span, not the row that holds it. The row is a block
+          // and comes out 1248px wide -- it reads 10.2px, while the span reads
+          // fine. This is the difference between what the product displays and
+          // the box the DOM reports for it.
+          purpose: "what the role pays, in the product's own words",
+          locator: { role: "text", name: "From", container: "span.font-medium" },
+          fields: [],
+          sourceTextPx: 12
+        },
+        {
+          id: "postingPosted",
+          purpose: "how long ago the posting went up",
+          locator: { role: "text", name: "Posted", container: "span[data-slot=\"badge\"]" },
+          fields: [],
+          sourceTextPx: 10
+        },
+        {
+          id: "postingSource",
+          purpose: "the ecosystem the hiring company was found in",
+          locator: { role: "text", name: "Curated Startups", container: "span[data-slot=\"badge\"]" },
+          fields: [],
+          sourceTextPx: 10
+        },
+        {
+          id: "postingCommandCentre",
+          purpose: "the product's own name for what it puts on top of a posting",
+          locator: { role: "text", name: "Job Command Center", container: "h2" },
+          fields: [],
+          sourceTextPx: 14
         }
       ]
     }
