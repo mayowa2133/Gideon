@@ -372,10 +372,38 @@ async function ocrRegion(file, rect) {
   }
 }
 
+// OCR a whole page, enlarged threefold like a region crop.
+//
+// This pass is what protects crops from cutting text. `snapClearOfWords` moves a
+// crop edge clear of every word it is given, and it is given the page's words --
+// so a word tesseract failed to read is a word the crop is free to slice through.
+// At native scale this page came back with 85 words for a screen carrying several
+// hundred, and the gap showed up in the film: the crop around a job card grew
+// upward into the filter bar and cut "Radius:" to "adius:", because as far as the
+// snapping knew there was nothing there.
+//
+// The same enlargement `ocrRegion` uses, for the same reason, mapped home the
+// same way. It costs one larger tesseract call per screen.
 async function ocrWords(file) {
-  const { stdout } = await run("tesseract", [file, "stdout", "--psm", "3", "tsv"]);
-  return stdout.split("\n").slice(1).map((line) => line.split("\t")).filter((cells) => cells.length >= 12 && Number(cells[11 - 1]) > 60 && cells[11]?.trim())
-    .map((cells) => ({ x: Number(cells[6]), y: Number(cells[7]), width: Number(cells[8]), height: Number(cells[9]), confidence: Number(cells[10]), text: cells[11].trim() }));
+  const scale = 3;
+  const enlarged = path.join(os.tmpdir(), `page-${process.pid}-${path.basename(file)}`);
+  try {
+    await run("ffmpeg", ["-v", "error", "-i", file,
+      "-vf", `scale=iw*${scale}:ih*${scale}:flags=lanczos`, "-y", enlarged]);
+    const { stdout } = await run("tesseract", [enlarged, "stdout", "--psm", "3", "tsv"], 240_000);
+    return stdout.split("\n").slice(1).map((line) => line.split("\t"))
+      .filter((cells) => cells.length >= 12 && Number(cells[10]) > 60 && cells[11]?.trim())
+      .map((cells) => ({
+        x: Math.round(Number(cells[6]) / scale),
+        y: Math.round(Number(cells[7]) / scale),
+        width: Math.round(Number(cells[8]) / scale),
+        height: Math.round(Number(cells[9]) / scale),
+        confidence: Number(cells[10]),
+        text: cells[11].trim()
+      }));
+  } finally {
+    await fs.rm(enlarged, { force: true }).catch(() => {});
+  }
 }
 
 function run(command, args, timeoutMs = 120_000) {
