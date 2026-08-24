@@ -83,7 +83,8 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
     // angle's fixture the same way a locator is.
     { path: "job.id", shownAs: "which posting the film opens" },
     { path: "job.duty", shownAs: "one thing the posting says the job does" },
-    { path: "job.duty2", shownAs: "a second thing the posting says the job does" }
+    { path: "job.duty2", shownAs: "a second thing the posting says the job does" },
+    { path: "job.pay", shownAs: "what the posting says the role pays" }
   ],
   surfaces: [
     {
@@ -1117,9 +1118,15 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           // and comes out 1248px wide -- it reads 10.2px, while the span reads
           // fine. This is the difference between what the product displays and
           // the box the DOM reports for it.
+          //
+          // Matched on the pay text itself rather than on a fixed word, because
+          // the product prints two different shapes: "From $500,000/yr" when a
+          // posting gives one figure and "$153,000 - $376,000/yr" when it gives a
+          // band. A locator keyed to "From" finds the first and silently misses
+          // the second, which is most of them.
           purpose: "what the role pays, in the product's own words",
-          locator: { role: "text", name: "From", container: "span.font-medium" },
-          fields: [],
+          locator: { role: "text", name: "{job.pay}", container: "span.font-medium" },
+          fields: ["job.pay"],
           sourceTextPx: 12
         },
         {
@@ -1314,6 +1321,67 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
         {
           id: "torontoFeedThird",
           purpose: "a third role, from a different employer again",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        }
+      ]
+    },
+    // Graduate roles filtered by pay.
+    //
+    // "Min salary" is looser than it looks and the film's wording depends on
+    // knowing how: the backend keeps a job when EITHER end of its band clears
+    // the threshold -- `or_(Job.salary_max >= salary_min, Job.salary_min >=
+    // salary_min)` -- so a posting advertised at 90k-110k is in a 100k feed on
+    // the strength of its ceiling. A film may therefore say these roles CAN pay
+    // over the number, and may not say they all start there.
+    //
+    // The level filter is the opposite: an exact match on `experience_level`,
+    // which drops every job whose level is null. Between them, nothing in this
+    // feed is missing salary information altogether, which is what makes the
+    // angle honest -- there is no card here whose pay is simply unknown.
+    {
+      id: "job_feed_highpay",
+      route: "/jobs",
+      purpose: "the graduate-level roles whose pay band reaches six figures",
+      reach: [
+        "Open /jobs with the level set to New Grad / Entry and a minimum salary of 100000.",
+        "Click the Software Engineering chip so the feed narrows to engineering roles."
+      ],
+      prepare: {
+        because: "a graduate filtering for the roles that actually pay, which is the first thing anyone does",
+        localStorage: [
+          { key: "nexusreach-jobs-last-visited", isoHoursAgo: 24 },
+          { key: "nexusreach-jobs-occupations", value: "[]" },
+          { key: "nexusreach-jobs-filters", value: JSON.stringify({ ...FEED_FILTER_DEFAULTS, experienceLevelFilter: "new_grad", salaryMinFilter: "100000" }) }
+        ],
+        scrollTo: { selector: "span.ml-auto", offsetPx: 120 }
+      },
+      motion: {
+        shows: "the feed narrowing from every field to engineering as the chip is picked",
+        actions: [{ kind: "click", locator: { role: "button", name: "Software Engineering" } }]
+      },
+      regions: [
+        {
+          id: "highPayCount",
+          purpose: "how many graduate roles clear the pay threshold",
+          locator: { role: "text", name: "jobs", container: "span.ml-auto" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        {
+          id: "highPayFirst",
+          // The feed never prints a number for pay -- only the posting does --
+          // so these two carry the roles and the film crosses to the posting for
+          // the figure itself.
+          purpose: "one graduate role that cleared the threshold",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "highPaySecond",
+          purpose: "a second one, from another employer",
           locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
           fields: ["job.title", "job.company"],
           sourceTextPx: 11
