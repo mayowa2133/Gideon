@@ -1,6 +1,15 @@
 # CLAUDE.md
 
-This file provides concise guidance for Claude Code or any Claude-backed coding assistant working in this repository.
+@AGENTS.md
+
+This file provides concise guidance for Claude Code or any Claude-backed coding
+assistant working in this repository.
+
+AGENTS.md is imported above rather than summarised here, because it is also what
+Codex loads unprompted -- so the two agents read one description of the repo
+instead of drifting copies. When it was wrong, Codex was confidently wrong in the
+same way: asked what this repo used, it answered "Next.js App Router, pnpm,
+Prisma", all three lifted from that file and none of them true.
 
 ## What Gideon is
 
@@ -125,6 +134,71 @@ Run the relevant commands before handoff. Once package scripts exist, expected c
 For browser-flow changes, run E2E tests. For media changes, run media smoke tests. For prompt changes, run prompt contract tests.
 
 If a check cannot run because the repository does not yet implement the command or environment, state that directly in the handoff.
+
+## Working with Codex
+
+`codex exec` is available and authenticated. It is a second frontier model with
+its own reading of the code, which makes it useful for a narrow set of things and
+a waste of time for the rest. What follows is from measured results in this
+repository, not from the general idea that two models beat one.
+
+**Always `-s read-only`.** Codex defaults to `sandbox: danger-full-access,
+approval: never`. Implementation stays here; a second agent editing the tree
+while this one reasons about it is how two correct changes become one broken one.
+Pass `--skip-git-repo-check` when running outside a repo root.
+
+**Run it in the background.** `run_in_background: true`, then keep working. The
+saving is parallelism, not delegation -- a codex call that blocks is usually
+slower than doing it yourself.
+
+### What it is good at
+
+Precise questions about code you can verify cheaply afterwards. Every win in this
+repo had that shape:
+
+- "Which fields does this filter compare against? Quote the expression with
+  file:line." It found `or_(Job.salary_max >= salary_min, Job.salary_min >=
+  salary_min)`, which changed a film's script from "these pay over 100k" to
+  "these *can* pay over 100k" -- the difference between an honest claim and a
+  false one, and it explained a 42-vs-49 count discrepancy that would otherwise
+  have gone into the voiceover.
+- "Is this filter deterministic, or does it call a geocoder at request time?"
+  Tracing state across a stack is something it does well and quickly.
+- "Which element renders X?" It found the location span in a 1900-line component
+  while the obvious selector kept matching the wrong node.
+
+### What it is bad at
+
+- **Anything needing the running system.** Rendered pixel boxes, a frame that
+  looks wrong, database state, whether a caption argues with its picture. Those
+  need the browser or the DB, and no amount of reading substitutes.
+- **Vague review.** "Review this" produces agreement. Reviews earn their place
+  only when the prompt enumerates specific failure modes -- and then they earn it
+  well: a review told to check trap ordering, `set -e` interactions, log growth
+  and overlapping runs found a real leak (an EXIT trap installed after the
+  servers start, so a failed readiness check left a backend running) and
+  corrected two things this file's author had stated wrongly.
+- **Confirming what you already tested.** It will agree, at the cost of a
+  round trip.
+
+### Verify what it says
+
+It is confidently wrong in the same ways any model is. It answered a question
+about this repo's stack straight from a stale AGENTS.md without opening
+package.json. Treat findings as leads: check the line it cites before acting, and
+say "codex found X, I verified it by Y" rather than passing its output through.
+
+### Reviews: tell it to disagree
+
+The useful review prompt names what to look for and forbids politeness:
+
+    You are reviewing another engineer's work. Do not defer to it.
+    Look specifically for: <the five things you are actually worried about>.
+    Report only concrete problems with file:line and a one-line consequence.
+    If a section is fine, say so briefly. Do not manufacture criticism.
+
+The last sentence matters as much as the rest: a review that invents problems
+costs more to triage than one that finds none.
 
 ## Git and handoff
 
