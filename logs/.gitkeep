@@ -1,0 +1,6 @@
+Kept so this directory exists in a fresh clone.
+
+launchd opens StandardOutPath and StandardErrorPath itself, before the job runs.
+If this directory is missing at that moment the job cannot log, and the first
+thing a scheduled run would lose is the record of why it failed. The script's own
+`mkdir -p` is too late to help: it runs after launchd has already tried.

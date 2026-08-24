@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Cuts the day's films at 07:00 local.
+
+  Install:
+    cp scripts/launchd/dev.gideon.daily-films.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/dev.gideon.daily-films.plist
+
+  Remove:
+    launchctl unload ~/Library/LaunchAgents/dev.gideon.daily-films.plist
+
+  Run it now, without waiting for 07:00:
+    launchctl start dev.gideon.daily-films
+
+  Notes worth knowing before trusting it:
+
+  - PATH is set explicitly. launchd gives a job /usr/bin:/bin:/usr/sbin:/sbin and
+    nothing else, while node, npm, ffmpeg, ffprobe and tesseract all live in
+    /opt/homebrew/bin. Inheriting the default PATH is the single most common way
+    a job that works in a terminal fails under launchd.
+
+  - It fires only while this user is LOGGED IN, not merely while the Mac is
+    awake. A LaunchAgent lives in the user's session: an awake but logged-out Mac
+    misses 07:00 entirely. (A LaunchDaemon would run regardless, but it runs as
+    root with no user session, which is wrong for a job that drives a browser.)
+
+  - A missed calendar firing runs once on the next opportunity, so a closed
+    laptop means a late run, not a lost one -- and not three days of catch-up.
+
+  - launchd will not run two copies of this job at once. If a slow run is still
+    going at the next firing, that firing is skipped rather than overlapped, so
+    no locking is needed here.
+
+  - RunAtLoad is false on purpose: loading this should not kick off a ten-minute
+    ingest while you are doing something else.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.gideon.daily-films</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/mayowaadesanya/Projects/Gideon/scripts/daily-run.sh</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>GIDEON_REPO</key>
+    <string>/Users/mayowaadesanya/Projects/Gideon</string>
+    <key>SOLOMON_REPO</key>
+    <string>/Users/mayowaadesanya/Projects/NexusReach</string>
+    <key>NEXUSREACH_DATABASE_URL</key>
+    <string>postgresql+asyncpg://mayowaadesanya@127.0.0.1:5432/nexusreach</string>
+    <key>SOLOMON_DEMO_URL</key>
+    <string>http://localhost:5173</string>
+  </dict>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>7</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+
+  <key>StandardOutPath</key>
+  <string>/Users/mayowaadesanya/Projects/Gideon/logs/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/mayowaadesanya/Projects/Gideon/logs/launchd.err.log</string>
+</dict>
+</plist>
