@@ -1252,6 +1252,73 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           sourceTextPx: 11
         }
       ]
+    },
+    // Jobs near one city, which the product decides by distance rather than by
+    // matching the word.
+    //
+    // Worth knowing before trusting this surface: the feed's own search box
+    // matches title and company only -- `Job.title.ilike(term) |
+    // Job.company_name.ilike(term)` -- so typing "Toronto" into it returns
+    // nothing at all. `Near:` is the control that understands places. It
+    // resolves through an in-process gazetteer (Toronto is a hard-coded entry)
+    // and filters on each job's stored `location_lat`/`location_lng`, so no
+    // network geocode happens at request time and the same filter returns the
+    // same set every run -- which is what makes it safe to plan a film against.
+    {
+      id: "job_feed_toronto",
+      route: "/jobs",
+      purpose: "the roles within commuting distance of one city, for a graduate who lives there",
+      reach: [
+        "Open /jobs with the near-location filter set to Toronto and a 50km radius.",
+        "Click the Software Engineering chip so the feed narrows to engineering roles."
+      ],
+      prepare: {
+        because: "a graduate in Toronto who has set the near-location filter and is looking at what is in reach",
+        localStorage: [
+          { key: "nexusreach-jobs-last-visited", isoHoursAgo: 24 },
+          { key: "nexusreach-jobs-occupations", value: "[]" },
+          { key: "nexusreach-jobs-filters", value: JSON.stringify({ ...FEED_FILTER_DEFAULTS, nearLocationFilter: "Toronto" }) }
+        ],
+        scrollTo: { selector: "span.ml-auto", offsetPx: 120 }
+      },
+      motion: {
+        shows: "the feed narrowing from every field to engineering as the chip is picked",
+        actions: [{ kind: "click", locator: { role: "button", name: "Software Engineering" } }]
+      },
+      regions: [
+        {
+          id: "torontoFeedCount",
+          purpose: "how many engineering roles are within reach of the city",
+          locator: { role: "text", name: "jobs", container: "span.ml-auto" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        // Three postings rather than one, because this angle is a list: the
+        // claim is that there are several, and one card cannot carry that. Each
+        // is framed on the headline block, which holds the role, the employer
+        // and the place together -- the place being the whole point here.
+        {
+          id: "torontoFeedFirst",
+          purpose: "one graduate-level engineering role, with the city it is in",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "torontoFeedSecond",
+          purpose: "a second role, so the list reads as a list",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "torontoFeedThird",
+          purpose: "a third role, from a different employer again",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        }
+      ]
     }
   ]
 };

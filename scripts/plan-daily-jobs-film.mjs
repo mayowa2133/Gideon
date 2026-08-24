@@ -96,6 +96,18 @@ const feed = await page.evaluate(() => {
     .find((text) => /\d+\s+jobs/.test(text)) ?? null;
   const badges = card ? [...card.querySelectorAll('span[data-slot="badge"]')].map((b) => b.textContent.trim()) : [];
 
+  // The top few cards, not just the first. A listicle film claims several roles
+  // and each one needs its own locator text, so the whole shortlist has to come
+  // off the same render the capture will shoot.
+  const top = [...(column?.children ?? [])].slice(0, 6).map((node) => {
+    const roleTitle = node.querySelector("div.font-medium.text-sm.truncate")?.textContent?.trim() ?? null;
+    const companyCell = [...node.querySelectorAll("div.text-xs.text-muted-foreground")]
+      .map((inner) => inner.textContent?.trim() ?? "")
+      .find((text) => text.length > 0) ?? "";
+    const place = node.querySelector("span.text-xs.text-muted-foreground")?.textContent?.trim() ?? null;
+    return { title: roleTitle, company: companyCell.split("\u00b7")[0].trim(), location: place };
+  }).filter((entry) => entry.title);
+
   // The first card that shows how old the posting is.
   //
   // Not every card has one -- the company cell reads "replit · 2 days ago" when
@@ -113,7 +125,7 @@ const feed = await page.evaluate(() => {
       break;
     }
   }
-  return { title, company, header, badges, dated, cards: column ? column.children.length : 0 };
+  return { title, company, header, badges, dated, top, cards: column ? column.children.length : 0 };
 });
 
 await browser.close();
