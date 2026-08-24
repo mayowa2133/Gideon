@@ -15,10 +15,25 @@ what it cannot verify.
 For the angles that run every day, the whole pipeline is wrapped:
 
 ```bash
-node scripts/run-daily-series.mjs --angle remote-today
+node scripts/run-daily-series.mjs --ingest --all
 ```
 
-It reads today's feed, writes today's requirements, plans, captures, verifies,
+`--ingest` runs Solomon's own discovery first, **once**, and then cuts every
+angle from that one ingest -- discovery walks a few dozen external boards and
+takes minutes, so running it per angle would spend that three times over to look
+at the same feed. It runs first because a film claiming "these arrived
+overnight" is only true if something went and looked. If any discovery mode
+fails the run stops rather than cutting a film from a feed nothing refreshed;
+re-run without `--ingest` if you deliberately want yesterday's data.
+
+The ingest itself is `backend/scripts/daily_ingest.py` in Solomon's checkout;
+point `SOLOMON_REPO` at it if it is not `~/Projects/NexusReach`, and set
+`NEXUSREACH_DATABASE_URL` because `backend/.env` may point somewhere that no
+longer resolves.
+
+`--angle a,b,c` cuts a subset; `--angle remote-today` cuts one.
+
+Either way it reads today's feed, writes today's requirements, plans, captures, verifies,
 fills the angle's script template, compiles, checks the crops are distinct,
 renders, and files the result as
 `renders/solomon-daily-<slug>-<date>-1080x1920.mp4`. It stops at the first gate
