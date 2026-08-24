@@ -26,6 +26,7 @@
 //   run, it is a migration.
 import fs from "node:fs/promises";
 import path from "node:path";
+import { locate } from "./lib/playwright-locate.mjs";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -110,20 +111,6 @@ async function frameDelta(first, second) {
 }
 
 // The same role-then-text addressing the claim regions use.
-async function locate(page, locator) {
-  const pattern = new RegExp(locator.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-  if (locator.role === "combobox" || locator.role === "textbox") {
-    const labelled = page.getByLabel(pattern).first();
-    try { await labelled.waitFor({ state: "visible", timeout: 4000 }); return labelled; } catch { /* fall through */ }
-  }
-  let target = locator.container
-    ? page.locator(locator.container).filter({ hasText: pattern }).first()
-    : page.getByRole(locator.role, { name: pattern }).first();
-  try { await target.waitFor({ state: "visible", timeout: 4000 }); return target; } catch { /* fall through */ }
-  target = page.getByText(pattern).first();
-  await target.waitFor({ state: "visible", timeout: 6000 });
-  return target;
-}
 
 // Perform the surface's interaction and film the product's response.
 //

@@ -1144,6 +1144,114 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           sourceTextPx: 14
         }
       ]
+    },
+    // Name one company, get its whole board.
+    //
+    // A different mechanism from the feed surfaces: those film what discovery
+    // already brought in, this films the user asking for something specific. The
+    // pair exists because the ask and the answer are 2000px apart on one route.
+    //
+    // The footage behind it is real. Searching figma's Greenhouse board through
+    // the product returned 162 roles, and the film's `figma` filter is showing
+    // exactly those. The capture types the company name rather than pressing
+    // Search, for two reasons: the endpoint is rate limited to 5/minute and
+    // charges a daily action budget, and the runner performs a surface's motion
+    // once per shot -- so filming the click would spend three real searches to
+    // record one. Typing is the part that moves anyway; a native button click
+    // moved 0.161 when it was measured, against a 0.5 floor.
+    {
+      id: "career_page_search",
+      route: "/jobs",
+      purpose: "the user naming a company instead of waiting for discovery to find it",
+      reach: [
+        "Open /jobs with the feed already filtered to the company that was searched.",
+        "Type the company's board name into the career-page field."
+      ],
+      prepare: {
+        because: "a user who has just searched one company's careers page and is looking at what came back",
+        localStorage: [
+          { key: "nexusreach-jobs-last-visited", isoHoursAgo: 24 },
+          { key: "nexusreach-jobs-occupations", value: "[]" },
+          { key: "nexusreach-jobs-filters", value: JSON.stringify({ ...FEED_FILTER_DEFAULTS, searchFilter: "figma" }) }
+        ]
+      },
+      // No motion. Typing the company name into the career-page field moved
+      // 0.482 against a 0.5 floor -- five characters land in one 584px input and
+      // nothing else on the page reacts until the request comes back. The floor
+      // is right and the interaction is simply not a filmable one; the feed
+      // narrowing on the results surface is where this product visibly moves.
+      regions: [
+        {
+          id: "careerPanel",
+          purpose: "that a company's own careers page is something you can point the product at",
+          locator: { role: "text", name: "Search Company Career Page" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        {
+          id: "careerSources",
+          // Named platforms rather than "we search everywhere". A viewer can
+          // check a list; they cannot check a boast.
+          purpose: "the career-page platforms the product can read, named",
+          locator: { role: "text", name: "Paste a job posting URL" },
+          fields: [],
+          sourceTextPx: 12
+        }
+      ]
+    },
+    {
+      id: "career_page_results",
+      route: "/jobs",
+      purpose: "the whole board that came back from naming one company",
+      reach: [
+        "Open /jobs with the feed filtered to the company that was searched.",
+        "Scroll the results into frame."
+      ],
+      prepare: {
+        because: "the same session, looking at what the career-page search returned",
+        localStorage: [
+          { key: "nexusreach-jobs-last-visited", isoHoursAgo: 24 },
+          { key: "nexusreach-jobs-occupations", value: "[]" },
+          { key: "nexusreach-jobs-filters", value: JSON.stringify({ ...FEED_FILTER_DEFAULTS, searchFilter: "figma" }) }
+        ],
+        scrollTo: { selector: "span.ml-auto", offsetPx: 120 }
+      },
+      // No motion here either, after three attempts, all measured:
+      //
+      //  - Typing the company into the career-page field moved 0.482 against a
+      //    0.5 floor. Five characters land in one input and nothing else reacts
+      //    until the request returns.
+      //  - Typing it into the feed's own search box is the pattern that moved
+      //    1.161 on the People page, but here `type` times out: the Jobs feed
+      //    polls while its results warm, the filter bar remounts under the
+      //    cursor, and the located input detaches between keystrokes.
+      //  - Clicking an occupation chip would narrow the results to nothing.
+      //    Jobs stored by the career-page search carry no tags at all -- a
+      //    separate defect, filed rather than worked around here -- so all 162
+      //    of them are invisible to every chip.
+      //
+      // A film is allowed to be stills. Manufacturing an interaction the product
+      // does not really have would be filming Gideon instead of Solomon.
+      regions: [
+        {
+          id: "careerFoundCount",
+          purpose: "how many roles one company search returned, and that all of them are new",
+          locator: { role: "text", name: "jobs", container: "span.ml-auto" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        {
+          id: "careerFoundCard",
+          // The headline block, not the card: the card runs 490-518px wide and
+          // reads 19.3px against a 20px floor at the wider end. This block drops
+          // the logo and the star button and holds the line that matters here --
+          // the company and how long ago it posted.
+          purpose: "one of the returned roles, with the company and how recently it posted",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        }
+      ]
     }
   ]
 };
