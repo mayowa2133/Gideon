@@ -351,8 +351,14 @@ export function planCapture(input: {
     // `contact.company`, and the region that carries the claim is the title.
     const driven = (surface.motion?.actions ?? []).flatMap((action) =>
       [...`${action.locator.name} ${action.text ?? ""}`.matchAll(/\{([^}]+)\}/g)].map(([, path]) => path!));
+    // The same for a value the route consumes. A surface that films one record
+    // carries that record's id in its path, and an id is used rather than
+    // shown -- it is in the address bar, not on the page. Without this, every
+    // claim on a per-record surface reports the id it needs as a fixture the
+    // region fails to display.
+    const routed = [...surface.route.matchAll(/\{([^}]+)\}/g)].map(([, path]) => path!);
     for (const path of Object.keys(requirement.fixture)) {
-      if (!region.fields.includes(path) && !placeholders.includes(path) && !driven.includes(path)) {
+      if (!region.fields.includes(path) && !placeholders.includes(path) && !driven.includes(path) && !routed.includes(path)) {
         issues.push({ claimId: requirement.id, reason: "fixture_not_shown_here", detail: path });
       }
     }
@@ -373,7 +379,13 @@ export function planCapture(input: {
       claimId: requirement.id,
       beatId: placed.beat.id,
       surfaceId: surface.id,
-      route: surface.route,
+      // The route is filled from the fixture like the locators are.
+      //
+      // A surface that films one record -- a job posting, not a list -- has that
+      // record's id in its path, and the id belongs to the angle rather than to
+      // the map. Without this a per-record surface would have to be rewritten
+      // for every film, or hardcode one row forever.
+      route: fill(surface.route),
       ...(surface.becomes ? { becomes: surface.becomes } : {}),
       ...(surface.prepare ? { prepare: surface.prepare } : {}),
       regionId: region.id,
