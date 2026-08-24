@@ -1,5 +1,30 @@
 import { type ProductSurfaceMap } from "./creatorCapturePlan";
 
+// The Jobs page's persisted filter object, as the product writes it.
+//
+// Restated here rather than imported because Solomon is a separate repository:
+// these three surfaces write this object into localStorage before the route
+// loads, and a field the product has since renamed would be dropped by its own
+// `getStoredJobsFilters`, which merges field-by-field over its defaults. That
+// is the safe failure -- the filter reverts, the film shows an unfiltered feed,
+// and the claim about the count fails verification rather than passing while
+// describing the wrong feed.
+const FEED_FILTER_DEFAULTS = {
+  searchFilter: "",
+  stageFilter: "",
+  employmentTypeFilter: "",
+  experienceLevelFilter: "",
+  countryFilter: "",
+  nearLocationFilter: "",
+  radiusKmFilter: "50",
+  includeRemoteInRadius: false,
+  starredFilter: false,
+  remoteFilter: false,
+  startupFilter: false,
+  salaryMinFilter: "",
+  sortBy: "date"
+} as const;
+
 // Every path of Solomon a creator video can be shot on, and what each one shows.
 //
 // This is the answer to "Gideon should know every single path of the product and
@@ -47,7 +72,13 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
     { path: "contact.role", shownAs: "the saved contact's job title" },
     { path: "contact.company", shownAs: "where the contact works" },
     { path: "contact.reason", shownAs: "why Solomon surfaced this contact" },
-    { path: "message.subject", shownAs: "the draft's subject line" }
+    { path: "message.subject", shownAs: "the draft's subject line" },
+    // The job feed's contents are not seeded, they are whatever Solomon pulled
+    // in. A daily film has to be planned against the feed it will actually
+    // shoot, so these two are filled per run by scripts/plan-daily-jobs-film.mjs
+    // from the same query the page makes.
+    { path: "job.title", shownAs: "the role on the posting the film opens with" },
+    { path: "job.company", shownAs: "the company hiring for it" }
   ],
   surfaces: [
     {
@@ -706,6 +737,342 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           locator: { role: "text", name: "Stage this email as a draft in your inbox" },
           fields: [],
           sourceTextPx: 9
+        }
+      ]
+    },
+    // The job feed, shot three ways.
+    //
+    // These are the only surfaces here whose content is not seeded. Everything
+    // else in this map films demo data that was written on purpose; the feed
+    // films whatever the ingest pulled in this morning, which is the entire
+    // point of a daily film and also the reason each of these carries a
+    // `prepare`. Solomon decides a job is NEW by comparing it against the stamp
+    // of your last visit, so on a fresh browser profile -- which is what
+    // Playwright always is -- nothing is ever new and the header reads
+    // "(0 new)" over a feed that just took in two thousand jobs.
+    //
+    // What is seeded is the *cause*: you last looked yesterday. The product
+    // does the counting.
+    {
+      id: "job_feed_remote",
+      route: "/jobs",
+      purpose: "the remote engineering roles that arrived since the user last looked",
+      reach: [
+        "Write yesterday's timestamp as the Jobs page's last visit, and clear the occupation chips.",
+        "Open /jobs and wait for the feed to settle.",
+        "Click the Software Engineering chip so the feed narrows to engineering roles."
+      ],
+      prepare: {
+        because: "a returning user who last opened the Jobs tab yesterday, with the remote filter already on",
+        localStorage: [
+          { key: "nexusreach-jobs-last-visited", isoHoursAgo: 24 },
+          { key: "nexusreach-jobs-occupations", value: "[]" },
+          { key: "nexusreach-jobs-filters", value: JSON.stringify({ ...FEED_FILTER_DEFAULTS, remoteFilter: true }) }
+        ],
+        // The feed list itself, held a little below the top of the frame so
+        // the count above it stays in shot.
+        scrollTo: { selector: "span.ml-auto", offsetPx: 120 }
+      },
+      motion: {
+        shows: "the feed narrowing to engineering roles as the chip is picked",
+        actions: [{ kind: "click", locator: { role: "button", name: "Software Engineering" } }]
+      },
+      regions: [
+        {
+          id: "remoteFeedCount",
+          // Two numbers in one 99px box: how many match, and how many of those
+          // are new since yesterday. The claim a daily film exists to make.
+          purpose: "how many roles match and how many arrived since the last visit",
+          locator: { role: "text", name: "jobs", container: "span.ml-auto" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        {
+          id: "remoteFeedCard",
+          purpose: "one whole posting as the feed lists it, role and company and tags together",
+          // The headline block inside the card -- role over company -- rather
+          // than the card itself. The card runs 490-518px wide depending on
+          // whether the feed column has a scrollbar, and at 518 the claim reads
+          // 19.3px against a 20px floor, so the same shot passed on one film and
+          // failed on the next two. This block excludes the logo and the star
+          // button, so it is narrower and does not move with them.
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "remoteFeedRole",
+          purpose: "the role on the newest posting, by itself",
+          locator: { role: "text", name: "{job.title}", container: "div.font-medium.text-sm.truncate" },
+          fields: ["job.title"],
+          sourceTextPx: 11
+        },
+        {
+          id: "remoteFeedDatedCard",
+          // A second posting, chosen because its company cell carries an age.
+          //
+          // Declared but NOT currently claimable, and both halves of that are
+          // measured. The age line on its own fails `no_fit_without_cutting
+          // _words`: a 16px line inside a card has no vertical room to reach any
+          // container aspect without cutting the line above or below it, and
+          // `snapClearOfWords` correctly refuses. Framed as the whole card it
+          // fits, and then reads 19.3px on a 518px crop against a 20px floor --
+          // the claim tokens sit at opposite ends of the card, so the crop grows
+          // to span them and the type shrinks with it.
+          //
+          // Left here because it is a real region and 0.7px from usable: a
+          // narrower card column, or a claim whose two tokens sit closer
+          // together, brings it over. Do not lower the floor to take it.
+          purpose: "a second posting, with how long ago it went up",
+          locator: { role: "text", name: "{job.company}", container: "div[data-slot=\"card\"]" },
+          fields: ["job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "remoteFeedSort",
+          // "Newest First", which is the whole premise of a daily film: the
+          // feed is in the order things arrived, so the top of it is today.
+          // Two words, which matters -- a claim needs two distinct readable
+          // tokens, and every badge on this page is one word.
+          purpose: "that the feed is ordered by arrival, newest at the top",
+          locator: { role: "text", name: "Newest First", container: "select" },
+          fields: [],
+          sourceTextPx: 11
+        },
+        {
+          id: "remoteFeedPosted",
+          // Company and posting age in one 258px cell, because the product
+          // renders them as one line: "WarpBuild · 2 days ago". A film that
+          // claims a role is recent needs the product to be the thing saying
+          // so, and this is the only place on the feed that says it.
+          purpose: "who is hiring, and how long ago they posted it",
+          locator: { role: "text", name: "{job.company}", container: "div.text-xs.text-muted-foreground" },
+          fields: ["job.company"],
+          sourceTextPx: 12
+        },
+        {
+          id: "remoteFeedBadge",
+          purpose: "the product's own mark that the role is remote",
+          locator: { role: "text", name: "Remote", container: "span[data-slot=\"badge\"]" },
+          fields: [],
+          sourceTextPx: 8
+        },
+        {
+          id: "remoteFeedNewBadge",
+          purpose: "the mark that says this one was not here yesterday",
+          locator: { role: "text", name: "NEW", container: "span[data-slot=\"badge\"]" },
+          fields: [],
+          sourceTextPx: 8
+        }
+      ]
+    },
+    {
+      id: "job_feed_newgrad",
+      route: "/jobs",
+      purpose: "startup roles open to new graduates, with the backer named on the card",
+      reach: [
+        "Write yesterday's timestamp as the last visit, select engineering, and turn the Startup filter on.",
+        "Open /jobs and wait for the feed to settle.",
+        "Choose New Grad / Entry in the Level filter so the feed narrows to roles a graduate can take."
+      ],
+      prepare: {
+        because: "a returning graduate who already filters to startups and engineering",
+        localStorage: [
+          { key: "nexusreach-jobs-last-visited", isoHoursAgo: 24 },
+          { key: "nexusreach-jobs-occupations", value: "[]" },
+          { key: "nexusreach-jobs-filters", value: JSON.stringify({ ...FEED_FILTER_DEFAULTS, experienceLevelFilter: "new_grad", startupFilter: true }) }
+        ],
+        // The feed list itself, held a little below the top of the frame so
+        // the count above it stays in shot.
+        scrollTo: { selector: "span.ml-auto", offsetPx: 120 }
+      },
+      // The graduate level and the startup filter are set before the load, and
+      // the occupation chip is what gets filmed.
+      //
+      // Two things were tried first and measured. Choosing the level from the
+      // native select moved 0.144 against a 0.5 floor -- it repaints one row of
+      // text and the list re-renders after the burst has already finished, so
+      // the capture is twelve frames of a page that has not changed yet.
+      // Toggling the Startup chip with the level already applied moved 0.248,
+      // because by then only a handful of cards are left to remove. Going from
+      // every occupation to one takes the column from hundreds of cards to
+      // eighteen, which is a change worth filming.
+      motion: {
+        shows: "the feed narrowing from every field to engineering as the chip is picked",
+        actions: [{ kind: "click", locator: { role: "button", name: "Software Engineering" } }]
+      },
+      regions: [
+        {
+          id: "newGradFeedCount",
+          purpose: "how many graduate-level startup roles match, and how many are new",
+          locator: { role: "text", name: "jobs", container: "span.ml-auto" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        {
+          id: "newGradFeedCard",
+          purpose: "one graduate-level startup posting as the feed lists it",
+          // The headline block inside the card -- role over company -- rather
+          // than the card itself. The card runs 490-518px wide depending on
+          // whether the feed column has a scrollbar, and at 518 the claim reads
+          // 19.3px against a 20px floor, so the same shot passed on one film and
+          // failed on the next two. This block excludes the logo and the star
+          // button, so it is narrower and does not move with them.
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "newGradFeedRole",
+          purpose: "the role a graduate can actually apply for",
+          locator: { role: "text", name: "{job.title}", container: "div.font-medium.text-sm.truncate" },
+          fields: ["job.title"],
+          sourceTextPx: 11
+        },
+        {
+          id: "newGradFeedDatedCard",
+          // A second posting, chosen because its company cell carries an age.
+          // The age line cannot be claimed on its own -- a 16px line inside a
+          // card has no vertical room to reach any container aspect without
+          // cutting the line above or below it, which `snapClearOfWords`
+          // correctly refuses. Framed as the whole card, it has room.
+          purpose: "a second posting, with how long ago it went up",
+          locator: { role: "text", name: "{job.company}", container: "div[data-slot=\"card\"]" },
+          fields: ["job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "newGradFeedSort",
+          // "Newest First", which is the whole premise of a daily film: the
+          // feed is in the order things arrived, so the top of it is today.
+          // Two words, which matters -- a claim needs two distinct readable
+          // tokens, and every badge on this page is one word.
+          purpose: "that the feed is ordered by arrival, newest at the top",
+          locator: { role: "text", name: "Newest First", container: "select" },
+          fields: [],
+          sourceTextPx: 11
+        },
+        {
+          id: "newGradFeedPosted",
+          // Company and posting age in one 258px cell, because the product
+          // renders them as one line: "WarpBuild · 2 days ago". A film that
+          // claims a role is recent needs the product to be the thing saying
+          // so, and this is the only place on the feed that says it.
+          purpose: "who is hiring, and how long ago they posted it",
+          locator: { role: "text", name: "{job.company}", container: "div.text-xs.text-muted-foreground" },
+          fields: ["job.company"],
+          sourceTextPx: 12
+        },
+        {
+          id: "newGradFeedBacker",
+          // The badge is the whole reason this angle beats a job board: the
+          // product already knows which ecosystem the company came out of.
+          purpose: "the accelerator the hiring company came out of, named by the product",
+          locator: { role: "text", name: "Y Combinator", container: "span[data-slot=\"badge\"]" },
+          fields: [],
+          sourceTextPx: 8
+        },
+        {
+          id: "newGradFeedStartupBadge",
+          purpose: "the product's own mark that this is a startup rather than a large employer",
+          locator: { role: "text", name: "Startup", container: "span[data-slot=\"badge\"]" },
+          fields: [],
+          sourceTextPx: 8
+        }
+      ]
+    },
+    {
+      id: "job_feed_overnight",
+      route: "/jobs",
+      purpose: "everything the overnight ingest added, counted against the last visit",
+      reach: [
+        "Write yesterday's timestamp as the last visit and select engineering.",
+        "Open /jobs and wait for the feed to settle.",
+        "Click the Startup chip so the feed narrows to the startup roles that arrived."
+      ],
+      prepare: {
+        because: "a returning user opening the tab the morning after an overnight ingest",
+        localStorage: [
+          { key: "nexusreach-jobs-last-visited", isoHoursAgo: 24 },
+          { key: "nexusreach-jobs-occupations", value: JSON.stringify(["software_engineering"]) },
+          { key: "nexusreach-jobs-filters", value: JSON.stringify(FEED_FILTER_DEFAULTS) }
+        ],
+        // The feed list itself, held a little below the top of the frame so
+        // the count above it stays in shot.
+        scrollTo: { selector: "span.ml-auto", offsetPx: 120 }
+      },
+      motion: {
+        shows: "the feed narrowing to startup roles as the chip is picked",
+        actions: [{ kind: "click", locator: { role: "button", name: "Startup" } }]
+      },
+      regions: [
+        {
+          id: "overnightFeedCount",
+          purpose: "the count of roles found, and how many of them are new since yesterday",
+          locator: { role: "text", name: "jobs", container: "span.ml-auto" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        {
+          id: "overnightFeedCard",
+          purpose: "one of the postings that arrived overnight, as the feed lists it",
+          // The headline block inside the card -- role over company -- rather
+          // than the card itself. The card runs 490-518px wide depending on
+          // whether the feed column has a scrollbar, and at 518 the claim reads
+          // 19.3px against a 20px floor, so the same shot passed on one film and
+          // failed on the next two. This block excludes the logo and the star
+          // button, so it is narrower and does not move with them.
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "overnightFeedDatedCard",
+          // A second posting, chosen because its company cell carries an age.
+          // The age line cannot be claimed on its own -- a 16px line inside a
+          // card has no vertical room to reach any container aspect without
+          // cutting the line above or below it, which `snapClearOfWords`
+          // correctly refuses. Framed as the whole card, it has room.
+          purpose: "a second posting, with how long ago it went up",
+          locator: { role: "text", name: "{job.company}", container: "div[data-slot=\"card\"]" },
+          fields: ["job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "overnightFeedSort",
+          // "Newest First", which is the whole premise of a daily film: the
+          // feed is in the order things arrived, so the top of it is today.
+          // Two words, which matters -- a claim needs two distinct readable
+          // tokens, and every badge on this page is one word.
+          purpose: "that the feed is ordered by arrival, newest at the top",
+          locator: { role: "text", name: "Newest First", container: "select" },
+          fields: [],
+          sourceTextPx: 11
+        },
+        {
+          id: "overnightFeedPosted",
+          // Company and posting age in one 258px cell, because the product
+          // renders them as one line: "WarpBuild · 2 days ago". A film that
+          // claims a role is recent needs the product to be the thing saying
+          // so, and this is the only place on the feed that says it.
+          purpose: "who is hiring, and how long ago they posted it",
+          locator: { role: "text", name: "{job.company}", container: "div.text-xs.text-muted-foreground" },
+          fields: ["job.company"],
+          sourceTextPx: 12
+        },
+        {
+          id: "overnightFeedNewBadge",
+          purpose: "the mark that says this posting was not in the feed yesterday",
+          locator: { role: "text", name: "NEW", container: "span[data-slot=\"badge\"]" },
+          fields: [],
+          sourceTextPx: 8
+        },
+        {
+          id: "overnightFeedRole",
+          purpose: "the role on one of the overnight arrivals",
+          locator: { role: "text", name: "{job.title}", container: "div.font-medium.text-sm.truncate" },
+          fields: ["job.title"],
+          sourceTextPx: 11
         }
       ]
     }

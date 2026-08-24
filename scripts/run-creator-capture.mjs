@@ -188,6 +188,33 @@ try {
     const still = path.join(stillsDir, `${shot.surfaceId}.png`);
     const sharesStill = (shotsPerSurface.get(shot.surfaceId) ?? 0) > 1;
     try {
+      // Browser state first, then the load that is measured.
+      //
+      // It has to be written on every shot, not once. The Jobs page reads the
+      // last-visit stamp in a useState initialiser and overwrites it with `now`
+      // in an effect on the same mount, so the value survives exactly one
+      // render: seed it once and the first shot sees a feed full of NEW and
+      // every shot after it sees none. Writing before each load reproduces the
+      // returning visitor each time, which is the state being filmed.
+      //
+      // The first goto is only there to give localStorage an origin to belong
+      // to -- there is nothing to write against about:blank.
+      if (shot.prepare?.localStorage?.length) {
+        const entries = shot.prepare.localStorage.map((entry) => ({
+          key: entry.key,
+          value: typeof entry.isoHoursAgo === "number"
+            ? new Date(Date.now() - entry.isoHoursAgo * 3600 * 1000).toISOString()
+            : entry.value
+        }));
+        if (entries.some((entry) => entry.value === undefined)) {
+          throw new Error(`prepare entry for ${shot.surfaceId} has neither value nor isoHoursAgo`);
+        }
+        await page.goto(`${baseUrl}${shot.route}`, { waitUntil: "domcontentloaded" });
+        await page.evaluate((written) => {
+          for (const entry of written) window.localStorage.setItem(entry.key, entry.value);
+        }, entries);
+      }
+
       await page.goto(`${baseUrl}${shot.route}`, { waitUntil: "networkidle" });
       await hold(page, 900);
 
@@ -251,7 +278,25 @@ try {
       // Invisible with one claim per surface, which is why raising claim count
       // is what surfaced it.
       await target.scrollIntoViewIfNeeded();
-      if (sharesStill) await page.evaluate(() => window.scrollTo(0, 0));
+      if (shot.prepare?.scrollTo) {
+        // A declared scroll replaces the pin-to-top: same position for every
+        // shot on this surface, so a shared still stays one moment, but a
+        // position the surface chose rather than the top of a page whose
+        // subject starts below the fold.
+        const landed = await page.evaluate(({ selector, offsetPx }) => {
+          const anchor = document.querySelector(selector);
+          if (!anchor) return null;
+          const target = anchor.getBoundingClientRect().top + window.scrollY - offsetPx;
+          window.scrollTo(0, Math.max(0, target));
+          return window.scrollY;
+        }, shot.prepare.scrollTo);
+        if (landed === null) {
+          issues.push({ claimId: shot.claimId, reason: "scroll_anchor_missing", detail: shot.prepare.scrollTo.selector });
+          continue;
+        }
+      } else if (sharesStill) {
+        await page.evaluate(() => window.scrollTo(0, 0));
+      }
       await hold(page, 600);
 
       // Every value the angle asked for has to be on the page. This is the

@@ -89,6 +89,48 @@ export interface SurfaceMotion {
   actions: CaptureAction[];
 }
 
+/**
+ * Browser state a surface needs before its route loads.
+ *
+ * Some facts a film wants to show are true of a *returning* user and of nobody
+ * else. Solomon marks a job NEW by comparing it against the timestamp of your
+ * last visit, so on a browser that has never opened /jobs nothing is new and
+ * the count reads "(0 new)" beside a feed that just pulled in two thousand
+ * jobs. The screen is not lying; the browser simply has no history for it to
+ * describe.
+ *
+ * This is the same kind of state as the dev seed, and carries the same
+ * obligation: seed the *cause* a real user would have, never the number. Write
+ * "you last looked yesterday" and let the product count what changed since.
+ */
+export interface SurfaceStoredValue {
+  key: string;
+  /** A literal value to write. */
+  value?: string;
+  /** Written as an ISO timestamp this many hours before the capture runs. */
+  isoHoursAgo?: number;
+}
+
+export interface SurfacePreparation {
+  /** Why a real user's browser would hold this. Prose, for the plan document. */
+  because: string;
+  localStorage: SurfaceStoredValue[];
+  /**
+   * Where the surface sits before anything is measured.
+   *
+   * Shots that share a still must share a scroll, so this is declared once for
+   * the surface rather than per shot. Solomon's Jobs page needs it: the search
+   * panels and the filter bar are 940px tall on their own, so at scroll-top the
+   * feed the film is about is entirely below the fold and every region in it
+   * fails as `region_outside_viewport`.
+   *
+   * Expressed as an element and an offset rather than a pixel count, because a
+   * pixel count is a second representation of the layout that stops agreeing
+   * with it the moment a filter row wraps.
+   */
+  scrollTo?: { selector: string; offsetPx: number };
+}
+
 export interface ProductSurface {
   /** Becomes the inventory asset id. */
   id: string;
@@ -98,6 +140,8 @@ export interface ProductSurface {
   reach: string[];
   /** Optional: an interaction to perform and film once the route has settled. */
   motion?: SurfaceMotion;
+  /** Optional: browser state written before the route loads. */
+  prepare?: SurfacePreparation;
   /**
    * Optional: the surface this one turns into once the user acts.
    *
@@ -172,6 +216,8 @@ export interface CaptureShot {
   framing: CaptureFraming;
   /** The interaction to film on this surface, if it has one. */
   motion?: SurfaceMotion;
+  /** Browser state to write before this shot's route loads, if the surface needs it. */
+  prepare?: SurfacePreparation;
 }
 
 export interface CapturePlanIssue { claimId?: string; reason: string; detail?: string }
@@ -329,6 +375,7 @@ export function planCapture(input: {
       surfaceId: surface.id,
       route: surface.route,
       ...(surface.becomes ? { becomes: surface.becomes } : {}),
+      ...(surface.prepare ? { prepare: surface.prepare } : {}),
       regionId: region.id,
       purpose: region.purpose,
       says: quoted(requirement.says),
