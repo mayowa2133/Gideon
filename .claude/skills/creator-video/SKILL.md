@@ -10,6 +10,32 @@ running product. Everything the film says has to be provable from a crop of a
 real screen; the tooling decides structure, timing and framing, and refuses
 what it cannot verify.
 
+## The daily series: one command
+
+For the angles that run every day, the whole pipeline is wrapped:
+
+```bash
+node scripts/run-daily-series.mjs --angle remote-today
+```
+
+It reads today's feed, writes today's requirements, plans, captures, verifies,
+fills the angle's script template, compiles, checks the crops are distinct,
+renders, and files the result as
+`renders/solomon-daily-<slug>-<date>-1080x1920.mp4`. It stops at the first gate
+that fails and names it.
+
+Angles live in `scripts/daily-angles.mjs`. Each one carries a script **template**
+a person wrote, interpolated with today's counts and the role the feed drew --
+which is the only reason this can be automated without breaking the rule that no
+model writes the script. `src/shared/dailyAngles.test.ts` checks every template
+still lands in its word budget, including when the feed hands it a long title and
+a three-word company name, so a template that has stopped fitting fails at commit
+rather than at six in the morning.
+
+**It does not decide whether the film is good.** It samples a frame per scene into
+`<out>/frames/` and tells you to look. Everything under "Then render and look"
+below still applies.
+
 ## The pipeline, in order
 
 Each stage writes into one directory. **Use a fresh directory per film** —
