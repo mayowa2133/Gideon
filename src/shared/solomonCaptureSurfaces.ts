@@ -1489,6 +1489,71 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           sourceTextPx: 13
         }
       ]
+    },
+    // One company's whole hiring shape.
+    //
+    // The angle a job board cannot do: not "here are jobs" but "here is what this
+    // company is building, by what it is hiring for". Anthropic is posting across
+    // eighteen occupations -- 94 sales roles, 27 in legal and compliance, 29 in
+    // finance -- and the ones people picture when they hear "AI lab" are a
+    // minority of them.
+    //
+    // Filtered by the feed's own search, which matches title and company name.
+    // That is worth knowing rather than assuming: it does NOT match location, so
+    // the same box that finds a company returns nothing for a city.
+    //
+    // No motion. The subject is breadth, and the only interaction that would
+    // change this view is a chip that narrows it to one field -- which is the
+    // opposite of the point.
+    {
+      id: "job_feed_company",
+      route: "/jobs",
+      purpose: "the range of work one company is hiring for, in one view",
+      reach: [
+        "Open /jobs with the saved-jobs search set to the company name.",
+        "Scroll the results into frame."
+      ],
+      prepare: {
+        because: "someone who has typed one company into the feed's search and is looking at everything it is hiring for",
+        localStorage: [
+          { key: "nexusreach-jobs-last-visited", isoHoursAgo: 24 },
+          { key: "nexusreach-jobs-occupations", value: "[]" },
+          { key: "nexusreach-jobs-filters", value: JSON.stringify({ ...FEED_FILTER_DEFAULTS, searchFilter: "anthropic" }) }
+        ],
+        scrollTo: { selector: "span.ml-auto", offsetPx: 120 }
+      },
+      regions: [
+        {
+          id: "companyFeedCount",
+          purpose: "how many roles one company has open at once",
+          locator: { role: "text", name: "jobs", container: "span.ml-auto" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        // Three postings from three different fields. The count says how many;
+        // only the cards can show that they are not all the same job.
+        {
+          id: "companyFeedFirst",
+          purpose: "one role at that company, in a field that is not engineering",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "companyFeedSecond",
+          purpose: "a role from a different discipline again",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "companyFeedThird",
+          purpose: "a third, to show the range is not two exceptions",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        }
+      ]
     }
   ]
 };
