@@ -1577,6 +1577,84 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           sourceTextPx: 11
         }
       ]
+    },
+    // Remote work that is not engineering.
+    //
+    // The largest untouched set in this workspace: 1209 remote postings outside
+    // software engineering, against 275 inside it. Every film before this one
+    // either filmed engineering or filmed one company, so the claim a viewer
+    // would most reasonably doubt -- that remote work exists outside code -- had
+    // never been shown.
+    //
+    // It is shown rather than asserted because the product labels each card with
+    // the field it belongs to. Three cards carrying three different occupation
+    // badges is the argument; the voiceover only points at it.
+    //
+    // Four occupations are selected rather than "everything except engineering",
+    // because the chips are additive: there is no not-this control, and picking
+    // the four largest non-engineering fields is the honest way to say the same
+    // thing with the controls that exist.
+    {
+      id: "job_feed_remote_nontech",
+      route: "/jobs",
+      purpose: "remote roles in the fields people assume are office-bound",
+      reach: [
+        "Open /jobs with marketing, sales, HR and support selected and the remote filter off.",
+        "Click the Remote chip so the feed narrows to roles that can be done from anywhere."
+      ],
+      prepare: {
+        because: "someone who does not write code, looking for work they can do from anywhere",
+        localStorage: [
+          { key: "nexusreach-jobs-last-visited", isoHoursAgo: 24 },
+          { key: "nexusreach-jobs-occupations", value: JSON.stringify(["marketing", "human_resources", "customer_service_support", "creatives_design"]) },
+          { key: "nexusreach-jobs-filters", value: JSON.stringify({ ...FEED_FILTER_DEFAULTS, remoteFilter: true }) }
+        ],
+        scrollTo: { selector: "span.ml-auto", offsetPx: 120 }
+      },
+      // Remote is set before the load, and there is no motion, because the
+      // "Remote" chip cannot be clicked by name.
+      //
+      // A locator name is a case-insensitive substring, and the filter bar also
+      // holds an "Include remote" button which comes first in DOM order -- so
+      // `role: button, name: "Remote"` reliably clicks the wrong control. The
+      // first attempt here did exactly that: the feed never filtered, and the
+      // capture returned Nordstrom seasonal stock and a Lowe's plumbing sales
+      // floor as "remote roles". The data was right and the locator was wrong,
+      // which is the more dangerous way round -- nothing failed, it just filmed
+      // something false.
+      //
+      // The other chips ("Startup", "Software Engineering", "Marketing") have no
+      // such twin and are safe to click.
+      regions: [
+        {
+          id: "remoteNonTechCount",
+          purpose: "how many non-engineering roles can be done from anywhere",
+          locator: { role: "text", name: "jobs", container: "span.ml-auto" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        {
+          id: "remoteNonTechFirst",
+          purpose: "one remote role, in a field that is not engineering",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "remoteNonTechSecond",
+          purpose: "a second, from a different field again",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "remoteNonTechThird",
+          purpose: "a third, so the range is not two exceptions",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        }
+      ]
     }
   ]
 };
