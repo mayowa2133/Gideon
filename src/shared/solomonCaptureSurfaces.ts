@@ -1113,6 +1113,17 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       ],
       regions: [
         {
+          id: "postingTitle",
+          // The role, before the number. A film that asks the viewer to guess
+          // has to show them what they are guessing about, and the heading is
+          // the only place the posting states it plainly -- the feed card
+          // truncates long titles with an ellipsis.
+          purpose: "what the role is called, in the posting's own heading",
+          locator: { role: "text", name: "{job.title}", container: "h1" },
+          fields: ["job.title"],
+          sourceTextPx: 18
+        },
+        {
           id: "postingSalary",
           // The value's own span, not the row that holds it. The row is a block
           // and comes out 1248px wide -- it reads 10.2px, while the span reads
