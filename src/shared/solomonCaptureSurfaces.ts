@@ -1387,6 +1387,108 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           sourceTextPx: 11
         }
       ]
+    },
+    // The same feed, filtered to a field that is not engineering.
+    //
+    // Worth having for a reason beyond one more angle: every surface above was
+    // built and tuned against software-engineering results, so none of them
+    // proved the pipeline works when the subject changes. Marketing is the
+    // larger set in this workspace -- 1172 postings against engineering's 715 --
+    // and it exercises the same regions with different words in them, which is
+    // the only way to find out whether the framing budgets were fitted to
+    // engineering job titles by accident.
+    {
+      id: "job_feed_marketing",
+      route: "/jobs",
+      purpose: "the marketing roles that arrived since the user last looked",
+      reach: [
+        "Write yesterday's timestamp as the Jobs page's last visit, and clear the occupation chips.",
+        "Click the Marketing chip so the feed narrows to marketing roles."
+      ],
+      prepare: {
+        because: "a returning user who last opened the Jobs tab yesterday and works in marketing",
+        localStorage: [
+          { key: "nexusreach-jobs-last-visited", isoHoursAgo: 24 },
+          { key: "nexusreach-jobs-occupations", value: "[]" },
+          { key: "nexusreach-jobs-filters", value: JSON.stringify(FEED_FILTER_DEFAULTS) }
+        ],
+        scrollTo: { selector: "span.ml-auto", offsetPx: 120 }
+      },
+      motion: {
+        shows: "the feed narrowing from every field to marketing as the chip is picked",
+        actions: [{ kind: "click", locator: { role: "button", name: "Marketing" } }]
+      },
+      regions: [
+        {
+          id: "marketingFeedCount",
+          purpose: "how many marketing roles match and how many arrived since the last visit",
+          locator: { role: "text", name: "jobs", container: "span.ml-auto" },
+          fields: [],
+          sourceTextPx: 13
+        },
+        {
+          id: "marketingFeedCard",
+          purpose: "one marketing posting as the feed lists it",
+          locator: { role: "text", name: "{job.title}", container: "div.min-w-0.flex-1" },
+          fields: ["job.title", "job.company"],
+          sourceTextPx: 11
+        },
+        {
+          id: "marketingFeedSort",
+          purpose: "that the feed is ordered by arrival, newest at the top",
+          locator: { role: "text", name: "Newest First", container: "select" },
+          fields: [],
+          sourceTextPx: 11
+        }
+      ]
+    },
+    // What the posting actually asks the person to do.
+    //
+    // This was declared unfilmable earlier and the note said so: at the capture
+    // viewport the description was a block 1226px wide holding one 14px line,
+    // which cropped to 8.8px against a 20px floor. The cause was `max-w-none` on
+    // the prose container, overriding the plugin's 65ch measure -- 124 characters
+    // per line, roughly twice the width at which a reader loses their place
+    // between lines. Removing it is a readability fix that happens to make the
+    // region claimable: the column is 530px, a bullet is 508x40 across two lines,
+    // and it reads 22-24px.
+    //
+    // The earlier note also said narrowing "would put it at about 19.7px, still
+    // under". That arithmetic used sourceTextPx 11 -- the value declared for a
+    // card region -- where 14px prose measures 13. The floor was never the
+    // problem; the assumed type height was.
+    {
+      id: "job_posting_requirements",
+      route: "/jobs/{job.id}",
+      purpose: "the responsibilities a posting lists, in its own words",
+      reach: [
+        "Open the posting's own page and wait for the description to render.",
+        "Scroll the responsibilities into frame; the description sits well down the page."
+      ],
+      prepare: {
+        because: "a reader who has scrolled to the part of the posting that says what the job is",
+        localStorage: [],
+        // Anchored on the first bullet with its heading left in frame. An offset
+        // from the list is stable where a pixel count is not: how far down the
+        // description starts is whatever that posting's preamble happens to be.
+        scrollTo: { selector: ".prose li", offsetPx: 150 }
+      },
+      regions: [
+        {
+          id: "postingDuty",
+          purpose: "one responsibility, as the posting words it",
+          locator: { role: "text", name: "{job.duty}", container: ".prose li" },
+          fields: ["job.duty"],
+          sourceTextPx: 13
+        },
+        {
+          id: "postingDutySecond",
+          purpose: "a second responsibility, so the list reads as a list",
+          locator: { role: "text", name: "{job.duty2}", container: ".prose li" },
+          fields: ["job.duty2"],
+          sourceTextPx: 13
+        }
+      ]
     }
   ]
 };

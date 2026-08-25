@@ -54,6 +54,36 @@ const countRequirement = (surface, region, says) => ({
 });
 
 export const DAILY_ANGLES = {
+"marketing-today": {
+    surface: "job_feed_marketing",
+    topic: "Marketing jobs hiring right now",
+    seconds: 18,
+    slug: "marketing-hiring-now",
+    plan: (feed, spent = new Set()) => {
+      const top = unspent(feed, spent);
+      if (!top) return null;
+      return {
+        spent: [cardKey(top)],
+        requirements: [
+          countRequirement("job_feed_marketing", "marketingFeedCount", "How many marketing roles match, and how many are new"),
+          cardRequirement("role", "job_feed_marketing", "marketingFeedCard", top, "One marketing posting, with the employer on it"),
+          { id: "sort", surfaceId: "job_feed_marketing", regionId: "marketingFeedSort", pattern: "wide_strip",
+            says: "The feed is ordered newest first", fixture: {} }
+        ],
+        script: [
+          { id: "hook", vo: "Marketing roles, not just engineering ones." },
+          { id: "beat-0", vo: "You do not have to code to get hired." },
+          { id: "proof-matched-1", claimId: "matched", vo: `${feed.matched} matched, and ${feed.fresh} are new.` },
+          { id: "beat-2", vo: "Every one is a real open posting." },
+          { id: "proof-role-3", claimId: "role", vo: `A ${words(top.title, 3)} role at ${top.company}.` },
+          { id: "beat-4", vo: "Found this morning, not last month." },
+          { id: "proof-sort-5", claimId: "sort", vo: "Sorted newest first, so today leads." },
+          { id: "cta", vo: "Follow @solomonhq for tomorrow's list." }
+        ]
+      };
+    }
+  },
+
   "remote-today": {
     surface: "job_feed_remote",
     topic: "Remote engineering jobs I found today",
