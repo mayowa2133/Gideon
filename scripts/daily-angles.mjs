@@ -53,8 +53,96 @@ const countRequirement = (surface, region, says) => ({
   id: "matched", surfaceId: surface, regionId: region, pattern: "wide_strip", says, fixture: {}
 });
 
+/**
+ * Cards a listicle film can actually use, from the part of the feed it can see.
+ *
+ * Three constraints, each learned by capturing something wrong first:
+ *
+ *  - **The window.** Every claim on a surface shares one scroll, so the count and
+ *    all the cards must sit inside one 900px viewport. That is about five cards;
+ *    the sixth reports `region_outside_viewport` and the film loses a beat it has
+ *    already written a line for.
+ *
+ *  - **Distinct, readable employers.** The first five were once five postings
+ *    from one insurer whose name the source had stored as "AL" -- three
+ *    identical-looking cards and a company that reads as a typo. One card per
+ *    employer, and a name too short to be a name is skipped.
+ *
+ *  - **Titles that do not contradict the angle.** A film about work that is not
+ *    software engineering cannot open on a "Web Developer & Digital Marketing
+ *    Specialist". The angle says what disqualifies a card; this enforces it.
+ *
+ * Returns fewer than asked for rather than something that breaks one of those.
+ * The caller decides whether fewer is still a film.
+ */
+export const pickCards = (feed, spent, { window = 5, take = 2, disqualify } = {}) => {
+  const seen = new Set();
+  const picked = [];
+  for (const card of (feed.top ?? []).slice(0, window)) {
+    const employer = String(card.company ?? "").trim();
+    if (employer.length < 4) continue;
+    if (seen.has(employer.toLowerCase())) continue;
+    if (spent.has(cardKey(card))) continue;
+    if (disqualify && disqualify.test(card.title ?? "")) continue;
+    seen.add(employer.toLowerCase());
+    picked.push(card);
+    if (picked.length === take) break;
+  }
+  return picked;
+};
+
 export const DAILY_ANGLES = {
-"marketing-today": {
+  "remote-nontech": {
+    surface: "job_feed_remote_nontech",
+    topic: "Remote jobs that are not software engineering",
+    seconds: 18,
+    slug: "remote-not-engineering",
+    plan: (feed, spent = new Set()) => {
+      // Exactly two cards, because the script below is written for two. Asking
+      // for three and settling for two would leave a beat with a line and no
+      // picture; if two distinct employers cannot be found in the window, this
+      // angle has no film today and says so.
+      const cards = pickCards(feed, spent, {
+        window: 5,
+        take: 2,
+        // A developer role would contradict the only thing this film claims.
+        disqualify: /\b(engineer|engineering|developer|programmer)\b/i
+      });
+      if (cards.length < 2) return null;
+      const [a, b] = cards;
+      return {
+        spent: cards.map(cardKey),
+        requirements: [
+          countRequirement("job_feed_remote_nontech", "remoteNonTechCount",
+            "How many non-engineering roles can be done from anywhere"),
+          cardRequirement("first", "job_feed_remote_nontech", "remoteNonTechFirst", a,
+            "One remote role, in a field that is not engineering"),
+          cardRequirement("second", "job_feed_remote_nontech", "remoteNonTechSecond", b,
+            "A second, at a different company")
+        ],
+        script: [
+          { id: "hook", vo: "Remote work is not just for engineers." },
+          { id: "beat-0", vo: "People assume you have to write code." },
+          { id: "proof-matched-1", claimId: "matched", vo: `${feed.matched} of them, ${feed.fresh} arrived today.` },
+          { id: "beat-2", vo: "Neither of these is an engineering role." },
+          // Employer capped at two words as well as the title. This is the only
+          // template that names two companies, so it carries twice the length
+          // variance of the others -- "Berkshire Hathaway Specialty Insurance"
+          // and "General Motors Financial Services" together pushed it to 58
+          // against a 57 ceiling. Saying "at General Motors" of a card reading
+          // "General Motors Financial Services" is the shortening a person would
+          // make out loud, and the compiler still checks the line carries the
+          // claim's own words.
+          { id: "proof-first-3", claimId: "first", vo: `A ${words(a.title, 3)} role at ${words(a.company, 2)}.` },
+          { id: "beat-4", vo: "A different company, same arrangement entirely." },
+          { id: "proof-second-5", claimId: "second", vo: `A ${words(b.title, 3)} role at ${words(b.company, 2)}.` },
+          { id: "cta", vo: "Follow @solomonhq for tomorrow's list." }
+        ]
+      };
+    }
+  },
+
+  "marketing-today": {
     surface: "job_feed_marketing",
     topic: "Marketing jobs hiring right now",
     seconds: 18,

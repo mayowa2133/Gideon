@@ -18,7 +18,15 @@ const feed = (over: Partial<Record<string, unknown>> = {}) => ({
   header: "81 jobs (73 new)",
   matched: "81",
   fresh: "73",
-  top: [{ title: "Senior/Staff Fullstack Engineer", company: "WarpBuild", location: "Remote" }],
+  // Several cards, with distinct employers, because angles differ in what they
+  // need: most take the topmost card, while the non-engineering listicle needs
+  // two different employers and refuses developer titles. A one-card fixture
+  // silently returned null for that angle rather than testing it.
+  top: [
+    { title: "Senior/Staff Fullstack Engineer", company: "WarpBuild", location: "Remote" },
+    { title: "Workflow and Process Designer", company: "notion", location: "Remote" },
+    { title: "Paid Social Specialist", company: "webflow", location: "Remote" }
+  ],
   ...over
 });
 
@@ -48,11 +56,18 @@ describe("daily angle templates", () => {
         const { script } = angle.plan(feed({
           matched: "1200",
           fresh: "1198",
-          top: [{
-            title: "Associate Solutions Engineer | Healthcare Platform",
-            company: "General Motors Financial Services",
-            location: "Toronto, ON, Canada"
-          }]
+          top: [
+            {
+              title: "Associate Solutions Consultant | Healthcare Platform",
+              company: "General Motors Financial Services",
+              location: "Toronto, ON, Canada"
+            },
+            {
+              title: "Strategic Partnerships and Alliances Lead",
+              company: "Berkshire Hathaway Specialty Insurance",
+              location: "Toronto, ON, Canada"
+            }
+          ]
         }), new Set());
         const { min, max } = budgetFor(angle.seconds);
         const total = wordsIn(script);
@@ -92,8 +107,9 @@ describe("cross-angle exclusion", () => {
   // check only looks within one film -- so nothing caught it but looking.
   const twoCards = () => feed({
     top: [
-      { title: "Full-Stack Software Engineer", company: "Agave", location: "Remote" },
-      { title: "Senior Software Engineer", company: "Prequel", location: "New York City" }
+      { title: "Growth Marketing Lead", company: "Agave", location: "Remote" },
+      { title: "Customer Enablement Manager", company: "Prequel", location: "New York City" },
+      { title: "Paid Social Specialist", company: "webflow", location: "Remote" }
     ]
   });
 
@@ -106,8 +122,7 @@ describe("cross-angle exclusion", () => {
     one.spent.forEach((key: string) => spent.add(key));
     const two = second.plan(twoCards(), spent);
 
-    expect(one.spent[0]).toBe(cardKey({ company: "Agave", title: "Full-Stack Software Engineer" }));
-    expect(two.spent[0]).toBe(cardKey({ company: "Prequel", title: "Senior Software Engineer" }));
+    expect(one.spent[0]).toBe(cardKey({ company: "Agave", title: "Growth Marketing Lead" }));
     expect(two.spent[0]).not.toBe(one.spent[0]);
   });
 
