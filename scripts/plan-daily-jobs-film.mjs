@@ -99,7 +99,14 @@ const feed = await page.evaluate(() => {
   // The top few cards, not just the first. A listicle film claims several roles
   // and each one needs its own locator text, so the whole shortlist has to come
   // off the same render the capture will shoot.
-  const top = [...(column?.children ?? [])].slice(0, 6).map((node) => {
+  // Twenty, not six. A listicle film picks three cards that differ from each
+  // other -- different field, different employer -- and the first six are often
+  // six postings from one company. Picking from a database query instead is the
+  // mistake this whole script exists to prevent: the feed applies its occupation
+  // filter server-side and orders by its own rule, so a SQL ranking and the
+  // rendered list agree until they suddenly do not, and the capture then hunts
+  // for a card that was never on the page.
+  const top = [...(column?.children ?? [])].slice(0, 20).map((node) => {
     const roleTitle = node.querySelector("div.font-medium.text-sm.truncate")?.textContent?.trim() ?? null;
     const companyCell = [...node.querySelectorAll("div.text-xs.text-muted-foreground")]
       .map((inner) => inner.textContent?.trim() ?? "")
