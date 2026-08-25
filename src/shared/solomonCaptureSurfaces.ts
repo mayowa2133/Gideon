@@ -257,6 +257,18 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
         {
           id: "savedContact",
           purpose: "one saved person: who they are and what they do",
+          // UNVERIFIED: this declares 14px where `contact/contactCard` declares 9
+          // for what is plausibly the same card root -- the People card carries
+          // both `flex-col` and `group/card`, so these two locators may resolve
+          // to one element. They sit on different surfaces and so cannot collide
+          // inside one film, but one of the two numbers is wrong, and
+          // `sourceTextPx` is what the framing budget is arithmetic on: too high
+          // buys a budget that passes planning and renders illegible.
+          //
+          // Not corrected here because the honest fix is to capture this surface
+          // and read the OCR median, and guessing at the number instead of
+          // measuring it is the specific mistake that has cost this pipeline
+          // three times.
           locator: { role: "text", name: "{contact.name}", container: "div.flex-col" },
           fields: ["contact.name"],
           sourceTextPx: 14
