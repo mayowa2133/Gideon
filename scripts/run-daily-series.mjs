@@ -50,7 +50,21 @@ if (!wanted.length || unknown.length) {
   process.exit(1);
 }
 
-const today = new Date().toISOString().slice(0, 10);
+// Local date, not UTC.
+//
+// `toISOString()` is UTC, and the wrapper names its logs with `date +%Y-%m-%d`,
+// which is local. Any run after 20:00 in this timezone therefore filed its films
+// under tomorrow while its log said today, and the wrapper's own "here is what I
+// made" listing found nothing and showed the previous run's output instead. At
+// 07:00 the two clocks agree, so this would have sat here indefinitely.
+//
+// Local wins because the schedule is local: a "daily" film belongs to the day
+// the person running it is having.
+const today = (() => {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+})();
 const handle = arg("--handle", "@solomonhq");
 const outFor = (angleId) => path.join(ROOT, arg("--out", `tmp/daily-${angleId}-${today}`));
 

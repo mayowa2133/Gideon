@@ -68,8 +68,18 @@
   <key>RunAtLoad</key>
   <false/>
 
+  <!--
+    Standard, not Background.
+    
+    `Background` looked like the polite choice for a job nobody asked for, and it
+    is exactly wrong here: macOS applies background QoS to it, throttling CPU and
+    I/O so the job cannot affect interactive work. The same run that took 18
+    minutes from a shell had not finished its first film after 23, and Remotion
+    hit its own render timeout. Rendering video is CPU-bound; it cannot be run at
+    a priority chosen to keep it out of the way.
+  -->
   <key>ProcessType</key>
-  <string>Background</string>
+  <string>Standard</string>
 
   <key>StandardOutPath</key>
   <string>/Users/mayowaadesanya/Projects/Gideon/logs/launchd.out.log</string>

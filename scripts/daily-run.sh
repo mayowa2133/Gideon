@@ -143,9 +143,22 @@ else
   wait_for_http "$SOLOMON_DEMO_URL" frontend
 fi
 
+# A marker to date the films against. `ls renders/*<today>*.mp4` matches films
+# from every run today, including ones this run did not produce -- so a run that
+# fails during render still lists yesterday-evening's output and reads as a
+# success. That nearly went out as "here are the films the scheduled run made".
+touch "$LOG_DIR/.run-started"
+
 say "cutting today's films"
 cd "$GIDEON"
 node scripts/run-daily-series.mjs --ingest --all || fail "run-daily-series exited non-zero"
 
-say "done. films:"
-ls -1 "$GIDEON"/renders/solomon-daily-*"$(date +%Y-%m-%d)"*.mp4 2>/dev/null || say "(no film files matched today's date)"
+say "done. films this run produced:"
+produced=$(find "$GIDEON/renders" -name 'solomon-daily-*.mp4' -newer "$LOG_DIR/.run-started" 2>/dev/null || true)
+if [ -n "$produced" ]; then
+  echo "$produced"
+else
+  # Reaching here means the films stage claimed success and wrote nothing, which
+  # is a failure however green the log looks.
+  fail "no film was written by this run"
+fi
