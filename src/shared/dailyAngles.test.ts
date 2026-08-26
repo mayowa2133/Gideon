@@ -22,10 +22,13 @@ const feed = (over: Partial<Record<string, unknown>> = {}) => ({
   // need: most take the topmost card, while the non-engineering listicle needs
   // two different employers and refuses developer titles. A one-card fixture
   // silently returned null for that angle rather than testing it.
+  // `age` is what the product printed in the company cell. Most angles ignore
+  // it; the overnight film ends on it, and a fixture without it silently made
+  // that angle return null instead of being tested.
   top: [
-    { title: "Senior/Staff Fullstack Engineer", company: "WarpBuild", location: "Remote" },
-    { title: "Workflow and Process Designer", company: "notion", location: "Remote" },
-    { title: "Paid Social Specialist", company: "webflow", location: "Remote" }
+    { title: "Senior/Staff Fullstack Engineer", company: "WarpBuild", location: "Remote", age: "22 hours ago" },
+    { title: "Workflow and Process Designer", company: "notion", location: "Remote", age: "1 day ago" },
+    { title: "Paid Social Specialist", company: "webflow", location: "Remote", age: "Today" }
   ],
   ...over
 });
@@ -60,12 +63,14 @@ describe("daily angle templates", () => {
             {
               title: "Associate Solutions Consultant | Healthcare Platform",
               company: "General Motors Financial Services",
-              location: "Toronto, ON, Canada"
+              location: "Toronto, ON, Canada",
+              age: "22 hours ago"
             },
             {
               title: "Strategic Partnerships and Alliances Lead",
               company: "Berkshire Hathaway Specialty Insurance",
-              location: "Toronto, ON, Canada"
+              location: "Toronto, ON, Canada",
+              age: "1 day ago"
             }
           ]
         }), new Set());
@@ -83,6 +88,44 @@ describe("daily angle templates", () => {
         for (const beat of script.filter((b: any) => b.claimId)) {
           expect(claimIds, `${id}: beat ${beat.id} names an unknown claim`).toContain(beat.claimId);
           expect(beat.vo.trim().length, `${id}: beat ${beat.id} is silent`).toBeGreaterThan(0);
+        }
+      });
+
+      it("hands its claims out in the order the beat plan will", () => {
+        // Requirements order and proof-beat order are one fact written twice.
+        // `planBeats` walks `claimIds` in array order and drops them onto
+        // ascending slots, and the brief then demands the script's beat ids
+        // match its own, in its order -- so a template that lists its claims in
+        // one order and numbers its beats in another dies at `beat_mismatch`,
+        // at seven in the morning, with nothing else having complained. Found
+        // by reordering the overnight angle's claims and watching every other
+        // test still pass.
+        const { script, requirements } = angle.plan(feed(), new Set());
+        const claimOrder = requirements.map((r: any) => r.id);
+        const proofOrder = script.filter((b: any) => b.claimId).map((b: any) => b.claimId);
+        expect(proofOrder, `${id}: claims are listed in a different order than the beats name them`)
+          .toEqual(claimOrder);
+        const slots = script.filter((b: any) => b.claimId).map((b: any) => Number(b.id.split("-").at(-1)));
+        expect(slots, `${id}: proof beats are not numbered in ascending slot order`)
+          .toEqual([...slots].sort((a, b) => a - b));
+      });
+
+      it("does not double a separator when the title is clipped mid-phrase", () => {
+        // Real titles carry their own punctuation and the three-word cut lands
+        // on it often: "Staff Software Engineer, AI Foundations (AI Agent
+        // Optimization)" becomes "Staff Software Engineer," and the template
+        // appends its own comma. Word budgets and claim gates all still pass --
+        // the line just reads wrong and the narrator stumbles over it.
+        const { script } = angle.plan(feed({
+          top: [
+            { title: "Staff Software Engineer, AI Foundations", company: "temporaltechnologies", location: "Remote", age: "22 hours ago" },
+            { title: "Growth Marketing Lead - Enterprise", company: "Agave", location: "Remote", age: "1 day ago" },
+            { title: "Paid Social Specialist | Retail", company: "webflow", location: "Remote", age: "Today" }
+          ]
+        }), new Set());
+        for (const beat of script) {
+          expect(beat.vo, `${id}: ${beat.id} doubles a separator: ${beat.vo}`)
+            .not.toMatch(/[,;:|]\s*[,;:|]|\s[,;:.]/);
         }
       });
 
@@ -140,5 +183,84 @@ describe("cross-angle exclusion", () => {
     const { cardKey } = (await import("../../scripts/daily-angles.mjs")) as any;
     expect(cardKey({ company: " Agave ", title: "Full-Stack Software Engineer" }))
       .toBe(cardKey({ company: "agave", title: "full-stack software engineer" }));
+  });
+});
+
+// The overnight film is the one angle whose argument is a chain rather than a
+// list, so it has requirements the other four do not: it must end on the job,
+// and it can only run on a card the product actually dated.
+describe("overnight", () => {
+  const overnight = () => (DAILY_ANGLES as any).overnight;
+  const dated = (over: Record<string, unknown> = {}) => feed(over);
+
+  it("closes on the posting, not on the sort control", () => {
+    // The defect this rewrite exists for. The listicle version ended on
+    // `Newest First` -- an 18-second film spending its last beat on a
+    // preference menu -- and nothing failed, because a sort control is a
+    // perfectly legible claim. Only the running order was wrong.
+    const { script } = overnight().plan(dated(), new Set());
+    const proofs = script.filter((b: any) => b.claimId);
+    expect(proofs.at(-1)!.claimId, "the last claim beat must be the job").toBe("newest");
+    expect(proofs.map((b: any) => b.claimId)).toEqual(["matched", "sort", "newest"]);
+  });
+
+  it("speaks the product's own wording for the age", () => {
+    const { script } = overnight().plan(dated(), new Set());
+    const close = script.find((b: any) => b.claimId === "newest")!;
+    // Not a computed duration: any figure spoken here has to be one the crop
+    // already shows, and `age` is the string the card rendered.
+    expect(close.vo).toContain("22 hours ago");
+  });
+
+  it("will not run on a feed the product never dated", () => {
+    const undatedCards = dated({
+      top: [
+        { title: "Senior Software Engineer", company: "Prequel", location: "Remote" },
+        { title: "Founding Engineer", company: "Heaviai", location: "Remote" }
+      ]
+    });
+    expect(overnight().plan(undatedCards, new Set())).toBeNull();
+  });
+
+  it("will not claim an overnight arrival on a morning with nothing new", () => {
+    expect(overnight().plan(dated({ fresh: null }), new Set())).toBeNull();
+    // "0" is a truthy string. The product does not currently render "(0 new)",
+    // so this only bites if that rendering changes -- which is exactly the kind
+    // of coupling worth not having.
+    expect(overnight().plan(dated({ fresh: "0" }), new Set())).toBeNull();
+  });
+
+  it("skips a one-word role, which cannot fill the closing beat", () => {
+    // "Engineer, posted Today." is three words against a four-word floor, so the
+    // card is unusable for this angle even though it is dated.
+    const { script, spent } = overnight().plan(dated({
+      top: [
+        { title: "Engineer", company: "Solo", location: "Remote", age: "Today" },
+        { title: "Growth Marketing Lead", company: "Agave", location: "Remote", age: "3 hours ago" }
+      ]
+    }), new Set());
+    expect(spent[0]).toContain("agave");
+    expect(script.find((b: any) => b.claimId === "newest")!.vo).toContain("3 hours ago");
+  });
+
+  it("fits the budget whether the age is one word or three", () => {
+    const { min, max } = budgetFor(overnight().seconds);
+    for (const age of ["Today", "Just now", "22 hours ago", "1 day ago"]) {
+      const { script } = overnight().plan(dated({
+        top: [{ title: "Staff Software Engineer", company: "temporaltechnologies", location: "Remote", age }]
+      }), new Set());
+      const total = wordsIn(script);
+      expect(total, `age "${age}": ${total} words against ${min}-${max}`).toBeGreaterThanOrEqual(min);
+      expect(total, `age "${age}": ${total} words against ${min}-${max}`).toBeLessThanOrEqual(max);
+    }
+  });
+
+  it("keeps every numeral it speaks inside a beat that shows one", () => {
+    // `ungrounded_numeral` is a compile gate: a non-proof beat may not contain a
+    // figure at all, because there is no evidence under it to check against.
+    const { script } = overnight().plan(dated(), new Set());
+    for (const beat of script.filter((b: any) => !b.claimId)) {
+      expect(/\d/.test(beat.vo), `${beat.id} speaks a figure it cannot prove: ${beat.vo}`).toBe(false);
+    }
   });
 });
