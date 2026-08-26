@@ -112,7 +112,14 @@ const feed = await page.evaluate(() => {
       .map((inner) => inner.textContent?.trim() ?? "")
       .find((text) => text.length > 0) ?? "";
     const place = node.querySelector("span.text-xs.text-muted-foreground")?.textContent?.trim() ?? null;
-    return { title: roleTitle, company: companyCell.split("\u00b7")[0].trim(), location: place };
+    // The age as the product prints it ("15 hours ago"), kept per card rather
+    // than only for the first dated one below. A film whose argument *is* the
+    // chronology needs every card's age: it picks three postings by how far
+    // apart in the night they went up, which cannot be read off a list that
+    // records only that some card somewhere carried a date.
+    const cell = companyCell.includes("\u00b7") ? companyCell : "";
+    const age = cell ? cell.split("\u00b7").slice(1).join("\u00b7").trim() : null;
+    return { title: roleTitle, company: companyCell.split("\u00b7")[0].trim(), location: place, age };
   }).filter((entry) => entry.title);
 
   // The first card that shows how old the posting is.
