@@ -1,0 +1,530 @@
+{
+  "version": "meet-solomon-v2",
+  "id": "meet-solomon-what-changed-v2",
+  "title": "Meet Solomon — What changed? (V2)",
+  "requiredEvidence": {
+    "older-age": "3 days ago",
+    "recent-age": "13 hours ago",
+    "field": "Software Engineering",
+    "sort": "Newest First",
+    "filter-00": "Startup",
+    "filter-02": "Startup",
+    "count-00": "200 jobs (13 new)",
+    "count-02": "200 jobs (3 new)"
+  },
+  "scenes": [
+    {
+      "id": "again",
+      "layout": "repeat",
+      "vo": "You check the jobs again.",
+      "headline": "Again.",
+      "background": "ivory",
+      "presenter": "left",
+      "expression": "skeptical",
+      "gesture": "open_palm",
+      "action": "gather",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "The repeated search is the problem, not a missed application deadline.",
+      "visualMetaphor": "Oversized duplicate search cards crowd the presenter; clearly labelled illustration.",
+      "transition": "Cut closer to the search loop.",
+      "captionPhrases": [
+        {
+          "text": "You check the jobs",
+          "style": "bold"
+        },
+        {
+          "text": "again.",
+          "style": "serif"
+        }
+      ]
+    },
+    {
+      "id": "same-scroll",
+      "layout": "inspect",
+      "vo": "Same search. Same scroll.",
+      "headline": "SAME SEARCH.\nSAME SCROLL.",
+      "background": "clay",
+      "presenter": "close",
+      "expression": "skeptical",
+      "gesture": "thinking_hand",
+      "action": "inspect",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "The viewer recognizes repetitive browsing.",
+      "visualMetaphor": "Close reaction shot; the mascot looks up at a recurring search card.",
+      "transition": "Cut from a repeated card to a verified posting date.",
+      "captionPhrases": [
+        {
+          "text": "Same search.",
+          "style": "bold"
+        },
+        {
+          "text": "Same scroll.",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "date",
+      "layout": "age",
+      "vo": "Posted three days ago.",
+      "headline": "POSTED",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "concerned",
+      "gesture": "open_palm",
+      "action": "reset",
+      "proofs": [
+        {
+          "id": "older-age",
+          "x": 90,
+          "y": 1230,
+          "w": 900,
+          "h": 160,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "older-age"
+      ],
+      "newInformation": "The actual captured listing is three days old, without calling it closed.",
+      "visualMetaphor": "Large bold numeral with the real timestamp immediately underneath.",
+      "transition": "The character asks a different question.",
+      "captionPhrases": []
+    },
+    {
+      "id": "whats-new",
+      "layout": "question",
+      "vo": "But what's new?",
+      "headline": "What's new?",
+      "background": "clay",
+      "presenter": "close",
+      "expression": "focused",
+      "gesture": "open_palm",
+      "action": "push",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "The useful question is which roles are newer.",
+      "visualMetaphor": "The mascot pushes the recurring search card off screen, making room for the question.",
+      "transition": "Hard reset to an early brand introduction.",
+      "captionPhrases": [
+        {
+          "text": "But what's new?",
+          "style": "serif"
+        }
+      ],
+      "actionCue": "what's"
+    },
+    {
+      "id": "meet",
+      "layout": "meet",
+      "vo": "Meet Solomon.",
+      "headline": "Meet\nSolomon.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "friendly",
+      "gesture": "wave",
+      "action": "present",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "Introduce Solomon by eight seconds.",
+      "visualMetaphor": "Large title, a single confident wave, no duplicate strapline.",
+      "transition": "Presenter turns attention to real product criteria.",
+      "captionPhrases": [
+        {
+          "text": "Meet Solomon.",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "field",
+      "layout": "field",
+      "vo": "Choose your field. Software engineering, for example.",
+      "headline": "CHOOSE YOUR FIELD.",
+      "background": "sage",
+      "presenter": "absent",
+      "expression": "focused",
+      "gesture": "true_point_right",
+      "action": "point",
+      "proofs": [
+        {
+          "id": "field",
+          "x": 80,
+          "y": 820,
+          "w": 920,
+          "h": 200,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "field"
+      ],
+      "newInformation": "Software Engineering is visibly selected in the recorded product.",
+      "visualMetaphor": "The real occupation chip fills the frame above an attentive presenter.",
+      "transition": "Match cut from the occupation chip to the Startup filter.",
+      "captionPhrases": [
+        {
+          "text": "Choose your field.",
+          "style": "bold"
+        },
+        {
+          "text": "Software engineering, for example.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "Software engineering"
+    },
+    {
+      "id": "filter",
+      "layout": "filter",
+      "vo": "Looking for startups? Narrow the feed.",
+      "headline": "NARROW THE FEED.",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "focused",
+      "gesture": "true_point_left",
+      "action": "point",
+      "proofs": [
+        {
+          "id": "filter-00",
+          "x": 105,
+          "y": 645,
+          "w": 870,
+          "h": 215,
+          "phase": "before"
+        },
+        {
+          "id": "filter-02",
+          "x": 105,
+          "y": 645,
+          "w": 870,
+          "h": 215,
+          "phase": "after"
+        },
+        {
+          "id": "count-00",
+          "x": 105,
+          "y": 1110,
+          "w": 870,
+          "h": 235,
+          "phase": "before"
+        },
+        {
+          "id": "count-02",
+          "x": 105,
+          "y": 1110,
+          "w": 870,
+          "h": 235,
+          "phase": "after"
+        }
+      ],
+      "evidence": [
+        "filter-00",
+        "filter-02",
+        "count-00",
+        "count-02"
+      ],
+      "newInformation": "The same captured Startup selection changes the displayed result count.",
+      "visualMetaphor": "Two large authentic crops change together, explicitly labelled before and after filtering.",
+      "transition": "Hard cut to the actual resulting feed.",
+      "captionPhrases": [
+        {
+          "text": "Looking for startups?",
+          "style": "bold"
+        },
+        {
+          "text": "Narrow the feed.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "Narrow"
+    },
+    {
+      "id": "feed",
+      "layout": "feed",
+      "vo": "Here's what the filtered feed looks like.",
+      "headline": "YOUR FILTERED FEED.",
+      "background": "sage",
+      "presenter": "absent",
+      "expression": "friendly",
+      "gesture": "open_palm",
+      "action": "reset",
+      "proofs": [
+        {
+          "id": "feed-context",
+          "x": 45,
+          "y": 505,
+          "w": 990,
+          "h": 850,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "feed-context"
+      ],
+      "newInformation": "Show the recognizable application and the resulting listings, not a claim-bearing whole-screen crop.",
+      "visualMetaphor": "The actual app gets the whole canvas for an establishing view.",
+      "transition": "Reset with the character before another product concept.",
+      "captionPhrases": [
+        {
+          "text": "Here's what the filtered feed looks like.",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "less",
+      "layout": "reset",
+      "vo": "Less to sift through.",
+      "headline": "LESS TO\nSIFT THROUGH.",
+      "background": "clay",
+      "presenter": "close",
+      "expression": "happy",
+      "gesture": "approval",
+      "action": "reset",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "The viewer has a narrower set to review.",
+      "visualMetaphor": "A tight relaxed reaction shot breaks the proof-heavy sequence.",
+      "transition": "The presenter redirects attention to a sorting control.",
+      "captionPhrases": [
+        {
+          "text": "Less to sift through.",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "sort",
+      "layout": "sort",
+      "vo": "Now start with newest first.",
+      "headline": "NEWEST\nFIRST.",
+      "background": "ivory",
+      "presenter": "left",
+      "expression": "focused",
+      "gesture": "true_point_right",
+      "action": "point",
+      "proofs": [
+        {
+          "id": "sort",
+          "x": 110,
+          "y": 770,
+          "w": 860,
+          "h": 190,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "sort"
+      ],
+      "newInformation": "Newest First is visibly selected in the actual product.",
+      "visualMetaphor": "The real control occupies most of the middle frame; the hand and eyes arrive together.",
+      "transition": "Cut from the ordering control into a listing.",
+      "captionPhrases": [
+        {
+          "text": "Now start with",
+          "style": "bold"
+        },
+        {
+          "text": "newest first.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "newest"
+    },
+    {
+      "id": "role",
+      "layout": "role",
+      "vo": "Read the role, then check its timestamp.",
+      "headline": "READ THE ROLE.",
+      "background": "sage",
+      "presenter": "right",
+      "expression": "focused",
+      "gesture": "true_point_left",
+      "action": "inspect",
+      "proofs": [
+        {
+          "id": "recent-role",
+          "x": 75,
+          "y": 560,
+          "w": 930,
+          "h": 225,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "recent-role"
+      ],
+      "newInformation": "One genuine listing contains both a role name and a visible posting age.",
+      "visualMetaphor": "Large product headline; an editorial underline moves from title to age as the voice directs it.",
+      "transition": "Match cut from the source timestamp to an oversized number.",
+      "captionPhrases": [
+        {
+          "text": "Read the role,",
+          "style": "bold"
+        },
+        {
+          "text": "then check its timestamp.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "then check"
+    },
+    {
+      "id": "fresh",
+      "layout": "fresh",
+      "vo": "Thirteen hours ago.",
+      "headline": "POSTED",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "happy",
+      "gesture": "open_palm",
+      "action": "reset",
+      "proofs": [
+        {
+          "id": "recent-age",
+          "x": 80,
+          "y": 1230,
+          "w": 920,
+          "h": 160,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "recent-age"
+      ],
+      "newInformation": "This different archived listing says thirteen hours ago.",
+      "visualMetaphor": "Same number layout as the opening, switching coral days to mint hours.",
+      "transition": "Return to both original proof strips without changing either date.",
+      "captionPhrases": []
+    },
+    {
+      "id": "different",
+      "layout": "compare",
+      "vo": "Different jobs. Different ages.",
+      "headline": "DIFFERENT JOBS.",
+      "background": "ivory",
+      "presenter": "left",
+      "expression": "friendly",
+      "gesture": "presentation_palm",
+      "action": "exchange",
+      "proofs": [
+        {
+          "id": "older-age",
+          "x": 115,
+          "y": 805,
+          "w": 850,
+          "h": 145,
+          "phase": "before"
+        },
+        {
+          "id": "recent-age",
+          "x": 115,
+          "y": 805,
+          "w": 850,
+          "h": 145,
+          "phase": "after"
+        }
+      ],
+      "evidence": [
+        "older-age",
+        "recent-age"
+      ],
+      "newInformation": "The two ages belong to different listings and different capture dates.",
+      "visualMetaphor": "The older proof card slides away and a different recent listing replaces it on the spoken cue; each complete source strip holds still for reading.",
+      "transition": "Presenter returns to the viewer for the caveat.",
+      "captionPhrases": [
+        {
+          "text": "Different jobs.",
+          "style": "bold"
+        },
+        {
+          "text": "Different ages.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "Different ages"
+    },
+    {
+      "id": "not-closed",
+      "layout": "caveat",
+      "vo": "Older doesn't mean closed. Check the date.",
+      "headline": "OLDER ≠ CLOSED.",
+      "background": "clay",
+      "presenter": "close",
+      "expression": "friendly",
+      "gesture": "stop_palm",
+      "action": "reset",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "A posting age is not evidence that applications have closed.",
+      "visualMetaphor": "An open palm interrupts the false inference; plain sans type states the caveat.",
+      "transition": "The caveat resolves into the opening-question callback.",
+      "captionPhrases": [
+        {
+          "text": "Older doesn't mean closed.",
+          "style": "bold"
+        },
+        {
+          "text": "Check the date.",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "callback",
+      "layout": "callback",
+      "vo": "Next time, ask: what changed since I last checked?",
+      "headline": "What changed?",
+      "background": "charcoal",
+      "presenter": "left",
+      "expression": "direct_cta",
+      "gesture": "presentation_palm",
+      "action": "push",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "Replace repeated searching with a focused question about freshness.",
+      "visualMetaphor": "The repeated search card exits; a large serif question takes its exact place.",
+      "transition": "Cut straight to a short clean end card.",
+      "captionPhrases": [
+        {
+          "text": "Next time, ask:",
+          "style": "bold"
+        },
+        {
+          "text": "what changed",
+          "style": "serif"
+        },
+        {
+          "text": "since I last checked?",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "what changed"
+    },
+    {
+      "id": "end",
+      "layout": "end",
+      "vo": "Meet Solomon.",
+      "headline": "Solomon.",
+      "background": "sage",
+      "presenter": "center",
+      "expression": "friendly",
+      "gesture": "wave",
+      "action": "present",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "Close with the product name and no unverified link or automation promise.",
+      "visualMetaphor": "One wordmark and one friendly gesture, no repeated payoff.",
+      "transition": "Hold the brand to the final frame.",
+      "captionPhrases": [
+        {
+          "text": "Meet Solomon.",
+          "style": "bold"
+        }
+      ]
+    }
+  ]
+}

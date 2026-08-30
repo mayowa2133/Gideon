@@ -117,3 +117,66 @@ The repository-wide typecheck still fails in existing renderer test files
 (`angleBlueprint`, `.mjs` declarations, and V11–V22 mascot literal-type tests).
 No existing application user flow or API changed, so no application E2E run was
 needed. Generated binaries and private screenshots are excluded from the commit.
+
+## V2 — What changed? — August 30, 2026
+
+V1 was copied byte-for-byte to `renders/meet-solomon/v1/` before revision. Its
+SHA-256 is `9f255dc57a182072be7ac06cde447293fb46b3c982f0ea7c418e3f33bfddec27`.
+The archive includes the film manifest, source metadata, alignment and quality
+reports, contact sheet, render receipt, and a separate preservation receipt.
+The V1 implementation is commit `c19b480`. Neither its blueprint nor compositor
+was changed for V2.
+
+V2 uses `fixtures/meet-solomon/what-changed-v2.json`, a separate runtime schema
+and composition under `meetSolomonV2`, and its own output directory. Its claim
+is now about checking freshness, without treating a three-day-old posting as
+closed or missed. The opening date appears at 3.63 seconds, and “Meet Solomon”
+starts at 6.23 seconds, compared with 8.67 and 11.97 seconds in V1. A single
+question callback and 1.47-second brand card replace the repeated ending.
+
+The product sequence shows the actual Software Engineering selection, a
+Startup filter before/after edit, the resulting application view, Newest First,
+and a genuine role with its timestamp. This is **dated archived evidence**, not
+a fresh account capture or a demonstration of jobs arriving automatically.
+The two filter states come from the same August 27 recording. Its intervening
+frame shows a transient empty state, so V2 explicitly labels the edit BEFORE /
+AFTER rather than silently presenting it as continuous playback. The retained
+source includes that frame. The total displayed count stays at 200; the new
+subset changes from 13 to 3 when the Startup filter is selected. It is not a
+claim that 10 jobs disappeared or that the product performed a background run.
+
+Presenter inspection, pushing, pointing and proof-card exchanges are tied to
+aligned spoken cues. Proof cards hold stationary for at least 18 frames on
+either side of their short exchange; UI text is never interpolated. Full
+product shots alternate with close reactions, while bold sans type carries
+most captions and serif is reserved for “again” and the question callback.
+
+```sh
+npm run creator:meet:solomon:v2
+npm run creator:meet:solomon:v2 -- --stills-only
+npm run test:meet:solomon
+```
+
+The V2 input evidence and private captures live under `tmp/meet-solomon-v2`.
+The final preserved video is
+`renders/meet-solomon/v2/meet-solomon-what-changed-v2.mp4`.
+An output directory with `preservation-receipt.json` cannot be rendered into.
+The renderer also refuses an existing different film/version or unreadable film
+metadata, so changing the story argument cannot overwrite V1 accidentally.
+
+The 35-second V2 master contains 16 shots at 1080×1920, 30 fps, H.264/AAC,
+yuv420p / BT.709, and 48 kHz audio. The presenter is visible for 63.3% of the
+film. Factual source text measures at least 34.3px at 1080 wide; the establishing
+view remains a separate 10.1px recognizability check. Narration alignment is
+98.7%. Audio measures −14.39 LUFS and −1.79 dBTP, with zero detected clicks.
+The final render receipt and decoded-quality report are authoritative.
+
+Validation: 29 targeted tests pass, including V1 and existing V22 rig golden
+tests; repository lint, main and Remotion typechecks, desktop/MCP/web build,
+PNG/hash/OCR verification, full Remotion render and decoded-media checks pass.
+The full repository typecheck still reports pre-existing renderer test errors
+(52 errors in the current working tree, none in Meet Solomon files). No API,
+account state, publishing flow or application user flow was changed. Final
+contact sheets and the filter/age/callback transitions were inspected from the
+encoded output. This remains a private review cut using archived screenshots,
+not a publication approval or a claim of mastery across every campaign angle.

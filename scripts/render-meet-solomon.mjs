@@ -15,7 +15,7 @@ import { measureDecodedMedia } from "./lib/creator-story-decoded-quality.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const { ChatterboxNarrationProvider } = require("../dist/main/main/chatterboxNarrationProvider.js");
-const { meetStorySchema, meetEvidenceSchema, meetFilmSchema, assertMeetStoryEvidence, auditMeetFilm } = require("../dist/main/shared/meetSolomon.js");
+const { meetEvidenceSchema } = require("../dist/main/shared/meetSolomon.js");
 const run = promisify(execFile);
 const hash = data => createHash("sha256").update(data).digest("hex");
 const normal = text => text.toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
@@ -55,9 +55,17 @@ async function makeSoundDesign(scenes, seconds, target) {
 }
 
 async function main() {
+  if (await fs.stat(path.join(out, "preservation-receipt.json")).catch(() => null)) throw new Error("This is a preserved video archive. Render revisions into a different output directory.");
   await fs.mkdir(out, { recursive: true, mode: 0o700 });
   await fs.chmod(out, 0o700);
-  const story = meetStorySchema.parse(JSON.parse(await fs.readFile(path.resolve(flag("story", path.join(root, "fixtures/meet-solomon/too-late.json"))), "utf8")));
+  const rawStory = JSON.parse(await fs.readFile(path.resolve(flag("story", path.join(root, "fixtures/meet-solomon/too-late.json"))), "utf8"));
+  const v2 = rawStory.version === "meet-solomon-v2";
+  const { meetStorySchema, meetFilmSchema, assertMeetStoryEvidence, auditMeetFilm } = require(v2 ? "../dist/main/shared/meetSolomonV2.js" : "../dist/main/shared/meetSolomon.js");
+  const story = meetStorySchema.parse(rawStory);
+  let previous;
+  try { previous = JSON.parse(await fs.readFile(path.join(out, "film.json"), "utf8")); }
+  catch (error) { if (error.code !== "ENOENT") throw new Error("Existing film metadata cannot be verified. Choose a new output directory."); }
+  if (previous && (previous.version !== story.version || previous.id !== story.id)) throw new Error("Do not overwrite a different film or version. Choose a new output directory.");
   const evidenceFile = path.resolve(flag("evidence", path.join(out, "evidence.json")));
   const evidence = JSON.parse(await fs.readFile(evidenceFile, "utf8")).map(e => meetEvidenceSchema.parse(e));
   const sourceDir = path.resolve(flag("capture-dir", path.join(path.dirname(evidenceFile), "capture")));
@@ -129,20 +137,27 @@ async function main() {
       return { ...p, from: Math.max(from, Math.round(aligned.words[starts[i] + start].from * 30)), to: Math.min(to, Math.round(aligned.words[starts[i] + phraseCursor - 1].to * 30)) };
     });
     for (let p = 0; p < phrases.length; p++) phrases[p].to = phrases[p + 1]?.from ?? to;
-    return { ...scene, from, to, phrases };
+    let actionFrame = 0;
+    if (v2 && scene.actionCue) {
+      const tokens = scene.actionCue.split(/\s+/).map(normal);
+      const at = normalized.findIndex((_, n) => tokens.every((token, k) => token === normalized[n + k]));
+      if (at < 0) throw new Error(`Action cue not spoken in ${scene.id}.`);
+      actionFrame = Math.max(0, Math.round(aligned.words[starts[i] + at].from * 30) - from);
+    }
+    return { ...scene, from, to, phrases, ...(v2 ? { actionFrame } : {}) };
   });
   const sounds = await makeSoundDesign(scenes, seconds, path.join(publicDir, "sound-design.wav"));
   const film = meetFilmSchema.parse({ version: story.version, id: story.id, title: story.title, fps: 30, durationInFrames: Math.round(seconds * 30), narrationSrc: "narration.wav", soundDesignSrc: "sound-design.wav", evidence, scenes, alignment: { source: aligned.source, coverage: aligned.coverage }, reviewOnly: true });
-  const report = { ...auditMeetFilm(film), scriptHash, audioHash, tempo, readability, ocr, sounds, humanApprovalRequired: true, captureLimitation: "Local preview could not load account data. Timestamp contrast uses disclosed archived captures; automatic discovery is supported by newly captured product explanation text, not an observed background run. No posting age was edited." };
+  const report = { ...auditMeetFilm(film), scriptHash, audioHash, tempo, readability, ocr, sounds, humanApprovalRequired: true, captureLimitation: v2 ? "Dated archived product evidence. Startup is an explicitly labelled before/after filter edit, not continuous playback or an observed job arrival. Its transient empty state remains in the retained source recording. Different posting ages belong to different jobs. No posting age was edited." : "Local preview could not load account data. Timestamp contrast uses disclosed archived captures; automatic discovery is supported by newly captured product explanation text, not an observed background run. No posting age was edited." };
   await write(path.join(out, "film.json"), film);
   await write(path.join(out, "quality.json"), report);
   const beatSheet = scenes.map(s => `## ${s.id} · ${(s.from / 30).toFixed(2)}–${(s.to / 30).toFixed(2)}s\n\nSCENE: ${s.vo}\n\nNEW INFORMATION: ${s.newInformation}\n\nVISUAL METAPHOR: ${s.visualMetaphor}\n\nSOLOMON ACTION: ${s.presenter}, ${s.expression}, ${s.gesture}; no mouth.\n\nEVIDENCE: ${s.evidence.join(", ") || "Conceptual / no product claim"}\n\nTRANSITION: ${s.transition}\n`).join("\n");
   await fs.writeFile(path.join(out, "BEAT-SHEET.md"), `# ${story.title}\n\nPrivate style study; final human review required.\n\n${beatSheet}`);
   process.stdout.write(`Prepared ${scenes.length} shots / ${seconds}s / ${(report.presenterShare * 100).toFixed(1)}% presenter / ${Math.round(aligned.coverage * 100)}% aligned.\n`);
   if (args.includes("--prepare-only")) return;
-  const serveUrl = await bundle({ entryPoint: path.join(root, "src/remotion/meetSolomon/index.tsx"), publicDir, outDir: path.join(out, "bundle") });
+  const serveUrl = await bundle({ entryPoint: path.join(root, v2 ? "src/remotion/meetSolomonV2/index.tsx" : "src/remotion/meetSolomon/index.tsx"), publicDir, outDir: path.join(out, "bundle") });
   const inputProps = { film };
-  const composition = await selectComposition({ serveUrl, id: "MeetSolomon", inputProps, chromeMode: "headless-shell", timeoutInMilliseconds: 120000 });
+  const composition = await selectComposition({ serveUrl, id: v2 ? "MeetSolomonV2" : "MeetSolomon", inputProps, chromeMode: "headless-shell", timeoutInMilliseconds: 120000 });
   const stillDir = path.join(out, "stills");
   await fs.mkdir(stillDir, { recursive: true, mode: 0o700 });
   for (const [i, s] of scenes.entries()) {
@@ -154,7 +169,7 @@ async function main() {
   let last = -1;
   await renderMedia({ composition, serveUrl, inputProps, outputLocation: raw, codec: "h264", audioCodec: "aac", crf: 17, pixelFormat: "yuv420p", imageFormat: "png", colorSpace: "bt709", concurrency: 1, chromeMode: "headless-shell", timeoutInMilliseconds: 180000,
     onProgress: ({ progress }) => { const n = Math.floor(progress * 10); if (n !== last) { last = n; process.stdout.write(`Render ${n * 10}%\n`); } } });
-  const master = path.join(out, "meet-solomon-too-late.mp4");
+  const master = path.join(out, `${story.id}.mp4`);
   const scan = await run("ffmpeg", ["-hide_banner", "-i", raw, "-af", "loudnorm=I=-14:TP=-1.8:LRA=9:print_format=json", "-vn", "-f", "null", "-"], { timeout: 180000, maxBuffer: 2_000_000 });
   const measured = JSON.parse(scan.stderr.match(/\{\s*"input_i"[\s\S]*?\}/)?.[0] ?? "null");
   if (!measured) throw new Error("Audio mastering measurement failed.");
