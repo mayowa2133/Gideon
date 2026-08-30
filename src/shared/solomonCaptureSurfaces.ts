@@ -1462,6 +1462,18 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           locator: { role: "text", name: "Newest First", container: "select" },
           fields: [],
           sourceTextPx: 11
+        },
+        {
+          // The same cell `overnightFeedPosted` claims, on the same component --
+          // the feed renders "company · age" as one line on every occupation.
+          // Its absence here was an omission rather than a product difference,
+          // and it is the only feed whose arrivals are measured in hours rather
+          // than days, so it is the one place freshness can actually be filmed.
+          id: "marketingFeedPosted",
+          purpose: "who is hiring, and how long ago they posted it",
+          locator: { role: "text", name: "{job.company}", container: "div.text-xs.text-muted-foreground" },
+          fields: ["job.company"],
+          sourceTextPx: 12
         }
       ]
     },

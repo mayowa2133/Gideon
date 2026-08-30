@@ -1,7 +1,7 @@
-import { AbsoluteFill, interpolate, spring, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame } from "remotion";
 import type { FilmScene } from "../../shared/creatorStoryFilm";
 import type { SceneProductCrop } from "../../shared/types";
-import { Backdrop, CONTENT_FLOOR_BOTTOM, Cursor, EvidenceCrop, EvidenceRegion, GREEN, INK, MINT, ProofLabel, StatePill, WHITE, placeholderSurface } from "./primitives";
+import { AMBER, Backdrop, CONTENT_FLOOR_BOTTOM, Cursor, EvidenceCrop, EvidenceRegion, GREEN, INK, MINT, ProofLabel, StatePill, WHITE, placeholderSurface } from "./primitives";
 
 // Seven content patterns covering the eighteen scenes the reference film draws
 // with fifteen bespoke components. The generalisation is arrangement math: where
@@ -42,17 +42,204 @@ function cardSize(crop: SceneProductCrop, maxWidth: number, maxHeight: number) {
 
 // ---------------------------------------------------------------- ambient
 
-// No product. The presenter and a light gesture -- the hook's flash and the
-// sting's glow are the same component at different intensities, which is what
-// `purpose` decides.
+// Where an ambient motif may draw, which is not one band but two.
+//
+// The presenter is opaque and centred, and its head occupies roughly x 200-880
+// from y 560 down. A motif centred in the gap between caption and floor is
+// therefore behind the mascot and invisible: the first cut of this drew a 340px
+// clock face at the band's centre and the rendered frame showed the mascot on a
+// bare gradient, exactly what the motif exists to replace.
+//
+// So geometry that must be seen whole goes in the strip ABOVE the head, and
+// anything that can be read from its extremities is drawn large enough to pass
+// either side of it. Captions run to about y 330 at two lines of 116px, which
+// sets the ceiling.
+//
+// The floor is the antenna, not the head. The rig box starts at y 560 but the
+// antenna bleeds ~48px above it (SOLOMON_MASCOT_V*_GEOMETRY.antennaClearancePx),
+// so the real obstruction begins near y 512 and is a thin spike on the centre
+// line -- invisible from this file, whose types and tests only know that some
+// opaque presenter is composited later. A strip ending at 548 cleared the head
+// and speared the antenna through `cards` and `sweep` alike. 464 keeps the same
+// 48px of clearance the rig asks for.
+const STRIP = { left: 90, right: 90, top: 340, height: 124 };
+const FIELD = { left: 90, right: 90, top: 348, height: CONTENT_FLOOR_BOTTOM - 388 };
+
+// Which motif a beat draws, from the slot in its id ("beat-7" -> 7).
+//
+// Slots are assigned by `planBeats` and ascend through the film, so taking them
+// modulo the motif count means consecutive ambient beats never draw the same
+// picture -- which is the whole point. Deriving it from the id rather than a
+// counter keeps the template a pure function of its scene.
+export const MOTIFS = ["cards", "rings", "night", "sweep", "rows"] as const;
+type Motif = (typeof MOTIFS)[number];
+export function motifFor(id: string): Motif | null {
+  const match = /(\d+)$/.exec(id);
+  // `hook` and `cta` keep the bare gradient they were tuned with.
+  if (!match) return null;
+  return MOTIFS[Number(match[1]) % MOTIFS.length]!;
+}
+
+// The same idea for a beat that carries a product screen, which in the daily
+// films is every beat: `defaultShot` gives a pattern to any beat with a claimId,
+// and a daily is evidence-backed throughout, so none of them are ever ambient.
+// Without this a daily draws no motif at all.
+//
+// Only two of the five port. A product scene spends its frame: the caption runs
+// to 307, the page occupies 336-1046 and the presenter stands at 1075-1872, so
+// the horizontal gaps are 29px and the strip motifs have nowhere to be. What is
+// left is the pair of gutters either side of the presenter -- x 0-248 and
+// x 832-1080 below 1075 -- and `rings` and `night` are precisely the two that
+// are read from their extremities rather than their centres, which is why they
+// survive having their middle covered.
+export const FIELD_MOTIFS = ["rings", "night"] as const;
+
+// `wide_strip` is the one product pattern with room for geometry seen whole: its
+// band is only 576-787, leaving full-width gaps of 269px and 288px where the
+// others leave 29px. So it draws from the three the field cannot take, and the
+// two sets being disjoint is what keeps the no-repeat rule true across patterns
+// without either function knowing about the other -- a strip scene can never
+// collide with the field scenes on both sides of it.
+export const STRIP_MOTIFS = ["cards", "sweep", "rows"] as const;
+
+// Plain `n`, not `n / 2`. When only `product_screen` drew, the motif-bearing
+// beats were every other integer (0, 2, 4) and halving was what stopped `% 2`
+// returning one motif forever. Now that the proof scenes draw too the run is
+// 0, 1, 2, 3, 4, 5 -- consecutive -- and halving is exactly what would produce
+// the adjacent repeats it was added to prevent. The rule follows the sequence,
+// so it has to change when the sequence does.
+export function fieldMotifFor(id: string): (typeof FIELD_MOTIFS)[number] | null {
+  const match = /(\d+)$/.exec(id);
+  if (!match) return null;
+  return FIELD_MOTIFS[Number(match[1]) % FIELD_MOTIFS.length]!;
+}
+
+export function stripMotifFor(id: string): (typeof STRIP_MOTIFS)[number] | null {
+  const match = /(\d+)$/.exec(id);
+  if (!match) return null;
+  return STRIP_MOTIFS[Number(match[1]) % STRIP_MOTIFS.length]!;
+}
+
+// Where a motif draws in a product scene: full width so the gutters carry it,
+// and bounded to the presenter's own band so nothing rises into the page.
+const PRODUCT_FIELD = { left: 40, right: 40, top: 1075, height: 797 };
+
+// The lower of wide_strip's two gaps, and anchored from below rather than
+// centred in it. The presenter's rect starts at 1075 but the antenna clears
+// ~48px above that, so the real obstruction is at ~1027 -- centring a 124px band
+// in 787-1075 would end at 993 and spear it the same way the ambient strip did
+// before it was moved. Ending at 979 keeps the rig's own 48px.
+const WIDE_STRIP_BAND = { left: 90, right: 90, top: 855, height: 124 };
+
+// Ambient motion, drawn behind the presenter on beats that carry no product.
+//
+// Every value here is either an opacity or a whole-pixel offset. That is not
+// fussiness: EditorialCamera used to translate and rescale each scene every
+// frame, none of the values landed on whole pixels, and the continuous
+// re-rasterisation is what made held content read as staticky -- while the
+// motion metric, decimated 36x spatially, scored the churn as a point in the
+// film's favour. Sub-pixel drift of a large block is the one thing this file
+// must not reintroduce, so translations are rounded and the sweep ticks in
+// whole degrees rather than sliding.
+//
+// Entrances are also spread over >=6 frames. A large block appearing in a single
+// frame is scored as a cut by ffmpeg's scene detector, which is how a caption
+// swap once produced a phantom nineteenth shot on no scene boundary at all.
+const AmbientMotif: React.FC<{ kind: Motif; frame: number; tone: string; deep: boolean; fieldBand?: typeof FIELD; stripBand?: typeof STRIP }> = ({ kind, frame, tone, deep, fieldBand, stripBand }) => {
+  const accent = deep ? MINT : GREEN;
+  const line = deep ? "rgba(57,242,181,.30)" : "rgba(8,112,82,.22)";
+  const fieldArea = fieldBand ?? FIELD;
+  const stripArea = stripBand ?? STRIP;
+  const strip: React.CSSProperties = { position: "absolute", left: stripArea.left, right: stripArea.right, top: stripArea.top, height: stripArea.height };
+  const field: React.CSSProperties = { position: "absolute", left: fieldArea.left, right: fieldArea.right, top: fieldArea.top, height: fieldArea.height };
+
+  if (kind === "cards") {
+    // Two postings arriving, one after the other, in the strip above the head.
+    return <div style={strip}>{[0, 1].map((i) => {
+      const p = spring({ frame: Math.max(0, frame - i * 9), fps: 30, config: { damping: 18, stiffness: 150 }, durationInFrames: 14 });
+      return <div key={i} style={{
+        position: "absolute", left: 0, right: 0, top: Math.round(i * 68),
+        height: 56, borderRadius: 14, border: `3px solid ${line}`,
+        background: deep ? "rgba(255,255,255,.05)" : "rgba(255,255,255,.55)",
+        opacity: p, transform: `translateY(${Math.round((1 - p) * 30)}px)`
+      }}>
+        <div style={{ position: "absolute", left: 26, top: 16, width: Math.round(230 + i * 70), height: 11, borderRadius: 6, background: accent, opacity: .75 }} />
+        <div style={{ position: "absolute", left: 26, top: 34, width: Math.round(130 + i * 34), height: 8, borderRadius: 4, background: tone, opacity: .28 }} />
+      </div>;
+    })}</div>;
+  }
+
+  if (kind === "rings") {
+    // Something checking, over and over. Centred low and grown past the mascot,
+    // so what reads is the arc either side of it rather than a hidden circle.
+    return <div style={field}>{[0, 1, 2].map((i) => {
+      const cycle = (frame + i * 16) % 48;
+      const grow = cycle / 48;
+      const size = Math.round(420 + grow * 620);
+      return <div key={i} style={{
+        position: "absolute", left: "50%", top: "72%", width: size, height: size,
+        marginLeft: Math.round(-size / 2), marginTop: Math.round(-size / 2),
+        borderRadius: 999, border: `3px solid ${accent}`, opacity: (1 - grow) * .38
+      }} />;
+    })}</div>;
+  }
+
+  if (kind === "night") {
+    // Nothing moves; only brightness changes. The quietest motif, for the beats
+    // that talk about being asleep.
+    const dots = [[8, 22], [26, 9], [44, 34], [62, 14], [80, 28], [16, 58], [38, 70], [56, 52], [74, 66], [90, 44], [30, 40], [68, 84], [12, 82], [86, 76]];
+    return <div style={field}>{dots.map(([x, y], i) => {
+      const twinkle = .18 + .52 * (0.5 + 0.5 * Math.sin(frame / 17 + i * 1.7));
+      const r = i % 3 === 0 ? 10 : 6;
+      return <div key={i} style={{
+        position: "absolute", left: `${x}%`, top: `${y}%`, width: r, height: r,
+        borderRadius: 999, background: accent, opacity: twinkle
+      }} />;
+    })}</div>;
+  }
+
+  if (kind === "sweep") {
+    // A clock hand, ticking in whole degrees. Continuous rotation of a ring this
+    // size resamples every edge on every frame; a tick does not.
+    const tick = Math.floor(frame / 5) * 30;
+    const size = 116;
+    return <div style={strip}><div style={{
+      position: "absolute", left: "50%", top: 4, width: size, height: size,
+      marginLeft: -size / 2, borderRadius: 999, border: `3px solid ${line}`
+    }}>
+      <div style={{ position: "absolute", left: "50%", top: "50%", width: 4, height: Math.round(size / 2 - 18), marginLeft: -2, background: accent, transformOrigin: "50% 0%", transform: `rotate(${tick}deg)` }} />
+      <div style={{ position: "absolute", left: "50%", top: "50%", width: 10, height: 10, marginLeft: -5, marginTop: -5, borderRadius: 999, background: accent }} />
+    </div></div>;
+  }
+
+  // rows -- a list filling in from the left, in the strip above the head.
+  return <div style={strip}>{[0, 1, 2, 3].map((i) => {
+    const p = spring({ frame: Math.max(0, frame - i * 7), fps: 30, config: { damping: 20, stiffness: 160 }, durationInFrames: 16 });
+    const width = [78, 92, 64, 84][i]!;
+    return <div key={i} style={{
+      position: "absolute", left: 0, top: Math.round(i * 34), height: 18, borderRadius: 9,
+      width: `${width}%`, background: i % 2 === 0 ? accent : tone,
+      opacity: p * (i % 2 === 0 ? .55 : .20),
+      transform: `translateX(${Math.round((1 - p) * -60)}px)`
+    }} />;
+  })}</div>;
+};
+
+// No product. The presenter, a light gesture, and -- on the mid-film beats -- a
+// motif, because a beat that carries the argument forward used to be the
+// presenter alone on a flat colour for its whole window. The hook's flash and
+// the sting's glow are the same component at different intensities, which is
+// what `purpose` decides.
 export const AmbientTemplate: React.FC<TemplateProps> = ({ scene, frame }) => {
   const opening = scene.contentOptions.arrangement !== "converge" && scene.mascot.narrativePurpose === "emotion";
   const flash = opening
     ? interpolate(frame, [0, 5, 12, 20], [.2, 1, .55, .15], { extrapolateRight: "clamp" })
     : .10 + .10 * spring({ frame, fps: 30, config: { damping: 15, stiffness: 175 }, durationInFrames: 8 });
   const centre = opening ? "38%" : "62%";
+  const motif = motifFor(scene.id);
   return <AbsoluteFill>
     <div style={{ position: "absolute", inset: 0, background: `radial-gradient(circle at 50% ${centre},rgba(57,242,181,${flash * (opening ? .24 : 1)}),transparent ${opening ? 48 : 55}%)` }} />
+    {motif && <AmbientMotif kind={motif} frame={frame} tone={scene.backdrop.foreground} deep={scene.backdrop.tier === "deep"} />}
   </AbsoluteFill>;
 };
 
@@ -77,7 +264,11 @@ export const EvidenceBandTemplate: React.FC<TemplateProps> = ({ scene, frame }) 
   const complete = swapped || crops.length === 1;
   const reveal = interpolate(frame, [10, 55], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const settle = spring({ frame: Math.max(0, frame - swapAt), fps: 30, config: { damping: 20, stiffness: 180 }, durationInFrames: 16 });
+  // Same shape as product_screen -- the band runs 326-1037 and leaves no gap
+  // wider than 29px -- so this takes a field motif in the gutters, not a strip.
+  const motif = fieldMotifFor(scene.id);
   return <AbsoluteFill>
+    {motif && <AmbientMotif kind={motif} frame={frame} tone={scene.backdrop.foreground} deep={scene.backdrop.tier === "deep"} fieldBand={PRODUCT_FIELD} />}
     <EvidenceRegion box={{ left: box.left + Math.round((box.width - size.width) / 2), top: box.top, width: size.width, height: size.height }} crop={crop} frame={frame} border={complete && options.highlight ? GREEN : undefined}>
       {options.highlight && <div style={{ position: "absolute", left: Math.round(size.width * .035), top: Math.round(size.height * .76), width: Math.round(size.width * .93) * reveal, height: Math.round(size.height * .2), borderRadius: 12, background: "rgba(57,242,181,.24)", borderBottom: `7px solid ${MINT}` }} />}
     </EvidenceRegion>
@@ -119,7 +310,11 @@ export const ProductScreenTemplate: React.FC<TemplateProps> = ({ scene, frame })
   // a static full page reads as a screenshot pasted into a video; the camera
   // already handles the push, so this only has to not be still.
   const drift = interpolate(frame, [0, 90], [0, -10], { extrapolateRight: "clamp" });
+  // Drawn first, so it is behind the page and the presenter both. A product
+  // scene is the one place the motif is decoration rather than the subject.
+  const motif = fieldMotifFor(scene.id);
   return <AbsoluteFill>
+    {motif && <AmbientMotif kind={motif} frame={frame} tone={scene.backdrop.foreground} deep={scene.backdrop.tier === "deep"} fieldBand={PRODUCT_FIELD} />}
     <EvidenceRegion
       box={{
         left: box.left + Math.round((box.width - size.width) / 2),
@@ -128,6 +323,62 @@ export const ProductScreenTemplate: React.FC<TemplateProps> = ({ scene, frame })
       }}
       crop={crop} frame={frame}
       style={{ opacity: enter, transform: `translateY(${Math.round((1 - enter) * 26 + drift)}px)` }}
+    />
+  </AbsoluteFill>;
+};
+
+// ------------------------------------------------------------ big_number
+
+// One value, as large as the frame allows, with nothing to compare it to.
+//
+// The scene the film stops for. Everything else here draws its crop as evidence
+// beside something else; this draws it as the subject, which is why it takes the
+// whole middle band and why `BIG_NUMBER_LAYOUT` gives it no mascot rect.
+//
+// The entrance is a scale, not a slide, and it settles rather than bounces: the
+// beat this serves is usually bad news the film has just walked the viewer into
+// ("posted two weeks ago"), and a number that springs cheerfully into place
+// argues with its own narration. It also holds still afterwards -- no drift --
+// because this is the one shot whose whole job is to be read.
+export const BigNumberTemplate: React.FC<TemplateProps> = ({ scene, frame }) => {
+  const box = productBox(scene);
+  const crop = scene.productCrops[0];
+  if (!crop) return null;
+  const { headline } = scene.contentOptions;
+  const deep = scene.backdrop.tier === "deep";
+  // The receipt is drawn at a third of the band, not centred in it: the type is
+  // the subject and the crop is the citation under it.
+  const size = cardSize(crop, Math.round(box.width * .78), 150);
+  // Ease-out on both, but opacity arrives first so the value is legible before
+  // it has finished growing -- the reverse reads as the film withholding it.
+  const grow = interpolate(frame, [0, 16], [.86, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) });
+  const fade = interpolate(frame, [0, 9], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // A leading integer is set on its own line and very large; the words after it
+  // carry the unit. "1 week ago" reads as the 1 with WEEK AGO under it, which is
+  // the shape the reveal wants. A headline with no leading figure -- "Newest
+  // First" -- simply sets whole, rather than being forced into a shape it has no
+  // number for.
+  const parsed = /^(\d[\d,]*)\s+(.*)$/.exec(headline ?? "");
+  const figure = parsed?.[1], unit = (parsed?.[2] ?? headline ?? "").toUpperCase();
+  return <AbsoluteFill>
+    <div style={{
+      position: "absolute", left: 60, right: 60, top: 470, textAlign: "center",
+      opacity: fade, transform: `scale(${grow})`, transformOrigin: "50% 40%"
+    }}>
+      {figure && <div style={{
+        fontFamily: '"Fraunces Variable", serif', fontWeight: 400, fontSize: 360, lineHeight: .9,
+        color: deep ? AMBER : GREEN, letterSpacing: -8
+      }}>{figure}</div>}
+      <div style={{
+        fontFamily: '"Manrope Variable", sans-serif', fontWeight: 950,
+        fontSize: figure ? 96 : 128, lineHeight: 1.02, letterSpacing: -2,
+        color: deep ? WHITE : INK, marginTop: figure ? 18 : 0
+      }}>{unit}</div>
+    </div>
+    <EvidenceRegion
+      box={{ left: Math.round((1080 - size.width) / 2), top: 1180, width: size.width, height: size.height }}
+      crop={crop} frame={frame}
+      style={{ opacity: interpolate(frame, [10, 22], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) }}
     />
   </AbsoluteFill>;
 };
@@ -158,7 +409,12 @@ export const WideStripTemplate: React.FC<TemplateProps> = ({ scene, frame }) => 
   const top = box.top + Math.round((box.height - size.height) / 2);
   const enter = spring({ frame, fps: 30, config: { damping: 22, stiffness: 170 }, durationInFrames: 14 });
   const sweep = interpolate(frame, [8, 40], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  // The only product pattern whose band leaves room for geometry read whole, so
+  // this one takes a strip motif rather than a field one. Drawn first, behind
+  // the evidence and the presenter both.
+  const motif = stripMotifFor(scene.id);
   return <AbsoluteFill>
+    {motif && <AmbientMotif kind={motif} frame={frame} tone={scene.backdrop.foreground} deep={scene.backdrop.tier === "deep"} stripBand={WIDE_STRIP_BAND} />}
     <EvidenceRegion
       box={{ left, top, width: size.width, height: size.height }}
       crop={crop} frame={frame} border={GREEN}
@@ -391,12 +647,86 @@ export const TEMPLATES = {
   evidence_band: EvidenceBandTemplate,
   wide_strip: WideStripTemplate,
   product_screen: ProductScreenTemplate,
+  big_number: BigNumberTemplate,
   state_swap: StateSwapTemplate,
   card_field: CardFieldTemplate,
   filmstrip: FilmstripTemplate,
   composed_board: ComposedBoardTemplate,
   comment_card: CommentCardTemplate
 } as const;
+
+// What kind of thing the viewer is looking at, said on the frame that shows it.
+//
+// The film mixes three materials and used to draw them in one visual language:
+// regions captured from the running product, whole product pages, and the
+// ambient motifs, which are invented. `cards` and `rows` are the confusable
+// pair -- an abstracted stack of postings and an abstracted list, drawn in the
+// brand's own palette next to frames where a real feed is being cited. Nothing
+// on screen distinguished a drawing from evidence.
+//
+// Rendered from the dispatcher rather than from each template, because a label
+// that a pattern can forget to draw is a label that will be missing on exactly
+// the pattern nobody checked.
+// What each motif depicts, and whether its shapes can be miscounted.
+//
+// Naming the subject is the cheap half. The disclaimer is the half that matters,
+// and it belongs on two of the five rather than all of them. `cards` draws two
+// discrete postings and `rows` four discrete list entries, in the brand's own
+// palette, in films whose neighbouring frames cite real figures -- "200 jobs
+// (5 new)", "13 hours ago". Two drawn cards can be read as two jobs arriving,
+// and a bare ILLUSTRATION label says the frame is a drawing without saying the
+// quantities are not counts, which is the part that could actually mislead.
+//
+// `rings`, `sweep` and `night` carry no such risk: concentric arcs, a clock hand
+// and scattered dots are not enumerable as items, and appending "not a count" to
+// them would be noise -- the same over-flagging that made the cross-capture
+// disclosure weaker before it was narrowed.
+const MOTIF_SUBJECT: Record<string, string> = {
+  cards: "POSTINGS ARRIVING · NOT A COUNT",
+  rows: "A LIST FILLING · NOT A COUNT",
+  rings: "REPEATED CHECKING",
+  sweep: "TIME PASSING",
+  night: "THE QUIET HOURS"
+};
+
+function provenanceOf(scene: FilmScene): string | null {
+  const parts: string[] = [];
+  const { capturedOn, captureRelation } = scene.contentOptions;
+  if (scene.productCrops.length && capturedOn) {
+    parts.push(`${scene.contentPattern === "product_screen" ? "PRODUCT VIEW" : "PRODUCT CAPTURE"} · ${capturedOn}`);
+  }
+  // Mirrors exactly which templates call AmbientMotif, rather than assuming
+  // every pattern that is not ambient draws a field motif. The first cut did
+  // assume that and labelled both reveals ILLUSTRATION -- a frame whose whole
+  // content is a captured value and its receipt, captioned as a drawing, which
+  // is the same class of error as the missing label and no better for being
+  // cautious. A scene with no crop and no motif is the presenter on a gradient:
+  // it asserts nothing and needs no label.
+  const motif = scene.contentPattern === "ambient" ? motifFor(scene.id)
+    : scene.contentPattern === "wide_strip" ? stripMotifFor(scene.id)
+    : scene.contentPattern === "product_screen" || scene.contentPattern === "evidence_band" ? fieldMotifFor(scene.id)
+    : null;
+  if (motif) parts.push(`ILLUSTRATION · ${MOTIF_SUBJECT[motif] ?? "AMBIENT"}`);
+  if (captureRelation === "different") parts.push("DIFFERENT LISTING · DIFFERENT CAPTURE");
+  if (captureRelation === "same") parts.push("SAME CAPTURE · SAME SEARCH");
+  return parts.length ? parts.join("  ·  ") : null;
+}
+
+const Provenance: React.FC<{ scene: FilmScene }> = ({ scene }) => {
+  const text = provenanceOf(scene);
+  if (!text) return null;
+  // Sized to wrap rather than to fit on one line. A scene can carry three facts
+  // at once -- a dated capture, an illustrated backdrop and a same-source
+  // relation -- which runs past 100 characters, and at 21px that overflowed the
+  // 960px band and left the tail off the frame. A provenance line that is cut in
+  // half is worse than none, because the half that survives still reads as a
+  // complete statement.
+  return <div style={{
+    position: "absolute", left: 60, right: 60, bottom: 26, textAlign: "center",
+    fontFamily: '"Manrope Variable", sans-serif', fontWeight: 700, fontSize: 19, letterSpacing: 1.1, lineHeight: 1.35,
+    color: scene.backdrop.tier === "deep" ? "rgba(255,255,255,.44)" : "rgba(7,17,31,.40)"
+  }}>{text}</div>;
+};
 
 export const SceneTemplate: React.FC<{ scene: FilmScene }> = ({ scene }) => {
   const localFrame = useCurrentFrame();
@@ -405,5 +735,5 @@ export const SceneTemplate: React.FC<{ scene: FilmScene }> = ({ scene }) => {
   // the three signature splits are why this exists.
   const frame = scene.contentPattern === "filmstrip" ? localFrame + (scene.from - scene.groupFrom) : localFrame;
   const Template = TEMPLATES[scene.contentPattern];
-  return <Backdrop backdrop={scene.backdrop}><Template scene={scene} frame={frame} /></Backdrop>;
+  return <Backdrop backdrop={scene.backdrop}><Template scene={scene} frame={frame} /><Provenance scene={scene} /></Backdrop>;
 };

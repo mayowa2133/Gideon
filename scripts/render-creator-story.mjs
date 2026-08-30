@@ -197,6 +197,12 @@ const alignment = [];
 const captions = [];
 for (const gap of gaps) {
   const scene = scenes.find((entry) => entry.id === gap.id);
+  // A `big_number` scene sets its own line in type, so captioning it as well
+  // puts the same words on screen twice at two sizes. The band caught the tail
+  // of the phrase -- a reveal reading "1 WEEK AGO" under a caption reading
+  // "AGO." -- which is worse than redundant, because the fragment reads as a
+  // different, unfinished sentence.
+  if (scene?.contentPattern === "big_number") continue;
   const line = script.find((beat) => beat.id === gap.id).vo;
   const words = line.split(/\s+/).filter(Boolean);
   const from = scene.from + HEAD, span = Math.round(gap.seconds * FPS);

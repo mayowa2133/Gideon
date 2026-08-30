@@ -4,7 +4,7 @@ import path from "node:path";
 import { buildFilmScenes } from "../../shared/creatorStoryFilm";
 import type { CreativeBlueprint } from "../../shared/types";
 import { WIDE_STRIP_LAYOUT } from "../../shared/angleBlueprint";
-import { CardFieldTemplate, TEMPLATES, WideStripTemplate } from "./templates";
+import { CardFieldTemplate, FIELD_MOTIFS, MOTIFS, STRIP_MOTIFS, TEMPLATES, WideStripTemplate, fieldMotifFor, motifFor, stripMotifFor } from "./templates";
 
 // Every template exercised against the scenes it will actually draw, from the
 // parity blueprint rather than from invented fixtures. This is the check that a
@@ -200,4 +200,100 @@ describe("creator story templates", () => {
       expect(over, `${scene.id} draws ${over.length} card(s) over the presenter`).toEqual([]);
     }
   });
+});
+
+describe("ambient motifs", () => {
+  // A beat that carries the argument forward used to draw the presenter on a
+  // flat colour for its whole window, and every such beat drew the identical
+  // picture. These lock the two properties that fixes: a motif exists, and
+  // neighbouring beats do not draw the same one.
+  const ambientIds = (beats: string[]) => beats.filter((id) => id.startsWith("beat-"));
+
+  it("gives the hook and the cta no motif", () => {
+    expect(motifFor("hook")).toBeNull();
+    expect(motifFor("cta")).toBeNull();
+  });
+
+  it("gives every mid-film beat a motif", () => {
+    for (const id of ambientIds(["beat-0", "beat-2", "beat-11", "beat-18"])) {
+      expect(MOTIFS, `${id} drew nothing`).toContain(motifFor(id));
+    }
+  });
+
+  for (const [film, beats] of [
+    ["overnight-46s", ["hook", "beat-0", "proof-careerpage-1", "beat-2", "beat-3", "beat-4", "proof-marketing-5", "beat-6", "beat-7", "beat-8", "proof-matched-9", "beat-10", "beat-11", "beat-12", "proof-sort-13", "beat-14", "beat-15", "beat-16", "proof-newest-17", "beat-18", "cta"]],
+    ["fresh-31s", ["hook", "beat-0", "proof-careerpage-1", "beat-2", "proof-marketing-3", "beat-4", "beat-5", "proof-matched-6", "beat-7", "proof-sort-8", "beat-9", "proof-newest-10", "beat-11", "cta"]],
+    ["different-way-34s", ["hook", "beat-0", "proof-careerpage-1", "beat-2", "proof-remote-3", "beat-4", "proof-company-5", "beat-6", "proof-role-7", "beat-8", "proof-fresh-9", "beat-10", "proof-centre-11", "beat-12", "cta"]]
+  ] as [string, string[]][]) {
+    it(`never draws the same motif twice running in ${film}`, () => {
+      const drawn = ambientIds(beats).map((id) => ({ id, motif: motifFor(id) }));
+      for (let i = 1; i < drawn.length; i += 1) {
+        expect(drawn[i]!.motif, `${film}: ${drawn[i]!.id} repeats ${drawn[i - 1]!.id}`)
+          .not.toBe(drawn[i - 1]!.motif);
+      }
+    });
+  }
+
+  it("uses more than one motif across a film", () => {
+    const used = new Set(["beat-0", "beat-2", "beat-3", "beat-4", "beat-6"].map(motifFor));
+    expect(used.size).toBeGreaterThan(2);
+  });
+});
+
+describe("product-scene motifs", () => {
+  // A daily is evidence-backed throughout, so `defaultShot` gives every one of
+  // its beats a product pattern and none of them are ever ambient. These lock
+  // the property that made the ambient path worth having, on the numbering a
+  // daily actually produces -- 0, 2, 4 -- where a plain `% 2` returns one motif
+  // forever and the films go back to drawing the identical picture every beat.
+  it("draws a motif on every numbered product beat", () => {
+    for (const id of ["beat-0", "beat-2", "beat-4"]) {
+      expect(FIELD_MOTIFS, `${id} drew nothing`).toContain(fieldMotifFor(id));
+    }
+    for (const id of ["proof-matched-1", "proof-first-3"]) {
+      expect(FIELD_MOTIFS, `${id} drew nothing`).toContain(fieldMotifFor(id));
+      expect(STRIP_MOTIFS, `${id} drew nothing`).toContain(stripMotifFor(id));
+    }
+  });
+
+  it("gives the hook and the cta no motif", () => {
+    for (const pick of [fieldMotifFor, stripMotifFor]) {
+      expect(pick("hook")).toBeNull();
+      expect(pick("cta")).toBeNull();
+    }
+  });
+
+  // The presenter stands in the middle of PRODUCT_FIELD, so a field scene may
+  // only draw something still legible with its centre covered. Keeping the two
+  // sets disjoint is also what makes the cross-pattern no-repeat check below
+  // hold without either selector consulting the other.
+  it("keeps the field and strip motif sets disjoint", () => {
+    for (const kind of FIELD_MOTIFS) expect(STRIP_MOTIFS).not.toContain(kind);
+    for (const kind of STRIP_MOTIFS) expect(FIELD_MOTIFS).not.toContain(kind);
+  });
+
+  // The real daily sequence, every scene of it. The earlier version of this
+  // listed only beats 0, 2 and 4 because those were the only scenes that drew;
+  // now the proof scenes draw too, the run is consecutive, and that is exactly
+  // the case the old halving rule got wrong.
+  for (const [film, scenes] of [
+    ["daily-8-scene", [
+      ["beat-0", "field"], ["proof-matched-1", "strip"], ["beat-2", "field"],
+      ["proof-first-3", "field"], ["beat-4", "field"], ["proof-second-5", "field"]
+    ]],
+    ["long-form", [
+      ["beat-0", "field"], ["proof-a-1", "strip"], ["beat-2", "field"],
+      ["proof-b-3", "strip"], ["beat-4", "field"], ["proof-c-5", "field"], ["beat-6", "field"]
+    ]]
+  ] as [string, [string, "field" | "strip"][]][]) {
+    it(`never draws the same motif twice running in ${film}`, () => {
+      const drawn = scenes.map(([id, kind]) => ({
+        id, motif: kind === "strip" ? stripMotifFor(id) : fieldMotifFor(id)
+      }));
+      for (let i = 1; i < drawn.length; i += 1) {
+        expect(drawn[i]!.motif, `${film}: ${drawn[i]!.id} repeats ${drawn[i - 1]!.id}`)
+          .not.toBe(drawn[i - 1]!.motif);
+      }
+    });
+  }
 });
