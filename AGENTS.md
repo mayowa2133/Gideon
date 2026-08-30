@@ -86,7 +86,7 @@ exists.
 
 ## Repository commands
 
-Verified against package.json: 79 of the 80 below exist as scripts (`db:seed` does not).
+Verified against package.json: 80 of the 81 script commands below exist (`db:seed` does not); `install` is a package-manager command.
 
 - pnpm install
 - pnpm lint
@@ -161,6 +161,8 @@ Verified against package.json: 79 of the 80 below exist as scripts (`db:seed` do
 - pnpm creator-story:v10:solomon
 - pnpm test:creator-story:v10
 - pnpm test:creator-story
+- pnpm creator:meet:solomon
+- pnpm test:meet:solomon
 - pnpm test:masked-presenter
 - pnpm test:creator-editorial
 - pnpm release:mac:check

@@ -189,7 +189,9 @@
     "package:mac:signed": "pnpm build && electron-builder --mac dmg zip --publish=never",
     "release:mac:check": "node scripts/check-macos-release.mjs",
     "hosted:review:check": "node scripts/check-hosted-review-policy.mjs",
-    "dist:mac": "pnpm package:mac"
+    "dist:mac": "pnpm package:mac",
+    "creator:meet:solomon": "npm run build:main && node scripts/render-meet-solomon.mjs",
+    "test:meet:solomon": "vitest run src/shared/meetSolomon.test.ts src/remotion/meetSolomon/MeetSolomonFilm.test.tsx src/remotion/mascotV22/RobotMascotV22Rig.test.tsx"
   },
   "build": {
     "appId": "com.gideon.desktop",
