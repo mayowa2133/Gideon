@@ -1,0 +1,515 @@
+{
+  "version": "meet-solomon-internships-v1",
+  "sampleData": true,
+  "id": "meet-solomon-internships",
+  "title": "Meet Solomon \u2014 Your internship hunt",
+  "requiredEvidence": {
+    "intern-role": "Marketing Intern",
+    "intern-company": "Northstar Labs",
+    "intern-card": "Marketing Intern Northstar Labs Toronto, Canada",
+    "intern-stage": "Interviewing",
+    "tracker-title": "Application Tracker"
+  },
+  "scenes": [
+    {
+      "id": "the-hunt",
+      "layout": "hunt",
+      "vo": "Your internship hunt.",
+      "headline": "Your internship hunt.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "focused",
+      "action": "inspect",
+      "gesture": "thinking_hand",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Your internship hunt.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Introduce the internship audience and the search in progress.",
+      "visualMetaphor": "A large illustrated folder labelled INTERNSHIPS opens above the presenter.",
+      "transition": "The folder fans out into a tangle of tabs.",
+      "actionCue": "internship"
+    },
+    {
+      "id": "lost-in-tabs",
+      "layout": "tabs",
+      "vo": "A blur of tabs. Where were you?",
+      "headline": "A blur of tabs.",
+      "background": "clay",
+      "presenter": "close",
+      "expression": "skeptical",
+      "action": "push",
+      "gesture": "stop_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "A blur of tabs.",
+          "style": "bold"
+        },
+        {
+          "text": "Where were you?",
+          "style": "serif"
+        }
+      ],
+      "newInformation": "The problem is losing the thread of the search, not a promised hiring result.",
+      "visualMetaphor": "Illustrated role, company and status tabs drift apart; Solomon clears the clutter.",
+      "transition": "Cut to an actual sample internship card.",
+      "actionCue": "Where"
+    },
+    {
+      "id": "sample-internship",
+      "layout": "intern-reveal",
+      "vo": "Marketing Intern. In Solomon's demo tracker.",
+      "headline": "Marketing Intern. In Solomon's demo tracker.",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "intern-card",
+          "x": 90,
+          "y": 800,
+          "w": 900,
+          "h": 405,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "intern-card"
+      ],
+      "captionPhrases": [],
+      "newInformation": "Explicitly introduce the sample Marketing Intern card in the existing Solomon demo.",
+      "visualMetaphor": "A full-screen original card with a prominent DEMO / SAMPLE DATA label, not a claimed open vacancy.",
+      "transition": "A short introduction follows the concrete sample."
+    },
+    {
+      "id": "meet",
+      "layout": "meet",
+      "vo": "Meet Solomon.",
+      "headline": "Meet Solomon.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "wave",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Meet Solomon.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Identify Solomon as the product holding the internship context.",
+      "visualMetaphor": "A clean mouthless presenter entrance with oversized brand type.",
+      "transition": "Turn attention toward role and company."
+    },
+    {
+      "id": "role-and-company",
+      "layout": "role-company",
+      "vo": "Keep the role and company together.",
+      "headline": "Keep the role",
+      "background": "sage",
+      "presenter": "right",
+      "expression": "friendly",
+      "action": "point",
+      "gesture": "true_point_left",
+      "proofs": [
+        {
+          "id": "intern-role",
+          "x": 70,
+          "y": 590,
+          "w": 940,
+          "h": 140,
+          "phase": "always"
+        },
+        {
+          "id": "intern-company",
+          "x": 295,
+          "y": 830,
+          "w": 490,
+          "h": 130,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "intern-role",
+        "intern-company"
+      ],
+      "captionPhrases": [
+        {
+          "text": "Keep the role",
+          "style": "bold"
+        },
+        {
+          "text": "and company together.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "The sample role title and company belong to the same original tracker card.",
+      "visualMetaphor": "Two exact source crops are connected, preserving their original text.",
+      "transition": "Cut wider to establish the tracker.",
+      "actionCue": "company"
+    },
+    {
+      "id": "where-it-sits",
+      "layout": "tracker-view",
+      "vo": "Then see where that application sits.",
+      "headline": "Then see where",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "tracker-view",
+          "x": 45,
+          "y": 590,
+          "w": 990,
+          "h": 600,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "tracker-view"
+      ],
+      "captionPhrases": [
+        {
+          "text": "Then see where",
+          "style": "bold"
+        },
+        {
+          "text": "that application sits.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Show the actual sample application tracker as context, not standalone factual grounding.",
+      "visualMetaphor": "A wide original tracker view sets up a readable stage detail.",
+      "transition": "Cut closer to the sample stage and its role."
+    },
+    {
+      "id": "sample-stage",
+      "layout": "stage",
+      "vo": "This sample is marked Interviewing.",
+      "headline": "This sample is",
+      "background": "clay",
+      "presenter": "left",
+      "expression": "focused",
+      "action": "point",
+      "gesture": "true_point_right",
+      "proofs": [
+        {
+          "id": "intern-stage",
+          "x": 210,
+          "y": 610,
+          "w": 660,
+          "h": 140,
+          "phase": "always"
+        },
+        {
+          "id": "intern-role",
+          "x": 70,
+          "y": 855,
+          "w": 940,
+          "h": 140,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "intern-stage",
+        "intern-role"
+      ],
+      "captionPhrases": [
+        {
+          "text": "This sample is",
+          "style": "bold"
+        },
+        {
+          "text": "marked Interviewing.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "The internship card sits in the Interviewing column in the captured demo; no interview is promised.",
+      "visualMetaphor": "Original column heading above original role crop with a single connecting line.",
+      "transition": "Reset to explain what a recorded stage means.",
+      "actionCue": "Interviewing"
+    },
+    {
+      "id": "status-not-outcome",
+      "layout": "status-caveat",
+      "vo": "That's a recorded stage, not a guaranteed outcome.",
+      "headline": "That's a recorded stage,",
+      "background": "sage",
+      "presenter": "close",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "That's a recorded stage,",
+          "style": "bold"
+        },
+        {
+          "text": "not a guaranteed outcome.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Distinguish a tracker status from a real hiring outcome.",
+      "visualMetaphor": "An illustrated status stamp sits above the presenter, without a progression animation or invented offer.",
+      "transition": "Replace status with the viewer\u2019s decision criteria.",
+      "actionCue": "not"
+    },
+    {
+      "id": "read-first",
+      "layout": "requirements",
+      "vo": "Read the dates. Check the requirements.",
+      "headline": "Read the dates.",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Read the dates.",
+          "style": "bold"
+        },
+        {
+          "text": "Check the requirements.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Advice to verify dates and requirements, with no invented deadline or eligibility.",
+      "visualMetaphor": "Two illustrated index cards, DATES and REQUIREMENTS, reveal sequentially.",
+      "transition": "The requirements card meets the viewer\u2019s experience.",
+      "actionCue": "Check"
+    },
+    {
+      "id": "your-fit",
+      "layout": "fit",
+      "vo": "Match the role to your skills and availability.",
+      "headline": "Match the role",
+      "background": "clay",
+      "presenter": "right",
+      "expression": "focused",
+      "action": "inspect",
+      "gesture": "thinking_hand",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Match the role",
+          "style": "bold"
+        },
+        {
+          "text": "to your skills and availability.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Use skills and availability to decide fit without guaranteeing eligibility.",
+      "visualMetaphor": "A labelled illustration brings YOUR SKILLS and YOUR AVAILABILITY into a bracket.",
+      "transition": "Focus the viewer on their own next action.",
+      "actionCue": "skills"
+    },
+    {
+      "id": "choose-next",
+      "layout": "next-step",
+      "vo": "Decide what you'll do next.",
+      "headline": "Decide what you'll do next.",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Decide what you'll do next.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "The person chooses the next action; the product does not apply automatically.",
+      "visualMetaphor": "An illustrated branching arrow resolves into a blank next-step line, with no invented automation.",
+      "transition": "Return to real tracker pixels."
+    },
+    {
+      "id": "return-to-tracker",
+      "layout": "return",
+      "vo": "Return to your tracker when you need to reorient.",
+      "headline": "Return to your tracker",
+      "background": "ivory",
+      "presenter": "left",
+      "expression": "friendly",
+      "action": "point",
+      "gesture": "true_point_right",
+      "proofs": [
+        {
+          "id": "tracker-title",
+          "x": 65,
+          "y": 600,
+          "w": 950,
+          "h": 155,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "tracker-title"
+      ],
+      "captionPhrases": [
+        {
+          "text": "Return to your tracker",
+          "style": "bold"
+        },
+        {
+          "text": "when you need to reorient.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "The tracker serves as the place to recover context.",
+      "visualMetaphor": "The original Application Tracker title returns above the presenter, tying back to the product.",
+      "transition": "Reassemble the exact sample role and stage.",
+      "actionCue": "tracker"
+    },
+    {
+      "id": "thread-restored",
+      "layout": "recap",
+      "vo": "The role. The stage. The next step.",
+      "headline": "The role.",
+      "background": "sage",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "intern-role",
+          "x": 65,
+          "y": 590,
+          "w": 950,
+          "h": 150,
+          "phase": "always"
+        },
+        {
+          "id": "intern-stage",
+          "x": 240,
+          "y": 860,
+          "w": 600,
+          "h": 120,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "intern-role",
+        "intern-stage"
+      ],
+      "captionPhrases": [
+        {
+          "text": "The role.",
+          "style": "bold"
+        },
+        {
+          "text": "The stage.",
+          "style": "bold"
+        },
+        {
+          "text": "The next step.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Summarize the sample\u2019s recorded role and stage, with next step explicitly a conceptual prompt.",
+      "visualMetaphor": "Original role and stage crops sit above a labelled NEXT STEP illustration; no synthetic UI.",
+      "transition": "The opening tangle resolves.",
+      "actionCue": "stage"
+    },
+    {
+      "id": "less-untangling",
+      "layout": "untangle",
+      "vo": "Less piecing things together.",
+      "headline": "Less piecing things together.",
+      "background": "clay",
+      "presenter": "center",
+      "expression": "friendly",
+      "action": "gather",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Less piecing things together.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Resolve the earlier scattered-context metaphor.",
+      "visualMetaphor": "The three illustrated tabs align into a tidy stack as Solomon gathers them.",
+      "transition": "Move into the direct internship payoff.",
+      "actionCue": "together"
+    },
+    {
+      "id": "clearer-hunt",
+      "layout": "clarity",
+      "vo": "More clarity for your internship hunt.",
+      "headline": "More clarity",
+      "background": "ivory",
+      "presenter": "left",
+      "expression": "happy",
+      "action": "present",
+      "gesture": "presentation_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "More clarity",
+          "style": "bold"
+        },
+        {
+          "text": "for your internship hunt.",
+          "style": "serif"
+        }
+      ],
+      "newInformation": "The benefit is clarity in the search, not an offer or response guarantee.",
+      "visualMetaphor": "A clean forward arrow replaces the opening visual clutter.",
+      "transition": "Hold a clear action CTA instead of ending on the logo alone.",
+      "actionCue": "clarity"
+    },
+    {
+      "id": "start-your-search",
+      "layout": "cta",
+      "vo": "Start your internship search with Solomon.",
+      "headline": "Start your internship search",
+      "background": "sage",
+      "presenter": "center",
+      "expression": "direct_cta",
+      "action": "present",
+      "gesture": "wave",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Start your internship search",
+          "style": "bold"
+        },
+        {
+          "text": "with Solomon.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Invite the viewer to start an internship search with Solomon; no unverified URL or delivery promise.",
+      "visualMetaphor": "A stable full CTA and wordmark, with enough time to read; no fake interactive button.",
+      "transition": "End on the requested call to action.",
+      "actionCue": "Solomon"
+    }
+  ]
+}
