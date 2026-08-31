@@ -1,0 +1,536 @@
+{
+  "version": "meet-solomon-categories-v1",
+  "category": "software",
+  "sampleData": true,
+  "captureMode": "offline-component-demo",
+  "id": "meet-solomon-software-internships",
+  "title": "Meet Solomon \u2014 Software internships",
+  "requiredEvidence": {
+    "role": "Software Engineering Intern",
+    "company": "Example Software Studio",
+    "role-card": "Software Engineering Intern Example Software Studio",
+    "stage": "Interviewing",
+    "detail-role": "Software Engineering Intern",
+    "category-detail": "Technical"
+  },
+  "scenes": [
+    {
+      "id": "software-category-hook",
+      "layout": "category-hook",
+      "vo": "Software internships. Applications here. Interview prep there.",
+      "headline": "Software internships.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "focused",
+      "action": "inspect",
+      "gesture": "thinking_hand",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Software internships.",
+          "style": "bold"
+        },
+        {
+          "text": "Applications here.",
+          "style": "bold"
+        },
+        {
+          "text": "Interview prep there.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Name the category and the viewer\u2019s search problem.",
+      "visualMetaphor": "Code brackets frame APPLICATIONS and PRACTICE cards, clearly an illustration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Interview prep there."
+    },
+    {
+      "id": "software-split",
+      "layout": "split",
+      "vo": "Keep them connected.",
+      "headline": "Keep them connected.",
+      "background": "clay",
+      "presenter": "close",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Keep them connected.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Separate applications and interview preparation as two areas of attention.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Keep them connected."
+    },
+    {
+      "id": "software-role-reveal",
+      "layout": "role-reveal",
+      "vo": "Software Engineering Intern. This is demo data.",
+      "headline": "Software Engineering Intern",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "role-card",
+          "x": 90,
+          "y": 740,
+          "w": 900,
+          "h": 580,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role-card"
+      ],
+      "captionPhrases": [],
+      "newInformation": "Show a category-specific fictional internship card in the original product component.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections."
+    },
+    {
+      "id": "software-meet",
+      "layout": "meet",
+      "vo": "Meet Solomon.",
+      "headline": "Meet Solomon.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "wave",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Meet Solomon.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Introduce Solomon after the first concrete sample.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Meet Solomon."
+    },
+    {
+      "id": "software-stage",
+      "layout": "stage",
+      "vo": "The sample is marked Interviewing.",
+      "headline": "The sample is",
+      "background": "sage",
+      "presenter": "right",
+      "expression": "focused",
+      "action": "point",
+      "gesture": "true_point_left",
+      "proofs": [
+        {
+          "id": "role",
+          "x": 65,
+          "y": 555,
+          "w": 950,
+          "h": 150,
+          "phase": "always"
+        },
+        {
+          "id": "stage",
+          "x": 290,
+          "y": 820,
+          "w": 500,
+          "h": 130,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role",
+        "stage"
+      ],
+      "captionPhrases": [
+        {
+          "text": "The sample is",
+          "style": "bold"
+        },
+        {
+          "text": "marked Interviewing.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Show the original sample stage heading and internship title from the same column.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "marked Interviewing."
+    },
+    {
+      "id": "software-reset",
+      "layout": "reset",
+      "vo": "A recorded stage. Not an interview guarantee.",
+      "headline": "A recorded stage.",
+      "background": "ivory",
+      "presenter": "close",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "A recorded stage.",
+          "style": "bold"
+        },
+        {
+          "text": "Not an interview guarantee.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Clarify that a recorded sample stage does not promise a hiring result.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Not an interview guarantee."
+    },
+    {
+      "id": "software-category-detail",
+      "layout": "category-detail",
+      "vo": "Its sample interview round is labelled Technical.",
+      "headline": "Its sample interview round",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "detail-role",
+          "x": 65,
+          "y": 610,
+          "w": 950,
+          "h": 150,
+          "phase": "always"
+        },
+        {
+          "id": "category-detail",
+          "x": 65,
+          "y": 1020,
+          "w": 950,
+          "h": 190,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "detail-role",
+        "category-detail"
+      ],
+      "captionPhrases": [
+        {
+          "text": "Its sample interview round",
+          "style": "bold"
+        },
+        {
+          "text": "is labelled Technical.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Show the original selected role title and its category-specific sample detail.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "is labelled Technical."
+    },
+    {
+      "id": "software-category-map",
+      "layout": "category-map",
+      "vo": "Track the application. Plan your practice.",
+      "headline": "Track the application.",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Track the application.",
+          "style": "bold"
+        },
+        {
+          "text": "Plan your practice.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Connect the category\u2019s decision criteria using a labelled illustration.",
+      "visualMetaphor": "APPLICATION and PRACTICE appear as two labelled workstreams, not an automation workflow.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Plan your practice."
+    },
+    {
+      "id": "software-criteria",
+      "layout": "criteria",
+      "vo": "Read the actual role before choosing what to prepare.",
+      "headline": "Read the actual role",
+      "background": "clay",
+      "presenter": "right",
+      "expression": "focused",
+      "action": "inspect",
+      "gesture": "thinking_hand",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Read the actual role",
+          "style": "bold"
+        },
+        {
+          "text": "before choosing what to prepare.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Advise reading the real listing without inventing universal requirements.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "before choosing what to prepare."
+    },
+    {
+      "id": "software-choose",
+      "layout": "choose",
+      "vo": "Match your projects to what it asks for.",
+      "headline": "Match your projects",
+      "background": "charcoal",
+      "presenter": "left",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Match your projects",
+          "style": "bold"
+        },
+        {
+          "text": "to what it asks for.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "The viewer chooses their next step; the product does not submit an application.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "to what it asks for."
+    },
+    {
+      "id": "software-role-company",
+      "layout": "role-company",
+      "vo": "Keep the role and employer in view.",
+      "headline": "Keep the role and employer",
+      "background": "sage",
+      "presenter": "right",
+      "expression": "focused",
+      "action": "point",
+      "gesture": "true_point_left",
+      "proofs": [
+        {
+          "id": "role",
+          "x": 65,
+          "y": 555,
+          "w": 950,
+          "h": 150,
+          "phase": "always"
+        },
+        {
+          "id": "company",
+          "x": 230,
+          "y": 815,
+          "w": 620,
+          "h": 125,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role",
+        "company"
+      ],
+      "captionPhrases": [
+        {
+          "text": "Keep the role and employer",
+          "style": "bold"
+        },
+        {
+          "text": "in view.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "The role and company are together on the same captured sample card.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "in view."
+    },
+    {
+      "id": "software-tracker-view",
+      "layout": "tracker-view",
+      "vo": "Return to the tracker when you switch tasks.",
+      "headline": "Return to the tracker",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "tracker-view",
+          "x": 45,
+          "y": 580,
+          "w": 990,
+          "h": 570,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "tracker-view"
+      ],
+      "captionPhrases": [
+        {
+          "text": "Return to the tracker",
+          "style": "bold"
+        },
+        {
+          "text": "when you switch tasks.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Establish the original tracker component with offline sample data; no factual claim from the whole screen.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections."
+    },
+    {
+      "id": "software-recap",
+      "layout": "recap",
+      "vo": "The application stays visible.",
+      "headline": "The application stays visible.",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "role",
+          "x": 65,
+          "y": 600,
+          "w": 950,
+          "h": 160,
+          "phase": "always"
+        },
+        {
+          "id": "stage",
+          "x": 260,
+          "y": 965,
+          "w": 560,
+          "h": 130,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role",
+        "stage"
+      ],
+      "captionPhrases": [
+        {
+          "text": "The application stays visible.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Return to the sample role and its recorded stage, without promising a hiring outcome.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections."
+    },
+    {
+      "id": "software-category-payoff",
+      "layout": "category-payoff",
+      "vo": "Your practice gets your attention.",
+      "headline": "Your practice",
+      "background": "clay",
+      "presenter": "center",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Your practice",
+          "style": "bold"
+        },
+        {
+          "text": "gets your attention.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Resolve the category-specific opening metaphor.",
+      "visualMetaphor": "An illustrated code-bracket frame leaves space for focused PRACTICE.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "gets your attention."
+    },
+    {
+      "id": "software-bridge",
+      "layout": "bridge",
+      "vo": "A clearer next step for your software internship hunt.",
+      "headline": "A clearer next step",
+      "background": "ivory",
+      "presenter": "right",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "A clearer next step",
+          "style": "bold"
+        },
+        {
+          "text": "for your software internship hunt.",
+          "style": "serif"
+        }
+      ],
+      "newInformation": "Focus the story on the viewer\u2019s next action before the CTA.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "for your software internship hunt."
+    },
+    {
+      "id": "software-cta",
+      "layout": "cta",
+      "vo": "Ready? Start your software internship search with Solomon.",
+      "headline": "Ready?",
+      "background": "sage",
+      "presenter": "center",
+      "expression": "direct_cta",
+      "action": "present",
+      "gesture": "wave",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Ready?",
+          "style": "bold"
+        },
+        {
+          "text": "Start your software internship search",
+          "style": "bold"
+        },
+        {
+          "text": "with Solomon.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Explicit category-specific action CTA, without an unverified URL or delivery automation.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hold the complete CTA until the film ends.",
+      "actionCue": "with Solomon."
+    }
+  ]
+}

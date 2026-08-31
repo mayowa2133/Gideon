@@ -35,6 +35,7 @@ async function makeSoundDesign(scenes, seconds, target) {
   const rate = 48000, samples = new Float64Array(Math.ceil(seconds * rate));
   const events = scenes.flatMap(s => {
     if (s.layout === "checklist") return s.phrases.map((p, i) => ({ at: p.from / 30, hz: 440 + i * 110, length: .085, gain: .032, endHz: 440 + i * 110 }));
+    if (s.layout === "role-reveal") return [{ at: s.from / 30, hz: 349, endHz: 523, length: .18, gain: .035 }];
     if (s.layout === "intern-reveal") return [{ at: s.from / 30, hz: 392, endHz: 587, length: .18, gain: .035 }];
     if (s.layout === "cta") return [{ at: s.from / 30, hz: 440, endHz: 660, length: .2, gain: .027 }];
     if (["legal-reveal", "partners-reveal"].includes(s.layout)) return [{ at: s.from / 30, hz: s.layout === "legal-reveal" ? 330 : 495, endHz: 660, length: .18, gain: .035 }];
@@ -66,7 +67,8 @@ async function main() {
   const v2 = rawStory.version === "meet-solomon-v2";
   const nontech = rawStory.version === "meet-solomon-nontech-v1";
   const internships = rawStory.version === "meet-solomon-internships-v1";
-  const { meetStorySchema, meetFilmSchema, assertMeetStoryEvidence, auditMeetFilm } = require(internships ? "../dist/main/shared/meetSolomonInternships.js" : nontech ? "../dist/main/shared/meetSolomonNontech.js" : v2 ? "../dist/main/shared/meetSolomonV2.js" : "../dist/main/shared/meetSolomon.js");
+  const categories = rawStory.version === "meet-solomon-categories-v1";
+  const { meetStorySchema, meetFilmSchema, assertMeetStoryEvidence, auditMeetFilm } = require(categories ? "../dist/main/shared/meetSolomonCategories.js" : internships ? "../dist/main/shared/meetSolomonInternships.js" : nontech ? "../dist/main/shared/meetSolomonNontech.js" : v2 ? "../dist/main/shared/meetSolomonV2.js" : "../dist/main/shared/meetSolomon.js");
   const story = meetStorySchema.parse(rawStory);
   let previous;
   try { previous = JSON.parse(await fs.readFile(path.join(out, "film.json"), "utf8")); }
@@ -144,26 +146,26 @@ async function main() {
     });
     for (let p = 0; p < phrases.length; p++) phrases[p].to = phrases[p + 1]?.from ?? to;
     let actionFrame = 0;
-    if ((v2 || nontech || internships) && scene.actionCue) {
+    if ((v2 || nontech || internships || categories) && scene.actionCue) {
       const tokens = scene.actionCue.split(/\s+/).map(normal);
       const at = normalized.findIndex((_, n) => tokens.every((token, k) => token === normalized[n + k]));
       if (at < 0) throw new Error(`Action cue not spoken in ${scene.id}.`);
       actionFrame = Math.max(0, Math.round(aligned.words[starts[i] + at].from * 30) - from);
     }
-    return { ...scene, from, to, phrases, ...(v2 || nontech || internships ? { actionFrame } : {}) };
+    return { ...scene, from, to, phrases, ...(v2 || nontech || internships || categories ? { actionFrame } : {}) };
   });
   const sounds = await makeSoundDesign(scenes, seconds, path.join(publicDir, "sound-design.wav"));
-  const film = meetFilmSchema.parse({ version: story.version, ...(internships ? { sampleData: true } : {}), id: story.id, title: story.title, fps: 30, durationInFrames: Math.round(seconds * 30), narrationSrc: "narration.wav", soundDesignSrc: "sound-design.wav", evidence, scenes, alignment: { source: aligned.source, coverage: aligned.coverage }, reviewOnly: true });
-  const report = { ...auditMeetFilm(film), scriptHash, audioHash, tempo, readability, ocr, sounds, humanApprovalRequired: true, captureLimitation: internships ? "Private internship pilot using the original August 11 product demo. Marketing Intern / Northstar Labs is sample data, not a verified vacancy. Recorded Interviewing status is not a customer outcome. No authenticated current capture was available. The CTA is informational: no URL, application submission, or delivery automation." : nontech ? "Private #5 pilot using dated archived company-search evidence. Titles and employers are paired in the same captured cards. No current vacancy, hiring distribution, eligibility, absence of coding requirements, or background search is claimed. Conceptual graphics are labelled illustrations." : v2 ? "Dated archived product evidence. Startup is an explicitly labelled before/after filter edit, not continuous playback or an observed job arrival. Its transient empty state remains in the retained source recording. Different posting ages belong to different jobs. No posting age was edited." : "Local preview could not load account data. Timestamp contrast uses disclosed archived captures; automatic discovery is supported by newly captured product explanation text, not an observed background run. No posting age was edited." };
+  const film = meetFilmSchema.parse({ version: story.version, ...(internships ? { sampleData: true } : {}), ...(categories ? { category: story.category, sampleData: true, captureMode: story.captureMode } : {}), id: story.id, title: story.title, fps: 30, durationInFrames: Math.round(seconds * 30), narrationSrc: "narration.wav", soundDesignSrc: "sound-design.wav", evidence, scenes, alignment: { source: aligned.source, coverage: aligned.coverage }, reviewOnly: true });
+  const report = { ...auditMeetFilm(film), scriptHash, audioHash, tempo, readability, ocr, sounds, humanApprovalRequired: true, captureLimitation: categories ? "Offline component demo: unmodified Solomon tracker UI with explicit category-specific sample hooks. No authenticated account, backend, live vacancy, real application, eligibility or hiring outcome is demonstrated. CTA has no URL or delivery automation. Source component hashes and fixture provenance are retained." : internships ? "Private internship pilot using the original August 11 product demo. Marketing Intern / Northstar Labs is sample data, not a verified vacancy. Recorded Interviewing status is not a customer outcome. No authenticated current capture was available. The CTA is informational: no URL, application submission, or delivery automation." : nontech ? "Private #5 pilot using dated archived company-search evidence. Titles and employers are paired in the same captured cards. No current vacancy, hiring distribution, eligibility, absence of coding requirements, or background search is claimed. Conceptual graphics are labelled illustrations." : v2 ? "Dated archived product evidence. Startup is an explicitly labelled before/after filter edit, not continuous playback or an observed job arrival. Its transient empty state remains in the retained source recording. Different posting ages belong to different jobs. No posting age was edited." : "Local preview could not load account data. Timestamp contrast uses disclosed archived captures; automatic discovery is supported by newly captured product explanation text, not an observed background run. No posting age was edited." };
   await write(path.join(out, "film.json"), film);
   await write(path.join(out, "quality.json"), report);
   const beatSheet = scenes.map(s => `## ${s.id} · ${(s.from / 30).toFixed(2)}–${(s.to / 30).toFixed(2)}s\n\nSCENE: ${s.vo}\n\nNEW INFORMATION: ${s.newInformation}\n\nVISUAL METAPHOR: ${s.visualMetaphor}\n\nSOLOMON ACTION: ${s.presenter}, ${s.expression}, ${s.gesture}; no mouth.\n\nEVIDENCE: ${s.evidence.join(", ") || "Conceptual / no product claim"}\n\nTRANSITION: ${s.transition}\n`).join("\n");
   await fs.writeFile(path.join(out, "BEAT-SHEET.md"), `# ${story.title}\n\nPrivate style study; final human review required.\n\n${beatSheet}`);
   process.stdout.write(`Prepared ${scenes.length} shots / ${seconds}s / ${(report.presenterShare * 100).toFixed(1)}% presenter / ${Math.round(aligned.coverage * 100)}% aligned.\n`);
   if (args.includes("--prepare-only")) return;
-  const serveUrl = await bundle({ entryPoint: path.join(root, internships ? "src/remotion/meetSolomonInternships/index.tsx" : nontech ? "src/remotion/meetSolomonNontech/index.tsx" : v2 ? "src/remotion/meetSolomonV2/index.tsx" : "src/remotion/meetSolomon/index.tsx"), publicDir, outDir: path.join(out, "bundle") });
+  const serveUrl = await bundle({ entryPoint: path.join(root, categories ? "src/remotion/meetSolomonCategories/index.tsx" : internships ? "src/remotion/meetSolomonInternships/index.tsx" : nontech ? "src/remotion/meetSolomonNontech/index.tsx" : v2 ? "src/remotion/meetSolomonV2/index.tsx" : "src/remotion/meetSolomon/index.tsx"), publicDir, outDir: path.join(out, "bundle") });
   const inputProps = { film };
-  const composition = await selectComposition({ serveUrl, id: internships ? "MeetSolomonInternships" : nontech ? "MeetSolomonNontech" : v2 ? "MeetSolomonV2" : "MeetSolomon", inputProps, chromeMode: "headless-shell", timeoutInMilliseconds: 120000 });
+  const composition = await selectComposition({ serveUrl, id: categories ? "MeetSolomonCategories" : internships ? "MeetSolomonInternships" : nontech ? "MeetSolomonNontech" : v2 ? "MeetSolomonV2" : "MeetSolomon", inputProps, chromeMode: "headless-shell", timeoutInMilliseconds: 120000 });
   const stillDir = path.join(out, "stills");
   await fs.mkdir(stillDir, { recursive: true, mode: 0o700 });
   for (const [i, s] of scenes.entries()) {

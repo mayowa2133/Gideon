@@ -1,0 +1,540 @@
+{
+  "version": "meet-solomon-categories-v1",
+  "category": "law",
+  "sampleData": true,
+  "captureMode": "offline-component-demo",
+  "id": "meet-solomon-law-internships",
+  "title": "Meet Solomon — Law internships",
+  "requiredEvidence": {
+    "role": "Legal Intern",
+    "company": "Example Legal Group",
+    "role-card": "Legal Intern Example Legal Group",
+    "stage": "Applied",
+    "detail-role": "Legal Intern",
+    "category-detail": "Check eligibility and required documents."
+  },
+  "scenes": [
+    {
+      "id": "law-category-hook",
+      "layout": "category-hook",
+      "vo": "Looking for a law internship?",
+      "headline": "Looking for a law internship?",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "focused",
+      "action": "inspect",
+      "gesture": "thinking_hand",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Looking for a law internship?",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Name the category and the viewer’s search problem.",
+      "visualMetaphor": "An illustrated document and magnifier direct attention past the title.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Looking for a law internship?"
+    },
+    {
+      "id": "law-noise",
+      "layout": "noise",
+      "vo": "Read past the title.",
+      "headline": "Read past the title.",
+      "background": "clay",
+      "presenter": "close",
+      "expression": "skeptical",
+      "action": "push",
+      "gesture": "stop_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Read past the title.",
+          "style": "serif"
+        }
+      ],
+      "newInformation": "Introduce scattered context as an illustration, without invented product state.",
+      "visualMetaphor": "The illustrated TITLE line lifts to reveal REQUIREMENTS beneath it.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Read past the title."
+    },
+    {
+      "id": "law-role-reveal",
+      "layout": "role-reveal",
+      "vo": "Legal Intern. A sample role in Solomon.",
+      "headline": "Legal Intern",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "role-card",
+          "x": 90,
+          "y": 740,
+          "w": 900,
+          "h": 580,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role-card"
+      ],
+      "captionPhrases": [],
+      "newInformation": "Show a category-specific fictional internship card in the original product component.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections."
+    },
+    {
+      "id": "law-meet",
+      "layout": "meet",
+      "vo": "Meet Solomon.",
+      "headline": "Meet Solomon.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "wave",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Meet Solomon.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Introduce Solomon after the first concrete sample.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Meet Solomon."
+    },
+    {
+      "id": "law-role-company",
+      "layout": "role-company",
+      "vo": "Keep the role and organisation together.",
+      "headline": "Keep the role",
+      "background": "sage",
+      "presenter": "right",
+      "expression": "focused",
+      "action": "point",
+      "gesture": "true_point_left",
+      "proofs": [
+        {
+          "id": "role",
+          "x": 65,
+          "y": 555,
+          "w": 950,
+          "h": 150,
+          "phase": "always"
+        },
+        {
+          "id": "company",
+          "x": 230,
+          "y": 815,
+          "w": 620,
+          "h": 125,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role",
+        "company"
+      ],
+      "captionPhrases": [
+        {
+          "text": "Keep the role",
+          "style": "bold"
+        },
+        {
+          "text": "and organisation together.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "The role and company are together on the same captured sample card.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "and organisation together."
+    },
+    {
+      "id": "law-category-detail",
+      "layout": "category-detail",
+      "vo": "This sample note says: check eligibility and required documents.",
+      "headline": "This sample note says:",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "detail-role",
+          "x": 65,
+          "y": 610,
+          "w": 950,
+          "h": 150,
+          "phase": "always"
+        },
+        {
+          "id": "category-detail",
+          "x": 65,
+          "y": 1020,
+          "w": 950,
+          "h": 190,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "detail-role",
+        "category-detail"
+      ],
+      "captionPhrases": [
+        {
+          "text": "This sample note says:",
+          "style": "bold"
+        },
+        {
+          "text": "check eligibility",
+          "style": "bold"
+        },
+        {
+          "text": "and required documents.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Show the original selected role title and its category-specific sample detail.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "and required documents."
+    },
+    {
+      "id": "law-reset",
+      "layout": "reset",
+      "vo": "Requirements differ. Check the actual listing.",
+      "headline": "Requirements differ.",
+      "background": "ivory",
+      "presenter": "close",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Requirements differ.",
+          "style": "bold"
+        },
+        {
+          "text": "Check the actual listing.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Clarify that a recorded sample stage does not promise a hiring result.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Check the actual listing."
+    },
+    {
+      "id": "law-criteria",
+      "layout": "criteria",
+      "vo": "Who can apply? What do they need from you?",
+      "headline": "Who can apply?",
+      "background": "clay",
+      "presenter": "left",
+      "expression": "focused",
+      "action": "inspect",
+      "gesture": "thinking_hand",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Who can apply?",
+          "style": "bold"
+        },
+        {
+          "text": "What do they need from you?",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Advise reading the real listing without inventing universal requirements.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "What do they need from you?"
+    },
+    {
+      "id": "law-category-map",
+      "layout": "category-map",
+      "vo": "Eligibility. Documents. Dates.",
+      "headline": "Eligibility.",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Eligibility.",
+          "style": "bold"
+        },
+        {
+          "text": "Documents.",
+          "style": "bold"
+        },
+        {
+          "text": "Dates.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Connect the category’s decision criteria using a labelled illustration.",
+      "visualMetaphor": "ELIGIBILITY, DOCUMENTS and DATES form a labelled checklist, with no invented criteria.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Dates."
+    },
+    {
+      "id": "law-choose",
+      "layout": "choose",
+      "vo": "Prepare for the role you're actually pursuing.",
+      "headline": "Prepare for the role",
+      "background": "charcoal",
+      "presenter": "left",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Prepare for the role",
+          "style": "bold"
+        },
+        {
+          "text": "you're actually pursuing.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "The viewer chooses their next step; the product does not submit an application.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "you're actually pursuing."
+    },
+    {
+      "id": "law-stage",
+      "layout": "stage",
+      "vo": "The sample card is marked Applied.",
+      "headline": "The sample card",
+      "background": "sage",
+      "presenter": "right",
+      "expression": "focused",
+      "action": "point",
+      "gesture": "true_point_left",
+      "proofs": [
+        {
+          "id": "role",
+          "x": 65,
+          "y": 555,
+          "w": 950,
+          "h": 150,
+          "phase": "always"
+        },
+        {
+          "id": "stage",
+          "x": 290,
+          "y": 820,
+          "w": 500,
+          "h": 130,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role",
+        "stage"
+      ],
+      "captionPhrases": [
+        {
+          "text": "The sample card",
+          "style": "bold"
+        },
+        {
+          "text": "is marked Applied.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Show the original sample stage heading and internship title from the same column.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "is marked Applied."
+    },
+    {
+      "id": "law-tracker-view",
+      "layout": "tracker-view",
+      "vo": "Use the tracker to keep that application in view.",
+      "headline": "Use the tracker",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "tracker-view",
+          "x": 45,
+          "y": 580,
+          "w": 990,
+          "h": 570,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "tracker-view"
+      ],
+      "captionPhrases": [
+        {
+          "text": "Use the tracker",
+          "style": "bold"
+        },
+        {
+          "text": "to keep that application in view.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Establish the original tracker component with offline sample data; no factual claim from the whole screen.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections."
+    },
+    {
+      "id": "law-recap",
+      "layout": "recap",
+      "vo": "A recorded stage is not a hiring promise.",
+      "headline": "A recorded stage",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "role",
+          "x": 65,
+          "y": 600,
+          "w": 950,
+          "h": 160,
+          "phase": "always"
+        },
+        {
+          "id": "stage",
+          "x": 260,
+          "y": 965,
+          "w": 560,
+          "h": 130,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role",
+        "stage"
+      ],
+      "captionPhrases": [
+        {
+          "text": "A recorded stage",
+          "style": "bold"
+        },
+        {
+          "text": "is not a hiring promise.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Return to the sample role and its recorded stage, without promising a hiring outcome.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections."
+    },
+    {
+      "id": "law-category-payoff",
+      "layout": "category-payoff",
+      "vo": "Less guesswork about where you left off.",
+      "headline": "Less guesswork",
+      "background": "clay",
+      "presenter": "center",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Less guesswork",
+          "style": "bold"
+        },
+        {
+          "text": "about where you left off.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Resolve the category-specific opening metaphor.",
+      "visualMetaphor": "The illustrated magnifier resolves over NEXT STEP instead of the job title.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "about where you left off."
+    },
+    {
+      "id": "law-bridge",
+      "layout": "bridge",
+      "vo": "More focus on your next step.",
+      "headline": "More focus",
+      "background": "ivory",
+      "presenter": "right",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "More focus",
+          "style": "bold"
+        },
+        {
+          "text": "on your next step.",
+          "style": "serif"
+        }
+      ],
+      "newInformation": "Focus the story on the viewer’s next action before the CTA.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "on your next step."
+    },
+    {
+      "id": "law-cta",
+      "layout": "cta",
+      "vo": "Ready? Start your law internship search with Solomon.",
+      "headline": "Ready?",
+      "background": "sage",
+      "presenter": "center",
+      "expression": "direct_cta",
+      "action": "present",
+      "gesture": "wave",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Ready?",
+          "style": "bold"
+        },
+        {
+          "text": "Start your law internship search",
+          "style": "bold"
+        },
+        {
+          "text": "with Solomon.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Explicit category-specific action CTA, without an unverified URL or delivery automation.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hold the complete CTA until the film ends.",
+      "actionCue": "with Solomon."
+    }
+  ]
+}

@@ -1,0 +1,528 @@
+{
+  "version": "meet-solomon-categories-v1",
+  "category": "finance",
+  "sampleData": true,
+  "captureMode": "offline-component-demo",
+  "id": "meet-solomon-finance-internships",
+  "title": "Meet Solomon \u2014 Finance internships",
+  "requiredEvidence": {
+    "role": "Finance Intern",
+    "company": "Example Finance Co.",
+    "role-card": "Finance Intern Example Finance Co.",
+    "stage": "Applied",
+    "detail-role": "Finance Intern",
+    "category-detail": "Review the role requirements."
+  },
+  "scenes": [
+    {
+      "id": "finance-category-hook",
+      "layout": "category-hook",
+      "vo": "Finance internships. Plenty to compare.",
+      "headline": "Finance internships.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "focused",
+      "action": "inspect",
+      "gesture": "thinking_hand",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Finance internships.",
+          "style": "bold"
+        },
+        {
+          "text": "Plenty to compare.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Name the category and the viewer\u2019s search problem.",
+      "visualMetaphor": "An illustrated three-column ledger for ROLE, FIRM and STAGE, without invented amounts.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Plenty to compare."
+    },
+    {
+      "id": "finance-noise",
+      "layout": "noise",
+      "vo": "Which firm? Which stage?",
+      "headline": "Which firm?",
+      "background": "clay",
+      "presenter": "close",
+      "expression": "skeptical",
+      "action": "push",
+      "gesture": "stop_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Which firm?",
+          "style": "bold"
+        },
+        {
+          "text": "Which stage?",
+          "style": "serif"
+        }
+      ],
+      "newInformation": "Introduce scattered context as an illustration, without invented product state.",
+      "visualMetaphor": "Loose ROLE, FIRM and STAGE slips shift aside as the presenter reacts.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Which stage?"
+    },
+    {
+      "id": "finance-role-reveal",
+      "layout": "role-reveal",
+      "vo": "Finance Intern. Here's a sample in Solomon.",
+      "headline": "Finance Intern",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "role-card",
+          "x": 90,
+          "y": 740,
+          "w": 900,
+          "h": 580,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role-card"
+      ],
+      "captionPhrases": [],
+      "newInformation": "Show a category-specific fictional internship card in the original product component.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections."
+    },
+    {
+      "id": "finance-meet",
+      "layout": "meet",
+      "vo": "Meet Solomon.",
+      "headline": "Meet Solomon.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "wave",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Meet Solomon.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Introduce Solomon after the first concrete sample.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Meet Solomon."
+    },
+    {
+      "id": "finance-role-company",
+      "layout": "role-company",
+      "vo": "The role and firm stay together.",
+      "headline": "The role and firm",
+      "background": "sage",
+      "presenter": "right",
+      "expression": "focused",
+      "action": "point",
+      "gesture": "true_point_left",
+      "proofs": [
+        {
+          "id": "role",
+          "x": 65,
+          "y": 555,
+          "w": 950,
+          "h": 150,
+          "phase": "always"
+        },
+        {
+          "id": "company",
+          "x": 230,
+          "y": 815,
+          "w": 620,
+          "h": 125,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role",
+        "company"
+      ],
+      "captionPhrases": [
+        {
+          "text": "The role and firm",
+          "style": "bold"
+        },
+        {
+          "text": "stay together.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "The role and company are together on the same captured sample card.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "stay together."
+    },
+    {
+      "id": "finance-stage",
+      "layout": "stage",
+      "vo": "This demo card is marked Applied.",
+      "headline": "This demo card",
+      "background": "sage",
+      "presenter": "left",
+      "expression": "focused",
+      "action": "point",
+      "gesture": "true_point_right",
+      "proofs": [
+        {
+          "id": "role",
+          "x": 65,
+          "y": 555,
+          "w": 950,
+          "h": 150,
+          "phase": "always"
+        },
+        {
+          "id": "stage",
+          "x": 290,
+          "y": 820,
+          "w": 500,
+          "h": 130,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role",
+        "stage"
+      ],
+      "captionPhrases": [
+        {
+          "text": "This demo card",
+          "style": "bold"
+        },
+        {
+          "text": "is marked Applied.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Show the original sample stage heading and internship title from the same column.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "is marked Applied."
+    },
+    {
+      "id": "finance-reset",
+      "layout": "reset",
+      "vo": "Recorded progress. Not an offer.",
+      "headline": "Recorded progress.",
+      "background": "ivory",
+      "presenter": "close",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Recorded progress.",
+          "style": "bold"
+        },
+        {
+          "text": "Not an offer.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Clarify that a recorded sample stage does not promise a hiring result.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Not an offer."
+    },
+    {
+      "id": "finance-category-detail",
+      "layout": "category-detail",
+      "vo": "A sample note reminds you to review the requirements.",
+      "headline": "A sample note reminds you",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "detail-role",
+          "x": 65,
+          "y": 610,
+          "w": 950,
+          "h": 150,
+          "phase": "always"
+        },
+        {
+          "id": "category-detail",
+          "x": 65,
+          "y": 1020,
+          "w": 950,
+          "h": 190,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "detail-role",
+        "category-detail"
+      ],
+      "captionPhrases": [
+        {
+          "text": "A sample note reminds you",
+          "style": "bold"
+        },
+        {
+          "text": "to review the requirements.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Show the original selected role title and its category-specific sample detail.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "to review the requirements."
+    },
+    {
+      "id": "finance-category-map",
+      "layout": "category-map",
+      "vo": "Role. Firm. Stage. Keep the context connected.",
+      "headline": "Role. Firm. Stage.",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Role. Firm. Stage.",
+          "style": "bold"
+        },
+        {
+          "text": "Keep the context connected.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Connect the category\u2019s decision criteria using a labelled illustration.",
+      "visualMetaphor": "ROLE, FIRM and STAGE connect as an illustrated set.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Keep the context connected."
+    },
+    {
+      "id": "finance-criteria",
+      "layout": "criteria",
+      "vo": "Check the dates and skills each listing asks for.",
+      "headline": "Check the dates and skills",
+      "background": "clay",
+      "presenter": "left",
+      "expression": "focused",
+      "action": "inspect",
+      "gesture": "thinking_hand",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Check the dates and skills",
+          "style": "bold"
+        },
+        {
+          "text": "each listing asks for.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Advise reading the real listing without inventing universal requirements.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "each listing asks for."
+    },
+    {
+      "id": "finance-choose",
+      "layout": "choose",
+      "vo": "Choose where your experience fits.",
+      "headline": "Choose where your experience fits.",
+      "background": "charcoal",
+      "presenter": "right",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Choose where your experience fits.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "The viewer chooses their next step; the product does not submit an application.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Choose where your experience fits."
+    },
+    {
+      "id": "finance-tracker-view",
+      "layout": "tracker-view",
+      "vo": "Then return to the tracker for the bigger picture.",
+      "headline": "Then return to the tracker",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "tracker-view",
+          "x": 45,
+          "y": 580,
+          "w": 990,
+          "h": 570,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "tracker-view"
+      ],
+      "captionPhrases": [
+        {
+          "text": "Then return to the tracker",
+          "style": "bold"
+        },
+        {
+          "text": "for the bigger picture.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Establish the original tracker component with offline sample data; no factual claim from the whole screen.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections."
+    },
+    {
+      "id": "finance-recap",
+      "layout": "recap",
+      "vo": "Know what you applied for.",
+      "headline": "Know what you applied for.",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "action": "reset",
+      "gesture": "open_palm",
+      "proofs": [
+        {
+          "id": "role",
+          "x": 65,
+          "y": 600,
+          "w": 950,
+          "h": 160,
+          "phase": "always"
+        },
+        {
+          "id": "stage",
+          "x": 260,
+          "y": 965,
+          "w": 560,
+          "h": 130,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "role",
+        "stage"
+      ],
+      "captionPhrases": [
+        {
+          "text": "Know what you applied for.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Return to the sample role and its recorded stage, without promising a hiring outcome.",
+      "visualMetaphor": "Original source crops float above the presenter.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections."
+    },
+    {
+      "id": "finance-category-payoff",
+      "layout": "category-payoff",
+      "vo": "Less reconstructing your search.",
+      "headline": "Less reconstructing your search.",
+      "background": "clay",
+      "presenter": "center",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Less reconstructing your search.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Resolve the category-specific opening metaphor.",
+      "visualMetaphor": "An illustrated ledger resolves to a tidy context card.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "Less reconstructing your search."
+    },
+    {
+      "id": "finance-bridge",
+      "layout": "bridge",
+      "vo": "More attention on your next move.",
+      "headline": "More attention",
+      "background": "ivory",
+      "presenter": "right",
+      "expression": "friendly",
+      "action": "present",
+      "gesture": "open_palm",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "More attention",
+          "style": "bold"
+        },
+        {
+          "text": "on your next move.",
+          "style": "serif"
+        }
+      ],
+      "newInformation": "Focus the story on the viewer\u2019s next action before the CTA.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hard cut to the next concept with a presenter reset between proof sections.",
+      "actionCue": "on your next move."
+    },
+    {
+      "id": "finance-cta",
+      "layout": "cta",
+      "vo": "Ready? Start your finance internship search with Solomon.",
+      "headline": "Ready?",
+      "background": "sage",
+      "presenter": "center",
+      "expression": "direct_cta",
+      "action": "present",
+      "gesture": "wave",
+      "proofs": [],
+      "evidence": [],
+      "captionPhrases": [
+        {
+          "text": "Ready?",
+          "style": "bold"
+        },
+        {
+          "text": "Start your finance internship search",
+          "style": "bold"
+        },
+        {
+          "text": "with Solomon.",
+          "style": "bold"
+        }
+      ],
+      "newInformation": "Explicit category-specific action CTA, without an unverified URL or delivery automation.",
+      "visualMetaphor": "A labelled conceptual composition tailored to the narration.",
+      "transition": "Hold the complete CTA until the film ends.",
+      "actionCue": "with Solomon."
+    }
+  ]
+}
