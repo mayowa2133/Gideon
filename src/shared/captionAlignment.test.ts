@@ -60,6 +60,11 @@ describe("caption alignment", () => {
     }
   });
 
+  it("aligns Whisper's alternate Salomon spelling to the approved product name", async () => {
+    const { alignWordSequences } = await alignment();
+    expect(alignWordSequences(["Solomon"], heard([["Salomon", 0, 1]]))[0]).not.toBeNull();
+  });
+
   // A transcript that matches nothing is not an alignment, and interpolating
   // across it drifts unpredictably instead of evenly. The estimate is the right
   // answer there -- but only if it is announced.

@@ -119,3 +119,31 @@ retained source and application overview. The OCR gate was not weakened.
 
 All three masters have zero detected audio clicks. Older saved masters are
 verified byte-for-byte before writing new `real-v1` archive directories.
+
+## Benefit-led V2
+
+The V2 revision makes every beat lead toward using Solomon. It explains that
+Solomon keeps opportunities in one workspace, can help tailor an uploaded
+resume to a role, provides a per-role workflow checklist, and opens the original
+employer posting. The copy says “helps tailor”; it does not promise a match,
+interview, or application outcome. Resume-tailoring and checklist claims are
+grounded in the same actual job-detail captures as each listing.
+
+V2 narration is generated in four short conversational passages and plays at
+its native rate (`tempo: 1`). The renderer derives the film length from the
+voice and adds the CTA hold; it does not slow or accelerate this version to a
+fixed runtime. The stock local Chatterbox voice remains synthetic and no voice
+reference or cloning is used.
+
+```sh
+npm run build:main
+node scripts/render-meet-solomon.mjs \
+  --story tmp/meet-real-internships-benefit-v2/finance/story.json \
+  --out tmp/meet-real-internships-benefit-v2/finance
+```
+
+| V2 cut | Duration | First proof | CTA hold | Alignment | Voice tempo |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Finance | 36.30s | 2.77s | 3.63s | 99% | 1.00× |
+| Software | 35.73s | 2.53s | 3.60s | 98% | 1.00× |
+| Legal operations | 37.03s | 3.27s | 3.50s | 99% | 1.00× |

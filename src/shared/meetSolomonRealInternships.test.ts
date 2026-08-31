@@ -58,4 +58,16 @@ describe("real internship source boundary", () => {
     expect(auditMeetFilm(film).ctaSeconds).toBe(3);
     film.scenes[11]!.from = 1050; expect(() => auditMeetFilm(film)).toThrow(/CTA/);
   });
+  it("grounds benefit-led V2 in resume-tailoring and checklist product proof", () => {
+    const { story, evidence } = inputs(); story.version = "meet-solomon-real-internships-v2";
+    story.scenes[7]!.vo = "Upload your resume and Solomon helps tailor it to the role.";
+    story.scenes[8]!.vo = "Keep your application organised with Solomon's checklist.";
+    for (const [index, id, text] of [[7, "tailoring", "Resume-backed scoring and tailoring"], [8, "checklist", "Resume uploaded Resume tailored Applied"]] as const) {
+      evidence.push({ ...evidence[0]!, id, text });
+      story.scenes[index]!.evidence.push(id); story.scenes[index]!.proofs.push({ id, x: 65, y: 600, w: 950, h: 200, phase: "always" });
+    }
+    expect(() => assertMeetStoryEvidence(story, evidence)).not.toThrow();
+    story.scenes[7]!.vo = "Solomon will make sure your resume matches.";
+    expect(() => assertMeetStoryEvidence(story, evidence)).toThrow(/guarantees/);
+  });
 });

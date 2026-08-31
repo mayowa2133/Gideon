@@ -9,12 +9,12 @@ const COLORS = { ivory: "#f4efe5", clay: "#cd7862", charcoal: "#171b1a", sage: "
 const abs = (left: number, top: number, width: number, height?: number): CSSProperties => ({ position: "absolute", left, top, width, height });
 const serif = '"Fraunces Variable", Georgia, serif';
 const tile: CSSProperties = { padding: 28, boxSizing: "border-box", border: "2px solid #aabcae", borderRadius: 20, background: "#fffdf6", color: "#182320", fontSize: 54, fontWeight: 800, textAlign: "center" };
-function Art({ scene, category }: { scene: MeetScene; category: MeetFilm["category"] }) {
+function Art({ scene, category, benefitLed }: { scene: MeetScene; category: MeetFilm["category"]; benefitLed: boolean }) {
   const words = category === "finance" ? ["AUDIT", "ANALYSIS", "YOUR NEXT STEP"] : category === "software" ? ["CODE", "BUILD", "YOUR NEXT STEP"] : ["LEGAL OPS", "DATA", "YOUR NEXT STEP"];
   if (scene.layout === "hook") return <>{words.slice(0, 2).map((word, i) => <div key={word} style={{ ...abs(120 + i * 100, 650 + i * 155, 740, 135), ...tile, transform: `rotate(${i ? 3 : -3}deg)` }}>{word}</div>)}<div style={{ ...abs(65, 1010, 950), textAlign: "center", fontSize: 24 }}>ILLUSTRATION · YOUR INTERNSHIP SEARCH</div></>;
-  if (scene.layout === "requirements" || scene.layout === "fit") return <>{(scene.layout === "requirements" ? ["READ THE DESCRIPTION", "CHECK THE REQUIREMENTS"] : ["YOUR SKILLS", "YOUR AVAILABILITY"]).map((word, i) => <div key={word} style={{ ...abs(90, 620 + i * 230, 900, 170), ...tile, display: "flex", alignItems: "center", justifyContent: "center" }}>{word}</div>)}<div style={{ ...abs(65, 1135, 950), textAlign: "center", fontSize: 24 }}>ILLUSTRATION · YOU DECIDE WHETHER TO APPLY</div></>;
+  if (scene.layout === "requirements" || scene.layout === "fit") return <>{(benefitLed ? scene.layout === "requirements" ? ["TAILOR TO THE ROLE", "KEEP YOUR EVIDENCE TRUE"] : ["RESUME", "APPLICATION CHECKLIST"] : scene.layout === "requirements" ? ["READ THE DESCRIPTION", "CHECK THE REQUIREMENTS"] : ["YOUR SKILLS", "YOUR AVAILABILITY"]).map((word, i) => <div key={word} style={{ ...abs(90, 620 + i * 230, 900, 170), ...tile, display: "flex", alignItems: "center", justifyContent: "center" }}>{word}</div>)}{!benefitLed && <div style={{ ...abs(65, 1135, 950), textAlign: "center", fontSize: 24 }}>ILLUSTRATION · YOU DECIDE WHETHER TO APPLY</div>}</>;
   if (scene.layout === "reset") return <div style={{ ...abs(90, 660, 900, 180), ...tile }}>LOOK BEYOND THE TITLE.</div>;
-  if (scene.layout === "caveat") return <div style={{ ...abs(90, 650, 900, 230), ...tile, fontSize: 64 }}>Listings can change.<br />Check before applying.</div>;
+  if (scene.layout === "caveat") return <div style={{ ...abs(90, 650, 900, 230), ...tile, fontSize: 64 }}>{benefitLed ? <>Open the employer link.<br />Confirm before applying.</> : <>Listings can change.<br />Check before applying.</>}</div>;
   if (scene.layout === "cta") return <div data-real-cta={realCta(category)}>
     <div style={{ ...abs(65, 220, 950), textAlign: "center", fontSize: 31, letterSpacing: 3 }}>YOUR NEXT STEP</div>
     <div style={{ ...abs(65, 335, 950), textAlign: "center", fontWeight: 800, fontSize: 92, lineHeight: 1.08, letterSpacing: -4 }}>Find your next<br />{category === "law" ? "legal" : category}<br />internship.</div>
@@ -30,7 +30,7 @@ export const MeetSolomonRealFrame: React.FC<{ film: MeetFilm; frame: number }> =
   return <AbsoluteFill style={{ background: COLORS[scene.background], color: dark ? "#f4efe5" : "#182320", fontFamily: '"Manrope Variable", Arial, sans-serif', overflow: "hidden" }}>
     <div style={{ ...abs(65, 78, 950), display: "flex", justifyContent: "space-between", fontSize: 24, fontWeight: 800, letterSpacing: 1 }}><span>MEET SOLOMON</span><span>{film.category === "law" ? "LEGAL OPERATIONS" : film.category.toUpperCase()} INTERNSHIPS</span></div>
     <div style={{ ...abs(65, 124, 950), fontSize: 21, opacity: .72 }}>REAL LISTING · CHECKED {film.listing.verifiedAt.slice(0, 10)}</div>
-    <Art scene={scene} category={film.category} />
+    <Art scene={scene} category={film.category} benefitLed={film.version === "meet-solomon-real-internships-v2"} />
     {scene.proofs.map(p => <InternshipProof key={p.id} evidence={film.evidence.find(e => e.id === p.id)!} placement={p} />)}
     {scene.proofs.length > 0 && <div style={{ ...abs(65, Math.max(...scene.proofs.map(p => p.y + p.h)) + 22, 950), textAlign: "center", fontSize: 23, opacity: .75 }}>SOLOMON · ACTUAL PRODUCT CAPTURE</div>}
     {scene.presenter !== "absent" && <div style={{ ...abs(scene.presenter === "right" ? 450 : scene.presenter === "left" ? 50 : 175, scene.layout === "meet" ? 900 : 1190, 660, 940), transform: `scale(${scene.layout === "meet" ? 1.15 : .96})`, transformOrigin: "0 0" }}>

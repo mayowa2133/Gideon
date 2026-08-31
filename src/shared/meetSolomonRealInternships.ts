@@ -19,8 +19,9 @@ const layout = z.enum(["hook", "reveal", "meet", "overview", "employer", "locati
 export const meetSceneSchema = v2Scene.extend({ layout });
 export type MeetScene = z.infer<typeof meetSceneSchema>;
 export const asV2Scene = (scene: MeetScene) => ({ ...scene, layout: "question" as const });
+const realVersion = z.enum(["meet-solomon-real-internships-v1", "meet-solomon-real-internships-v2"]);
 export const meetStorySchema = v2Story.extend({
-  version: z.literal("meet-solomon-real-internships-v1"), category: z.enum(["finance", "software", "law"]), listing: listingSchema,
+  version: realVersion, category: z.enum(["finance", "software", "law"]), listing: listingSchema,
   scenes: z.array(meetSceneSchema.omit({ from: true, to: true, phrases: true, actionFrame: true }).extend({
     captionPhrases: z.array(z.object({ text: z.string().min(1).max(48), style: z.enum(["bold", "serif"]) })).optional(),
   })).length(12),
@@ -54,10 +55,16 @@ export function assertMeetStoryEvidence(story: MeetStory, evidence: MeetEvidence
   const last = story.scenes.at(-1)!;
   if (last.layout !== "cta" || last.vo !== realCta(story.category)) throw new Error("Real internship films must end with their spoken CTA.");
   if (!story.scenes.some(s => s.layout === "caveat" && /change/i.test(s.vo))) throw new Error("Explain that listings can change.");
+  if (story.version === "meet-solomon-real-internships-v2") {
+    const spoken = story.scenes.map(s => s.vo).join(" ");
+    if (story.scenes.some(s => /make sure|guarantee|will match/i.test(s.vo))) throw new Error("Do not claim Solomon guarantees a resume match or outcome.");
+    if (!/tailor/i.test(spoken) || !/track|checklist|organi[sz]/i.test(spoken)) throw new Error("Benefit-led films must explain Solomon resume tailoring and application organisation.");
+    for (const id of ["tailoring", "checklist"]) if (!story.scenes.some(s => s.proofs.some(p => p.id === id))) throw new Error(`Benefit-led films require ${id} product proof.`);
+  }
   return result;
 }
 export const meetFilmSchema = z.object({
-  version: z.literal("meet-solomon-real-internships-v1"), category: z.enum(["finance", "software", "law"]), listing: listingSchema,
+  version: realVersion, category: z.enum(["finance", "software", "law"]), listing: listingSchema,
   id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/), title: z.string(), fps: z.literal(30), durationInFrames: z.number().int().positive(),
   narrationSrc: z.literal("narration.wav"), soundDesignSrc: z.literal("sound-design.wav").optional(), evidence: z.array(meetEvidenceSchema).min(1),
   scenes: z.array(meetSceneSchema).length(12), alignment: z.object({ source: z.literal("aligned"), coverage: z.number().min(.9).max(1) }), reviewOnly: z.literal(true),
