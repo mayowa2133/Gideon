@@ -180,6 +180,11 @@ Verified against package.json: 89 of the 90 script commands below exist (`db:see
 - pnpm dev
 - pnpm dev:web
 
+`test:meet:solomon` includes the isolated real-internship source, verification,
+readability and CTA tests. See `docs/meet-solomon-real-internships.md` for the
+actual-listing capture/render workflow; do not substitute the older fictional
+category fixtures when the user asks for real internships.
+
 When package scripts are added or changed, update this section.
 
 ## Code quality rules
