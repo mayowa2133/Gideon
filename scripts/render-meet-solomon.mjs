@@ -67,8 +67,9 @@ async function main() {
   const v2 = rawStory.version === "meet-solomon-v2";
   const nontech = rawStory.version === "meet-solomon-nontech-v1";
   const internships = rawStory.version === "meet-solomon-internships-v1";
-  const categories = rawStory.version === "meet-solomon-categories-v1";
-  const { meetStorySchema, meetFilmSchema, assertMeetStoryEvidence, auditMeetFilm } = require(categories ? "../dist/main/shared/meetSolomonCategories.js" : internships ? "../dist/main/shared/meetSolomonInternships.js" : nontech ? "../dist/main/shared/meetSolomonNontech.js" : v2 ? "../dist/main/shared/meetSolomonV2.js" : "../dist/main/shared/meetSolomon.js");
+  const categoriesV2 = rawStory.version === "meet-solomon-categories-v2";
+  const categories = categoriesV2 || rawStory.version === "meet-solomon-categories-v1";
+  const { meetStorySchema, meetFilmSchema, assertMeetStoryEvidence, auditMeetFilm } = require(categoriesV2 ? "../dist/main/shared/meetSolomonCategoriesV2.js" : categories ? "../dist/main/shared/meetSolomonCategories.js" : internships ? "../dist/main/shared/meetSolomonInternships.js" : nontech ? "../dist/main/shared/meetSolomonNontech.js" : v2 ? "../dist/main/shared/meetSolomonV2.js" : "../dist/main/shared/meetSolomon.js");
   const story = meetStorySchema.parse(rawStory);
   let previous;
   try { previous = JSON.parse(await fs.readFile(path.join(out, "film.json"), "utf8")); }
@@ -87,6 +88,11 @@ async function main() {
     await fs.writeFile(path.join(publicDir, e.file), bytes, { mode: 0o600 });
   }
   const readability = assertMeetStoryEvidence(story, evidence);
+  let interaction;
+  if (categoriesV2) {
+    const { assertInteraction } = require("../dist/main/shared/meetSolomonCategoriesV2.js");
+    interaction = assertInteraction(story.category, evidence, JSON.parse(await fs.readFile(path.join(out, "interaction-capture.json"), "utf8")));
+  }
   const proofDir = path.join(out, "proof-review");
   await fs.mkdir(proofDir, { recursive: true, mode: 0o700 });
   const ocr = [];
@@ -97,6 +103,16 @@ async function main() {
     const matched = normal(read.stdout).includes(normal(e.text));
     if (!matched) throw new Error(`OCR does not confirm the claimed source region: ${e.id}`);
     ocr.push({ id: e.id, sourceSha256: e.sha256, matched });
+  }
+  if (categoriesV2) {
+    const { CATEGORY_DATA } = require("../dist/main/shared/meetSolomonCategoriesV2.js"), e = evidence.find(e => e.id === "open-after"), c = e.crop;
+    const panel = path.join(proofDir, "open-after.png");
+    await ffmpeg(["-i", path.join(publicDir, e.file), "-vf", `crop=${c.width}:${c.height}:${c.x}:${c.y},scale=iw*3:ih*3`, "-frames:v", "1", panel]);
+    const read = await run("tesseract", [panel, "stdout", "--psm", "6"], { timeout: 30000 });
+    const expected = CATEGORY_DATA[story.category];
+    for (const quote of [expected.role, expected.company, expected.detail]) if (!normal(read.stdout).includes(normal(quote)))
+      throw new Error("Selected interaction panel does not confirm its category-specific role, company and detail.");
+    ocr.push({ id: "open-after", sourceSha256: e.sha256, matched: true, establishingOnly: true });
   }
   const text = story.scenes.map(s => s.vo).join(" ");
   const scriptHash = hash(text), source = path.join(voiceDir, "source.wav");
@@ -114,7 +130,7 @@ async function main() {
   const clean = path.join(voiceDir, "clean.wav");
   await ffmpeg(["-i", source, "-af", "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.04,areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.12,areverse", "-ar", "48000", "-ac", "2", clean]);
   const seconds = Number(flag("seconds", "38.5"));
-  if (!Number.isFinite(seconds) || seconds < 35 || seconds > 45) throw new Error("Meet pilot duration must be 35–45 seconds.");
+  if (!Number.isFinite(seconds) || seconds < (categoriesV2 ? 30 : 35) || seconds > (categoriesV2 ? 33 : 45)) throw new Error(categoriesV2 ? "Category V2 duration must be 30–33 seconds." : "Meet pilot duration must be 35–45 seconds.");
   const tempo = await duration(clean) / (seconds - .45);
   if (tempo < .8 || tempo > 1.3) throw new Error(`Voice needs excessive retiming (${tempo.toFixed(2)}). Revise the script or voice; do not force it.`);
   const spoken = path.join(publicDir, "narration.wav");
@@ -155,7 +171,7 @@ async function main() {
     return { ...scene, from, to, phrases, ...(v2 || nontech || internships || categories ? { actionFrame } : {}) };
   });
   const sounds = await makeSoundDesign(scenes, seconds, path.join(publicDir, "sound-design.wav"));
-  const film = meetFilmSchema.parse({ version: story.version, ...(internships ? { sampleData: true } : {}), ...(categories ? { category: story.category, sampleData: true, captureMode: story.captureMode } : {}), id: story.id, title: story.title, fps: 30, durationInFrames: Math.round(seconds * 30), narrationSrc: "narration.wav", soundDesignSrc: "sound-design.wav", evidence, scenes, alignment: { source: aligned.source, coverage: aligned.coverage }, reviewOnly: true });
+  const film = meetFilmSchema.parse({ version: story.version, ...(internships ? { sampleData: true } : {}), ...(categories ? { category: story.category, sampleData: true, captureMode: story.captureMode, ...(categoriesV2 ? { interaction } : {}) } : {}), id: story.id, title: story.title, fps: 30, durationInFrames: Math.round(seconds * 30), narrationSrc: "narration.wav", soundDesignSrc: "sound-design.wav", evidence, scenes, alignment: { source: aligned.source, coverage: aligned.coverage }, reviewOnly: true });
   const report = { ...auditMeetFilm(film), scriptHash, audioHash, tempo, readability, ocr, sounds, humanApprovalRequired: true, captureLimitation: categories ? "Offline component demo: unmodified Solomon tracker UI with explicit category-specific sample hooks. No authenticated account, backend, live vacancy, real application, eligibility or hiring outcome is demonstrated. CTA has no URL or delivery automation. Source component hashes and fixture provenance are retained." : internships ? "Private internship pilot using the original August 11 product demo. Marketing Intern / Northstar Labs is sample data, not a verified vacancy. Recorded Interviewing status is not a customer outcome. No authenticated current capture was available. The CTA is informational: no URL, application submission, or delivery automation." : nontech ? "Private #5 pilot using dated archived company-search evidence. Titles and employers are paired in the same captured cards. No current vacancy, hiring distribution, eligibility, absence of coding requirements, or background search is claimed. Conceptual graphics are labelled illustrations." : v2 ? "Dated archived product evidence. Startup is an explicitly labelled before/after filter edit, not continuous playback or an observed job arrival. Its transient empty state remains in the retained source recording. Different posting ages belong to different jobs. No posting age was edited." : "Local preview could not load account data. Timestamp contrast uses disclosed archived captures; automatic discovery is supported by newly captured product explanation text, not an observed background run. No posting age was edited." };
   await write(path.join(out, "film.json"), film);
   await write(path.join(out, "quality.json"), report);
@@ -163,9 +179,9 @@ async function main() {
   await fs.writeFile(path.join(out, "BEAT-SHEET.md"), `# ${story.title}\n\nPrivate style study; final human review required.\n\n${beatSheet}`);
   process.stdout.write(`Prepared ${scenes.length} shots / ${seconds}s / ${(report.presenterShare * 100).toFixed(1)}% presenter / ${Math.round(aligned.coverage * 100)}% aligned.\n`);
   if (args.includes("--prepare-only")) return;
-  const serveUrl = await bundle({ entryPoint: path.join(root, categories ? "src/remotion/meetSolomonCategories/index.tsx" : internships ? "src/remotion/meetSolomonInternships/index.tsx" : nontech ? "src/remotion/meetSolomonNontech/index.tsx" : v2 ? "src/remotion/meetSolomonV2/index.tsx" : "src/remotion/meetSolomon/index.tsx"), publicDir, outDir: path.join(out, "bundle") });
+  const serveUrl = await bundle({ entryPoint: path.join(root, categoriesV2 ? "src/remotion/meetSolomonCategoriesV2/index.tsx" : categories ? "src/remotion/meetSolomonCategories/index.tsx" : internships ? "src/remotion/meetSolomonInternships/index.tsx" : nontech ? "src/remotion/meetSolomonNontech/index.tsx" : v2 ? "src/remotion/meetSolomonV2/index.tsx" : "src/remotion/meetSolomon/index.tsx"), publicDir, outDir: path.join(out, "bundle") });
   const inputProps = { film };
-  const composition = await selectComposition({ serveUrl, id: categories ? "MeetSolomonCategories" : internships ? "MeetSolomonInternships" : nontech ? "MeetSolomonNontech" : v2 ? "MeetSolomonV2" : "MeetSolomon", inputProps, chromeMode: "headless-shell", timeoutInMilliseconds: 120000 });
+  const composition = await selectComposition({ serveUrl, id: categoriesV2 ? "MeetSolomonCategoriesV2" : categories ? "MeetSolomonCategories" : internships ? "MeetSolomonInternships" : nontech ? "MeetSolomonNontech" : v2 ? "MeetSolomonV2" : "MeetSolomon", inputProps, chromeMode: "headless-shell", timeoutInMilliseconds: 120000 });
   const stillDir = path.join(out, "stills");
   await fs.mkdir(stillDir, { recursive: true, mode: 0o700 });
   for (const [i, s] of scenes.entries()) {
