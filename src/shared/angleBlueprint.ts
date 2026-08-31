@@ -295,6 +295,15 @@ export const READABLE_PX = 20;
 // capture trim, so `still-<asset>-<trim>.png` for a sequence can never collide
 // with the single still the same screen's proof shots draw.
 export const MOTION_TRIM_BASE = 1000;
+// The screen as it was before its interaction, on a trim of its own.
+//
+// It cannot share the sequence's base. Stills are published under
+// `<asset>-<trim>`, the sequence publishes frame i at MOTION_TRIM_BASE + i*step,
+// and a crop asking for MOTION_TRIM_BASE without motion loses the key to the one
+// with it -- so a "before" addressed there was overwritten by burst frame 00,
+// which on the marketing feed is a blank cell mid-reload. Below the base and
+// clear of every published frame.
+export const RESTING_TRIM = 900;
 
 // How many proofs a recap needs before it reads as a row rather than a mistake.
 // Two cards with a marker travelling between them is not a strip, it is a pair
@@ -646,6 +655,24 @@ export function compileAngleBlueprint(input: {
       }
     }
 
+    // A claim asking for `state_swap` on a surface that was filmed becomes the
+    // two ends of that interaction, held side by side rather than played.
+    //
+    // The footage is the same burst the establishing shots animate; what differs
+    // is the reading. A sequence playing through shows that something changed
+    // and is gone in four hundred milliseconds. Two frozen states under BEFORE
+    // and AFTER let a viewer compare the counts either side of a filter, which
+    // is the claim -- "narrowing the search changes what is in it" -- and a shot
+    // nobody can pause is a poor place to make it.
+    //
+    // Both ends address plain trims, so neither crop carries `motion`: the burst
+    // starts at MOTION_TRIM_BASE and the settled screenshot is trim 0. Pairing
+    // the first burst frame with the settled still spans the whole interaction
+    // rather than two arbitrary points inside it.
+    const swapPair = shot.contentPattern === "state_swap" && productCrop
+      && inventory.screens.find(({ asset }) => asset === productCrop!.assetId)?.motion
+      ? [{ ...productCrop, trim: RESTING_TRIM, motion: undefined }, { ...productCrop, trim: 0, motion: undefined }]
+      : undefined;
     const performance = beatPerformance(index, script.length, shot.contentPattern, Boolean(claim));
     const previousAsset = shot.contentPattern ? lastAssetByPattern.get(shot.contentPattern) : undefined;
     const captureRelation = claim && previousAsset ? (previousAsset === claim.assetId ? "same" as const : "different" as const) : undefined;
@@ -665,7 +692,11 @@ export function compileAngleBlueprint(input: {
         // headline the renderer invented would be exactly the thing the pattern
         // exists to avoid.
         ...evidenceProvenance(inventory, captureRelation, claim),
-        ...(shot.contentPattern === "big_number" ? bigNumberOptions(inventory, claim) : {})
+        ...(shot.contentPattern === "big_number" ? bigNumberOptions(inventory, claim) : {}),
+        // Late enough in the scene that the before state is read before it is
+        // replaced, and early enough that the after state is not a flash. The
+        // pills name the two ends; StateSwapTemplate tracks which is live.
+        ...(swapPair ? { swapAt: 0.55, pills: ["BEFORE", "AFTER"] as [string, string] } : {})
       },
       purpose: performance.purpose,
       // The template still supplies crop, scale, disclosure and provenance --
@@ -689,7 +720,7 @@ export function compileAngleBlueprint(input: {
       // resolved one -- three of four proof beats drew the contact card no
       // matter which claim they were making. Every compile-time gate passed,
       // because they all read the blueprint and none read the film.
-      productCrops: productCrop ? [productCrop] : []
+      productCrops: swapPair ?? (productCrop ? [productCrop] : [])
     };
     startMs = endMs;
     return scene;

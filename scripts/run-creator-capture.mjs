@@ -112,14 +112,55 @@ async function frameDelta(first, second) {
 
 // The same role-then-text addressing the claim regions use.
 
+// Put the page where the surface says its subject is. Returns the landed
+// offset, or null when the anchor is not on the page yet.
+//
+// Shared by the pre-interaction shot and the measured one so both sit at the
+// same offset. They did not: the declared scroll ran only in the measure phase,
+// so the burst and the resting frame were photographed at the top of the page
+// while the still every crop is measured against was photographed lower down. A
+// rect resolved on one does not address the other, which is why a before/after
+// pair drawn from them showed an empty card.
+async function applyDeclaredScroll(page, scrollTo) {
+  return page.evaluate(({ selector, offsetPx }) => {
+    const anchor = document.querySelector(selector);
+    if (!anchor) return null;
+    const target = anchor.getBoundingClientRect().top + window.scrollY - offsetPx;
+    window.scrollTo(0, Math.max(0, target));
+    return window.scrollY;
+  }, scrollTo);
+}
+
 // Perform the surface's interaction and film the product's response.
 //
 // The burst runs alongside the action rather than after it. Typing resolves in
 // well under a second, and a sequence recorded once the list has already
 // narrowed is a photograph of the answer rather than a film of the product
 // arriving at it.
-async function filmMotion(page, motion, dir, assetId, record) {
+async function filmMotion(page, motion, dir, assetId, record, restingAligned) {
   const stills = [];
+  // The state the screen was in before anything was done to it.
+  //
+  // Shot on its own, ahead of the burst, because the burst cannot contain it:
+  // `shoot` and `perform` run concurrently, so frame 00 is taken at the moment
+  // of the click and every frame after it is the product mid-transition. A film
+  // wanting to show what a control changed has nothing to point at -- measured
+  // on the marketing feed, the count cell is empty in all twelve burst frames
+  // and only the settled still ever carries "200 jobs (5 new)".
+  //
+  // Its own trim so it cannot be confused with either end: the sequence owns
+  // MOTION_TRIM_BASE upward and the settled still owns 0.
+  let resting;
+  const shootResting = async () => {
+    // Only when the page is where the measured still will be. An unaligned
+    // resting frame is worse than none: it looks like a before and addresses
+    // different pixels, so the pair would draw two unrelated crops under BEFORE
+    // and AFTER and call the difference a change.
+    if (!record || !restingAligned) return;
+    const file = path.join(dir, `${assetId}-resting.png`);
+    await page.screenshot({ path: file, scale: "css" });
+    resting = path.relative(root, file);
+  };
   const shoot = async () => {
     if (!record) return;
     for (let index = 0; index < MOTION_FRAMES; index += 1) {
@@ -146,6 +187,8 @@ async function filmMotion(page, motion, dir, assetId, record) {
       for (const character of action.text ?? "") await target.type(character, { delay: 0 });
     }
   };
+  // Strictly before the interaction, then the burst alongside it.
+  await shootResting();
   await Promise.all([shoot(), perform()]);
   let moved = 0;
   for (let index = 1; index < stills.length; index += 1) {
@@ -154,6 +197,7 @@ async function filmMotion(page, motion, dir, assetId, record) {
   return {
     shows: motion.shows, stills, frames: stills.length,
     step: MOTION_STEP, hold: MOTION_HOLD,
+    ...(resting ? { resting } : {}),
     delta: Number(moved.toFixed(3)), moved: moved >= MOTION_FLOOR, floor: MOTION_FLOOR
   };
 }
@@ -219,7 +263,15 @@ try {
       // measured on instead of drifting away from it.
       if (shot.motion) {
         try {
-          const filmed = await filmMotion(page, shot.motion, stillsDir, shot.surfaceId, !filmedSurfaces.has(shot.surfaceId));
+          // Before the burst, so the sequence and the resting frame share the
+          // measured still's offset. A surface whose anchor does not exist until
+          // the interaction has run -- a feed that populates rather than narrows
+          // -- simply has no before to photograph, and says so by not producing
+          // one rather than by producing a misleading one.
+          const restingAligned = shot.prepare?.scrollTo
+            ? (await applyDeclaredScroll(page, shot.prepare.scrollTo)) !== null
+            : true;
+          const filmed = await filmMotion(page, shot.motion, stillsDir, shot.surfaceId, !filmedSurfaces.has(shot.surfaceId), restingAligned);
           filmedSurfaces.add(shot.surfaceId);
           if (filmed.stills.length && !filmed.moved) {
             issues.push({ claimId: shot.claimId, reason: "motion_did_not_move", detail: `${shot.surfaceId} changed by ${filmed.delta}, floor is ${filmed.floor}` });
@@ -270,13 +322,7 @@ try {
         // shot on this surface, so a shared still stays one moment, but a
         // position the surface chose rather than the top of a page whose
         // subject starts below the fold.
-        const landed = await page.evaluate(({ selector, offsetPx }) => {
-          const anchor = document.querySelector(selector);
-          if (!anchor) return null;
-          const target = anchor.getBoundingClientRect().top + window.scrollY - offsetPx;
-          window.scrollTo(0, Math.max(0, target));
-          return window.scrollY;
-        }, shot.prepare.scrollTo);
+        const landed = await applyDeclaredScroll(page, shot.prepare.scrollTo);
         if (landed === null) {
           issues.push({ claimId: shot.claimId, reason: "scroll_anchor_missing", detail: shot.prepare.scrollTo.selector });
           continue;

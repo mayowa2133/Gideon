@@ -24,6 +24,7 @@ const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { buildFilmScenes } = require("../dist/main/shared/creatorStoryFilm.js");
 const { SPEECH_RATE_BAND, MIN_SCENE_FRAMES } = require("../dist/main/shared/creatorStoryQuality.js");
+const { RESTING_TRIM } = require("../dist/main/shared/angleBlueprint.js");
 
 const FPS = 30;
 const args = process.argv.slice(2);
@@ -82,13 +83,20 @@ for (const [name, crop] of wanted) {
   // that path still resolves against the frames V22 extracted -- and only that
   // path, which is the point: a film that captured its own screens can never
   // silently fall back to another film's.
-  const source = captured ? path.resolve(root, captured) : path.join(referenceDir, `still-${name}.png`);
+  // A before/after pair draws the screen at rest, which is a different
+  // photograph from the settled one and has to be resolved as such -- resolving
+  // it to the settled still would put the same picture on both sides of the
+  // arrow and call it a change.
+  const filmedScreen = inventory.screens.find((screen) => screen.asset === crop.assetId)?.motion;
+  const source = crop.trim === RESTING_TRIM && filmedScreen?.resting
+    ? path.resolve(root, filmedScreen.resting)
+    : captured ? path.resolve(root, captured) : path.join(referenceDir, `still-${name}.png`);
   if (!existsSync(source)) throw new Error(`Blueprint draws ${crop.assetId} at trim ${crop.trim}, and neither ${path.relative(root, inventoryPath)} nor the reference stills have that screen.`);
   await fs.copyFile(source, path.join(publicDir, `still-${name}.png`));
 
   // A crop that plays a sequence needs every frame of it, under the trims the
   // renderer will ask for: `crop.trim + i * step`.
-  const filmed = inventory.screens.find((screen) => screen.asset === crop.assetId)?.motion;
+  const filmed = filmedScreen;
   if (crop.motion && filmed) {
     for (const [index, frame] of filmed.stills.entries()) {
       await fs.copyFile(path.resolve(root, frame), path.join(publicDir, `still-${crop.assetId}-${crop.trim + index * crop.motion.step}.png`));
