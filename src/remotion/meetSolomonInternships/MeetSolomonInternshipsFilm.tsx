@@ -29,10 +29,10 @@ const Presenter: React.FC<{ scene: MeetScene; frame: number }> = ({ scene, frame
   </div>;
 };
 
-export const InternshipProof: React.FC<{ evidence: MeetEvidence; placement: MeetProof }> = ({ evidence: e, placement: p }) => {
+export const InternshipProof: React.FC<{ evidence: MeetEvidence; placement: MeetProof; style?: CSSProperties }> = ({ evidence: e, placement: p, style }) => {
   const box = meetEvidenceScale(e, p.w, p.h);
   if (box.readablePx < (e.kind === "establishing" ? 10 : 28)) throw new Error(`Unreadable internship proof: ${e.id}`);
-  return <div data-internship-proof={e.id} style={{ ...abs(Math.round(p.x + (p.w - box.width) / 2), Math.round(p.y + (p.h - box.height) / 2), box.width, box.height), overflow: "hidden", borderRadius: 12, boxShadow: "0 16px 34px #00000017" }}>
+  return <div data-internship-proof={e.id} style={{ ...abs(Math.round(p.x + (p.w - box.width) / 2), Math.round(p.y + (p.h - box.height) / 2), box.width, box.height), overflow: "hidden", borderRadius: 12, boxShadow: "0 16px 34px #00000017", ...style }}>
     <Img src={staticFile(e.file)} style={{ position: "absolute", maxWidth: "none", left: -e.crop.x * box.scale, top: -e.crop.y * box.scale, width: e.sourceWidth * box.scale, height: e.sourceHeight * box.scale }} />
   </div>;
 };

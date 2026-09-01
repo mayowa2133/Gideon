@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertMeetStoryEvidence, assertVerification, auditMeetFilm, listingSchema, meetStorySchema, realCta } from "./meetSolomonRealInternships";
+import { assertMeetStoryEvidence, assertVerification, auditMeetFilm, isMotionLedRealInternship, listingSchema, meetStorySchema, realCta } from "./meetSolomonRealInternships";
 import type { MeetEvidence } from "./meetSolomon";
 
 const date = "2026-08-31T12:00:00.000Z";
@@ -69,5 +69,37 @@ describe("real internship source boundary", () => {
     expect(() => assertMeetStoryEvidence(story, evidence)).not.toThrow();
     story.scenes[7]!.vo = "Solomon will make sure your resume matches.";
     expect(() => assertMeetStoryEvidence(story, evidence)).toThrow(/guarantees/);
+  });
+  it("supports motion-led V3 and the new-grad audience CTA", () => {
+    const { story, evidence } = inputs(); story.version = "meet-solomon-real-internships-v3";
+    story.scenes[7]!.vo = "Upload your resume and Solomon helps tailor it to the role.";
+    story.scenes[8]!.vo = "Keep your application organised with Solomon's checklist.";
+    for (const [index, id, text] of [[7, "tailoring", "Resume-backed scoring and tailoring"], [8, "checklist", "Workflow Checklist"]] as const) {
+      evidence.push({ ...evidence[0]!, id, text }); story.scenes[index]!.evidence.push(id); story.scenes[index]!.proofs.push({ id, x: 65, y: 600, w: 950, h: 200, phase: "always" });
+    }
+    expect(() => assertMeetStoryEvidence(story, evidence)).not.toThrow();
+    expect(isMotionLedRealInternship(story.version)).toBe(true);
+    expect(isMotionLedRealInternship("meet-solomon-real-internships-v2")).toBe(false);
+    expect(realCta("new_grad")).toBe("Start your first job search with Solomon.");
+  });
+  it("grounds the new-grad angle in the automatic feed and opportunity stages", () => {
+    const { story, evidence } = inputs();
+    story.version = "meet-solomon-real-internships-v3";
+    story.category = "new_grad";
+    story.listing = listingSchema.parse({ ...listing, employer: "Cerebras", role: "Software Engineer - New Grad 2026", employerPageRole: "Software Engineer - New Grad 2026" });
+    story.requiredEvidence.role = "Software Engineer - New Grad 2026";
+    evidence[0]!.text = "Cerebras Software Engineer - New Grad 2026";
+    for (const [index, id, text, vo] of [
+      [7, "auto-populate", "Jobs populate automatically from your profile", "Jobs populate automatically from your profile."],
+      [8, "workflow", "Stage: Interested Applied Interviewing", "Use Solomon's stages to track every opportunity."],
+    ] as const) {
+      evidence.push({ ...evidence[0]!, id, text });
+      story.scenes[index]!.vo = vo;
+      story.scenes[index]!.evidence.push(id);
+      story.scenes[index]!.proofs.push({ id, x: 65, y: 600, w: 950, h: 200, phase: "always" });
+    }
+    story.scenes.at(-1)!.vo = realCta("new_grad");
+    expect(() => assertMeetStoryEvidence(story, evidence)).not.toThrow();
+    expect(() => assertVerification(story.listing, "Cerebras Software Engineer - New Grad 2026 Apply", "a".repeat(64))).not.toThrow();
   });
 });

@@ -2,7 +2,8 @@ import { z } from "zod";
 import { meetEvidenceSchema, meetEvidenceScale, meetFilmSchema as baseFilm, type MeetEvidence } from "./meetSolomon";
 import { meetSceneSchema as v2Scene, meetStorySchema as v2Story, assertMeetStoryEvidence as assertV2 } from "./meetSolomonV2";
 
-export const realCta = (category: string) => `Find your next ${category === "law" ? "legal" : category} internship with Solomon.`;
+export const realCta = (category: string) => category === "new_grad" ? "Start your first job search with Solomon." : `Find your next ${category === "law" ? "legal" : category} internship with Solomon.`;
+export const isMotionLedRealInternship = (version: string) => version === "meet-solomon-real-internships-v3";
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const https = z.string().url().refine(value => new URL(value).protocol === "https:", "Employer URLs must use HTTPS.");
 export const listingSchema = z.object({
@@ -13,15 +14,16 @@ export const listingSchema = z.object({
   accountContext: z.literal("existing-local-development-session"), sampleData: z.literal(false),
 }).superRefine((listing, ctx) => {
   if (/example|fictional|sample|northstar/i.test(listing.employer + " " + listing.role)) ctx.addIssue({ code: "custom", message: "Demo records cannot be used in real internship films." });
-  if (!/intern/i.test(listing.role) || !/intern/i.test(listing.employerPageRole)) ctx.addIssue({ code: "custom", message: "Both product and employer must identify an internship." });
+  if (!/intern|new grad/i.test(listing.role) || !/intern|new grad/i.test(listing.employerPageRole)) ctx.addIssue({ code: "custom", message: "Both product and employer must identify an internship or new-grad role." });
 });
 const layout = z.enum(["hook", "reveal", "meet", "overview", "employer", "location", "reset", "requirements", "fit", "posting", "caveat", "cta"]);
 export const meetSceneSchema = v2Scene.extend({ layout });
 export type MeetScene = z.infer<typeof meetSceneSchema>;
 export const asV2Scene = (scene: MeetScene) => ({ ...scene, layout: "question" as const });
-const realVersion = z.enum(["meet-solomon-real-internships-v1", "meet-solomon-real-internships-v2"]);
+const realVersion = z.enum(["meet-solomon-real-internships-v1", "meet-solomon-real-internships-v2", "meet-solomon-real-internships-v3"]);
+const realCategory = z.enum(["finance", "software", "law", "new_grad"]);
 export const meetStorySchema = v2Story.extend({
-  version: realVersion, category: z.enum(["finance", "software", "law"]), listing: listingSchema,
+  version: realVersion, category: realCategory, listing: listingSchema,
   scenes: z.array(meetSceneSchema.omit({ from: true, to: true, phrases: true, actionFrame: true }).extend({
     captionPhrases: z.array(z.object({ text: z.string().min(1).max(48), style: z.enum(["bold", "serif"]) })).optional(),
   })).length(12),
@@ -47,7 +49,7 @@ export function assertMeetStoryEvidence(story: MeetStory, evidence: MeetEvidence
   }
   const reveal = story.scenes.find(s => s.layout === "reveal");
   const revealedText = reveal?.proofs.map(p => evidence.find(e => e.id === p.id && e.kind === "proof")?.text ?? "").join(" ") ?? "";
-  if (!normal(revealedText).includes(normal(story.listing.employer)) || !/intern/i.test(revealedText)) throw new Error("The reveal must show its employer and internship in same-scene proof.");
+  if (!normal(revealedText).includes(normal(story.listing.employer)) || !(story.category === "new_grad" ? /new grad/i : /intern/i).test(revealedText)) throw new Error("The reveal must show its employer and target role in same-scene proof.");
   const identity = evidence.filter(e => e.kind === "proof").map(e => e.text).join(" ");
   if (!normal(identity).includes(normal(story.listing.employer))) throw new Error("Employer must be visible in product proof.");
   // Full role is captured as one band; fragments may be shown at larger sizes too.
@@ -55,16 +57,21 @@ export function assertMeetStoryEvidence(story: MeetStory, evidence: MeetEvidence
   const last = story.scenes.at(-1)!;
   if (last.layout !== "cta" || last.vo !== realCta(story.category)) throw new Error("Real internship films must end with their spoken CTA.");
   if (!story.scenes.some(s => s.layout === "caveat" && /change/i.test(s.vo))) throw new Error("Explain that listings can change.");
-  if (story.version === "meet-solomon-real-internships-v2") {
+  if ((story.version === "meet-solomon-real-internships-v2" || story.version === "meet-solomon-real-internships-v3") && story.category !== "new_grad") {
     const spoken = story.scenes.map(s => s.vo).join(" ");
     if (story.scenes.some(s => /make sure|guarantee|will match/i.test(s.vo))) throw new Error("Do not claim Solomon guarantees a resume match or outcome.");
     if (!/tailor/i.test(spoken) || !/track|checklist|organi[sz]/i.test(spoken)) throw new Error("Benefit-led films must explain Solomon resume tailoring and application organisation.");
     for (const id of ["tailoring", "checklist"]) if (!story.scenes.some(s => s.proofs.some(p => p.id === id))) throw new Error(`Benefit-led films require ${id} product proof.`);
   }
+  if (story.category === "new_grad") {
+    const spoken = story.scenes.map(s => s.vo).join(" ");
+    if (!/populate|automatic/i.test(spoken) || !/stage|track|workflow/i.test(spoken)) throw new Error("New-grad films must explain Solomon's automatic feed and opportunity stages.");
+    for (const id of ["auto-populate", "workflow"]) if (!story.scenes.some(s => s.proofs.some(p => p.id === id))) throw new Error(`New-grad films require ${id} product proof.`);
+  }
   return result;
 }
 export const meetFilmSchema = z.object({
-  version: realVersion, category: z.enum(["finance", "software", "law"]), listing: listingSchema,
+  version: realVersion, category: realCategory, listing: listingSchema,
   id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/), title: z.string(), fps: z.literal(30), durationInFrames: z.number().int().positive(),
   narrationSrc: z.literal("narration.wav"), soundDesignSrc: z.literal("sound-design.wav").optional(), evidence: z.array(meetEvidenceSchema).min(1),
   scenes: z.array(meetSceneSchema).length(12), alignment: z.object({ source: z.literal("aligned"), coverage: z.number().min(.9).max(1) }), reviewOnly: z.literal(true),

@@ -147,3 +147,38 @@ node scripts/render-meet-solomon.mjs \
 | Finance | 36.30s | 2.77s | 3.63s | 99% | 1.00× |
 | Software | 35.73s | 2.53s | 3.60s | 98% | 1.00× |
 | Legal operations | 37.03s | 3.27s | 3.50s | 99% | 1.00× |
+
+## Motion-led V3 and recent graduates
+
+V3 addresses the static pacing documented in
+[`meet-solomon-motion-audit.md`](meet-solomon-motion-audit.md). It adds
+continuous background movement, staggered concept tiles, kinetic caption
+phrases, floating product-proof cards, presenter travel, a progress rail, and a
+moving but fully readable CTA. The change is isolated to
+`meet-solomon-real-internships-v3`; V1 and V2 rendering remain selectable and
+unchanged.
+
+The finance, software, and legal-operations V3 cuts reuse the verified listing,
+voice, and evidence of their V2 counterparts. The decoded-media motion score
+rises by 66.6–82.3%; the V2 cuts' 2.8–3.0 second longest static runs fall to
+0–0.2 seconds. All encoded scenes and both endpoints of each CTA are reviewed
+after rendering.
+
+V3 also adds the `new_grad` audience. Its first cut uses a real Solomon import
+of Cerebras Systems' **Software Engineer - New Grad 2026** posting in Toronto.
+The source capture shows the role, employer, location, profile-driven automatic
+job population, and Solomon's opportunity stages. The matching employer page
+displayed an Apply control when checked on August 31, 2026. No application was
+started or submitted, and the film explicitly warns that listings can change.
+The role is a dated verification, not a promise that it remains available.
+
+```sh
+npm run build:main
+node scripts/render-meet-solomon.mjs \
+  --story tmp/meet-real-internships-motion-v3/finance/story.json \
+  --out tmp/meet-real-internships-motion-v3/finance
+
+node scripts/render-meet-solomon.mjs \
+  --story tmp/meet-real-new-grad-v1/story.json \
+  --out tmp/meet-real-new-grad-v1
+```

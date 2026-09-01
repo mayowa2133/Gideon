@@ -20,6 +20,15 @@ const run = promisify(execFile);
 const hash = data => createHash("sha256").update(data).digest("hex");
 const normal = text => text.toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
 const args = process.argv.slice(2);
+const valueFlags = new Set(["--out", "--story", "--evidence", "--capture-dir", "--seconds"]);
+const booleanFlags = new Set(["--prepare-only", "--stills-only"]);
+for (let i = 0; i < args.length; i++) {
+  const argument = args[i];
+  if (booleanFlags.has(argument)) continue;
+  if (!valueFlags.has(argument)) throw new Error(`Unknown argument: ${argument}. Use --story and --out to select a film.`);
+  if (!args[i + 1] || args[i + 1].startsWith("--")) throw new Error(`Missing value for ${argument}.`);
+  i++;
+}
 const flag = (name, fallback) => args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : fallback;
 const out = path.resolve(flag("out", path.join(root, "tmp/meet-solomon-style")));
 const write = async (file, data) => fs.writeFile(file, JSON.stringify(data, null, 2) + "\n", { mode: 0o600 });
@@ -67,7 +76,7 @@ async function main() {
   const v2 = rawStory.version === "meet-solomon-v2";
   const nontech = rawStory.version === "meet-solomon-nontech-v1";
   const internships = rawStory.version === "meet-solomon-internships-v1";
-  const benefitRealInternships = rawStory.version === "meet-solomon-real-internships-v2";
+  const benefitRealInternships = ["meet-solomon-real-internships-v2", "meet-solomon-real-internships-v3"].includes(rawStory.version);
   const realInternships = rawStory.version === "meet-solomon-real-internships-v1";
   const anyRealInternships = realInternships || benefitRealInternships;
   const categoriesV2 = rawStory.version === "meet-solomon-categories-v2";
