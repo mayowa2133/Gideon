@@ -10,7 +10,8 @@ const abs = (left: number, top: number, width: number, height?: number): CSSProp
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 export const scrollOffset = (frame: number, start: number, end: number, distance: number) => interpolate(frame, [start, end], [0, -distance], { ...clamp, easing: value => value < .5 ? 2 * value * value : 1 - Math.pow(-2 * value + 2, 2) / 2 });
-export const opportunityMascotPlacement = (version: OpportunityFilm["version"], sceneId: string) => version === "meet-solomon-opportunity-scroll-v2" && (sceneId === "hook" || sceneId === "cta") ? sceneId : null;
+export const opportunityMascotPlacement = (version: OpportunityFilm["version"], sceneId: string) => version !== "meet-solomon-opportunity-scroll-v1" && (sceneId === "hook" || sceneId === "cta") ? sceneId : null;
+export const opportunityMascotHasBackdrop = (version: OpportunityFilm["version"]) => version === "meet-solomon-opportunity-scroll-v2";
 
 export function opportunityMascotPlan(kind: "hook" | "cta", duration: number): V22MascotPerformance {
   const cta = kind === "cta";
@@ -27,11 +28,11 @@ export function opportunityMascotPlan(kind: "hook" | "cta", duration: number): V
   });
 }
 
-const OpportunityMascot: React.FC<{ kind: "hook" | "cta"; frame: number; duration: number }> = ({ kind, frame, duration }) => {
-  const cta = kind === "cta", enter = interpolate(frame, [0, 13], [0, 1], { ...clamp, easing: value => 1 - (1 - value) ** 3 });
+const OpportunityMascot: React.FC<{ version: OpportunityFilm["version"]; kind: "hook" | "cta"; frame: number; duration: number }> = ({ version, kind, frame, duration }) => {
+  const cta = kind === "cta", backdrop = opportunityMascotHasBackdrop(version), enter = interpolate(frame, [0, 13], [0, 1], { ...clamp, easing: value => 1 - (1 - value) ** 3 });
   const scale = cta ? .43 : .39;
-  return <div data-opportunity-mascot={kind} style={{ ...abs(cta ? 745 : 785, cta ? 1232 : 245, cta ? 300 : 270, cta ? 410 : 265), zIndex: 8, overflow: "hidden", borderRadius: cta ? 54 : 135,
-    background: cta ? "linear-gradient(145deg,#d8f3e5,#aee7cd)" : "linear-gradient(145deg,#e4f6ec,#b8ead2)", border: "3px solid #ffffffc9", boxShadow: "0 18px 45px #174c3930",
+  return <div data-opportunity-mascot={kind} style={{ ...abs(cta ? 745 : 785, cta ? 1232 : 245, cta ? 300 : 270, cta ? 410 : backdrop ? 265 : 215), zIndex: 8, overflow: "hidden", borderRadius: cta ? 54 : backdrop ? 135 : 108,
+    background: backdrop ? cta ? "linear-gradient(145deg,#d8f3e5,#aee7cd)" : "linear-gradient(145deg,#e4f6ec,#b8ead2)" : "transparent", border: backdrop ? "3px solid #ffffffc9" : "none", boxShadow: backdrop ? "0 18px 45px #174c3930" : "none",
     opacity: enter, transform: `translateX(${(1 - enter) * 95}px) scale(${.94 + enter * .06})`, transformOrigin: "center" }}>
     <div style={{ position: "absolute", left: cta ? 8 : 8, top: cta ? 7 : 2, width: 660, height: 940, transform: `scale(${scale})`, transformOrigin: "0 0" }}>
       <RobotMascotV22Rig plan={opportunityMascotPlan(kind, duration)} frame={Math.min(frame, cta ? 70 : 48)} positioning="external" pixelScale={scale} enterOverride={1} mouthless />
@@ -74,7 +75,7 @@ export const MeetSolomonOpportunityScrollFrame: React.FC<{ film: OpportunityFilm
       <div style={{ marginTop: 76, padding: "30px 68px", borderRadius: 28, background: GREEN, color: "white", fontSize: 102, lineHeight: 1, fontWeight: 900, letterSpacing: -4, boxShadow: "0 22px 55px #0f4e3938" }}>JOIN SOLOMON.</div>
       <div style={{ marginTop: 34, fontSize: 30, fontWeight: 750, color: GREEN }}>Pick your direction. Revisit one focused feed.</div>
     </div>}
-    {mascot && <OpportunityMascot kind={mascot} frame={local} duration={scene.to - scene.from} />}
+    {mascot && <OpportunityMascot version={film.version} kind={mascot} frame={local} duration={scene.to - scene.from} />}
     <div style={{ ...abs(62, 1780, 956), color: cta ? GREEN : "#51615a", textAlign: "center", fontSize: 19, fontWeight: 700, letterSpacing: 1.15 }}>ACTUAL SOLOMON FEED · CAPTURED 2026-08-31 · EDITORIAL SCROLL · LISTINGS CAN CHANGE</div>
     <div style={{ ...abs(65, 1835, 950), height: 3, background: cta ? MINT : "#d6ddd5" }} />
   </AbsoluteFill>;

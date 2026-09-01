@@ -175,3 +175,9 @@ CTA cameo below the copy. It is absent from the entire opportunity scroll. Both
 appearances perform one short gesture and settle, so the mascot adds warmth
 without creating a second continuous movement or obscuring product evidence.
 The approved V1 master remains byte-identical.
+
+V3 removes the colored panels around both mascot cameos. The hook now crops the
+robot directly against the ivory canvas, and the CTA uses the full character
+with only its built-in cast shadow. This keeps the mascot integrated with the
+film instead of presenting it as a separate sticker card. The mascot remains
+absent from the scrolling product section.

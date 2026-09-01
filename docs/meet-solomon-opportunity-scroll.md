@@ -64,3 +64,16 @@ V2 verification:
 - Decoded narration: exact approved script with Whisper `small.en`
 - Integrated loudness: -14.42 LUFS; detected audio clicks: 0
 - CTA OCR: required CTA text matched at 19.3 and 23.3 seconds
+
+## V3 background-free mascot
+
+V3 removes the green gradient panels, white borders, and container shadows from
+both mascot appearances. The hook uses a tight transparent crop around the
+robot's head. The CTA shows the full robot directly on the ivory film canvas,
+using only the character rig's own cast shadow. V1 and V2 remain independently
+selectable and their preserved masters are byte-identical.
+
+V3 keeps the same narration, product cards, timing, and two-scene mascot limit.
+The final decoded master measures 23.53 seconds, 4.35 mean motion, -14.42 LUFS,
+and zero detected audio clicks. Whisper `small.en` decoded the exact approved
+script, and the required CTA text remained OCR-readable at both endpoints.
