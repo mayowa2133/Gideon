@@ -182,3 +182,26 @@ node scripts/render-meet-solomon.mjs \
   --story tmp/meet-real-new-grad-v1/story.json \
   --out tmp/meet-real-new-grad-v1
 ```
+
+## Settled-motion V4: career switchers
+
+The follow-up V4 profile corrects V3's excessive simultaneous motion. Each
+background, proof card, and presenter gets one entrance movement and then
+settles. The progress rail is removed and the CTA remains stationary. The first
+cut scores 8.09 for mean decoded motion, below V3's 11.15–11.40 while retaining
+short editorial entrances. Its 0.31 median interval provides stable reading
+holds.
+
+This cut targets customer-facing professionals considering technology customer
+success. It uses a verified Solomon import of Recharge's **Customer Success
+Manager (Toronto)** position. The exact role, employer, Toronto location,
+profile-driven job population, opportunity stages, and employer-page control
+are retained as source evidence. The role is not presented as entry level, and
+the film tells viewers to confirm the employer's requirements.
+
+```sh
+npm run build:main
+node scripts/render-meet-solomon.mjs \
+  --story tmp/meet-real-career-switch-v1/story.json \
+  --out tmp/meet-real-career-switch-v1
+```

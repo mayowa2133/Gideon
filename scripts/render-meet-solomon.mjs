@@ -76,7 +76,7 @@ async function main() {
   const v2 = rawStory.version === "meet-solomon-v2";
   const nontech = rawStory.version === "meet-solomon-nontech-v1";
   const internships = rawStory.version === "meet-solomon-internships-v1";
-  const benefitRealInternships = ["meet-solomon-real-internships-v2", "meet-solomon-real-internships-v3"].includes(rawStory.version);
+  const benefitRealInternships = ["meet-solomon-real-internships-v2", "meet-solomon-real-internships-v3", "meet-solomon-real-opportunities-v4"].includes(rawStory.version);
   const realInternships = rawStory.version === "meet-solomon-real-internships-v1";
   const anyRealInternships = realInternships || benefitRealInternships;
   const categoriesV2 = rawStory.version === "meet-solomon-categories-v2";

@@ -105,3 +105,42 @@ mascot's gesture to determine proof-card travel, and use sound accents tied to
 specific actions. A human voice performance would create the largest remaining
 quality gain. Any new category still needs its own current Solomon capture and
 employer verification; changing the label or accent color alone is not enough.
+
+## Follow-up: V3 moved too much
+
+Follow-up review on September 1, 2026 confirmed that the first motion response
+overshot. V3 removed static runs by keeping the background, proof cards,
+presenter container, progress rail, and CTA moving at the same time. The motion
+score improved, but the eye had no dependable resting point. Product evidence
+was especially affected: once a crop became readable, it continued to float,
+scale, and rotate instead of holding still long enough to inspect.
+
+The corrected `meet-solomon-real-opportunities-v4` profile uses a simpler rule:
+one dominant entrance movement, then a stable reading hold. Background forms
+finish their travel after 18 frames. Product cards spring in and settle without
+ongoing drift. The presenter container stops moving, and the mascot animation
+freezes after 32 frames. The continuous progress rail is removed. CTA copy is
+fully visible and stationary for the complete CTA scene.
+
+The first V4 cut has a mean decoded-motion score of 8.09, between V2's
+6.25–6.69 and V3's 11.15–11.40. Its median interval is 0.31, compared with
+5.96–6.27 in V3, which reflects the intended pattern of a short entrance
+followed by a quiet hold. Its longest static run is 1.6 seconds: deliberate
+reading time rather than an unattended composition. Cut changes still keep the
+film moving forward.
+
+## New audience: customer-facing career switchers
+
+The V4 film targets people with customer-facing experience who want to move
+toward a technology customer-success role. It uses a real Solomon import of
+Recharge's **Customer Success Manager (Toronto)** position, checked against the
+employer's Ashby page on September 1, 2026. The product capture shows the exact
+role, employer, Toronto location, profile-driven job population, opportunity
+stages, and employer-page control.
+
+The story frames existing customer skills as transferable, then shows how
+Solomon can keep the new direction focused and track the opportunity. It does
+not claim that the role is entry level or that any career changer is qualified.
+The employer page states experience requirements, so the film explicitly tells
+the viewer to confirm every requirement before applying. No application was
+started or submitted.

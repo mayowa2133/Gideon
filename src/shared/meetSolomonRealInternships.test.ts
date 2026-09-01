@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertMeetStoryEvidence, assertVerification, auditMeetFilm, isMotionLedRealInternship, listingSchema, meetStorySchema, realCta } from "./meetSolomonRealInternships";
+import { assertMeetStoryEvidence, assertVerification, auditMeetFilm, isMotionLedRealInternship, listingSchema, meetStorySchema, realCta, realOpportunityMotionProfile } from "./meetSolomonRealInternships";
 import type { MeetEvidence } from "./meetSolomon";
 
 const date = "2026-08-31T12:00:00.000Z";
@@ -80,6 +80,8 @@ describe("real internship source boundary", () => {
     expect(() => assertMeetStoryEvidence(story, evidence)).not.toThrow();
     expect(isMotionLedRealInternship(story.version)).toBe(true);
     expect(isMotionLedRealInternship("meet-solomon-real-internships-v2")).toBe(false);
+    expect(realOpportunityMotionProfile(story.version)).toBe("continuous");
+    expect(realOpportunityMotionProfile("meet-solomon-real-opportunities-v4")).toBe("settled");
     expect(realCta("new_grad")).toBe("Start your first job search with Solomon.");
   });
   it("grounds the new-grad angle in the automatic feed and opportunity stages", () => {
@@ -101,5 +103,25 @@ describe("real internship source boundary", () => {
     story.scenes.at(-1)!.vo = realCta("new_grad");
     expect(() => assertMeetStoryEvidence(story, evidence)).not.toThrow();
     expect(() => assertVerification(story.listing, "Cerebras Software Engineer - New Grad 2026 Apply", "a".repeat(64))).not.toThrow();
+  });
+  it("supports a settled career-switcher cut grounded in a customer-success opportunity", () => {
+    const { story, evidence } = inputs();
+    story.version = "meet-solomon-real-opportunities-v4";
+    story.category = "career_switcher";
+    story.listing = listingSchema.parse({ ...listing, employer: "Recharge", role: "Customer Success Manager (Toronto)", employerPageRole: "Customer Success Manager (Toronto)" });
+    story.requiredEvidence.role = "Customer Success Manager (Toronto)";
+    evidence[0]!.text = "Recharge Customer Success Manager (Toronto)";
+    for (const [index, id, text, vo] of [
+      [7, "auto-populate", "Jobs populate automatically from your profile", "Jobs populate automatically from your profile."],
+      [8, "workflow", "Stage: Discovered Interested Applied Interviewing", "Track the opportunity through Solomon's stages."],
+    ] as const) {
+      evidence.push({ ...evidence[0]!, id, text });
+      story.scenes[index]!.vo = vo;
+      story.scenes[index]!.evidence.push(id);
+      story.scenes[index]!.proofs.push({ id, x: 65, y: 600, w: 950, h: 200, phase: "always" });
+    }
+    story.scenes.at(-1)!.vo = realCta("career_switcher");
+    expect(() => assertMeetStoryEvidence(story, evidence)).not.toThrow();
+    expect(realCta("career_switcher")).toBe("Make your next career move with Solomon.");
   });
 });

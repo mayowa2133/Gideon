@@ -2,8 +2,9 @@ import { z } from "zod";
 import { meetEvidenceSchema, meetEvidenceScale, meetFilmSchema as baseFilm, type MeetEvidence } from "./meetSolomon";
 import { meetSceneSchema as v2Scene, meetStorySchema as v2Story, assertMeetStoryEvidence as assertV2 } from "./meetSolomonV2";
 
-export const realCta = (category: string) => category === "new_grad" ? "Start your first job search with Solomon." : `Find your next ${category === "law" ? "legal" : category} internship with Solomon.`;
-export const isMotionLedRealInternship = (version: string) => version === "meet-solomon-real-internships-v3";
+export const realCta = (category: string) => category === "new_grad" ? "Start your first job search with Solomon." : category === "career_switcher" ? "Make your next career move with Solomon." : `Find your next ${category === "law" ? "legal" : category} internship with Solomon.`;
+export const realOpportunityMotionProfile = (version: string) => version === "meet-solomon-real-internships-v3" ? "continuous" as const : version === "meet-solomon-real-opportunities-v4" ? "settled" as const : "static" as const;
+export const isMotionLedRealInternship = (version: string) => realOpportunityMotionProfile(version) !== "static";
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const https = z.string().url().refine(value => new URL(value).protocol === "https:", "Employer URLs must use HTTPS.");
 export const listingSchema = z.object({
@@ -14,14 +15,14 @@ export const listingSchema = z.object({
   accountContext: z.literal("existing-local-development-session"), sampleData: z.literal(false),
 }).superRefine((listing, ctx) => {
   if (/example|fictional|sample|northstar/i.test(listing.employer + " " + listing.role)) ctx.addIssue({ code: "custom", message: "Demo records cannot be used in real internship films." });
-  if (!/intern|new grad/i.test(listing.role) || !/intern|new grad/i.test(listing.employerPageRole)) ctx.addIssue({ code: "custom", message: "Both product and employer must identify an internship or new-grad role." });
+  if (!/intern|new grad|customer success/i.test(listing.role) || !/intern|new grad|customer success/i.test(listing.employerPageRole)) ctx.addIssue({ code: "custom", message: "Both product and employer must identify the supported opportunity type." });
 });
 const layout = z.enum(["hook", "reveal", "meet", "overview", "employer", "location", "reset", "requirements", "fit", "posting", "caveat", "cta"]);
 export const meetSceneSchema = v2Scene.extend({ layout });
 export type MeetScene = z.infer<typeof meetSceneSchema>;
 export const asV2Scene = (scene: MeetScene) => ({ ...scene, layout: "question" as const });
-const realVersion = z.enum(["meet-solomon-real-internships-v1", "meet-solomon-real-internships-v2", "meet-solomon-real-internships-v3"]);
-const realCategory = z.enum(["finance", "software", "law", "new_grad"]);
+const realVersion = z.enum(["meet-solomon-real-internships-v1", "meet-solomon-real-internships-v2", "meet-solomon-real-internships-v3", "meet-solomon-real-opportunities-v4"]);
+const realCategory = z.enum(["finance", "software", "law", "new_grad", "career_switcher"]);
 export const meetStorySchema = v2Story.extend({
   version: realVersion, category: realCategory, listing: listingSchema,
   scenes: z.array(meetSceneSchema.omit({ from: true, to: true, phrases: true, actionFrame: true }).extend({
@@ -49,7 +50,8 @@ export function assertMeetStoryEvidence(story: MeetStory, evidence: MeetEvidence
   }
   const reveal = story.scenes.find(s => s.layout === "reveal");
   const revealedText = reveal?.proofs.map(p => evidence.find(e => e.id === p.id && e.kind === "proof")?.text ?? "").join(" ") ?? "";
-  if (!normal(revealedText).includes(normal(story.listing.employer)) || !(story.category === "new_grad" ? /new grad/i : /intern/i).test(revealedText)) throw new Error("The reveal must show its employer and target role in same-scene proof.");
+  const targetRole = story.category === "new_grad" ? /new grad/i : story.category === "career_switcher" ? /customer success/i : /intern/i;
+  if (!normal(revealedText).includes(normal(story.listing.employer)) || !targetRole.test(revealedText)) throw new Error("The reveal must show its employer and target role in same-scene proof.");
   const identity = evidence.filter(e => e.kind === "proof").map(e => e.text).join(" ");
   if (!normal(identity).includes(normal(story.listing.employer))) throw new Error("Employer must be visible in product proof.");
   // Full role is captured as one band; fragments may be shown at larger sizes too.
@@ -63,10 +65,10 @@ export function assertMeetStoryEvidence(story: MeetStory, evidence: MeetEvidence
     if (!/tailor/i.test(spoken) || !/track|checklist|organi[sz]/i.test(spoken)) throw new Error("Benefit-led films must explain Solomon resume tailoring and application organisation.");
     for (const id of ["tailoring", "checklist"]) if (!story.scenes.some(s => s.proofs.some(p => p.id === id))) throw new Error(`Benefit-led films require ${id} product proof.`);
   }
-  if (story.category === "new_grad") {
+  if (story.category === "new_grad" || story.category === "career_switcher") {
     const spoken = story.scenes.map(s => s.vo).join(" ");
-    if (!/populate|automatic/i.test(spoken) || !/stage|track|workflow/i.test(spoken)) throw new Error("New-grad films must explain Solomon's automatic feed and opportunity stages.");
-    for (const id of ["auto-populate", "workflow"]) if (!story.scenes.some(s => s.proofs.some(p => p.id === id))) throw new Error(`New-grad films require ${id} product proof.`);
+    if (!/populate|automatic/i.test(spoken) || !/stage|track|workflow/i.test(spoken)) throw new Error("Audience films must explain Solomon's automatic feed and opportunity stages.");
+    for (const id of ["auto-populate", "workflow"]) if (!story.scenes.some(s => s.proofs.some(p => p.id === id))) throw new Error(`Audience films require ${id} product proof.`);
   }
   return result;
 }
