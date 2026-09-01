@@ -144,3 +144,27 @@ not claim that the role is entry level or that any career changer is qualified.
 The employer page states experience requirements, so the film explicitly tells
 the viewer to confirm every requirement before applying. No application was
 started or submitted.
+
+## Opportunity-feed scroll
+
+The opportunity-scroll cut responds to the request for a video that feels full
+of jobs without returning to V3's competing motion. It has one continuous
+movement: a vertical editorial scroll through 17 unmodified cards from three
+real Solomon job-feed captures. Headline changes do not animate independently,
+the cards do not float or rotate, and the final CTA stops the scroll for a
+4.4-second reading hold.
+
+The captures were produced on August 31, 2026 and show Solomon feeds with 200
+jobs across software, new-grad, internship, marketing, design, and human
+resources results. The film dates and labels the composite as an editorial
+scroll. It also says listings can change and directs the viewer to confirm the
+employer posting. Because Solomon's product copy identifies public sources such
+as JSearch, Adzuna, Remotive, Dice, and newgrad-jobs.com, the requested
+"exclusive jobs" wording is not supportable. The approved CTA is: **Want easy
+access to more opportunities? Join Solomon.**
+
+The final 23.53-second master has two measured shots: the 19.13-second scrolling
+product section and the stationary CTA. Its decoded video is 1080×1920,
+30 fps, H.264/YUV420p/BT.709; audio measures -14.42 LUFS with no detected clicks.
+Whisper small.en decoded the exact approved narration, and CTA OCR matched at
+both the first and final review frames.
