@@ -37,6 +37,7 @@ Do not expand the MVP into avatar generation, social posting, autonomous publish
 - Structured capture operational readiness: docs/capture-operations-readiness.md
 - Structured capture incident runbook: docs/capture-incident-runbook.md
 - Structured capture final local delivery: docs/capture-final-delivery-2026-07-16.md
+- Meet Solomon five-film campaign: docs/meet-solomon-five-campaigns.md
 - Tooling research: docs/research/open-source-tools-research.md
 - Build/buy/fork recommendation: docs/research/build-vs-buy-vs-fork.md
 
@@ -86,7 +87,7 @@ exists.
 
 ## Repository commands
 
-Verified against package.json: 89 of the 90 script commands below exist (`db:seed` does not); `install` is a package-manager command.
+Verified against package.json: 90 of the 91 script commands below exist (`db:seed` does not); `install` is a package-manager command.
 
 - pnpm install
 - pnpm lint
@@ -171,6 +172,7 @@ Verified against package.json: 89 of the 90 script commands below exist (`db:see
 - pnpm creator:meet:solomon:finance-internships:v2
 - pnpm creator:meet:solomon:software-internships:v2
 - pnpm creator:meet:solomon:law-internships:v2
+- pnpm creator:meet:solomon:campaigns
 - pnpm test:meet:solomon
 - pnpm test:masked-presenter
 - pnpm test:creator-editorial
@@ -278,6 +280,9 @@ Update docs when changing:
 - Environment variables.
 - External providers.
 - Render output profiles.
+
+The five-film Meet Solomon campaign format is documented in
+`docs/meet-solomon-five-campaigns.md`.
 
 ## Forbidden without explicit user instruction
 
