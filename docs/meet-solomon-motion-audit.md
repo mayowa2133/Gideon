@@ -168,3 +168,10 @@ product section and the stationary CTA. Its decoded video is 1080×1920,
 30 fps, H.264/YUV420p/BT.709; audio measures -14.42 LUFS with no detected clicks.
 Whisper small.en decoded the exact approved narration, and CTA OCR matched at
 both the first and final review frames.
+
+The follow-up V2 robot cut keeps that motion structure. The mouthless Solomon
+mascot appears only as a small head cameo in the hook and as a full-character
+CTA cameo below the copy. It is absent from the entire opportunity scroll. Both
+appearances perform one short gesture and settle, so the mascot adds warmth
+without creating a second continuous movement or obscuring product evidence.
+The approved V1 master remains byte-identical.

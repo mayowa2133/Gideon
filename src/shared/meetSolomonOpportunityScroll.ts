@@ -12,7 +12,7 @@ export const opportunitySceneSchema = z.object({
   from: z.number().int().nonnegative().optional(), to: z.number().int().positive().optional(),
 });
 const opportunityStoryBase = z.object({
-  version: z.literal("meet-solomon-opportunity-scroll-v1"), id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/), title: z.string().min(3),
+  version: z.enum(["meet-solomon-opportunity-scroll-v1", "meet-solomon-opportunity-scroll-v2"]), id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/), title: z.string().min(3),
   sources: z.array(opportunitySourceSchema).min(2), scenes: z.array(opportunitySceneSchema.omit({ from: true, to: true })).length(6),
 });
 export const opportunityStorySchema = opportunityStoryBase.superRefine((story, ctx) => {
