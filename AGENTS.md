@@ -30,6 +30,7 @@ Do not expand the MVP into avatar generation, social posting, autonomous publish
 - Testing strategy: docs/testing-strategy.md
 - Security rules: docs/security-rules.md
 - Design system: docs/design-system.md
+- Meet Solomon people campaigns: docs/meet-solomon-people-campaigns.md
 - Structured product-flow capture plan: docs/product-flow-capture-plan.md
 - Structured capture implementation status: docs/product-flow-capture-implementation.md
 - Structured capture requirement audit: docs/product-flow-capture-requirement-audit.md
@@ -87,7 +88,7 @@ exists.
 
 ## Repository commands
 
-Verified against package.json: 90 of the 91 script commands below exist (`db:seed` does not); `install` is a package-manager command.
+Verified against package.json: 91 of the 92 script commands below exist (`db:seed` does not); `install` is a package-manager command.
 
 - pnpm install
 - pnpm lint
@@ -173,6 +174,7 @@ Verified against package.json: 90 of the 91 script commands below exist (`db:see
 - pnpm creator:meet:solomon:software-internships:v2
 - pnpm creator:meet:solomon:law-internships:v2
 - pnpm creator:meet:solomon:campaigns
+- pnpm creator:meet:solomon:people-campaigns
 - pnpm test:meet:solomon
 - pnpm test:masked-presenter
 - pnpm test:creator-editorial
