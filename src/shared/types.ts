@@ -972,6 +972,22 @@ export interface SceneLayoutRect {
 // above it and the chips below. The resolver refuses that crop, correctly. At
 // 5.5 the label needs no vertical growth at all, so the region that reads best
 // becomes the one the film can actually show.
+// And one that shows the feed as a feed:
+//
+//   editorial_scroll  several captured cards stacked and travelled vertically
+//
+// The pixels are the product's; the column is not. A feed on screen is a list
+// you scroll, and no single crop says that -- a still of one card says a card
+// exists. Stacking cards the film has already proved and moving them says what
+// the surface is for.
+//
+// The arrangement is the only transformation, and the frame says so. This
+// pattern always labels itself an editorial scroll, because the viewer is
+// watching a motion the product did not perform: these cards were photographed
+// in one state and are being travelled past by the film. Calling that a
+// recording of scrolling would be the one dishonest thing in an otherwise
+// evidence-bound format.
+
 // And one that exists for the beat where a single value carries the whole scene:
 //
 //   big_number     one short field, drawn as large as the frame allows, alone
@@ -997,7 +1013,8 @@ export type SceneContentPattern =
   | "comment_card"
   | "wide_strip"
   | "product_screen"
-  | "big_number";
+  | "big_number"
+  | "editorial_scroll";
 
 // What a pattern needs beyond its crops. Kept as a small typed bag rather than
 // bespoke fields per pattern, because the alternative is what V22 did: fifteen

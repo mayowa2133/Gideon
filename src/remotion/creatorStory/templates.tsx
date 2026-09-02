@@ -383,6 +383,53 @@ export const BigNumberTemplate: React.FC<TemplateProps> = ({ scene, frame }) => 
   </AbsoluteFill>;
 };
 
+// -------------------------------------------------------- editorial_scroll
+
+// The feed as a feed: captured cards in one column, travelled past.
+//
+// The motion is the film's, not the product's, and the provenance line says so.
+// What is real is every pixel inside every card -- these are the same crops the
+// film proved on their own beats, at the same rects, unretouched. Stacking them
+// is the whole transformation.
+//
+// Travel is linear and whole-pixel. A list moving at a constant rate is what a
+// thumb produces and what a reader can follow; easing it turns a scroll into a
+// swoop, and sub-pixel offsets on a column of high-contrast card edges is the
+// one thing the render is known to score as churn rather than motion.
+const SCROLL_GAP = 26;
+export const EditorialScrollTemplate: React.FC<TemplateProps> = ({ scene, frame }) => {
+  const box = productBox(scene);
+  const crops = scene.productCrops;
+  if (!crops.length) return null;
+  const cards = crops.map((crop) => ({ crop, ...cardSize(crop, box.width, box.height) }));
+  const column = cards.reduce((sum, card) => sum + card.height + SCROLL_GAP, -SCROLL_GAP);
+  // Travel the column's overhang across the scene, and no further: a list that
+  // runs off the top and leaves the frame empty has stopped being evidence.
+  const overhang = Math.max(0, column - box.height);
+  const span = Math.max(1, scene.to - scene.from);
+  const travel = Math.round(overhang * Math.min(1, Math.max(0, frame / span)));
+  const enter = interpolate(frame, [0, 12], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  let offset = 0;
+  return <AbsoluteFill>
+    <div style={{ position: "absolute", left: box.left, top: box.top, width: box.width, height: box.height, overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 0, top: 0, width: box.width, transform: `translateY(${-travel}px)` }}>
+        {cards.map((card, index) => {
+          const top = offset;
+          offset += card.height + SCROLL_GAP;
+          return <div key={`${card.crop.assetId}-${card.crop.trim}-${index}`} style={{
+            position: "absolute", left: Math.round((box.width - card.width) / 2), top,
+            width: card.width, height: card.height,
+            opacity: enter, borderRadius: 18, overflow: "hidden",
+            boxShadow: "0 10px 30px rgba(7,17,31,.13)"
+          }}>
+            <EvidenceCrop crop={card.crop} width={card.width} height={card.height} frame={frame} />
+          </div>;
+        })}
+      </div>
+    </div>
+  </AbsoluteFill>;
+};
+
 // ------------------------------------------------------------- wide_strip
 
 // One crop of a single line of product UI, drawn as a band across the frame.
@@ -648,6 +695,7 @@ export const TEMPLATES = {
   wide_strip: WideStripTemplate,
   product_screen: ProductScreenTemplate,
   big_number: BigNumberTemplate,
+  editorial_scroll: EditorialScrollTemplate,
   state_swap: StateSwapTemplate,
   card_field: CardFieldTemplate,
   filmstrip: FilmstripTemplate,
@@ -707,6 +755,11 @@ function provenanceOf(scene: FilmScene): string | null {
     : scene.contentPattern === "product_screen" || scene.contentPattern === "evidence_band" ? fieldMotifFor(scene.id)
     : null;
   if (motif) parts.push(`ILLUSTRATION · ${MOTIF_SUBJECT[motif] ?? "AMBIENT"}`);
+  // Always, and not as an option the author can forget. The viewer is watching
+  // a motion the product never performed: these cards were photographed still
+  // and the column is the film's arrangement of them. Every pixel inside a card
+  // is the product's; the travel is not.
+  if (scene.contentPattern === "editorial_scroll") parts.push("EDITORIAL SCROLL · ARRANGEMENT ONLY");
   if (captureRelation === "different") parts.push("DIFFERENT LISTING · DIFFERENT CAPTURE");
   if (captureRelation === "same") parts.push("SAME CAPTURE · SAME SEARCH");
   return parts.length ? parts.join("  ·  ") : null;

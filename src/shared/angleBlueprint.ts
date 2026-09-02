@@ -47,7 +47,11 @@ export const CONTAINER_ASPECT: Record<string, number> = {
   // clears the 3.0 floor where the resolver starts growing a crop vertically, so
   // the line above and below it are still not cut; it just carries less air,
   // which is what lets the type land larger for the same region.
-  big_number: 4
+  big_number: 4,
+  // A feed card as the feed draws it. Wider than tall and close to the card's
+  // own proportion, because the column is the shot: a crop grown to some other
+  // aspect stops looking like a row in a list and starts looking like a panel.
+  editorial_scroll: 3.1
 };
 
 // A default shot for each kind of beat. Deliberately small: eight patterns are
@@ -154,6 +158,66 @@ function beatPerformance(index: number, total: number, pattern: SceneContentPatt
   };
 }
 
+// Which ground each kind of beat stands on.
+//
+// The film darkens into its reveals and lifts out of them: a problem beat sits
+// on a mid tone, the proof it leads to is the darkest frame in the film, and the
+// payoff comes back up. `deep` on a proof is what made the age reveal land in
+// film 06 -- the same crop on a bright backdrop reads as a caption with a card
+// under it.
+// Ordered, not single, because the ground still has to change at every cut.
+//
+// Two adjacent scenes on one tier is a backdrop that does not move when the shot
+// does, which reads as one long take and is the exact fault this change exists
+// to remove -- so a purpose states a preference and yields when the beat before
+// it already took that tier. Consecutive proofs are the common case: the first
+// gets the dark frame the reveal wants, the second takes mid rather than
+// flattening the pair.
+const TIER_BY_PURPOSE: Record<string, readonly string[]> = {
+  hook: ["bright", "mid"], problem: ["mid", "deep"], demo: ["bright", "mid"],
+  proof: ["deep", "mid"], payoff: ["bright", "mid"], cta: ["bright", "mid"]
+};
+
+// Where the presenter stands, from what it is doing in the beat.
+//
+// The rect used to come from the content pattern alone, which meant two boxes
+// did the whole film: one for scenes with a product and one for scenes without.
+// Role varied -- hero_close, host, cameo_left -- and changed nothing on screen,
+// because `mascotBoxForScene` reads the declared rect and the declared rect
+// never asked. A sixteen-beat film drew the presenter at one of two sizes in one
+// of two places, which is most of the frame holding still while the words moved.
+//
+// Scale is a consequence of the rect, not a field: the rig is fitted inside it
+// and bottom-aligned, so a taller box is a bigger presenter. The rig's own
+// aspect is about 0.69, and a rect matching it fits exactly in both directions
+// and wastes nothing.
+//
+// Product scenes get less range than ambient ones and that is arithmetic rather
+// than choice. The band under a product rect is ~0.41 of the canvas, which caps
+// the fit at 0.89 whatever the width, so widening a hero there buys nothing --
+// only the smaller sided variants actually differ.
+const MASCOT_RECT: Record<string, { free: SceneLayoutRect; band: SceneLayoutRect }> = {
+  // Dominant and high. 1.50x, the largest the frame takes without cropping.
+  close_up: {
+    free: { id: "mascot", kind: "mascot", left: .07, top: .135, right: .93, bottom: .838 },
+    band: { id: "mascot", kind: "mascot", left: .18, top: .56, right: .82, bottom: .975 }
+  },
+  // Mid shot, standing on the floor of the frame.
+  medium: {
+    free: { id: "mascot", kind: "mascot", left: .213, top: .501, right: .787, bottom: .97 },
+    band: { id: "mascot", kind: "mascot", left: .23, top: .56, right: .77, bottom: .975 }
+  },
+  // Small and pushed aside, leaving the rest of the frame to what it is looking at.
+  split_left: {
+    free: { id: "mascot", kind: "mascot", left: .03, top: .684, right: .386, bottom: .975 },
+    band: { id: "mascot", kind: "mascot", left: .04, top: .70, right: .38, bottom: .975 }
+  },
+  split_right: {
+    free: { id: "mascot", kind: "mascot", left: .614, top: .684, right: .97, bottom: .975 },
+    band: { id: "mascot", kind: "mascot", left: .62, top: .70, right: .96, bottom: .975 }
+  }
+};
+
 // The geometry a pattern the reference film never drew has to be given.
 //
 // A generated scene inherits its rects from whichever reference scene draws the
@@ -230,7 +294,15 @@ export const BIG_NUMBER_LAYOUT: SceneLayoutRect[] = [
   { id: "big-number-product", kind: "product", left: .06, top: .38, right: .94, bottom: .60 },
   { id: "big-number-caption", kind: "caption", left: .05, top: .04, right: .95, bottom: .16 }
 ];
+// The column runs the height of the frame under the caption. No mascot rect:
+// the feed is the subject here and a presenter standing in front of a moving
+// list is a presenter standing in front of the shot.
+export const EDITORIAL_SCROLL_LAYOUT: SceneLayoutRect[] = [
+  { id: "scroll-product", kind: "product", left: .04, top: .19, right: .96, bottom: .93 },
+  { id: "scroll-caption", kind: "caption", left: .05, top: .04, right: .95, bottom: .16 }
+];
 const PATTERN_LAYOUT: Partial<Record<SceneContentPattern, SceneLayoutRect[]>> = {
+  editorial_scroll: EDITORIAL_SCROLL_LAYOUT,
   wide_strip: WIDE_STRIP_LAYOUT,
   product_screen: PRODUCT_SCREEN_LAYOUT,
   big_number: BIG_NUMBER_LAYOUT
@@ -284,7 +356,10 @@ export const CONTAINER_PX: Record<string, number> = {
   // at 1000px as a band lands ~1.9x larger here, because the crop is tighter
   // (aspect 4 against 5.5) and drawn wider. That ratio is what makes a 12px
   // product line read at reveal scale without the film retypesetting it.
-  big_number: 1900
+  big_number: 1900,
+  // Near the frame's full width. The cards are stacked in one column and read at
+  // the size a phone would show them, which is the whole point of the format.
+  editorial_scroll: 940
 };
 // The floor a region's text must clear once it is drawn. `marginal` in the
 // inventory is 20px and that is the same floor here, because it is the same
@@ -318,6 +393,8 @@ const FILMSTRIP_CARDS = 4;
 // which is exactly the crop the filmstrip had to give up on. Four in two columns
 // of a 1000px box leaves each card 487 wide, magnifying a band rather than
 // shrinking it.
+// A column reads as a list at three cards and not at two, which is a pair.
+const SCROLL_MINIMUM = 3;
 const CARD_FIELD_MINIMUM = 3;
 const CARD_FIELD_CARDS = 4;
 
@@ -504,6 +581,10 @@ export function compileAngleBlueprint(input: {
   // disclosure carries weight -- the first cut marked three scenes and the
   // comparison itself was only one of them.
   const lastAssetByPattern = new Map<string, string>();
+  // How many beats have already drawn on each tier, so a run of one purpose
+  // still moves through that tier's palette.
+  const tierSeen = new Map<string, number>();
+  let previousTier: string | undefined;
   const scenes: SceneComposition[] = script.map((beat, index) => {
     const slot = brief.beats[index]!;
     const claim = beat.claimId ? claimById.get(beat.claimId) : undefined;
@@ -538,10 +619,36 @@ export function compileAngleBlueprint(input: {
     const template = reference.scenes.find((scene) => scene.contentPattern === shot.contentPattern)
       ?? reference.scenes.find((scene) => scene.shotType === shot.shotType)
       ?? reference.scenes[0]!;
-    const layoutRects = PATTERN_LAYOUT[shot.contentPattern!] ?? template.layoutRects;
-    const tier = cadence[index % cadence.length]!;
+    const patternRects: SceneLayoutRect[] = PATTERN_LAYOUT[shot.contentPattern!] ?? template.layoutRects ?? [];
+    const performance = beatPerformance(index, script.length, shot.contentPattern, Boolean(claim));
+    // Tier from what the beat is doing, not from its position in the film.
+    //
+    // It was `cadence[index % 3]`, which changed the ground every beat and meant
+    // nothing by it: a reveal could land on the brightest backdrop in the
+    // palette and a payoff on the darkest, purely by parity. Purpose reads the
+    // other way round -- the film darkens into its reveals and lifts out of
+    // them -- which is the difference between a background that rotates and one
+    // that is doing something.
+    //
+    // Rotation is kept inside the tier rather than lost. Several beats in a row
+    // share a purpose (four problem beats is normal), so the option advances per
+    // occurrence of the tier and consecutive beats still change colour.
+    // Replaced rather than added, and only where the pattern declared one: a
+    // pattern with no mascot rect (the reveal) is stating that the presenter has
+    // nowhere to stand, which is a decision this must not overturn.
+    const roleRect = performance.cue.layout ? MASCOT_RECT[performance.cue.layout] : undefined;
+    const hasProduct = patternRects.some(({ kind }) => kind === "product");
+    const layoutRects = roleRect && patternRects.some(({ kind }) => kind === "mascot")
+      ? patternRects.map((rect) => (rect.kind === "mascot" ? (hasProduct ? roleRect.band : roleRect.free) : rect))
+      : patternRects;
+
+    const preferred = TIER_BY_PURPOSE[performance.purpose] ?? ["mid", "bright"];
+    const tier = preferred.find((candidate) => candidate !== previousTier) ?? preferred[0]!;
+    previousTier = tier;
     const options = byTier(tier);
-    const backdrop = options[Math.floor(index / cadence.length) % Math.max(1, options.length)] ?? template.backdrop!;
+    const seen = tierSeen.get(tier) ?? 0;
+    tierSeen.set(tier, seen + 1);
+    const backdrop = options[seen % Math.max(1, options.length)] ?? template.backdrop!;
 
     let productCrop: SceneComposition["productCrop"];
     if (!claim && establishing) {
@@ -673,7 +780,6 @@ export function compileAngleBlueprint(input: {
       && inventory.screens.find(({ asset }) => asset === productCrop!.assetId)?.motion
       ? [{ ...productCrop, trim: RESTING_TRIM, motion: undefined }, { ...productCrop, trim: 0, motion: undefined }]
       : undefined;
-    const performance = beatPerformance(index, script.length, shot.contentPattern, Boolean(claim));
     const previousAsset = shot.contentPattern ? lastAssetByPattern.get(shot.contentPattern) : undefined;
     const captureRelation = claim && previousAsset ? (previousAsset === claim.assetId ? "same" as const : "different" as const) : undefined;
     if (claim && shot.contentPattern) lastAssetByPattern.set(shot.contentPattern, claim.assetId);
@@ -777,9 +883,39 @@ export function compileAngleBlueprint(input: {
     .filter(({ scene }) => !scene.productCrop?.motion)
     .map(({ index }) => index);
   // Swap and grid land mid-argument, in that order; the recap closes.
-  const swapIndex = spareBeats[0] ?? -1;
-  const fieldIndex = spareBeats.find((index) => index !== swapIndex) ?? -1;
-  const recapIndex = [...spareBeats].reverse().find((index) => index !== swapIndex && index !== fieldIndex) ?? -1;
+  // The scroll takes the first spare beat, ahead of the swap and the grid.
+  //
+  // It is the only one of the three that shows the surface rather than a claim
+  // about it, so a film that can afford exactly one composed shot should spend
+  // it here -- and unlike the others it degrades gracefully: with fewer than
+  // three crops it simply does not appear.
+  const scrolled = scenes.flatMap((scene) => (scene.supportedClaimIds.length && scene.productCrop ? [scene.productCrop] : []));
+  const scrollIndex = scrolled.length >= SCROLL_MINIMUM ? (spareBeats[0] ?? -1) : -1;
+  const swapIndex = spareBeats.find((index) => index !== scrollIndex) ?? -1;
+  const fieldIndex = spareBeats.find((index) => index !== swapIndex && index !== scrollIndex) ?? -1;
+  const recapIndex = [...spareBeats].reverse().find((index) => index !== swapIndex && index !== fieldIndex && index !== scrollIndex) ?? -1;
+
+  // Every crop the film proved, stacked and travelled.
+  //
+  // Not deduplicated by asset, unlike the grid: two cards from one feed are two
+  // openings, and collapsing them would turn the shot the format exists for --
+  // a list with things in it -- back into one card per screen.
+  //
+  // Claims nothing. Each crop was proved on its own beat and the column asserts
+  // no new fact; what it adds is that these are rows in a feed rather than
+  // isolated findings.
+  if (scrollIndex > 0) {
+    scenes[scrollIndex] = {
+      ...scenes[scrollIndex]!,
+      shotType: "product_fullscreen",
+      contentPattern: "editorial_scroll",
+      layoutRects: EDITORIAL_SCROLL_LAYOUT,
+      presenter: { ...scenes[scrollIndex]!.presenter, visible: false },
+      productAssetIds: [...new Set(scrolled.map(({ assetId }) => assetId))],
+      productCrop: scrolled[0],
+      productCrops: scrolled
+    };
+  }
   // The film's proofs, all at once.
   //
   // `card_field` was implemented and nothing ever selected it, so eighteen beats
