@@ -1,0 +1,538 @@
+{
+  "version": "meet-solomon-nontech-v1",
+  "id": "meet-solomon-05-beyond-engineering",
+  "title": "Meet Solomon 05 — Beyond engineering",
+  "requiredEvidence": {
+    "company-search": "anthropic",
+    "legal-title": "IP Counsel, Trademarks & Domains",
+    "legal-employer": "anthropic",
+    "legal-category": "Legal and Compliance",
+    "partners-title": "Economic Mobility Partnerships Manager",
+    "partners-employer": "anthropic"
+  },
+  "scenes": [
+    {
+      "id": "code-assumption",
+      "layout": "code-wall",
+      "vo": "Think working in AI means writing code?",
+      "headline": "WRITING CODE?",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "skeptical",
+      "gesture": "thinking_hand",
+      "action": "inspect",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "The film opens on an assumption about working at an AI company.",
+      "visualMetaphor": "An oversized code window crowds a small presenter; explicitly conceptual, not product UI.",
+      "transition": "Solomon moves the assumption aside.",
+      "captionPhrases": [
+        {
+          "text": "Think working in AI",
+          "style": "bold"
+        },
+        {
+          "text": "means writing code?",
+          "style": "serif"
+        }
+      ],
+      "actionCue": "writing code"
+    },
+    {
+      "id": "look-again",
+      "layout": "only-code",
+      "vo": "Look again.",
+      "headline": "LOOK AGAIN.",
+      "background": "clay",
+      "presenter": "close",
+      "expression": "focused",
+      "gesture": "stop_palm",
+      "action": "push",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "Invite the viewer to reconsider the assumption.",
+      "visualMetaphor": "The code window is pushed out of frame as the robot leans toward the next reveal.",
+      "transition": "Hard cut to actual legal-role proof.",
+      "captionPhrases": [
+        {
+          "text": "Look again.",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "lawyer",
+      "layout": "legal-reveal",
+      "vo": "IP counsel. At Anthropic.",
+      "headline": "LEGAL.",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "happy",
+      "gesture": "open_palm",
+      "action": "reset",
+      "proofs": [
+        {
+          "id": "legal-title",
+          "x": 65,
+          "y": 835,
+          "w": 950,
+          "h": 155,
+          "phase": "always"
+        },
+        {
+          "id": "legal-employer",
+          "x": 320,
+          "y": 1130,
+          "w": 440,
+          "h": 130,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "legal-title",
+        "legal-employer"
+      ],
+      "newInformation": "An IP counsel role and its employer appear in the same captured card.",
+      "visualMetaphor": "Huge LEGAL type replaces the code motif; two verified source crops show title and employer.",
+      "transition": "A short warm introduction follows the surprising role.",
+      "captionPhrases": []
+    },
+    {
+      "id": "meet",
+      "layout": "meet",
+      "vo": "Meet Solomon.",
+      "headline": "Meet\nSolomon.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "friendly",
+      "gesture": "wave",
+      "action": "present",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "Solomon is the product used to explore the company’s jobs.",
+      "visualMetaphor": "A clean presenter entrance and a single brand title.",
+      "transition": "Turn from brand introduction to the actual company search.",
+      "captionPhrases": [
+        {
+          "text": "Meet Solomon.",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "pick-company",
+      "layout": "company-search",
+      "vo": "Start with a company you're curious about.",
+      "headline": "START WITH A COMPANY.",
+      "background": "sage",
+      "presenter": "right",
+      "expression": "focused",
+      "gesture": "true_point_left",
+      "action": "point",
+      "proofs": [
+        {
+          "id": "company-search",
+          "x": 90,
+          "y": 640,
+          "w": 900,
+          "h": 185,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "company-search"
+      ],
+      "newInformation": "The recorded Solomon search is set to anthropic.",
+      "visualMetaphor": "The actual search input becomes the main object, with the presenter pointing to it.",
+      "transition": "Cut wider to the resulting application view.",
+      "captionPhrases": [
+        {
+          "text": "Start with a company",
+          "style": "bold"
+        },
+        {
+          "text": "you're curious about.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "company"
+    },
+    {
+      "id": "actual-jobs",
+      "layout": "company-view",
+      "vo": "Then look at what it's actually hiring for.",
+      "headline": "LOOK AT THE WORK.",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "gesture": "open_palm",
+      "action": "reset",
+      "proofs": [
+        {
+          "id": "company-view",
+          "x": 45,
+          "y": 520,
+          "w": 990,
+          "h": 845,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "company-view"
+      ],
+      "newInformation": "Establish the real company-filtered Jobs interface, without treating the whole page as proof of individual facts.",
+      "visualMetaphor": "A full application view provides context before a readable detail shot.",
+      "transition": "Cut into a specific job family.",
+      "captionPhrases": [
+        {
+          "text": "Then look at what",
+          "style": "bold"
+        },
+        {
+          "text": "it's actually hiring for.",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "legal-detail",
+      "layout": "legal-detail",
+      "vo": "Trademarks. Domains. Legal work.",
+      "headline": "LEGAL WORK.",
+      "background": "clay",
+      "presenter": "left",
+      "expression": "focused",
+      "gesture": "true_point_right",
+      "action": "point",
+      "proofs": [
+        {
+          "id": "legal-title",
+          "x": 65,
+          "y": 560,
+          "w": 950,
+          "h": 145,
+          "phase": "always"
+        },
+        {
+          "id": "legal-employer",
+          "x": 80,
+          "y": 790,
+          "w": 230,
+          "h": 85,
+          "phase": "always"
+        },
+        {
+          "id": "legal-category",
+          "x": 380,
+          "y": 775,
+          "w": 610,
+          "h": 115,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "legal-title",
+        "legal-employer",
+        "legal-category"
+      ],
+      "newInformation": "The title names trademarks and domains; its category says Legal and Compliance.",
+      "visualMetaphor": "Three linked original crops from the same card make the legal function unmistakable.",
+      "transition": "A presenter reset prevents the proof sequence becoming a list.",
+      "captionPhrases": [
+        {
+          "text": "Trademarks.",
+          "style": "bold"
+        },
+        {
+          "text": "Domains.",
+          "style": "bold"
+        },
+        {
+          "text": "Legal work.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "Legal work"
+    },
+    {
+      "id": "more-to-it",
+      "layout": "reset",
+      "vo": "And that's not the whole picture.",
+      "headline": "THERE’S MORE.",
+      "background": "ivory",
+      "presenter": "close",
+      "expression": "happy",
+      "gesture": "presentation_palm",
+      "action": "present",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "The first role is not the entire story.",
+      "visualMetaphor": "The robot looks to the empty side of frame as a second illustrated branch unfolds.",
+      "transition": "The new branch becomes real partnerships evidence.",
+      "captionPhrases": [
+        {
+          "text": "And that's not",
+          "style": "bold"
+        },
+        {
+          "text": "the whole picture.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "whole picture"
+    },
+    {
+      "id": "partnerships",
+      "layout": "partners-reveal",
+      "vo": "Economic mobility partnerships.",
+      "headline": "Partnerships.",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "friendly",
+      "gesture": "open_palm",
+      "action": "reset",
+      "proofs": [
+        {
+          "id": "partners-title",
+          "x": 65,
+          "y": 835,
+          "w": 950,
+          "h": 155,
+          "phase": "always"
+        },
+        {
+          "id": "partners-employer",
+          "x": 320,
+          "y": 1130,
+          "w": 440,
+          "h": 130,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "partners-title",
+        "partners-employer"
+      ],
+      "newInformation": "The recorded title names Economic Mobility Partnerships Manager.",
+      "visualMetaphor": "Another full-screen role reveal, backed by the visible title stem and original employer.",
+      "transition": "Cut back to a presenter who connects the two roles.",
+      "captionPhrases": []
+    },
+    {
+      "id": "same-company",
+      "layout": "partners-detail",
+      "vo": "A different role. At the same company.",
+      "headline": "SAME COMPANY.",
+      "background": "sage",
+      "presenter": "right",
+      "expression": "friendly",
+      "gesture": "true_point_left",
+      "action": "point",
+      "proofs": [
+        {
+          "id": "partners-title",
+          "x": 65,
+          "y": 580,
+          "w": 950,
+          "h": 150,
+          "phase": "always"
+        },
+        {
+          "id": "partners-employer",
+          "x": 345,
+          "y": 800,
+          "w": 390,
+          "h": 105,
+          "phase": "always"
+        }
+      ],
+      "evidence": [
+        "partners-title",
+        "partners-employer"
+      ],
+      "newInformation": "Both roles carry the same employer in the same source capture.",
+      "visualMetaphor": "The original employer is foregrounded rather than inventing a new logo or a hiring statistic.",
+      "transition": "Expand two specific examples into a qualitative role map.",
+      "captionPhrases": [
+        {
+          "text": "A different role.",
+          "style": "bold"
+        },
+        {
+          "text": "At the same company.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "same company"
+    },
+    {
+      "id": "bigger-picture",
+      "layout": "constellation",
+      "vo": "The company builds AI. The work reaches beyond engineering.",
+      "headline": "BEYOND ENGINEERING.",
+      "background": "ivory",
+      "presenter": "absent",
+      "expression": "friendly",
+      "gesture": "open_palm",
+      "action": "reset",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "The examples show different kinds of work inside an AI company.",
+      "visualMetaphor": "A labelled conceptual map connects AI COMPANY to LEGAL and PARTNERSHIPS. It is not a headcount chart.",
+      "transition": "Return to the viewer and the qualifications caveat.",
+      "captionPhrases": [
+        {
+          "text": "The company builds AI.",
+          "style": "bold"
+        },
+        {
+          "text": "The work reaches",
+          "style": "bold"
+        },
+        {
+          "text": "beyond engineering.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "work reaches"
+    },
+    {
+      "id": "requirements",
+      "layout": "requirements",
+      "vo": "Each role has its own requirements. Read them. Match your experience.",
+      "headline": "READ THE REQUIREMENTS.",
+      "background": "clay",
+      "presenter": "left",
+      "expression": "focused",
+      "gesture": "thinking_hand",
+      "action": "inspect",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "These examples do not remove the need for relevant qualifications or imply coding is never required.",
+      "visualMetaphor": "Two oversized conceptual checklist cards say REQUIREMENTS and YOUR EXPERIENCE, without fabricated job requirements.",
+      "transition": "Carry the experience card into a new frame.",
+      "captionPhrases": [
+        {
+          "text": "Each role has",
+          "style": "bold"
+        },
+        {
+          "text": "its own requirements.",
+          "style": "bold"
+        },
+        {
+          "text": "Read them.",
+          "style": "bold"
+        },
+        {
+          "text": "Match your experience.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "Match your experience"
+    },
+    {
+      "id": "not-every-field",
+      "layout": "narrow",
+      "vo": "You don't have to search every field.",
+      "headline": "NOT EVERY FIELD.",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "friendly",
+      "gesture": "open_palm",
+      "action": "gather",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "Focus the exploration instead of indiscriminately browsing every category.",
+      "visualMetaphor": "A fan of conceptual field cards collapses into a single YOUR FIELD card, with no numerical hiring claims.",
+      "transition": "The selected card returns to the presenter.",
+      "captionPhrases": [
+        {
+          "text": "You don't have to",
+          "style": "bold"
+        },
+        {
+          "text": "search every field.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "every field"
+    },
+    {
+      "id": "start-here",
+      "layout": "your-field",
+      "vo": "Start with the work you know, then find where it exists.",
+      "headline": "START WITH YOUR WORK.",
+      "background": "ivory",
+      "presenter": "right",
+      "expression": "happy",
+      "gesture": "presentation_palm",
+      "action": "present",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "Use known expertise as the starting question for the search.",
+      "visualMetaphor": "The YOUR FIELD card becomes a doorway; the presenter invites attention toward it.",
+      "transition": "Resolve the opening code-only assumption.",
+      "captionPhrases": [
+        {
+          "text": "Start with the work you know,",
+          "style": "bold"
+        },
+        {
+          "text": "then find where it exists.",
+          "style": "bold"
+        }
+      ],
+      "actionCue": "then find"
+    },
+    {
+      "id": "callback",
+      "layout": "callback",
+      "vo": "Tech needs more than engineers.",
+      "headline": "More than\nengineers.",
+      "background": "sage",
+      "presenter": "left",
+      "expression": "direct_cta",
+      "gesture": "open_palm",
+      "action": "present",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "Resolve the opening misconception using the legal and partnerships examples.",
+      "visualMetaphor": "The opening code brackets open outward, leaving room for LEGAL and PARTNERSHIPS alongside the character.",
+      "transition": "Close directly on the brand.",
+      "captionPhrases": [
+        {
+          "text": "Tech needs",
+          "style": "bold"
+        },
+        {
+          "text": "more than engineers.",
+          "style": "serif"
+        }
+      ],
+      "actionCue": "more than"
+    },
+    {
+      "id": "end",
+      "layout": "end",
+      "vo": "Meet Solomon.",
+      "headline": "Solomon.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "friendly",
+      "gesture": "wave",
+      "action": "present",
+      "proofs": [],
+      "evidence": [],
+      "newInformation": "Close with Solomon’s name, without an unverified public link or posting promise.",
+      "visualMetaphor": "One wordmark, a calm expression and a short hold.",
+      "transition": "End the private review cut.",
+      "captionPhrases": [
+        {
+          "text": "Meet Solomon.",
+          "style": "bold"
+        }
+      ]
+    }
+  ]
+}

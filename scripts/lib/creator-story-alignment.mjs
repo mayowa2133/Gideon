@@ -33,7 +33,13 @@ import path from "node:path";
 // estimate -- it drifts unpredictably instead of evenly.
 export const MIN_COVERAGE = 0.6;
 
-const normalise = (word) => word.toLowerCase().replace(/[^a-z0-9]/g, "");
+const normalise = (word) => {
+  const token = word.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Whisper commonly renders the product name's identical spoken form with the
+  // alternate Salomon spelling. This only affects timing alignment; captions
+  // continue to use the approved script's spelling.
+  return token === "salomon" ? "solomon" : token;
+};
 
 // Longest common subsequence over normalised words, then the timings of the
 // matched transcript words are carried onto the authored ones.

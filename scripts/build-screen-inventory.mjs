@@ -231,7 +231,13 @@ for (const screen of fromRun ? [] : SCREENS) {
 // The source dimensions describe the screens actually in this inventory, not
 // the constants a previous film was captured at.
 const source = screens[0] ? { width: screens[0].width, height: screens[0].height } : { width: SOURCE_WIDTH, height: SOURCE_HEIGHT };
-const inventory = { schemaVersion: "1", product: "solomon", source, screens };
+// Carried from the capture run rather than stamped here, because "when this
+// inventory was written" and "when the product was photographed" are different
+// facts and only the second one can stand under a claim.
+const capturedAt = fromRun
+  ? JSON.parse(await fs.readFile(path.resolve(fromRun), "utf8")).capturedAt
+  : undefined;
+const inventory = { schemaVersion: "1", product: "solomon", source, screens, ...(capturedAt ? { capturedAt } : {}) };
 // Report where it wrote, not where it usually writes. This line named the
 // shipped fixture unconditionally, so every run with --out looked like it had
 // just overwritten the regression floor. It had not -- but reading a log

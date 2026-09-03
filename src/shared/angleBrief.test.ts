@@ -84,6 +84,66 @@ describe("angle brief", () => {
     expect(validateAngleScript(brief, grounded)).toEqual([]);
   });
 
+  // The gate used to ask whether the evidence string CONTAINED the spoken
+  // figure, so "3" was satisfied by "13 hours ago". A film shipped on that: the
+  // age drifted from three hours at planning to thirteen at capture, the script
+  // still said three, and nothing reported it. Every figure that is a prefix of
+  // a larger one has the hole -- 1 in 12, 2 in 200, 5 in 15.
+  it("does not let a spoken figure match inside a larger captured one", () => {
+    const aged: SelectableClaim = {
+      id: "feed-posted", assetId: "feed", elementId: "posted",
+      requiredReadableText: ["hours"], renderedTextPx: 25, evidenceText: "roku · 13 hours ago"
+    };
+    const slots = [
+      { id: "hook", purpose: "name the change", energy: "high" as const, spoken: true },
+      { id: "beat", purpose: "show the age", energy: "medium" as const, spoken: true, claimId: "feed-posted" },
+      { id: "cta", purpose: "one instruction", energy: "high" as const, spoken: true }
+    ];
+    const agedBrief = buildAngleBrief({ topic: "posting age", product: "Solomon", claims: [aged], filmFrames: 1155, speechRateBand: SPEECH_RATE_BAND, beats: slots });
+    const script = (figure: string): ScriptBeat[] => agedBrief.beats.map((slot) => ({
+      id: slot.id,
+      vo: slot.claimId
+        ? `${line(slot.wordBudget[0] - 2)} hours ${figure}`
+        : line(Math.round((slot.wordBudget[0] + slot.wordBudget[1]) / 2)),
+      claimId: slot.claimId
+    }));
+
+    const wrong = validateAngleScript(agedBrief, script("3"));
+    expect(wrong.map(({ reason }) => reason)).toContain("ungrounded_numeral");
+    expect(wrong.find(({ reason }) => reason === "ungrounded_numeral")?.detail).toBe("3");
+
+    // The figure the capture actually shows still passes, and so does a figure
+    // ending a sentence -- "13." is the same claim as "13".
+    expect(validateAngleScript(agedBrief, script("13")).map(({ reason }) => reason)).not.toContain("ungrounded_numeral");
+    expect(validateAngleScript(agedBrief, script("13.")).map(({ reason }) => reason)).not.toContain("ungrounded_numeral");
+  });
+
+  // A count beat quotes two figures from one cell and both have to be grounded,
+  // which is the case a stricter check could plausibly have broken.
+  it("grounds every figure in a multi-figure claim", () => {
+    const counted: SelectableClaim = {
+      id: "feed-count", assetId: "feed", elementId: "count",
+      requiredReadableText: ["jobs"], renderedTextPx: 25, evidenceText: "200 jobs (5 new)"
+    };
+    const slots = [
+      { id: "hook", purpose: "name the change", energy: "high" as const, spoken: true },
+      { id: "beat", purpose: "show the count", energy: "medium" as const, spoken: true, claimId: "feed-count" },
+      { id: "cta", purpose: "one instruction", energy: "high" as const, spoken: true }
+    ];
+    const countBrief = buildAngleBrief({ topic: "how many", product: "Solomon", claims: [counted], filmFrames: 1155, speechRateBand: SPEECH_RATE_BAND, beats: slots });
+    const script = (figures: string): ScriptBeat[] => countBrief.beats.map((slot) => ({
+      id: slot.id,
+      vo: slot.claimId
+        ? `${line(slot.wordBudget[0] - 3)} jobs ${figures}`
+        : line(Math.round((slot.wordBudget[0] + slot.wordBudget[1]) / 2)),
+      claimId: slot.claimId
+    }));
+
+    expect(validateAngleScript(countBrief, script("200 5")).map(({ reason }) => reason)).not.toContain("ungrounded_numeral");
+    // 20 is a prefix of 200 and 50 contains 5; neither is on the card.
+    expect(validateAngleScript(countBrief, script("20 50")).filter(({ reason }) => reason === "ungrounded_numeral").map(({ detail }) => detail)).toEqual(["20", "50"]);
+  });
+
   it("rejects a beat that names a claim and then talks about something else", () => {
     const wandering = good();
     wandering[1] = { ...wandering[1]!, vo: line(brief.beats[1]!.wordBudget[0]) };

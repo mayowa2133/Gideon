@@ -249,11 +249,24 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
       id: "people_saved",
       route: "/people",
       purpose: "the people already found, with what the product thinks of each",
+      motion: {
+        shows: "the saved-contact list narrowing to the target company",
+        actions: [
+          { kind: "type", locator: { role: "textbox", name: "Filter saved contacts by company" }, text: "{contact.company}" }
+        ]
+      },
       reach: [
         "Open /people and wait for the Saved Contacts panel.",
         "No interaction: saved contacts render with the route."
       ],
       regions: [
+        {
+          id: "savedContactIdentity",
+          purpose: "the public professional identity and current role Solomon surfaced",
+          locator: { role: "text", name: "{contact.name}", container: "div.flex.items-baseline" },
+          fields: ["contact.name", "contact.role"],
+          sourceTextPx: 14
+        },
         {
           id: "savedContact",
           purpose: "one saved person: who they are and what they do",
@@ -1462,6 +1475,18 @@ export const SOLOMON_SURFACES: ProductSurfaceMap = {
           locator: { role: "text", name: "Newest First", container: "select" },
           fields: [],
           sourceTextPx: 11
+        },
+        {
+          // The same cell `overnightFeedPosted` claims, on the same component --
+          // the feed renders "company · age" as one line on every occupation.
+          // Its absence here was an omission rather than a product difference,
+          // and it is the only feed whose arrivals are measured in hours rather
+          // than days, so it is the one place freshness can actually be filmed.
+          id: "marketingFeedPosted",
+          purpose: "who is hiring, and how long ago they posted it",
+          locator: { role: "text", name: "{job.company}", container: "div.text-xs.text-muted-foreground" },
+          fields: ["job.company"],
+          sourceTextPx: 12
         }
       ]
     },

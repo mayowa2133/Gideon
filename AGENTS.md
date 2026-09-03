@@ -30,6 +30,8 @@ Do not expand the MVP into avatar generation, social posting, autonomous publish
 - Testing strategy: docs/testing-strategy.md
 - Security rules: docs/security-rules.md
 - Design system: docs/design-system.md
+- Meet Solomon people campaigns: docs/meet-solomon-people-campaigns.md
+- Meet Solomon people campaigns V2: docs/meet-solomon-people-campaigns-v2.md
 - Structured product-flow capture plan: docs/product-flow-capture-plan.md
 - Structured capture implementation status: docs/product-flow-capture-implementation.md
 - Structured capture requirement audit: docs/product-flow-capture-requirement-audit.md
@@ -37,6 +39,7 @@ Do not expand the MVP into avatar generation, social posting, autonomous publish
 - Structured capture operational readiness: docs/capture-operations-readiness.md
 - Structured capture incident runbook: docs/capture-incident-runbook.md
 - Structured capture final local delivery: docs/capture-final-delivery-2026-07-16.md
+- Meet Solomon five-film campaign: docs/meet-solomon-five-campaigns.md
 - Tooling research: docs/research/open-source-tools-research.md
 - Build/buy/fork recommendation: docs/research/build-vs-buy-vs-fork.md
 
@@ -86,7 +89,7 @@ exists.
 
 ## Repository commands
 
-Verified against package.json: 79 of the 80 below exist as scripts (`db:seed` does not).
+Verified against package.json: 91 of the 92 script commands below exist (`db:seed` does not); `install` is a package-manager command.
 
 - pnpm install
 - pnpm lint
@@ -161,6 +164,20 @@ Verified against package.json: 79 of the 80 below exist as scripts (`db:seed` do
 - pnpm creator-story:v10:solomon
 - pnpm test:creator-story:v10
 - pnpm test:creator-story
+- pnpm creator:meet:solomon
+- pnpm creator:meet:solomon:v2
+- pnpm creator:meet:solomon:nontech
+- pnpm creator:meet:solomon:internships
+- pnpm creator:meet:solomon:finance-internships
+- pnpm creator:meet:solomon:software-internships
+- pnpm creator:meet:solomon:law-internships
+- pnpm creator:meet:solomon:finance-internships:v2
+- pnpm creator:meet:solomon:software-internships:v2
+- pnpm creator:meet:solomon:law-internships:v2
+- pnpm creator:meet:solomon:campaigns
+- pnpm creator:meet:solomon:people-campaigns
+- pnpm creator:meet:solomon:people-campaigns:v2
+- pnpm test:meet:solomon
 - pnpm test:masked-presenter
 - pnpm test:creator-editorial
 - pnpm release:mac:check
@@ -168,6 +185,11 @@ Verified against package.json: 79 of the 80 below exist as scripts (`db:seed` do
 - pnpm db:seed
 - pnpm dev
 - pnpm dev:web
+
+`test:meet:solomon` includes the isolated real-internship source, verification,
+readability and CTA tests. See `docs/meet-solomon-real-internships.md` for the
+actual-listing capture/render workflow; do not substitute the older fictional
+category fixtures when the user asks for real internships.
 
 When package scripts are added or changed, update this section.
 
@@ -262,6 +284,9 @@ Update docs when changing:
 - Environment variables.
 - External providers.
 - Render output profiles.
+
+The five-film Meet Solomon campaign format is documented in
+`docs/meet-solomon-five-campaigns.md`.
 
 ## Forbidden without explicit user instruction
 

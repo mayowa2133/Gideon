@@ -972,6 +972,37 @@ export interface SceneLayoutRect {
 // above it and the chips below. The resolver refuses that crop, correctly. At
 // 5.5 the label needs no vertical growth at all, so the region that reads best
 // becomes the one the film can actually show.
+// And one that shows the feed as a feed:
+//
+//   editorial_scroll  several captured cards stacked and travelled vertically
+//
+// The pixels are the product's; the column is not. A feed on screen is a list
+// you scroll, and no single crop says that -- a still of one card says a card
+// exists. Stacking cards the film has already proved and moving them says what
+// the surface is for.
+//
+// The arrangement is the only transformation, and the frame says so. This
+// pattern always labels itself an editorial scroll, because the viewer is
+// watching a motion the product did not perform: these cards were photographed
+// in one state and are being travelled past by the film. Calling that a
+// recording of scrolling would be the one dishonest thing in an otherwise
+// evidence-bound format.
+
+// And one that exists for the beat where a single value carries the whole scene:
+//
+//   big_number     one short field, drawn as large as the frame allows, alone
+//
+// The reveal shot. A film whose turn is a number -- an age, a count, a salary --
+// has to be able to stop and let the viewer read it, and every other pattern
+// draws its crop as evidence *beside* something: a caption above, a presenter
+// below, a card around it. At that scale the number is a detail on a page rather
+// than the thing the scene is about.
+//
+// It crops the product's own field rather than typesetting the value into the
+// film, which is the same rule the rest of the pipeline follows and matters most
+// here: a scene asserting "posted two weeks ago" at 400px is the strongest claim
+// in the film, so it is the last place to let the film say it in its own voice.
+// The value on screen is the value the product rendered.
 export type SceneContentPattern =
   | "ambient"
   | "evidence_band"
@@ -981,7 +1012,9 @@ export type SceneContentPattern =
   | "composed_board"
   | "comment_card"
   | "wide_strip"
-  | "product_screen";
+  | "product_screen"
+  | "big_number"
+  | "editorial_scroll";
 
 // What a pattern needs beyond its crops. Kept as a small typed bag rather than
 // bespoke fields per pattern, because the alternative is what V22 did: fifteen
@@ -1010,6 +1043,40 @@ export interface SceneContentOptions {
   // evidence, so they are placeholders rather than crops, and without a count
   // the field has nothing to converge.
   placeholders?: number;
+  // What a `big_number` scene sets in type, and when its evidence was recorded.
+  //
+  // `headline` is not written by the film. It is the captured region's own text,
+  // carried through from the inventory and re-set at reveal scale, with the crop
+  // kept underneath as the receipt. The first draft of this pattern refused to
+  // typeset anything and drew only the crop, on the theory that letting the film
+  // render the value in its own voice was the one liberty a reveal must not
+  // take. That was the wrong cut: magnifying a 10px line is capped at about 46px
+  // before it turns to mush, so the strongest claim in the film was also its
+  // least legible, and "the product said it" was being carried by blurred pixels
+  // rather than by anything a viewer could check.
+  //
+  // `capturedOn` is what makes the larger type honest. The claim becomes "this
+  // is what the product showed on this date", which is both provable from the
+  // capture run and immune to the value drifting afterwards -- an age that read
+  // "3 hours ago" when the film was planned and "13 hours ago" when it was
+  // captured is a false claim under the old framing and a true one under this.
+  headline?: string;
+  capturedOn?: string;
+  // How this scene's evidence relates to the last scene that drew the same way.
+  //
+  // `different` is the one that prevents a misreading: a film showing one age
+  // beside another invites the viewer to read them as a single listing being
+  // refreshed, and in a daily they are usually two roles in two searches. The
+  // comparison is honest; letting the viewer assume otherwise is not.
+  //
+  // `same` is the affirmative half, and it is the stronger statement of the two.
+  // Only flagging difference means silence carries all the weight of "these
+  // share a source" while never actually saying it, and silence is also what a
+  // missing label looks like. Two frames that genuinely come from one capture of
+  // one employer should say so.
+  //
+  // Absent on the first claim of a pattern, which has nothing to be related to.
+  captureRelation?: "same" | "different";
 }
 
 export interface SceneComposition {

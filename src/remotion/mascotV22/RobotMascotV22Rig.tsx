@@ -34,7 +34,7 @@ function entranceCurve(frame: number, durationInFrames: number) {
 // `positioning: "external"` hands placement to the persistent MascotLayer, which
 // owns the anchor and scale. Without it the rig's own roleLayout compounds with
 // the layer's transform and the mascot lands mid-frame over the product proof.
-export const RobotMascotV22Rig: React.FC<{ plan: V22MascotPerformance; frame: number; fps?: number; enterOverride?: number; positioning?: "self" | "external"; pixelScale?: number }> = ({ plan, frame, enterOverride, positioning = "self", pixelScale = 1 }) => {
+export const RobotMascotV22Rig: React.FC<{ plan: V22MascotPerformance; frame: number; fps?: number; enterOverride?: number; positioning?: "self" | "external"; pixelScale?: number; mouthless?: boolean }> = ({ plan, frame, enterOverride, positioning = "self", pixelScale = 1, mouthless = false }) => {
   if (plan.role === "absent") return null;
   const enter = enterOverride ?? entranceCurve(frame, 13);
   const leftAmount = limbCurve(frame, plan.left.timing), rightAmount = limbCurve(frame, plan.right.timing);
@@ -107,7 +107,7 @@ export const RobotMascotV22Rig: React.FC<{ plan: V22MascotPerformance; frame: nu
         <rect x={330 - SCREEN_W / 2} y="112" width={SCREEN_W} height={SCREEN_H} rx={SCREEN_R} fill={INK} />
         <path d="M102 154 Q162 120 232 128" fill="none" stroke="#42546a" strokeOpacity=".42" strokeWidth="12" strokeLinecap="round" />
         <Face face={face} gazeX={gaze.dx * 28} gazeY={gaze.dy * 13} blink={blink} beat={phraseBeat} />
-        <Mouth state={mouth} />
+        {!mouthless && <Mouth state={mouth} />}
         <rect x="294" y="18" width="72" height="52" rx="26" fill="#d4dce6" />
         <rect x="319" y={-4 - antenna * .22} width="22" height={35 + antenna * .22} rx="11" fill="#92a6bb" />
         <circle cx="330" cy={-13 - antenna} r={18 + audio.onset * 2} fill={AMBER} style={{ filter: "drop-shadow(0 0 10px rgba(255,157,24,.65))" }} />

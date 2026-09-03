@@ -61,6 +61,19 @@ const EditorialCamera: React.FC<React.PropsWithChildren<{ scene: FilmScene }>> =
 //
 // Tone and halo come from the scene's backdrop rather than a token lookup, which
 // is the one change from V22: the film no longer needs to know a palette exists.
+// The four voices a caption speaks in. Both families are already loaded by the
+// composition's font gate, so this changes how they are used rather than what is
+// available: editorial beats keep the Fraunces serif and grow, product claims
+// take the heavier Manrope and give the frame back to the crop.
+const REGISTERS: Record<string, { size: number; top: number; family: string; weight: number }> = {
+  emotion: { size: 104, top: 96, family: "Fraunces Variable,serif", weight: 900 },
+  payoff_reaction: { size: 112, top: 88, family: "Fraunces Variable,serif", weight: 900 },
+  cta: { size: 104, top: 96, family: "Fraunces Variable,serif", weight: 900 },
+  attention: { size: 84, top: 118, family: "Fraunces Variable,serif", weight: 850 },
+  interpretation: { size: 72, top: 132, family: "Manrope Variable,sans-serif", weight: 950 },
+  default: { size: 80, top: 116, family: "Fraunces Variable,serif", weight: 900 }
+};
+
 const CaptionLayer: React.FC<{ caption: FilmCaption; scenes: FilmScene[] }> = ({ caption, scenes }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
@@ -105,11 +118,23 @@ const CaptionLayer: React.FC<{ caption: FilmCaption; scenes: FilmScene[] }> = ({
   const pre = highlightIndex >= 0 ? text.slice(0, highlightIndex) : text;
   const highlighted = highlightIndex >= 0 ? text.slice(highlightIndex, highlightIndex + (caption.highlight?.length ?? 0)) : "";
   const post = highlightIndex >= 0 ? text.slice(highlightIndex + (caption.highlight?.length ?? 0)) : "";
-  const size = group.emphasis ? 116 : 80;
-  const bandTop = group.emphasis ? 86 : 116;
+  // How the line is set, from what the beat is doing.
+  //
+  // Every caption in the film used to be Fraunces 900 at one of two sizes, so a
+  // hook, a caution and a product claim shared a voice and the composition
+  // changed slower than the narration did. The register is read off the scene's
+  // own narrative purpose -- already carried for the presenter -- so nothing new
+  // has to be authored per film.
+  //
+  // Proof beats take the sans and sit lower and smaller on purpose. The claim on
+  // those frames is the crop; a serif headline over it competes with the thing
+  // it is introducing, and the evidence should be the largest thing on screen.
+  const register = REGISTERS[active.mascot.narrativePurpose] ?? REGISTERS.default!;
+  const size = group.emphasis ? Math.round(register.size * 1.18) : register.size;
+  const bandTop = group.emphasis ? register.top - 30 : register.top;
   const scale = (.9 + .1 * pop) * (group.emphasis ? 1.04 : 1);
   return <div data-cs-caption={caption.id} data-cs-word-group={group.text} style={{ position: "absolute", left: 60, right: 60, top: bandTop, display: "flex", justifyContent: "center", zIndex: 70, opacity: opacity * swapFade, transform: `translateY(${(1 - enter) * -22}px)` }}>
-    <div style={{ fontFamily: "Fraunces Variable,serif", color: tone, fontSize: size, lineHeight: .94, textAlign: "center", fontWeight: 900, textShadow: `0 0 26px ${halo},0 2px 10px ${halo}`, transform: `scale(${scale})`, transformOrigin: "50% 0%" }}>
+    <div style={{ fontFamily: register.family, color: tone, fontSize: size, lineHeight: .94, textAlign: "center", fontWeight: register.weight, textShadow: `0 0 26px ${halo},0 2px 10px ${halo}`, transform: `scale(${scale})`, transformOrigin: "50% 0%" }}>
       {pre}{highlighted && <span style={{ color: MINT }}>{highlighted}</span>}{post}
     </div>
   </div>;

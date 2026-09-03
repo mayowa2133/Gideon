@@ -102,7 +102,11 @@ export interface InventoryScreen {
    */
   motion?: { stills: string[]; frames: number; step: number; hold: number; delta: number };
 }
-export interface ScreenInventory { schemaVersion: "1"; product: string; source: { width: number; height: number }; screens: InventoryScreen[] }
+// `capturedAt` is the capture run's own timestamp, carried through so a scene
+// can state when its evidence was recorded. A film that sets a captured value in
+// large type is claiming what the product showed at a moment, and the moment has
+// to travel with the value or the claim quietly becomes a claim about now.
+export interface ScreenInventory { schemaVersion: "1"; product: string; source: { width: number; height: number }; screens: InventoryScreen[]; capturedAt?: string }
 
 export interface ResolvedCrop {
   assetId: string;

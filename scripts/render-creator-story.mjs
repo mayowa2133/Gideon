@@ -24,6 +24,7 @@ const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { buildFilmScenes } = require("../dist/main/shared/creatorStoryFilm.js");
 const { SPEECH_RATE_BAND, MIN_SCENE_FRAMES } = require("../dist/main/shared/creatorStoryQuality.js");
+const { RESTING_TRIM } = require("../dist/main/shared/angleBlueprint.js");
 
 const FPS = 30;
 const args = process.argv.slice(2);
@@ -82,13 +83,20 @@ for (const [name, crop] of wanted) {
   // that path still resolves against the frames V22 extracted -- and only that
   // path, which is the point: a film that captured its own screens can never
   // silently fall back to another film's.
-  const source = captured ? path.resolve(root, captured) : path.join(referenceDir, `still-${name}.png`);
+  // A before/after pair draws the screen at rest, which is a different
+  // photograph from the settled one and has to be resolved as such -- resolving
+  // it to the settled still would put the same picture on both sides of the
+  // arrow and call it a change.
+  const filmedScreen = inventory.screens.find((screen) => screen.asset === crop.assetId)?.motion;
+  const source = crop.trim === RESTING_TRIM && filmedScreen?.resting
+    ? path.resolve(root, filmedScreen.resting)
+    : captured ? path.resolve(root, captured) : path.join(referenceDir, `still-${name}.png`);
   if (!existsSync(source)) throw new Error(`Blueprint draws ${crop.assetId} at trim ${crop.trim}, and neither ${path.relative(root, inventoryPath)} nor the reference stills have that screen.`);
   await fs.copyFile(source, path.join(publicDir, `still-${name}.png`));
 
   // A crop that plays a sequence needs every frame of it, under the trims the
   // renderer will ask for: `crop.trim + i * step`.
-  const filmed = inventory.screens.find((screen) => screen.asset === crop.assetId)?.motion;
+  const filmed = filmedScreen;
   if (crop.motion && filmed) {
     for (const [index, frame] of filmed.stills.entries()) {
       await fs.copyFile(path.resolve(root, frame), path.join(publicDir, `still-${crop.assetId}-${crop.trim + index * crop.motion.step}.png`));
@@ -197,6 +205,12 @@ const alignment = [];
 const captions = [];
 for (const gap of gaps) {
   const scene = scenes.find((entry) => entry.id === gap.id);
+  // A `big_number` scene sets its own line in type, so captioning it as well
+  // puts the same words on screen twice at two sizes. The band caught the tail
+  // of the phrase -- a reveal reading "1 WEEK AGO" under a caption reading
+  // "AGO." -- which is worse than redundant, because the fragment reads as a
+  // different, unfinished sentence.
+  if (scene?.contentPattern === "big_number") continue;
   const line = script.find((beat) => beat.id === gap.id).vo;
   const words = line.split(/\s+/).filter(Boolean);
   const from = scene.from + HEAD, span = Math.round(gap.seconds * FPS);

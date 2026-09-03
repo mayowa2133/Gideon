@@ -40,7 +40,18 @@ export const CONTAINER_ASPECT: Record<string, number> = {
   // The application's own shape. Solomon's content box is 1280x843 at the
   // capture viewport, which is 1.52. A page cropped far from its own aspect
   // stops looking like the page, which is the whole job of this shot.
-  product_screen: 1.52
+  product_screen: 1.52,
+  // Same reasoning as wide_strip and for the same kind of region -- one line of
+  // product text -- but tighter, because this pattern draws that line across the
+  // whole frame rather than as a band with content above and below it. 4.0 still
+  // clears the 3.0 floor where the resolver starts growing a crop vertically, so
+  // the line above and below it are still not cut; it just carries less air,
+  // which is what lets the type land larger for the same region.
+  big_number: 4,
+  // A feed card as the feed draws it. Wider than tall and close to the card's
+  // own proportion, because the column is the shot: a crop grown to some other
+  // aspect stops looking like a row in a list and starts looking like a panel.
+  editorial_scroll: 3.1
 };
 
 // A default shot for each kind of beat. Deliberately small: eight patterns are
@@ -71,6 +82,142 @@ export function defaultShot(
     : { shotType: "product_fullscreen", contentPattern: pattern ?? "evidence_band" };
 }
 
+// The story arc, as the presenter plays it.
+//
+// Every generated scene used to take its cue and its purpose from whichever V22
+// reference scene supplied its template, so a sixteen-beat film ran one
+// expression, one gesture pair and one narrative purpose from the hook to the
+// CTA. `mascotFromCue` was never at fault: it reads a cue faithfully and already
+// varies head, torso and limb timing by scene hash. It was being handed the same
+// cue sixteen times, and no gate compares a scene's cue to its neighbour's.
+//
+// Positional, because the script is. A beat carrying no claim early in a film is
+// stating the problem and the same beat late in it is banking the payoff; those
+// are not the same performance, and the only thing that separates them is where
+// they sit. The thresholds are the spec's own arc -- problem, then mechanism,
+// then payoff -- rather than tuned numbers.
+function beatPerformance(index: number, total: number, pattern: SceneContentPattern | undefined, hasClaim: boolean) {
+  const position = total > 1 ? index / (total - 1) : 0;
+  if (index === 0) return { purpose: "hook" as const, cue: { layout: "close_up" as const, expression: "excited" as const, gestureIntent: "open_hand" as const, eyeline: "camera" as const } };
+  if (index === total - 1) return { purpose: "cta" as const, cue: { layout: "close_up" as const, expression: "confident" as const, gestureIntent: "emphasis" as const, eyeline: "camera" as const } };
+  if (hasClaim) {
+    // A reveal has no mascot rect by construction, so the presenter is not
+    // merely unhelpful there, it has nowhere to stand.
+    if (pattern === "big_number") return { purpose: "proof" as const, cue: { visible: false } };
+    // Alternated so two proofs in a row are not the same picture, and the
+    // eyeline follows the side the presenter is standing on.
+    const right = index % 2 === 1;
+    return {
+      purpose: "proof" as const,
+      cue: {
+        layout: right ? ("split_right" as const) : ("split_left" as const),
+        expression: "explanatory" as const, gestureIntent: "point" as const,
+        eyeline: right ? ("product_left" as const) : ("product_right" as const)
+      }
+    };
+  }
+  // Alternated inside each section, because a section is several beats long and
+  // holding one framing across all of them is the flat film this function exists
+  // to fix -- the first cut of it played four consecutive problem beats as the
+  // same close-up with both hands at rest. The emotion is what the section is
+  // for and it stays; the framing and the hands are what stop it reading as one
+  // held shot. `close_up` and `medium` resolve to different mascot roles, so the
+  // alternation changes the composition and not just the pose.
+  const alternate = index % 2 === 0;
+  // `neutral` is what `mascotFromCue` turns into a concerned face, but only
+  // where the purpose is `problem` -- which is why the early beats ask for
+  // neutral and the late ones do not.
+  if (position < .35) return {
+    purpose: "problem" as const,
+    cue: {
+      layout: alternate ? ("close_up" as const) : ("medium" as const),
+      expression: "neutral" as const,
+      // An open palm on a concerned beat reads as "and what am I meant to do
+      // with that", which is the question the section is asking.
+      gestureIntent: alternate ? ("none" as const) : ("open_hand" as const),
+      eyeline: "camera" as const
+    }
+  };
+  if (position < .7) return {
+    purpose: "demo" as const,
+    cue: {
+      layout: alternate ? ("medium" as const) : ("close_up" as const),
+      expression: "explanatory" as const,
+      gestureIntent: alternate ? ("open_hand" as const) : ("point" as const),
+      eyeline: "camera" as const
+    }
+  };
+  return {
+    purpose: "payoff" as const,
+    cue: {
+      layout: alternate ? ("close_up" as const) : ("medium" as const),
+      expression: "confident" as const,
+      gestureIntent: alternate ? ("emphasis" as const) : ("open_hand" as const),
+      eyeline: "camera" as const
+    }
+  };
+}
+
+// Which ground each kind of beat stands on.
+//
+// The film darkens into its reveals and lifts out of them: a problem beat sits
+// on a mid tone, the proof it leads to is the darkest frame in the film, and the
+// payoff comes back up. `deep` on a proof is what made the age reveal land in
+// film 06 -- the same crop on a bright backdrop reads as a caption with a card
+// under it.
+// Ordered, not single, because the ground still has to change at every cut.
+//
+// Two adjacent scenes on one tier is a backdrop that does not move when the shot
+// does, which reads as one long take and is the exact fault this change exists
+// to remove -- so a purpose states a preference and yields when the beat before
+// it already took that tier. Consecutive proofs are the common case: the first
+// gets the dark frame the reveal wants, the second takes mid rather than
+// flattening the pair.
+const TIER_BY_PURPOSE: Record<string, readonly string[]> = {
+  hook: ["bright", "mid"], problem: ["mid", "deep"], demo: ["bright", "mid"],
+  proof: ["deep", "mid"], payoff: ["bright", "mid"], cta: ["bright", "mid"]
+};
+
+// Where the presenter stands, from what it is doing in the beat.
+//
+// The rect used to come from the content pattern alone, which meant two boxes
+// did the whole film: one for scenes with a product and one for scenes without.
+// Role varied -- hero_close, host, cameo_left -- and changed nothing on screen,
+// because `mascotBoxForScene` reads the declared rect and the declared rect
+// never asked. A sixteen-beat film drew the presenter at one of two sizes in one
+// of two places, which is most of the frame holding still while the words moved.
+//
+// Scale is a consequence of the rect, not a field: the rig is fitted inside it
+// and bottom-aligned, so a taller box is a bigger presenter. The rig's own
+// aspect is about 0.69, and a rect matching it fits exactly in both directions
+// and wastes nothing.
+//
+// Product scenes get less range than ambient ones and that is arithmetic rather
+// than choice. The band under a product rect is ~0.41 of the canvas, which caps
+// the fit at 0.89 whatever the width, so widening a hero there buys nothing --
+// only the smaller sided variants actually differ.
+const MASCOT_RECT: Record<string, { free: SceneLayoutRect; band: SceneLayoutRect }> = {
+  // Dominant and high. 1.50x, the largest the frame takes without cropping.
+  close_up: {
+    free: { id: "mascot", kind: "mascot", left: .07, top: .135, right: .93, bottom: .838 },
+    band: { id: "mascot", kind: "mascot", left: .18, top: .56, right: .82, bottom: .975 }
+  },
+  // Mid shot, standing on the floor of the frame.
+  medium: {
+    free: { id: "mascot", kind: "mascot", left: .213, top: .501, right: .787, bottom: .97 },
+    band: { id: "mascot", kind: "mascot", left: .23, top: .56, right: .77, bottom: .975 }
+  },
+  // Small and pushed aside, leaving the rest of the frame to what it is looking at.
+  split_left: {
+    free: { id: "mascot", kind: "mascot", left: .03, top: .684, right: .386, bottom: .975 },
+    band: { id: "mascot", kind: "mascot", left: .04, top: .70, right: .38, bottom: .975 }
+  },
+  split_right: {
+    free: { id: "mascot", kind: "mascot", left: .614, top: .684, right: .97, bottom: .975 },
+    band: { id: "mascot", kind: "mascot", left: .62, top: .70, right: .96, bottom: .975 }
+  }
+};
+
 // The geometry a pattern the reference film never drew has to be given.
 //
 // A generated scene inherits its rects from whichever reference scene draws the
@@ -99,9 +246,66 @@ export const PRODUCT_SCREEN_LAYOUT: SceneLayoutRect[] = [
   { id: "product-screen-mascot", kind: "mascot", left: .23, top: .56, right: .77, bottom: .975 },
   { id: "product-screen-caption", kind: "caption", left: .05, top: .04, right: .95, bottom: .16 }
 ];
+// The reveal's geometry. The crop sits across the middle third and there is no
+// mascot rect, which is the one place in this map that is a statement rather
+// than a measurement: the pattern exists so the frame can hold one value and
+// nothing else, and a rect is an invitation to put a presenter in it. A scene
+// that wants Solomon in shot with its number wants `wide_strip`.
+//
+// The band is centred rather than pushed up under the caption because this is
+// the only pattern with nothing beneath it -- leaving the lower half empty and
+// the number high reads as a layout that lost its presenter.
+// The headline and provenance a `big_number` scene draws.
+//
+// The headline is the tail of the captured line, not the whole of it. A feed
+// renders "mercury · 1 week ago" as one cell, and the half that carries the
+// claim is the age: setting the employer at reveal scale would put a company
+// name in 200px type on a beat that is not about the company. Split on the
+// product's own separator, keep what follows it, and fall back to the whole
+// string when there is nothing to split -- a region that is only a value, like
+// a count, is already the thing to show.
+function bigNumberOptions(inventory: ScreenInventory, claim?: { assetId: string; elementId: string }) {
+  if (!claim) return {};
+  const element = inventory.screens.find(({ asset }) => asset === claim.assetId)?.elements.find(({ id }) => id === claim.elementId);
+  const captured = element?.sourceText ?? element?.text;
+  if (!captured) return {};
+  const tail = captured.split(/\s[·|]\s/).pop()!.trim();
+  return { headline: (tail || captured).trim() };
+}
+
+// What a scene is allowed to say about where its evidence came from.
+//
+// Applied to every claim rather than only to the reveal, because the reveal was
+// never the only frame making an assertion -- it was just the loudest. A band
+// showing a captured count is the same kind of statement at a smaller size, and
+// the date is what the statement is actually good for.
+function evidenceProvenance(inventory: ScreenInventory, relation: "same" | "different" | undefined, claim?: { assetId: string }) {
+  if (!claim) return {};
+  return {
+    // Date only. The capture's timestamp is to the millisecond and a viewer
+    // reading a frame needs the day, which is the unit the claim is good for.
+    ...(inventory.capturedAt ? { capturedOn: inventory.capturedAt.slice(0, 10) } : {}),
+    ...(relation ? { captureRelation: relation } : {})
+  };
+}
+
+
+export const BIG_NUMBER_LAYOUT: SceneLayoutRect[] = [
+  { id: "big-number-product", kind: "product", left: .06, top: .38, right: .94, bottom: .60 },
+  { id: "big-number-caption", kind: "caption", left: .05, top: .04, right: .95, bottom: .16 }
+];
+// The column runs the height of the frame under the caption. No mascot rect:
+// the feed is the subject here and a presenter standing in front of a moving
+// list is a presenter standing in front of the shot.
+export const EDITORIAL_SCROLL_LAYOUT: SceneLayoutRect[] = [
+  { id: "scroll-product", kind: "product", left: .04, top: .19, right: .96, bottom: .93 },
+  { id: "scroll-caption", kind: "caption", left: .05, top: .04, right: .95, bottom: .16 }
+];
 const PATTERN_LAYOUT: Partial<Record<SceneContentPattern, SceneLayoutRect[]>> = {
+  editorial_scroll: EDITORIAL_SCROLL_LAYOUT,
   wide_strip: WIDE_STRIP_LAYOUT,
-  product_screen: PRODUCT_SCREEN_LAYOUT
+  product_screen: PRODUCT_SCREEN_LAYOUT,
+  big_number: BIG_NUMBER_LAYOUT
 };
 
 // How many beats ahead of a proof still show its screen. Claims are the only
@@ -147,7 +351,15 @@ function layoutOnly(options: Record<string, unknown> = {}) {
 // how big the product's own type lands on screen.
 export const CONTAINER_PX: Record<string, number> = {
   evidence_band: 1000, composed_board: 1000, card_field: 500, state_swap: 900, filmstrip: 320, comment_card: 900, ambient: 900,
-  wide_strip: 1000, product_screen: 1010
+  wide_strip: 1000, product_screen: 1010,
+  // The widest of any pattern, and the point of it: the same region that lands
+  // at 1000px as a band lands ~1.9x larger here, because the crop is tighter
+  // (aspect 4 against 5.5) and drawn wider. That ratio is what makes a 12px
+  // product line read at reveal scale without the film retypesetting it.
+  big_number: 1900,
+  // Near the frame's full width. The cards are stacked in one column and read at
+  // the size a phone would show them, which is the whole point of the format.
+  editorial_scroll: 940
 };
 // The floor a region's text must clear once it is drawn. `marginal` in the
 // inventory is 20px and that is the same floor here, because it is the same
@@ -158,6 +370,15 @@ export const READABLE_PX = 20;
 // capture trim, so `still-<asset>-<trim>.png` for a sequence can never collide
 // with the single still the same screen's proof shots draw.
 export const MOTION_TRIM_BASE = 1000;
+// The screen as it was before its interaction, on a trim of its own.
+//
+// It cannot share the sequence's base. Stills are published under
+// `<asset>-<trim>`, the sequence publishes frame i at MOTION_TRIM_BASE + i*step,
+// and a crop asking for MOTION_TRIM_BASE without motion loses the key to the one
+// with it -- so a "before" addressed there was overwritten by burst frame 00,
+// which on the marketing feed is a blank cell mid-reload. Below the base and
+// clear of every published frame.
+export const RESTING_TRIM = 900;
 
 // How many proofs a recap needs before it reads as a row rather than a mistake.
 // Two cards with a marker travelling between them is not a strip, it is a pair
@@ -172,6 +393,8 @@ const FILMSTRIP_CARDS = 4;
 // which is exactly the crop the filmstrip had to give up on. Four in two columns
 // of a 1000px box leaves each card 487 wide, magnifying a band rather than
 // shrinking it.
+// A column reads as a list at three cards and not at two, which is a pair.
+const SCROLL_MINIMUM = 3;
 const CARD_FIELD_MINIMUM = 3;
 const CARD_FIELD_CARDS = 4;
 
@@ -348,6 +571,20 @@ export function compileAngleBlueprint(input: {
   // proves three things off one page does not show that page identically three
   // times.
   const established = new Map<string, number>();
+  // The last asset each pattern drew from, filled in as the scenes are built.
+  //
+  // Compared per pattern rather than against the film's first claim, because the
+  // confusion this guards against is specific: two ages set in the same
+  // treatment, one after the other, read as one listing being refreshed. A count
+  // or a sort control drawn from a second search invites no such reading, and
+  // flagging those was noise that also weakened the one frame where the
+  // disclosure carries weight -- the first cut marked three scenes and the
+  // comparison itself was only one of them.
+  const lastAssetByPattern = new Map<string, string>();
+  // How many beats have already drawn on each tier, so a run of one purpose
+  // still moves through that tier's palette.
+  const tierSeen = new Map<string, number>();
+  let previousTier: string | undefined;
   const scenes: SceneComposition[] = script.map((beat, index) => {
     const slot = brief.beats[index]!;
     const claim = beat.claimId ? claimById.get(beat.claimId) : undefined;
@@ -382,10 +619,36 @@ export function compileAngleBlueprint(input: {
     const template = reference.scenes.find((scene) => scene.contentPattern === shot.contentPattern)
       ?? reference.scenes.find((scene) => scene.shotType === shot.shotType)
       ?? reference.scenes[0]!;
-    const layoutRects = PATTERN_LAYOUT[shot.contentPattern!] ?? template.layoutRects;
-    const tier = cadence[index % cadence.length]!;
+    const patternRects: SceneLayoutRect[] = PATTERN_LAYOUT[shot.contentPattern!] ?? template.layoutRects ?? [];
+    const performance = beatPerformance(index, script.length, shot.contentPattern, Boolean(claim));
+    // Tier from what the beat is doing, not from its position in the film.
+    //
+    // It was `cadence[index % 3]`, which changed the ground every beat and meant
+    // nothing by it: a reveal could land on the brightest backdrop in the
+    // palette and a payoff on the darkest, purely by parity. Purpose reads the
+    // other way round -- the film darkens into its reveals and lifts out of
+    // them -- which is the difference between a background that rotates and one
+    // that is doing something.
+    //
+    // Rotation is kept inside the tier rather than lost. Several beats in a row
+    // share a purpose (four problem beats is normal), so the option advances per
+    // occurrence of the tier and consecutive beats still change colour.
+    // Replaced rather than added, and only where the pattern declared one: a
+    // pattern with no mascot rect (the reveal) is stating that the presenter has
+    // nowhere to stand, which is a decision this must not overturn.
+    const roleRect = performance.cue.layout ? MASCOT_RECT[performance.cue.layout] : undefined;
+    const hasProduct = patternRects.some(({ kind }) => kind === "product");
+    const layoutRects = roleRect && patternRects.some(({ kind }) => kind === "mascot")
+      ? patternRects.map((rect) => (rect.kind === "mascot" ? (hasProduct ? roleRect.band : roleRect.free) : rect))
+      : patternRects;
+
+    const preferred = TIER_BY_PURPOSE[performance.purpose] ?? ["mid", "bright"];
+    const tier = preferred.find((candidate) => candidate !== previousTier) ?? preferred[0]!;
+    previousTier = tier;
     const options = byTier(tier);
-    const backdrop = options[Math.floor(index / cadence.length) % Math.max(1, options.length)] ?? template.backdrop!;
+    const seen = tierSeen.get(tier) ?? 0;
+    tierSeen.set(tier, seen + 1);
+    const backdrop = options[seen % Math.max(1, options.length)] ?? template.backdrop!;
 
     let productCrop: SceneComposition["productCrop"];
     if (!claim && establishing) {
@@ -499,6 +762,27 @@ export function compileAngleBlueprint(input: {
       }
     }
 
+    // A claim asking for `state_swap` on a surface that was filmed becomes the
+    // two ends of that interaction, held side by side rather than played.
+    //
+    // The footage is the same burst the establishing shots animate; what differs
+    // is the reading. A sequence playing through shows that something changed
+    // and is gone in four hundred milliseconds. Two frozen states under BEFORE
+    // and AFTER let a viewer compare the counts either side of a filter, which
+    // is the claim -- "narrowing the search changes what is in it" -- and a shot
+    // nobody can pause is a poor place to make it.
+    //
+    // Both ends address plain trims, so neither crop carries `motion`: the burst
+    // starts at MOTION_TRIM_BASE and the settled screenshot is trim 0. Pairing
+    // the first burst frame with the settled still spans the whole interaction
+    // rather than two arbitrary points inside it.
+    const swapPair = shot.contentPattern === "state_swap" && productCrop
+      && inventory.screens.find(({ asset }) => asset === productCrop!.assetId)?.motion
+      ? [{ ...productCrop, trim: RESTING_TRIM, motion: undefined }, { ...productCrop, trim: 0, motion: undefined }]
+      : undefined;
+    const previousAsset = shot.contentPattern ? lastAssetByPattern.get(shot.contentPattern) : undefined;
+    const captureRelation = claim && previousAsset ? (previousAsset === claim.assetId ? "same" as const : "different" as const) : undefined;
+    if (claim && shot.contentPattern) lastAssetByPattern.set(shot.contentPattern, claim.assetId);
     const scene: SceneComposition = {
       ...template,
       id: beat.id,
@@ -506,8 +790,29 @@ export function compileAngleBlueprint(input: {
       endMs,
       shotType: shot.shotType,
       contentPattern: shot.contentPattern,
-      contentOptions: layoutOnly((shot.contentPattern === template.contentPattern ? template.contentOptions : {}) as Record<string, unknown>),
-      presenter: { ...template.presenter, visible: shot.shotType !== "product_fullscreen" },
+      contentOptions: {
+        ...layoutOnly((shot.contentPattern === template.contentPattern ? template.contentOptions : {}) as Record<string, unknown>),
+        // A reveal sets the captured region's own words in type, with the crop
+        // kept under it as the receipt. Read here rather than in the template
+        // because this is where the inventory is in scope, and because a
+        // headline the renderer invented would be exactly the thing the pattern
+        // exists to avoid.
+        ...evidenceProvenance(inventory, captureRelation, claim),
+        ...(shot.contentPattern === "big_number" ? bigNumberOptions(inventory, claim) : {}),
+        // Late enough in the scene that the before state is read before it is
+        // replaced, and early enough that the after state is not a flash. The
+        // pills name the two ends; StateSwapTemplate tracks which is live.
+        ...(swapPair ? { swapAt: 0.55, pills: ["BEFORE", "AFTER"] as [string, string] } : {})
+      },
+      purpose: performance.purpose,
+      // The template still supplies crop, scale, disclosure and provenance --
+      // everything about how the presenter is composited. What is overridden is
+      // only what it is doing, which is the half the template cannot know.
+      presenter: {
+        ...template.presenter,
+        visible: shot.shotType !== "product_fullscreen",
+        ...performance.cue
+      },
       productAssetIds: productCrop ? [productCrop.assetId] : [],
       supportedClaimIds: claim && productCrop ? [claim.id] : [],
       captions: [],
@@ -521,7 +826,7 @@ export function compileAngleBlueprint(input: {
       // resolved one -- three of four proof beats drew the contact card no
       // matter which claim they were making. Every compile-time gate passed,
       // because they all read the blueprint and none read the film.
-      productCrops: productCrop ? [productCrop] : []
+      productCrops: swapPair ?? (productCrop ? [productCrop] : [])
     };
     startMs = endMs;
     return scene;
@@ -578,9 +883,39 @@ export function compileAngleBlueprint(input: {
     .filter(({ scene }) => !scene.productCrop?.motion)
     .map(({ index }) => index);
   // Swap and grid land mid-argument, in that order; the recap closes.
-  const swapIndex = spareBeats[0] ?? -1;
-  const fieldIndex = spareBeats.find((index) => index !== swapIndex) ?? -1;
-  const recapIndex = [...spareBeats].reverse().find((index) => index !== swapIndex && index !== fieldIndex) ?? -1;
+  // The scroll takes the first spare beat, ahead of the swap and the grid.
+  //
+  // It is the only one of the three that shows the surface rather than a claim
+  // about it, so a film that can afford exactly one composed shot should spend
+  // it here -- and unlike the others it degrades gracefully: with fewer than
+  // three crops it simply does not appear.
+  const scrolled = scenes.flatMap((scene) => (scene.supportedClaimIds.length && scene.productCrop ? [scene.productCrop] : []));
+  const scrollIndex = scrolled.length >= SCROLL_MINIMUM ? (spareBeats[0] ?? -1) : -1;
+  const swapIndex = spareBeats.find((index) => index !== scrollIndex) ?? -1;
+  const fieldIndex = spareBeats.find((index) => index !== swapIndex && index !== scrollIndex) ?? -1;
+  const recapIndex = [...spareBeats].reverse().find((index) => index !== swapIndex && index !== fieldIndex && index !== scrollIndex) ?? -1;
+
+  // Every crop the film proved, stacked and travelled.
+  //
+  // Not deduplicated by asset, unlike the grid: two cards from one feed are two
+  // openings, and collapsing them would turn the shot the format exists for --
+  // a list with things in it -- back into one card per screen.
+  //
+  // Claims nothing. Each crop was proved on its own beat and the column asserts
+  // no new fact; what it adds is that these are rows in a feed rather than
+  // isolated findings.
+  if (scrollIndex > 0) {
+    scenes[scrollIndex] = {
+      ...scenes[scrollIndex]!,
+      shotType: "product_fullscreen",
+      contentPattern: "editorial_scroll",
+      layoutRects: EDITORIAL_SCROLL_LAYOUT,
+      presenter: { ...scenes[scrollIndex]!.presenter, visible: false },
+      productAssetIds: [...new Set(scrolled.map(({ assetId }) => assetId))],
+      productCrop: scrolled[0],
+      productCrops: scrolled
+    };
+  }
   // The film's proofs, all at once.
   //
   // `card_field` was implemented and nothing ever selected it, so eighteen beats

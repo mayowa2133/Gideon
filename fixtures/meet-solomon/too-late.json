@@ -1,0 +1,370 @@
+{
+  "version": "meet-solomon-v1",
+  "id": "meet-solomon-too-late",
+  "title": "Meet Solomon \u2014 Too Late",
+  "requiredEvidence": {
+    "older-age": "3 days ago",
+    "recent-age": "13 hours ago",
+    "sort": "Newest First",
+    "automatic": "New jobs populate automatically from your profile."
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "layout": "hook",
+      "vo": "You find a job that looks perfect.",
+      "headline": "looks perfect.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "happy",
+      "gesture": "open_palm",
+      "evidence": [],
+      "newInformation": "The viewer recognizes the appealing-job moment.",
+      "visualMetaphor": "A promising card drops into reach.",
+      "transition": "The promise becomes specific.",
+      "captionPhrases": [
+        {
+          "text": "You find a job",
+          "style": "bold"
+        },
+        {
+          "text": "that looks perfect.",
+          "style": "serif"
+        }
+      ]
+    },
+    {
+      "id": "checklist",
+      "layout": "checklist",
+      "vo": "Great company. Right role. You tick the boxes.",
+      "headline": "TICK THE BOXES.",
+      "background": "ivory",
+      "presenter": "right",
+      "expression": "happy",
+      "gesture": "approval",
+      "evidence": [],
+      "newInformation": "The role appears to meet the viewer\u2019s priorities.",
+      "visualMetaphor": "Three large checkmarks land one by one.",
+      "transition": "The checklist misses one detail.",
+      "captionPhrases": [
+        {
+          "text": "Great company.",
+          "style": "bold"
+        },
+        {
+          "text": "Right role.",
+          "style": "bold"
+        },
+        {
+          "text": "You tick the boxes.",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "detail",
+      "layout": "detail",
+      "vo": "Then you notice one tiny detail.",
+      "headline": "one tiny detail.",
+      "background": "clay",
+      "presenter": "left",
+      "expression": "focused",
+      "gesture": "thinking_hand",
+      "evidence": [],
+      "newInformation": "Posting age is the overlooked detail.",
+      "visualMetaphor": "A small timestamp sits in a large empty frame.",
+      "transition": "A hard cut magnifies the detail.",
+      "captionPhrases": [
+        {
+          "text": "Then you notice",
+          "style": "bold"
+        },
+        {
+          "text": "one tiny detail.",
+          "style": "serif"
+        }
+      ]
+    },
+    {
+      "id": "stale",
+      "layout": "stale",
+      "vo": "Posted three days ago.",
+      "headline": "THREE DAYS AGO.",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "concerned",
+      "gesture": "open_palm",
+      "evidence": [
+        "older-age"
+      ],
+      "newInformation": "The captured older posting says three days ago.",
+      "visualMetaphor": "The age takes over the entire frame with its original pixel strip.",
+      "transition": "Return to the presenter for the emotional consequence.",
+      "captionPhrases": []
+    },
+    {
+      "id": "reaction",
+      "layout": "reaction",
+      "vo": "How did you miss it?",
+      "headline": "HOW DID YOU MISS IT?",
+      "background": "clay",
+      "presenter": "close",
+      "expression": "concerned",
+      "gesture": "thinking_hand",
+      "evidence": [],
+      "newInformation": "Repeated searching still feels like missed timing.",
+      "visualMetaphor": "The presenter leans into the unanswered question.",
+      "transition": "An empty cream reset introduces the product.",
+      "captionPhrases": [
+        {
+          "text": "How did you miss it?",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "meet",
+      "layout": "meet",
+      "vo": "Meet Solomon.",
+      "headline": "Meet Solomon.",
+      "background": "ivory",
+      "presenter": "center",
+      "expression": "friendly",
+      "gesture": "wave",
+      "evidence": [],
+      "newInformation": "Solomon is the product being introduced.",
+      "visualMetaphor": "A clean wordmark and presenter entrance reset the tension.",
+      "transition": "Explain what feeds the product.",
+      "captionPhrases": [
+        {
+          "text": "Meet Solomon.",
+          "style": "serif"
+        }
+      ]
+    },
+    {
+      "id": "profile",
+      "layout": "profile",
+      "vo": "Your profile tells it what you\u2019re looking for.",
+      "headline": "YOUR PROFILE.",
+      "background": "sage",
+      "presenter": "right",
+      "expression": "friendly",
+      "gesture": "true_point_left",
+      "evidence": [
+        "automatic"
+      ],
+      "newInformation": "Automatic discovery uses the profile.",
+      "visualMetaphor": "Criteria chips merge into a single profile object; labelled illustration.",
+      "transition": "The profile becomes a source for the feed.",
+      "captionPhrases": [
+        {
+          "text": "Your profile tells it",
+          "style": "bold"
+        },
+        {
+          "text": "what you\u2019re looking for.",
+          "style": "serif"
+        }
+      ]
+    },
+    {
+      "id": "automatic",
+      "layout": "automatic",
+      "vo": "New jobs populate your feed automatically.",
+      "headline": "automatically.",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "friendly",
+      "gesture": "open_palm",
+      "evidence": [
+        "automatic"
+      ],
+      "newInformation": "The actual product describes automatic population of the feed.",
+      "visualMetaphor": "The product\u2019s own explanation appears as an enlarged proof strip.",
+      "transition": "Show the benefit of not repeating the search.",
+      "captionPhrases": [
+        {
+          "text": "New jobs populate",
+          "style": "bold"
+        },
+        {
+          "text": "your feed automatically.",
+          "style": "serif"
+        }
+      ]
+    },
+    {
+      "id": "leave",
+      "layout": "leave",
+      "vo": "So you don\u2019t have to keep running the same search.",
+      "headline": "THE SAME SEARCH.",
+      "background": "ivory",
+      "presenter": "left",
+      "expression": "skeptical",
+      "gesture": "wave",
+      "evidence": [
+        "automatic"
+      ],
+      "newInformation": "Automatic population reduces the need to repeat discovery.",
+      "visualMetaphor": "Repeated query cards collapse; the presenter exits while the profile remains.",
+      "transition": "Return to the application rather than promising instant alerts.",
+      "captionPhrases": [
+        {
+          "text": "So you don\u2019t have to",
+          "style": "bold"
+        },
+        {
+          "text": "keep running",
+          "style": "bold"
+        },
+        {
+          "text": "the same search.",
+          "style": "serif"
+        }
+      ]
+    },
+    {
+      "id": "feed",
+      "layout": "feed",
+      "vo": "Come back. Open your feed.",
+      "headline": "OPEN YOUR FEED.",
+      "background": "sage",
+      "presenter": "center",
+      "expression": "friendly",
+      "gesture": "presentation_palm",
+      "evidence": [
+        "feed-context",
+        "recent-role"
+      ],
+      "newInformation": "The feed contains concrete role listings.",
+      "visualMetaphor": "A wide application view cuts to one authentic job headline above the returning presenter.",
+      "transition": "Magnify that listing\u2019s age.",
+      "captionPhrases": [
+        {
+          "text": "Come back.",
+          "style": "serif"
+        },
+        {
+          "text": "Open your feed.",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "fresh",
+      "layout": "fresh",
+      "vo": "This one\u2019s thirteen hours old.",
+      "headline": "THIRTEEN HOURS OLD.",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "happy",
+      "gesture": "open_palm",
+      "evidence": [
+        "recent-age"
+      ],
+      "newInformation": "The second captured listing says thirteen hours ago.",
+      "visualMetaphor": "A large thirteen replaces the three-day motif, backed by source pixels.",
+      "transition": "Show the real sorting control.",
+      "captionPhrases": []
+    },
+    {
+      "id": "sort",
+      "layout": "sort",
+      "vo": "Sort by newest first.",
+      "headline": "NEWEST FIRST.",
+      "background": "ivory",
+      "presenter": "right",
+      "expression": "focused",
+      "gesture": "true_point_left",
+      "evidence": [
+        "sort"
+      ],
+      "newInformation": "The product offers Newest First sorting.",
+      "visualMetaphor": "The authentic select control grows to readable scale.",
+      "transition": "Contrast two different listings explicitly.",
+      "captionPhrases": [
+        {
+          "text": "Sort by",
+          "style": "serif"
+        },
+        {
+          "text": "newest first.",
+          "style": "bold"
+        }
+      ]
+    },
+    {
+      "id": "compare",
+      "layout": "compare",
+      "vo": "Different listings. Days old, or hours old.",
+      "headline": "DAYS. OR HOURS.",
+      "background": "clay",
+      "presenter": "absent",
+      "expression": "friendly",
+      "gesture": "open_palm",
+      "evidence": [
+        "older-age",
+        "recent-age"
+      ],
+      "newInformation": "The ages belong to two different jobs and dated captures.",
+      "visualMetaphor": "The old age sinks; the newer age rises. Both source strips stay visible.",
+      "transition": "The age contrast prompts a better habit.",
+      "captionPhrases": []
+    },
+    {
+      "id": "question",
+      "layout": "question",
+      "vo": "Now ask a better question. What changed?",
+      "headline": "What changed?",
+      "background": "charcoal",
+      "presenter": "absent",
+      "expression": "direct_cta",
+      "gesture": "open_palm",
+      "evidence": [],
+      "newInformation": "Ask what changed instead of repeating the same search.",
+      "visualMetaphor": "A crossed-out old question is replaced with one large new question.",
+      "transition": "The question resolves into the human payoff.",
+      "captionPhrases": []
+    },
+    {
+      "id": "payoff",
+      "layout": "payoff",
+      "vo": "Finding the right job matters. Finding it fresh matters too.",
+      "headline": "right. and fresh.",
+      "background": "ivory",
+      "presenter": "left",
+      "expression": "happy",
+      "gesture": "approval",
+      "evidence": [],
+      "newInformation": "Suitability and freshness are separate things to consider.",
+      "visualMetaphor": "Two short phrases become a balanced pair.",
+      "transition": "Close with a calm callback to less searching.",
+      "captionPhrases": [
+        {
+          "text": "Finding the right job matters.",
+          "style": "bold"
+        },
+        {
+          "text": "Finding it fresh matters too.",
+          "style": "serif"
+        }
+      ]
+    },
+    {
+      "id": "end",
+      "layout": "end",
+      "vo": "Search less. Find what matters. Meet Solomon.",
+      "headline": "Search less.",
+      "background": "sage",
+      "presenter": "center",
+      "expression": "friendly",
+      "gesture": "wave",
+      "evidence": [],
+      "newInformation": "Solomon is associated with less repetitive searching.",
+      "visualMetaphor": "The last card closes; only the presenter and the brand remain.",
+      "transition": "End without an unverified URL or delivery promise.",
+      "captionPhrases": []
+    }
+  ]
+}
