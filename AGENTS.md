@@ -31,6 +31,7 @@ Do not expand the MVP into avatar generation, social posting, autonomous publish
 - Security rules: docs/security-rules.md
 - Design system: docs/design-system.md
 - Meet Solomon people campaigns: docs/meet-solomon-people-campaigns.md
+- Meet Solomon people campaigns V2: docs/meet-solomon-people-campaigns-v2.md
 - Structured product-flow capture plan: docs/product-flow-capture-plan.md
 - Structured capture implementation status: docs/product-flow-capture-implementation.md
 - Structured capture requirement audit: docs/product-flow-capture-requirement-audit.md
@@ -175,6 +176,7 @@ Verified against package.json: 91 of the 92 script commands below exist (`db:see
 - pnpm creator:meet:solomon:law-internships:v2
 - pnpm creator:meet:solomon:campaigns
 - pnpm creator:meet:solomon:people-campaigns
+- pnpm creator:meet:solomon:people-campaigns:v2
 - pnpm test:meet:solomon
 - pnpm test:masked-presenter
 - pnpm test:creator-editorial
