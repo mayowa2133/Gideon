@@ -23,8 +23,10 @@ const run = promisify(execFile);
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { buildFilmScenes } = require("../dist/main/shared/creatorStoryFilm.js");
+const { planSoundDesign } = require("../dist/main/shared/creatorStorySoundDesign.js");
 const { SPEECH_RATE_BAND, MIN_SCENE_FRAMES } = require("../dist/main/shared/creatorStoryQuality.js");
 const { RESTING_TRIM } = require("../dist/main/shared/angleBlueprint.js");
+const { mixSoundDesign } = require("../dist/main/main/soundDesignMix.js");
 
 const FPS = 30;
 const args = process.argv.slice(2);
@@ -34,7 +36,10 @@ const flag = (name, fallback) => {
 };
 const inDir = path.resolve(flag("in", path.join(root, "tmp", "creator-story")));
 const outDir = path.resolve(flag("out", path.join(inDir, "render")));
-// The sound design the V22 capture produced. Nothing else is borrowed from it.
+// The V22 capture's stills, for the shipped fixture inventory that names no
+// images of its own. Nothing else is borrowed from it any more: its
+// sound-design.wav used to be copied under every film too, and its cues were
+// frame numbers for a different cut.
 const referenceDir = path.join(root, "tmp", "solomon-creator-story-v22-performance", "remotion-public");
 // This film's own public directory, assembled per render.
 //
@@ -105,8 +110,6 @@ for (const [name, crop] of wanted) {
   }
 }
 process.stdout.write(`published ${wanted.size} product still(s) from ${path.relative(root, inventoryPath)}\n`);
-const soundDesign = path.join(referenceDir, "sound-design.wav");
-if (existsSync(soundDesign)) await fs.copyFile(soundDesign, path.join(publicDir, "sound-design.wav"));
 
 const ffprobeDuration = async (file) => {
   const { stdout } = await run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file]);
@@ -290,10 +293,21 @@ for (const beat of estimated) process.stdout.write(`  estimated ${beat.id}: ${be
 const durationInFrames = scenes.at(-1).to;
 process.stdout.write(`${scenes.length} scenes, ${durationInFrames} frames (${(durationInFrames / FPS).toFixed(2)}s), ${captions.length} captions\n`);
 
+// Sound effects from the scenes the film is about to draw, mixed from the
+// bundled library. The plan is made after the boundaries are realized, so a
+// cue sits where its scene actually starts, not where the blueprint guessed it
+// would. The receipt travels with the render like the caption alignment does:
+// a track copied from another film looks exactly like one cut for this one.
+const soundCues = planSoundDesign(blueprint, scenes, FPS);
+const soundDesign = await mixSoundDesign({ cues: soundCues, durationInFrames, fps: FPS, outputPath: path.join(publicDir, "sound-design.wav") });
+await fs.writeFile(path.join(outDir, "sound-design-plan.json"), `${JSON.stringify(soundDesign, null, 2)}\n`);
+process.stdout.write(`sound design: ${soundCues.length} cue(s)\n`);
+for (const cue of soundCues) process.stdout.write(`  ${String(cue.frame).padStart(5)}  ${cue.kind.padEnd(8)} ${cue.sceneId} -- ${cue.reason}\n`);
+
 const inputProps = {
   scenes, captions,
   narrationSrc: "generated-narration.wav",
-  soundDesignSrc: existsSync(path.join(publicDir, "sound-design.wav")) ? "sound-design.wav" : undefined,
+  soundDesignSrc: "sound-design.wav",
   disclosure: { fromFrame: 45, durationInFrames: Math.max(1, durationInFrames - 196) }
 };
 await fs.writeFile(path.join(outDir, "input-props.json"), `${JSON.stringify(inputProps, null, 2)}\n`);

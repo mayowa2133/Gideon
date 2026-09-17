@@ -408,6 +408,17 @@ node scripts/render-creator-story.mjs --in tmp/creator-story-mkt
   whisper supplies when, never what. `caption-alignment.json` records the source
   and coverage per beat, because a track that was quietly estimated looks exactly
   like one that was aligned.
+- **The sound design is cut from this film's scenes.** It used to be
+  `sound-design.wav` copied out of the V22 reference directory -- twelve tones at
+  frame numbers authored for a different 36-second cut, laid under whatever had
+  just been compiled, with a click landing mid-face and a reveal hit on a plain
+  cut. `planSoundDesign` (`src/shared/creatorStorySoundDesign.ts`) now reads the
+  realized `FilmScene[]` and places a `card` where a product crop enters, a
+  `success` on a state swap, an `impact` on a big-number reveal and a `sting`
+  on a CTA card; the hook and a held-face ending stay silent. The cues are
+  mixed from `assets/sfx/` and `sound-design-plan.json` records each cue's
+  frame, reason and library asset hash. Levels are marked `untuned` in that
+  receipt until someone has listened.
 
 Rules the compiler enforces, and why they are not negotiable:
 
