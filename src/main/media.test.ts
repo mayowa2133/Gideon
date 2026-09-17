@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { createMoments, generateConcepts, generateScripts, splitCaptionSegments } from "../shared/contentEngine";
 import { buildEditDecisionList, buildVisualBeatsForTemplate, creatorTemplatePack } from "../shared/renderTemplates";
 import type { ProductProfile } from "../shared/types";
+import { loadSfxLibrary, resolveSfxCues } from "./sfxLibrary";
 import {
   buildAudioMixFilter,
   calloutTextFromInstruction,
@@ -290,15 +291,35 @@ describe("media pipeline", () => {
     expect(expressions.cropY).toContain("0.5+(between(t\\,0.000\\,1.800))*-0.300");
   });
 
-  it("builds optional music and SFX audio mix filters from the render manifest", () => {
+  it("mixes SFX from library inputs after the voice track, never from tones", async () => {
     const script = draftScript();
-    const filter = buildAudioMixFilter(script.editDecisionList!, 12);
+    const library = await loadSfxLibrary(path.resolve("assets", "sfx"));
+    const cues = resolveSfxCues(script.editDecisionList!.sfx, library);
+    const filter = buildAudioMixFilter(script.editDecisionList!, 12, 2, cues);
 
     expect(script.editDecisionList!.music.enabled).toBe(true);
-    expect(script.editDecisionList!.sfx.length).toBeGreaterThan(0);
+    expect(cues.length).toBeGreaterThan(0);
+    // The music bed is still a tone; the sound effects are not.
     expect(filter).toContain("sine=frequency=220");
-    expect(filter).toContain("adelay=");
-    expect(filter).toContain("amix=inputs=");
+    expect(filter.match(/sine=/g)).toHaveLength(1);
+    cues.forEach((cue, index) => {
+      expect(filter).toContain(`[${3 + index}:a]aresample=44100,aformat=channel_layouts=stereo,volume=${(cue.gainDb + cue.gainTrimDb).toFixed(2)}dB,adelay=${Math.round(cue.startMs)}|${Math.round(cue.startMs)}`);
+      expect(filter).toContain(`[sfx${index}]`);
+    });
+    expect(filter).toContain(`amix=inputs=${2 + cues.length}`);
+  });
+
+  it("refuses to build a mix whose SFX were not resolved against the library", () => {
+    const script = draftScript();
+    expect(script.editDecisionList!.sfx.length).toBeGreaterThan(0);
+    expect(() => buildAudioMixFilter(script.editDecisionList!, 12, 2, [])).toThrow(/resolved against the library/);
+  });
+
+  it("rejects a render manifest with an SFX kind the library does not know", () => {
+    const script = draftScript();
+    const manifest = structuredClone(script.editDecisionList!);
+    (manifest.sfx[0] as { kind: string }).kind = "kazoo";
+    expect(() => validateRenderManifest(manifest)).toThrow(/unsupported kind "kazoo"/);
   });
 
   it("rejects render QA samples when every sampled frame is visually empty", () => {
@@ -400,6 +421,14 @@ describe("media pipeline", () => {
     expect(rendered.validation.audioCodec).toBe("aac");
     expect(rendered.validation.frameQa).toMatchObject({ sampledFrames: 3 });
     expect(rendered.validation.frameQa?.informativeFrames).toBeGreaterThan(0);
+    // The receipt names the library assets the mix used, and only those.
+    const library = await loadSfxLibrary(path.resolve("assets", "sfx"));
+    expect(rendered.validation.sfxMix?.length).toBe(Math.min(12, script!.editDecisionList!.sfx.length));
+    for (const cue of rendered.validation.sfxMix ?? []) {
+      const entry = library.entries.find(({ id }) => id === cue.asset.id);
+      expect(entry?.sha256).toBe(cue.asset.sha256);
+      expect(entry?.kind).toBe(cue.kind);
+    }
     const overlayFrames = await fs.readdir(path.join(tempDir, "renders", script!.id, "overlay-frames"));
     expect(overlayFrames.filter((fileName) => fileName.endsWith(".png")).length).toBeGreaterThan(1);
     const signal = await run(ffmpeg!, [

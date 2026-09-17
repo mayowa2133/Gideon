@@ -734,11 +734,17 @@ export interface RenderCursorCue {
   confidence: number;
 }
 
+// The seven kinds are the vocabulary a script or template can ask for; which
+// file plays is decided at render time from assets/sfx/manifest.json and
+// written back as `asset`, so a stored manifest names the exact bytes it mixed.
+export type RenderSfxKind = "click" | "pop" | "whoosh" | "card" | "impact" | "success" | "sting";
+
 export interface RenderSfxCue {
   id: string;
-  kind: "click" | "pop" | "whoosh";
+  kind: RenderSfxKind;
   startMs: number;
   gainDb: number;
+  asset?: { id: string; sha256: string };
 }
 
 export interface BrandPresenterLayer {
@@ -1285,6 +1291,9 @@ export interface RenderValidation {
   layoutQa?: RenderLayoutQa;
   typographyQa?: RenderTypographyQa;
   visualReadinessQa?: RenderVisualReadinessQa;
+  // The sound effects the render mixed, each pinned to the library asset it
+  // came from. Re-rendering with a changed library is refused, not guessed.
+  sfxMix?: Array<Required<Pick<RenderSfxCue, "id" | "kind" | "startMs" | "gainDb" | "asset">>>;
 }
 
 export interface VisualQaFinding {
