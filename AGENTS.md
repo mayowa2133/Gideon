@@ -93,6 +93,8 @@ Verified against package.json: 91 of the 92 script commands below exist (`db:see
 
 - pnpm install
 - pnpm lint
+- pnpm sfx:manifest (regenerates assets/sfx/manifest.json from the files on disk)
+- pnpm sfx:manifest:check (exit 1 if the manifest no longer matches the files)
 - pnpm typecheck
 - pnpm test
 - pnpm test:capture
@@ -226,6 +228,7 @@ Follow docs/security-rules.md. Key constraints:
 - Never trust user-provided object keys or filenames.
 - Keep FFmpeg stderr out of user-facing responses.
 - Add fixture tests for media behavior.
+- Sound effects come from the bundled CC0 library in `assets/sfx/` and are resolved by kind at render time; the render refuses a missing, tampered or incomplete library rather than falling back to a tone. Never hand-edit `assets/sfx/manifest.json`; run `pnpm sfx:manifest`. Music is not bundled.
 - Preserve independently selectable creator-editorial versions. New creator formats must not silently change V1–V5 outputs.
 - User-story creator formats must use isolated authenticated product micro-scenes as supporting proof, with presenter resets between concepts; continuous cursor-following and connected workflow navigation are not the default.
 - Creator-editorial product claims must fail closed against approved asset hashes and verified source intervals; conceptual graphics must remain disclosed and visually distinct from product pixels.

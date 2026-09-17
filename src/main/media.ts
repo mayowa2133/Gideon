@@ -28,6 +28,7 @@ import { inspectCreatorVideoTemporalQa } from "./creatorVideoTemporalQuality";
 import { buildVisualReadinessQa, treatmentContentLines } from "./creatorVideoVisualReadiness";
 import { executeSceneRenderCache, type SceneCacheContext } from "./sceneRenderCache";
 import { checkViseme2dAssetPacks } from "./viseme2dAvatarWorker";
+import { SFX_KINDS, loadSfxLibrary, resolveSfxCues, type ResolvedSfxCue, type SfxLibrary } from "./sfxLibrary";
 import { normalizePronunciationDictionary, pronunciationDictionaryHash } from "../shared/pronunciation";
 import { CLICK_FEEDBACK_MS, easePointerPosition } from "../shared/creatorVideoInteraction";
 import { createHash } from "node:crypto";
@@ -91,7 +92,15 @@ interface RenderDraftInput {
   sceneCacheContext?: Partial<SceneCacheContext>;
   skipBlueprintValidation?: boolean;
   skipPostRenderQa?: boolean;
+  // Loaded once per film by the scene-cache path so ten segment renders do
+  // not re-hash the library ten times. A whole-film render loads its own.
+  sfxLibrary?: SfxLibrary;
 }
+
+// At most this many cues reach the mix. It was the cap on the sine-tone
+// version too; a twenty-second draft with more than twelve sound effects is a
+// script problem, not a mixing one.
+const MAX_SFX_CUES = 12;
 
 export async function getToolAvailability(): Promise<{
   ffmpegAvailable: boolean;
@@ -242,6 +251,10 @@ async function renderDraftWhole(input: RenderDraftInput): Promise<{
   const sourceDurationSec = timeline.durationSec;
 
   validateRenderManifest(editDecisionList, input.skipBlueprintValidation);
+  // Resolved before any frame is drawn: a missing or tampered library fails
+  // the render here, in seconds, not after the overlay sequence is built.
+  const sfxLibrary = input.sfxLibrary ?? await loadSfxLibrary();
+  const sfxCues = resolveSfxCues(editDecisionList.sfx.slice(0, MAX_SFX_CUES), sfxLibrary);
   const overlaySequence = await createTimedOverlaySequence(
     input.profile,
     input.script,
@@ -268,12 +281,16 @@ async function renderDraftWhole(input: RenderDraftInput): Promise<{
     avatarPresenter ? "[base][overlay]overlay=0:0:shortest=1[base_decorated]" : "[base][overlay]overlay=0:0:shortest=1[v]",
     ...presenterFilters.filters,
     ...(avatarPresenter ? [`[${presenterFilters.outputLabel}]null[v]`] : []),
-    buildAudioMixFilter(editDecisionList, sourceDurationSec, audioInputIndex)
+    buildAudioMixFilter(editDecisionList, sourceDurationSec, audioInputIndex, sfxCues)
   ].join(";");
 
   const presenterInputArgs = avatarPresenter
     ? ["-stream_loop", "-1", "-i", avatarPresenter.path]
     : [];
+  // One input per cue, after the voice track, so the mix filter can address
+  // them as [audioInputIndex+1:a] onward. A path is an argv element here and
+  // never part of the filter string, so it needs no escaping.
+  const sfxInputArgs = sfxCues.flatMap((cue) => ["-i", cue.filePath]);
 
   await runCommand(resolveFfmpeg(), [
     "-hide_banner",
@@ -291,6 +308,7 @@ async function renderDraftWhole(input: RenderDraftInput): Promise<{
     ...presenterInputArgs,
     "-i",
     audioInput,
+    ...sfxInputArgs,
     "-filter_complex",
     filter,
     "-map",
@@ -321,11 +339,18 @@ async function renderDraftWhole(input: RenderDraftInput): Promise<{
   if (!input.skipPostRenderQa) await normalizeRenderedAudio(outputPath);
   const validation = input.skipPostRenderQa ? await probeBasicRenderValidation(outputPath) : await validateRenderedVideo(outputPath, editDecisionList.creativeBlueprint, editDecisionList);
   validateRenderedTimeline(validation, sourceDurationSec);
+  validation.sfxMix = sfxMixReceipt(sfxCues);
   return {
     outputPath,
     outputUrl: pathToFileURL(outputPath).toString(),
     validation
   };
+}
+
+// What the mix actually contained, by asset id and hash -- not the library
+// path, which is a private location and belongs in no stored record.
+function sfxMixReceipt(cues: ResolvedSfxCue[]): NonNullable<RenderValidation["sfxMix"]> {
+  return cues.map(({ id, kind, startMs, gainDb, asset }) => ({ id, kind, startMs, gainDb, asset }));
 }
 
 async function renderDraftWithSceneCache(input: RenderDraftInput, blueprint: import("../shared/types").CreativeBlueprint): Promise<{ outputPath: string; outputUrl: string; validation: RenderValidation; sceneCache: import("../shared/types").SceneRenderCacheReport }> {
@@ -334,14 +359,22 @@ async function renderDraftWithSceneCache(input: RenderDraftInput, blueprint: imp
   await fs.mkdir(renderDir, { recursive: true, mode: 0o700 });
   const outputPath = path.join(renderDir, safeFileName(`${input.title}.mp4`));
   const fullVoiceoverPath = await ensureSceneCacheVoiceover(input, cacheDir, blueprint.targetDurationMs / 1000);
-  const editDecisionList = ensureEditDecisionList(input.profile, input.script, input.moment);
-  validateRenderManifest(editDecisionList);
+  const baseEditDecisionList = ensureEditDecisionList(input.profile, input.script, input.moment);
+  validateRenderManifest(baseEditDecisionList);
+  // Cues are resolved once for the whole film and pinned, so the click that
+  // alternates between two voices alternates across scenes rather than
+  // restarting at the first voice in every segment. The per-scene render then
+  // honours the pinned asset instead of choosing again.
+  const sfxLibrary = input.sfxLibrary ?? await loadSfxLibrary();
+  const sfxCues = resolveSfxCues(baseEditDecisionList.sfx.slice(0, MAX_SFX_CUES), sfxLibrary);
+  const editDecisionList: EditDecisionList = { ...baseEditDecisionList, sfx: sfxCues.map(({ id, kind, startMs, gainDb, asset }) => ({ id, kind, startMs, gainDb, asset })) };
   const context: SceneCacheContext = {
     sourceRecordingHash: input.sceneCacheContext?.sourceRecordingHash ?? input.recording.sha256 ?? await hashFile(input.recording.filePath),
     productAssetHashes: input.sceneCacheContext?.productAssetHashes ?? Object.fromEntries(blueprint.productAssets.map((asset) => [asset.id, asset.contentHash ?? "unmaterialized"])),
     avatarHash: input.sceneCacheContext?.avatarHash ?? (normalizedAvatarPresenter(input) ? await hashFile(normalizedAvatarPresenter(input)!.path) : "deterministic-fixture"),
     narrationHash: input.sceneCacheContext?.narrationHash ?? await hashFile(fullVoiceoverPath),
-    pronunciationDictionaryHash: input.sceneCacheContext?.pronunciationDictionaryHash ?? pronunciationDictionaryHash(normalizePronunciationDictionary(input.profile.pronunciationDictionary))
+    pronunciationDictionaryHash: input.sceneCacheContext?.pronunciationDictionaryHash ?? pronunciationDictionaryHash(normalizePronunciationDictionary(input.profile.pronunciationDictionary)),
+    sfxLibraryHash: input.sceneCacheContext?.sfxLibraryHash ?? sfxLibrary.hash
   };
   const sceneCache = await executeSceneRenderCache({
     scriptId: input.script.id,
@@ -355,7 +388,7 @@ async function renderDraftWithSceneCache(input: RenderDraftInput, blueprint: imp
       const sceneAudio = path.join(cacheDir, `.audio-${safeFileName(scene.id)}-${process.pid}.m4a`);
       await runCommand(resolveFfmpeg(), ["-hide_banner", "-loglevel", "error", "-y", "-ss", (scene.startMs / 1000).toFixed(3), "-i", fullVoiceoverPath, "-t", ((scene.endMs - scene.startMs) / 1000).toFixed(3), "-c:a", "aac", "-b:a", "160k", sceneAudio]);
       try {
-        const rendered = await renderDraftWhole({ ...input, projectDir: path.join(cacheDir, "work"), script: localized, title: scene.id, voiceoverPath: sceneAudio, sceneIds: undefined, skipBlueprintValidation: true, skipPostRenderQa: true });
+        const rendered = await renderDraftWhole({ ...input, sfxLibrary, projectDir: path.join(cacheDir, "work"), script: localized, title: scene.id, voiceoverPath: sceneAudio, sceneIds: undefined, skipBlueprintValidation: true, skipPostRenderQa: true });
         await fs.copyFile(rendered.outputPath, temporaryPath);
       } finally { await fs.rm(sceneAudio, { force: true }); }
     },
@@ -365,6 +398,7 @@ async function renderDraftWithSceneCache(input: RenderDraftInput, blueprint: imp
   await normalizeRenderedAudio(outputPath, blueprint.renderPolicy.targetLufs);
   const validation = await validateRenderedVideo(outputPath, blueprint, editDecisionList);
   validateRenderedTimeline(validation, blueprint.targetDurationMs / 1000);
+  validation.sfxMix = sfxMixReceipt(sfxCues);
   return { outputPath, outputUrl: pathToFileURL(outputPath).toString(), validation, sceneCache };
 }
 
@@ -761,7 +795,15 @@ async function createSilentAudio(outputPath: string, durationSec: number): Promi
   ]);
 }
 
-export function buildAudioMixFilter(editDecisionList: EditDecisionList, durationSec: number, audioInputIndex = 2): string {
+// The sound effects are ffmpeg inputs [audioInputIndex+1 ...], one per
+// resolved cue in order. They are passed in resolved rather than read off the
+// manifest so that a caller cannot reach the mix with cues nobody checked
+// against the library -- the count has to match, or this refuses to build.
+export function buildAudioMixFilter(editDecisionList: EditDecisionList, durationSec: number, audioInputIndex = 2, sfx: ResolvedSfxCue[] = []): string {
+  const expectedCues = Math.min(editDecisionList.sfx.length, MAX_SFX_CUES);
+  if (sfx.length !== expectedCues) {
+    throw new Error(`Render manifest has ${expectedCues} SFX cue(s) but ${sfx.length} were resolved against the library.`);
+  }
   const duration = durationSec.toFixed(3);
   const filters = [
     `[${audioInputIndex}:a]apad,atrim=0:${duration},asetpts=N/SR/TB,aresample=44100,aformat=channel_layouts=stereo[voice]`
@@ -774,13 +816,15 @@ export function buildAudioMixFilter(editDecisionList: EditDecisionList, duration
     );
     layerLabels.push("[music]");
   }
-  editDecisionList.sfx.slice(0, 12).forEach((cue, index) => {
-    const tone = sfxTone(cue.kind);
+  sfx.forEach((cue, index) => {
     const delayMs = Math.max(0, Math.round(cue.startMs));
+    // Stereo before adelay: the library files are mono and adelay wants one
+    // delay per channel. The trim brings every file to the same peak, so the
+    // cue's gainDb means the same thing whichever file it resolved to.
     filters.push(
-      `sine=frequency=${tone.frequency}:duration=${tone.durationSec.toFixed(3)}:sample_rate=44100,` +
-      `volume=${cue.gainDb}dB,adelay=${delayMs}|${delayMs},apad,atrim=0:${duration},` +
-      `aformat=channel_layouts=stereo[sfx${index}]`
+      `[${audioInputIndex + 1 + index}:a]aresample=44100,aformat=channel_layouts=stereo,` +
+      `volume=${(cue.gainDb + cue.gainTrimDb).toFixed(2)}dB,adelay=${delayMs}|${delayMs},apad,atrim=0:${duration},` +
+      `asetpts=N/SR/TB[sfx${index}]`
     );
     layerLabels.push(`[sfx${index}]`);
   });
@@ -798,16 +842,6 @@ function musicFrequency(mood: EditDecisionList["music"]["mood"]): number {
     return 330;
   }
   return 220;
-}
-
-function sfxTone(kind: EditDecisionList["sfx"][number]["kind"]): { frequency: number; durationSec: number } {
-  if (kind === "pop") {
-    return { frequency: 660, durationSec: 0.09 };
-  }
-  if (kind === "whoosh") {
-    return { frequency: 440, durationSec: 0.16 };
-  }
-  return { frequency: 980, durationSec: 0.055 };
 }
 
 interface OverlaySequence {
@@ -1896,6 +1930,11 @@ function validateSfxCueTimings(sfx: EditDecisionList["sfx"], durationMs: number)
   sfx.forEach((cue, index) => {
     if (cue.startMs < 0 || cue.startMs >= durationMs || cue.gainDb < -60 || cue.gainDb > 0) {
       throw new Error(`SFX cue ${index + 1} is outside the supported render range.`);
+    }
+    // Manifests come back from the store as JSON; the kind is a trust
+    // boundary, not a type.
+    if (!(SFX_KINDS as readonly string[]).includes(cue.kind)) {
+      throw new Error(`SFX cue ${index + 1} has unsupported kind "${String(cue.kind)}".`);
     }
   });
 }

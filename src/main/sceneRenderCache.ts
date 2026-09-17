@@ -3,7 +3,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { CreativeBlueprint, SceneComposition, SceneRenderCacheEntry, SceneRenderCacheReport } from "../shared/types";
 
-export const CREATOR_SCENE_RENDERER_VERSION = "creator-scene-renderer-v8";
+// v9: sound effects are library files instead of sine tones, so every v8
+// segment carries audio this renderer no longer produces.
+export const CREATOR_SCENE_RENDERER_VERSION = "creator-scene-renderer-v9";
 
 export interface SceneCacheContext {
   sourceRecordingHash: string;
@@ -11,6 +13,7 @@ export interface SceneCacheContext {
   avatarHash: string;
   narrationHash: string;
   pronunciationDictionaryHash: string;
+  sfxLibraryHash: string;
 }
 
 interface StoredManifest { schemaVersion: "1"; rendererVersion: string; scriptId: string; entries: SceneRenderCacheEntry[] }
@@ -73,7 +76,7 @@ export async function executeSceneRenderCache(input: ExecuteSceneRenderCacheInpu
 export function sceneRenderCacheKey(blueprint: CreativeBlueprint, scene: SceneComposition, dependencySceneIds: string[], context: SceneCacheContext): string {
   const dependencies = dependencySceneIds.map((id) => blueprint.scenes.find((candidate) => candidate.id === id)).filter(Boolean);
   const assetIds = [...new Set([scene, ...dependencies].flatMap((item) => item!.productAssetIds))];
-  const payload = { rendererVersion: CREATOR_SCENE_RENDERER_VERSION, schemaVersion: blueprint.schemaVersion, templateId: blueprint.templateId, templateVersion: blueprint.templateVersion, scene, transitionDependencies: dependencies, sourceRecordingHash: context.sourceRecordingHash, productAssetHashes: Object.fromEntries(assetIds.sort().map((id) => [id, context.productAssetHashes[id] ?? "missing"])), avatarHash: context.avatarHash, narrationHash: context.narrationHash, pronunciationDictionaryHash: context.pronunciationDictionaryHash, narrationRange: { startMs: scene.startMs, endMs: scene.endMs }, captions: scene.captions, typography: scene.typography, renderPolicy: blueprint.renderPolicy, qualityPolicy: blueprint.qualityPolicy };
+  const payload = { rendererVersion: CREATOR_SCENE_RENDERER_VERSION, schemaVersion: blueprint.schemaVersion, templateId: blueprint.templateId, templateVersion: blueprint.templateVersion, scene, transitionDependencies: dependencies, sourceRecordingHash: context.sourceRecordingHash, productAssetHashes: Object.fromEntries(assetIds.sort().map((id) => [id, context.productAssetHashes[id] ?? "missing"])), avatarHash: context.avatarHash, narrationHash: context.narrationHash, pronunciationDictionaryHash: context.pronunciationDictionaryHash, sfxLibraryHash: context.sfxLibraryHash, narrationRange: { startMs: scene.startMs, endMs: scene.endMs }, captions: scene.captions, typography: scene.typography, renderPolicy: blueprint.renderPolicy, qualityPolicy: blueprint.qualityPolicy };
   return createHash("sha256").update(stableSerialize(payload)).digest("hex");
 }
 
