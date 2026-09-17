@@ -119,6 +119,15 @@ describe("creator video CreativeBlueprint", () => {
     const cta = first.blueprint.scenes.at(-1)!;
     expect(cta.shotType).toBe("cta_end_card");
     expect(cta.endMs - cta.startMs).toBe(4_500);
+    // The sound names what enters: the hook has none, a product shot is a
+    // card, the end card is the film's one sting. Before the library existed
+    // every scene got a pop or a whoosh and the CTA shared the whoosh.
+    expect(first.blueprint.scenes[0]!.audioCues).toEqual([]);
+    expect(cta.audioCues.map(({ kind }) => kind)).toEqual(["sting"]);
+    const productScenes = first.blueprint.scenes.slice(1).filter((scene) => ["product_hero", "product_fullscreen", "product_mockup", "comparison_card"].includes(scene.shotType));
+    expect(productScenes.length).toBeGreaterThan(0);
+    for (const scene of productScenes) expect(scene.audioCues.map(({ kind }) => kind), scene.id).toEqual(["card"]);
+    for (const scene of first.blueprint.scenes) for (const cue of scene.audioCues) expect(cue.startMs, cue.id).toBe(scene.startMs);
     expect(first.blueprint.scenes.every((scene, index) => index === 0 || scene.startMs === first.blueprint.scenes[index - 1]!.endMs)).toBe(true);
     expect(validateCreativeBlueprint(first.blueprint).filter((issue) => issue.severity === "blocking")).toEqual([]);
   });

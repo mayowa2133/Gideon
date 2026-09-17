@@ -5,7 +5,8 @@ import type {
   CreativeBlueprint,
   EditDecisionList,
   ProductEvidenceAsset,
-  RenderFocusPoint
+  RenderFocusPoint,
+  RenderSfxKind
 } from "./types";
 
 export const CREATOR_EDITORIAL_TEMPLATE_ID = "creator_editorial_v1" as const;
@@ -424,6 +425,21 @@ export function editorialChangedSceneIds(previous: CreatorEditorialEdl, next: Cr
   }).filter((id, index, all) => all.indexOf(id) === index);
 }
 
+// One render kind per editorial sound, and the same name where the names
+// overlap. Until the library existed the render only had three tones, so
+// card_entry, impact and outro_sting were all folded into "pop" here -- a
+// shot family that asked for a sting at the outro got the same beep as a
+// label appearing. Written as a table rather than a conditional so that
+// adding an editorial sound without a render kind is a type error, not a
+// silent fold into the default.
+export const EDITORIAL_SFX_KIND: Record<EditorialShot["soundEffects"][number], RenderSfxKind> = {
+  click: "click",
+  soft_whoosh: "whoosh",
+  card_entry: "card",
+  impact: "impact",
+  outro_sting: "sting"
+};
+
 export function projectCreatorEditorialOntoEditDecisionList(
   base: EditDecisionList,
   editorial: CreatorEditorialEdl
@@ -478,7 +494,7 @@ export function projectCreatorEditorialOntoEditDecisionList(
     ],
     sfx: editorial.shots.flatMap((shot) => shot.soundEffects.map((kind, index) => ({
       id: `editorial-sfx-${shot.id}-${index}`,
-      kind: kind === "click" ? "click" as const : kind === "soft_whoosh" ? "whoosh" as const : "pop" as const,
+      kind: EDITORIAL_SFX_KIND[kind],
       startMs: shot.startMs + 40 + index * 70,
       gainDb: -16
     }))),

@@ -12,6 +12,7 @@ import type {
   FrameEvidence,
   ProductEvidenceAsset,
   ProductProfile,
+  RenderSfxKind,
   SceneComposition,
   ScriptDraft
 } from "./types";
@@ -308,7 +309,10 @@ export function compileCreativeBlueprint(input: CompileCreativeBlueprintInput): 
         : productShot(shotType)
           ? template.productProofDwellMs.min
           : template.sceneDurationMs.min,
-      audioCues: index === 0 ? [] : [{ id: `sfx-${id}`, kind: transitionForIndex(index) === "wipe" ? "whoosh" : "pop", startMs: timing.startMs, gainDb: -18 }]
+      // The sound is named for what enters, not for the cut. A product shot
+      // is a card arriving; a wipe is a whoosh; anything else is a soft pop.
+      // The hook has no cue because the voice starting is the hook.
+      audioCues: index === 0 ? [] : [{ id: `sfx-${id}`, kind: sceneEntranceSfxKind(shotType, transitionForIndex(index)), startMs: timing.startMs, gainDb: -18 }]
     } satisfies SceneComposition;
   });
 
@@ -609,8 +613,16 @@ function createCtaScene(input: {
     transition: { kind: "match_cut", durationMs: 300 },
     focus: { x: 0.5, y: 0.4, scale: 1.2 },
     minimumReadableDwellMs: 4_500,
-    audioCues: [{ id: "sfx-cta", kind: "whoosh", startMs: input.startMs, gainDb: -20 }]
+    // The end card is the one moment the film asks for something; it lands
+    // with a sting, not the transition whoosh it used to share with every cut.
+    audioCues: [{ id: "sfx-cta", kind: "sting", startMs: input.startMs, gainDb: -20 }]
   };
+}
+
+function sceneEntranceSfxKind(shotType: CreatorShotType, transition: ReturnType<typeof transitionForIndex>): RenderSfxKind {
+  if (productShot(shotType)) return "card";
+  if (transition === "wipe") return "whoosh";
+  return "pop";
 }
 
 function preserveManualScene(scene: SceneComposition, startMs: number, endMs: number): SceneComposition {

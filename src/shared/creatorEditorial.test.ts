@@ -5,6 +5,7 @@ import {
   compileCreatorEditorial,
   creatorEditorialTemplateV1,
   editorialChangedSceneIds,
+  EDITORIAL_SFX_KIND,
   estimateWords,
   evaluateCreatorEditorial,
   projectCreatorEditorialOntoEditDecisionList,
@@ -216,5 +217,12 @@ describe("creator_editorial_v1", () => {
     expect(projected.captions.flatMap(({ words = [] }) => words).map(({ text }) => text).join(" ")).toBe(beats().map(({ text }) => text).join(" "));
     expect(projected.presenter.enabled).toBe(true);
     expect(projected.transitions.length).toBeGreaterThan(0);
+    // Every editorial sound keeps its own render kind. Three of the five used
+    // to fold into "pop", so the outro asked for a sting and got a label pop.
+    const bySound = new Map(editorial.shots.flatMap((shot) => shot.soundEffects.map((sound, index) => [`editorial-sfx-${shot.id}-${index}`, sound] as const)));
+    expect(projected.sfx.length).toBe(bySound.size);
+    for (const cue of projected.sfx) expect(cue.kind, cue.id).toBe(EDITORIAL_SFX_KIND[bySound.get(cue.id)!]);
+    expect(projected.sfx.map(({ kind }) => kind)).toEqual(expect.arrayContaining(["sting", "card", "impact"]));
+    expect(projected.sfx.filter(({ kind }) => kind === "sting")).toHaveLength(1);
   });
 });
